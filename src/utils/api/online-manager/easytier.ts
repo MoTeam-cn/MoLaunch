@@ -58,6 +58,11 @@ export function setGithubProxies(proxies: GithubProxy[]): Promise<{ success: boo
   return onlineManager<{ success: boolean }>(ONLINE_ACTIONS.SET_GITHUB_PROXIES, proxies)
 }
 
+/** 后端测速筛选镜像源（reqwest 并发测速 + 禁止重定向，不受前端 CSP 限制），返回最快的前 10 个 */
+export function probeGithubProxies(proxies: GithubProxy[]): Promise<GithubProxy[]> {
+  return onlineManager<GithubProxy[]>(ONLINE_ACTIONS.PROBE_GITHUB_PROXIES, proxies)
+}
+
 /** 房主一站式启动：探测 MC 端口 → 联机中心 → easytier */
 export function scaffoldingHostStart(
   params: ScaffoldingHostStartParams,

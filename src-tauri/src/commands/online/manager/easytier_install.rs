@@ -12,7 +12,7 @@ use crate::handler;
 use crate::log_warn;
 use crate::state::AppState;
 use crate::utils::dispatcher::Dispatcher;
-use crate::utils::github_download::GithubProxy;
+use crate::utils::github_download::{probe_fastest_proxies, GithubProxy};
 
 /// easytier GitHub 仓库
 pub(super) const EASYTIER_REPO: &str = "EasyTier/EasyTier";
@@ -24,6 +24,11 @@ const GITHUB_API_FALLBACK: &str = "https://github-api.mocdn.net";
 const EASYTIER_INSTALL_PROGRESS_EVENT: &str = "easytier-install-progress";
 /// 版本标记文件名
 pub(super) const VERSION_FILE: &str = "version.txt";
+/// 镜像源测速用固定版本（已知存在的 release，仅验证可用性与速度）
+const PROBE_VERSION: &str = "2.6.4";
+/// 镜像源测速抽样数 / 筛选上限
+const PROBE_SAMPLE: usize = 30;
+const PROXY_LIMIT: usize = 10;
 
 /// `easytier_install_status` 返回
 #[derive(Debug, Serialize)]
@@ -228,6 +233,26 @@ pub fn register(d: &mut Dispatcher) {
             })
             .await?;
             serde_json::to_value(serde_json::json!({ "success": true })).map_err(|e| e.to_string())
+        }),
+    );
+
+    // 镜像源测速筛选（后端 reqwest 测速，不受前端 CSP 限制；禁止重定向）
+    d.register(
+        "probe_github_proxies",
+        handler!(_state, _app, params, {
+            let proxies: Vec<GithubProxy> =
+                serde_json::from_value(params).map_err(|e| format!("参数解析失败: {e}"))?;
+            let asset = asset_name(PROBE_VERSION);
+            let picked = probe_fastest_proxies(
+                &proxies,
+                EASYTIER_REPO,
+                PROBE_VERSION,
+                &asset,
+                PROBE_SAMPLE,
+                PROXY_LIMIT,
+            )
+            .await;
+            serde_json::to_value(picked).map_err(|e| e.to_string())
         }),
     );
 }
