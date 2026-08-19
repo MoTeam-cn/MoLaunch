@@ -86,6 +86,15 @@ export interface GithubProxy {
   base: string
 }
 
+/** `github_probe` 返回：后端并发测速结果（按耗时升序，仅含可用源） */
+export interface ProxyProbeResult {
+  name: string
+  proxyType: string
+  base: string
+  /** 响应耗时（ms） */
+  ms: number
+}
+
 /** `scaffolding_host_start` 参数 */
 export interface ScaffoldingHostStartParams {
   /** 完整房间码 `U/NNNN-NNNN-SSSS-SSSS` */

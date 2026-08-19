@@ -11,6 +11,7 @@ import type {
   EasyTierJoinResult,
   EasyTierStatusResult,
   GithubProxy,
+  ProxyProbeResult,
   ScaffoldingClientProbeParams,
   ScaffoldingClientProbeResult,
   ScaffoldingHostSetMcPortParams,
@@ -51,6 +52,11 @@ export function updateEasyTier(): Promise<{ success: boolean }> {
 /** 把前端筛选的 GitHub 镜像源传给后端（下载竞速选源用） */
 export function setGithubProxies(proxies: GithubProxy[]): Promise<{ success: boolean }> {
   return onlineManager<{ success: boolean }>(ONLINE_ACTIONS.SET_GITHUB_PROXIES, proxies)
+}
+
+/** 后端并发测速镜像源（Rust reqwest 无浏览器 CORS 限制），返回按耗时升序的可用源 */
+export function probeGithubProxies(proxies: GithubProxy[]): Promise<ProxyProbeResult[]> {
+  return onlineManager<ProxyProbeResult[]>(ONLINE_ACTIONS.GITHUB_PROBE, proxies)
 }
 
 /** 房主一站式启动：探测 MC 端口 → 联机中心 → easytier */
