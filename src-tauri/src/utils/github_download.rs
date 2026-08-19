@@ -141,6 +141,11 @@ pub async fn probe_fastest_proxies(
     let mut pool: Vec<&GithubProxy> = proxies.iter().collect();
     pool.shuffle(&mut rand::thread_rng());
     let sampled: Vec<&GithubProxy> = pool.into_iter().take(sample).collect();
+    crate::log_debug!(
+        "[GitHub] 测速抽样: 从 {} 个源中抽 {} 个",
+        proxies.len(),
+        sampled.len()
+    );
     let urls: Vec<String> = sampled
         .iter()
         .map(|p| build_proxy_url(p, repo, version, asset))
@@ -148,7 +153,8 @@ pub async fn probe_fastest_proxies(
     let Ok(results) = probe_urls(&urls, None).await else {
         return Vec::new();
     };
-    results
+    let usable = results.len();
+    let picked: Vec<GithubProxy> = results
         .into_iter()
         .take(limit)
         .filter_map(|(_, url)| {
@@ -157,7 +163,13 @@ pub async fn probe_fastest_proxies(
                 .find(|p| build_proxy_url(p, repo, version, asset) == url)
                 .map(|p| (*p).clone())
         })
-        .collect()
+        .collect();
+    crate::log_debug!(
+        "[GitHub] 测速筛选: 可用 {} 个，返回最快 {} 个",
+        usable,
+        picked.len()
+    );
+    picked
 }
 
 /// 流式下载文件（reqwest bytes_stream，单请求 120s 超时，按字节回调进度：done/total）

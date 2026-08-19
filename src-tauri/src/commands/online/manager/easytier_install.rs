@@ -242,6 +242,10 @@ pub fn register(d: &mut Dispatcher) {
         handler!(_state, _app, params, {
             let proxies: Vec<GithubProxy> =
                 serde_json::from_value(params).map_err(|e| format!("参数解析失败: {e}"))?;
+            crate::log_debug!(
+                "[GitHub] 测速筛选开始: 收到 {} 个源",
+                proxies.len()
+            );
             let asset = asset_name(PROBE_VERSION);
             let picked = probe_fastest_proxies(
                 &proxies,
@@ -252,6 +256,7 @@ pub fn register(d: &mut Dispatcher) {
                 PROXY_LIMIT,
             )
             .await;
+            crate::log_debug!("[GitHub] 测速筛选完成: 返回 {} 个源", picked.len());
             serde_json::to_value(picked).map_err(|e| e.to_string())
         }),
     );
