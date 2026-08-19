@@ -2,6 +2,12 @@
 
 本项目所有重要变更均会记录在此文件中。格式参考 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/)。
 
+## [Unreleased]
+
+### Docs
+
+- **系统默认厂商 frpc 下载源改造调研文档**（[FRP_GITHUB_DOWNLOAD_RESEARCH.md](docs/online/FRP_GITHUB_DOWNLOAD_RESEARCH.md)（新增））：调研将系统默认厂商 frpc 的版本获取/下载从 apiServer `/v1/frp/manifest` 改为 GitHub API 拉取版本号 + 镜像竞速下载的可靠度。实测验证双源（`api.github.com` 主源 / `github-api.mocdn.net` 备选源）可用；确认 frp 官方资产命名差异（Windows zip / macOS-Linux tar.gz、os 用 darwin、arch 用 amd64）；评估复用 easytier 检查更新安装模式（泛化 `fetch_latest_release` repo 参数 + `pick_fastest` 竞速 + DownloadManager）的可行性；结论可行且与 easytier 完全同构，主要收益为解除登录依赖与版本自动同步，含风险权衡与实施步骤。
+
 ## [0.3.7-rc1] - 2026-08-19
 
 ### Added
