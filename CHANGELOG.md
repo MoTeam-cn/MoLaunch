@@ -6,6 +6,8 @@
 
 ### Changed
 
+- **设置-联机页优化：镜像源输入布局修复 + 内核下载安抚提示**（[SettingsOnline.vue](src/views/settings/SettingsOnline.vue)）：① **镜像源输入框布局修复**：`Input` 根元素 `.input-root` 为 scoped 样式 `width:100%`（特异性高于 tailwind `w-32`），导致名称输入框恒 100% 宽把类型/镜像地址挤到溢出省略；改用组件 `width` prop（内联样式优先）+ grid 固定列宽布局（`7rem 7rem minmax(0,1fr) auto`），名称/类型列固定、镜像地址自适应可收缩；类型下拉文案精简为「追加路径 / 完整 URL」适配窄列（卡片顶部说明文字已解释两种模式）；② **下载安抚提示**：内核下载（download/extract 阶段）进度条下方新增琥珀色提示条（icon + 文字），说明 GitHub 部分地区网络不稳定、下载慢或卡顿属正常现象、稍安勿躁。
+
 - **修复 easytier 安装进度跳变：71% 突跳完成**（[easytier_download.rs](src-tauri/src/commands/online/manager/easytier_download.rs) / [SettingsOnline.vue](src/views/settings/SettingsOnline.vue)）：分片下载的 `expected_size` 经 HEAD 探测，实际下载字节与之存在偏差时字节映射（5→80%）可能停在 80 以下就 Completed，随后直接 emit done(100)，前端进度条"突然完成"。① **后端收尾补发**：下载成功后强制 emit `download 80%`（"下载完成"）再进入解压，解压阶段 emit `extract 85%`；② **前端 extract 阶段也展示进度条**：`showProgress` 由仅 download 扩展为 download/extract，Tag 文案区分「下载中 N% / 解压安装 N%」，进度条 71→80→85→100 平滑过渡。
 
 - **修复 DownloadManager 按下载源模式过滤 URL 破坏 easytier 镜像优先**（[core.rs](src-tauri/src/minecraft/download/manager/core.rs) / [easytier_download.rs](src-tauri/src/commands/online/manager/easytier_download.rs)）：`download_batch` 对每个任务执行 `reorder_urls`，按用户下载源模式（官方/镜像/智能）过滤 URL——用户下载源为「官方」时镜像 URL 被过滤（正是 easytier 下载慢的根因），为「镜像」时官方保底被过滤，为「智能」时官方在前镜像在后同样破坏镜像优先意图。新增 `DownloadManager::with_preserve_order(true)` 开关（默认 false 保持原行为），开启后跳过 `reorder_urls` 保持调用方传入顺序；easytier 安装任务启用，确保「镜像竞速胜者优先 + 官方保底」按序生效。

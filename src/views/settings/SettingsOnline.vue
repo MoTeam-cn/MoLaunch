@@ -28,6 +28,7 @@ import {
   ArrowRightOnRectangleIcon,
   CheckIcon,
   CloudIcon,
+  InformationCircleIcon,
   PlusIcon,
   ServerStackIcon,
   TrashIcon,
@@ -162,10 +163,10 @@ const githubProxies = ref<ProxyRow[]>([])
 const proxiesLoaded = ref(false)
 const proxiesBusy = ref(false)
 
-/** type 选项（full: 镜像 + 完整 GitHub URL / path: 镜像前缀 + GitHub 路径） */
+/** type 选项（full: 镜像 + 完整 GitHub URL / path: 镜像前缀 + GitHub 路径），文案精简以适配窄列 */
 const proxyTypeOptions = [
-  { label: '追加路径 (path)', value: 'path' },
-  { label: '完整 URL (full)', value: 'full' },
+  { label: '追加路径', value: 'path' },
+  { label: '完整 URL', value: 'full' },
 ]
 
 async function loadGithubProxies() {
@@ -300,6 +301,15 @@ onMounted(() => {
               </span>
             </div>
             <p class="text-xs text-gray-400 mt-1">{{ installProgress?.message }}</p>
+            <!-- 下载安抚提示：GitHub 部分地区网络不稳定时避免用户干等 -->
+            <div
+              class="mt-3 flex items-start gap-2 rounded-md border border-amber-200 bg-amber-50 px-3 py-2.5"
+            >
+              <InformationCircleIcon class="mt-px h-4 w-4 shrink-0 text-amber-500" />
+              <p class="text-xs leading-relaxed text-amber-700">
+                受网络环境影响，GitHub 在部分地区的访问可能不稳定。若内核下载出现速度慢或进度卡顿，属正常现象，请稍安勿躁，下载完成后会自动继续安装。
+              </p>
+            </div>
           </div>
         </div>
       </div>
@@ -314,20 +324,23 @@ onMounted(() => {
         </p>
         <div v-if="!proxiesLoaded" class="mt-3 h-20 bg-gray-100 rounded animate-pulse" />
         <template v-else>
-          <div class="mt-3 flex items-center gap-2 text-xs text-gray-400">
-            <span class="w-32 shrink-0">名称</span>
-            <span class="w-28 shrink-0">类型</span>
-            <span class="flex-1">镜像地址</span>
-            <span class="w-8 shrink-0" />
+          <!-- 表头：grid 固定列宽（名称/类型固定，镜像地址自适应），与输入行对齐 -->
+          <div
+            class="mt-3 grid grid-cols-[7rem_7rem_minmax(0,1fr)_auto] items-center gap-2 text-xs text-gray-400"
+          >
+            <span>名称</span>
+            <span>类型</span>
+            <span>镜像地址</span>
+            <span />
           </div>
           <div
             v-for="(p, i) in githubProxies"
             :key="i"
-            class="mt-2 flex items-center gap-2"
+            class="mt-2 grid grid-cols-[7rem_7rem_minmax(0,1fr)_auto] items-center gap-2"
           >
-            <Input v-model="p.name" placeholder="可选" size="small" class="w-32 shrink-0" />
-            <Select v-model="p.type" :options="proxyTypeOptions" class="w-28 shrink-0" />
-            <Input v-model="p.base" placeholder="https://mirror.example.com" size="small" class="flex-1" />
+            <Input v-model="p.name" placeholder="可选" size="small" width="100%" />
+            <Select v-model="p.type" :options="proxyTypeOptions" />
+            <Input v-model="p.base" placeholder="https://mirror.example.com" size="small" width="100%" />
             <Button type="text" size="small" @click="removeProxyRow(i)">删除</Button>
           </div>
           <div
