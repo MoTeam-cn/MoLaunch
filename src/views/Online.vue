@@ -33,6 +33,7 @@ const RedStoneCreatePanel = defineAsyncComponent(() => import('@/components/onli
 const RedStoneKernelPanel = defineAsyncComponent(() => import('@/components/online/RedStoneKernelPanel.vue'))
 const OnlineTopBar = defineAsyncComponent(() => import('@/views/online/OnlineTopBar.vue'))
 const DisclaimerDialog = defineAsyncComponent(() => import('@/components/common/DisclaimerDialog.vue'))
+const EasyTierInstallModal = defineAsyncComponent(() => import('@/components/online/EasyTierInstallModal.vue'))
 import { useOnlineNav, type OnlineCategoryId } from '@/composables/useOnlineNav'
 import { hasAgreedToday } from '@/utils/disclaimer'
 import { showWarning } from '@/utils/modal'
@@ -202,5 +203,8 @@ const currentProps = computed<Record<string, unknown>>(() => {
 
     <!-- 使用协议抽屉（当日未同意时展示；teleport 到 #app-content，位置不影响单根约束） -->
     <DisclaimerDialog v-model:visible="disclaimerVisible" kind="online" />
+
+    <!-- easytier 内核安装进度弹窗（搭桥前置依赖，事件驱动自动显隐） -->
+    <EasyTierInstallModal />
   </div>
 </template>
