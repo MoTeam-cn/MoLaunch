@@ -11,6 +11,7 @@
 ### Fixed
 
 - **修复 GitHub 镜像源测速被 CSP 拦截**（[tauri.conf.json](src-tauri/tauri.conf.json)）：前端 `githubProxy.ts` 测速 fetch 的镜像源为运行时用户自定义 URL，静态 CSP 白名单无法覆盖，被 `connect-src` 拦截导致测速全部失败；将 `connect-src` 放宽至 `https:` `http:`（保留 `ws://127.0.0.1:*` 等原有限制），镜像源测速恢复正常。
+- **房间码切换提示改用自定义 Tooltip**（[HostRoomInfoCard.vue](src/components/online/HostRoomInfoCard.vue)）：房主房间信息卡中「点击切换完整码」的原生 `title` 属性替换为项目自定义 `Tooltip` 组件（与「复制完整房间码」按钮一致），统一提示样式。
 
 ## [0.3.7-rc1] - 2026-08-19
 

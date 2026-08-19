@@ -76,13 +76,14 @@ async function copyFullCode() {
           <ServerStackIcon class="w-4 h-4 text-gray-400" /><span>房间码</span>
         </div>
         <div class="flex items-center gap-1.5">
-          <code
-            class="text-base font-semibold text-primary-600 tracking-wider bg-primary-50 px-3 py-1 rounded cursor-pointer select-all"
-            title="点击切换完整码"
-            @click="showFullCode = !showFullCode"
-          >
-            {{ showFullCode ? room.roomCode : room.publicIdentifier }}
-          </code>
+          <Tooltip text="点击切换完整码">
+            <code
+              class="text-base font-semibold text-primary-600 tracking-wider bg-primary-50 px-3 py-1 rounded cursor-pointer select-all"
+              @click="showFullCode = !showFullCode"
+            >
+              {{ showFullCode ? room.roomCode : room.publicIdentifier }}
+            </code>
+          </Tooltip>
           <Tooltip text="复制完整房间码">
             <Button type="ghost" size="mini" @click="copyFullCode">
               <template #icon><ClipboardDocumentIcon class="w-3.5 h-3.5" /></template>
