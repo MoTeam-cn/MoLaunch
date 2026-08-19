@@ -8,7 +8,7 @@
  * 用法：
  * <SubTabBar v-model="activeTab" :tabs="tabs" sticky />
  */
-import { ref } from 'vue'
+import { ref, nextTick } from 'vue'
 
 interface Tab {
   id: string
@@ -29,14 +29,31 @@ const emit = defineEmits<{ 'update:modelValue': [value: string] }>()
 
 /** 鼠标是否悬停在子菜单区域（控制细滚动条显隐） */
 const hovered = ref(false)
+const containerRef = ref<HTMLElement | null>(null)
 
 function selectTab(id: string) {
   emit('update:modelValue', id)
+  // 自动滚动到可见区域：点击右侧被遮挡的 tab 时自动左滑，避免手动拖滚动条
+  nextTick(() => {
+    const container = containerRef.value
+    if (!container) return
+    const btn = container.querySelector<HTMLElement>(`[data-tab-id="${id}"]`)
+    if (!btn) return
+    const cRect = container.getBoundingClientRect()
+    const bRect = btn.getBoundingClientRect()
+    const pad = 8
+    if (bRect.right > cRect.right) {
+      container.scrollLeft += bRect.right - cRect.right + pad
+    } else if (bRect.left < cRect.left) {
+      container.scrollLeft -= cRect.left - bRect.left + pad
+    }
+  })
 }
 </script>
 
 <template>
   <div
+    ref="containerRef"
     class="sub-tab-bar flex items-center gap-1 overflow-x-auto border-b border-gray-200 bg-white px-1"
     :class="[sticky ? 'sticky top-0 z-20 shadow-sm' : '', { 'show-scrollbar': hovered }]"
     @mouseenter="hovered = true"
@@ -47,6 +64,7 @@ function selectTab(id: string) {
     <button
       v-for="tab in tabs"
       :key="tab.id"
+      :data-tab-id="tab.id"
       class="relative flex flex-none items-center gap-1.5 whitespace-nowrap px-4 py-2.5 text-[13px] font-medium transition-colors"
       :class="modelValue === tab.id
         ? 'text-primary-600'

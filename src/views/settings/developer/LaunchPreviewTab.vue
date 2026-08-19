@@ -9,6 +9,7 @@ import { ref, computed, onMounted, defineAsyncComponent } from 'vue'
 const Button = defineAsyncComponent(() => import('@/components/common/Button.vue'))
 const Select = defineAsyncComponent(() => import('@/components/common/Select.vue'))
 const Alert = defineAsyncComponent(() => import('@/components/common/Alert.vue'))
+const Tag = defineAsyncComponent(() => import('@/components/common/Tag.vue'))
 import { listInstalledVersionsWithType } from '@/utils/api/version'
 import { previewLaunchArgs, type LaunchArgsPreview } from '@/utils/api/launch'
 import { useAuthStore } from '@/stores/auth'
@@ -122,53 +123,58 @@ async function copyAll() {
 
         <!-- 预览结果 -->
         <div v-if="preview" class="rounded-md border border-gray-200 overflow-hidden">
-          <div class="px-3 py-2 bg-gray-50 border-b border-gray-200 text-xs font-medium text-gray-700">
-            预览结果 · {{ preview.version_id }}
+          <div class="flex items-center justify-between px-3 py-2 bg-gray-50 border-b border-gray-200">
+            <span class="text-xs font-semibold text-gray-700">预览结果 · {{ preview.version_id }}</span>
+            <span class="text-xs text-gray-400 font-mono">{{ preview.login_type }} · {{ preview.username }}</span>
           </div>
-          <div data-inner-scroll class="max-h-[28rem] overflow-y-auto divide-y divide-gray-100">
+          <div data-inner-scroll class="max-h-[36rem] overflow-y-auto divide-y divide-gray-100">
             <!-- Java -->
-            <div class="px-3 py-2.5">
-              <p class="text-xs font-medium text-gray-500 mb-1">Java 路径</p>
-              <p class="text-xs text-gray-800 font-mono break-all">{{ preview.java_path }}</p>
+            <div class="px-4 py-3">
+              <p class="text-xs font-bold text-gray-900 mb-1.5">Java 路径</p>
+              <p class="text-xs text-gray-700 font-mono break-all">{{ preview.java_path }}</p>
             </div>
             <!-- JVM 参数 -->
-            <div class="px-3 py-2.5">
-              <p class="text-xs font-medium text-gray-500 mb-1">JVM 参数（{{ preview.jvm_args.length }}）</p>
-              <p class="text-xs text-gray-800 font-mono whitespace-pre-wrap break-all">{{ preview.jvm_args.join('\n') }}</p>
+            <div class="px-4 py-3">
+              <p class="text-xs font-bold text-gray-900 mb-2">JVM 参数（{{ preview.jvm_args.length }}）</p>
+              <div class="flex flex-wrap gap-1.5">
+                <Tag v-for="(arg, i) in preview.jvm_args" :key="i" size="small" color="arcoblue">{{ arg }}</Tag>
+              </div>
             </div>
             <!-- 主类 -->
-            <div class="px-3 py-2.5">
-              <p class="text-xs font-medium text-gray-500 mb-1">主类</p>
-              <p class="text-xs text-gray-800 font-mono break-all">{{ preview.main_class }}</p>
+            <div class="px-4 py-3">
+              <p class="text-xs font-bold text-gray-900 mb-1.5">主类</p>
+              <p class="text-xs text-gray-700 font-mono break-all">{{ preview.main_class }}</p>
             </div>
             <!-- Classpath -->
-            <div class="px-3 py-2.5">
-              <p class="text-xs font-medium text-gray-500 mb-1">Classpath</p>
-              <p class="text-xs text-gray-800 font-mono whitespace-pre-wrap break-all">{{ preview.classpath }}</p>
+            <div class="px-4 py-3">
+              <p class="text-xs font-bold text-gray-900 mb-1.5">Classpath</p>
+              <p class="text-xs text-gray-700 font-mono whitespace-pre-wrap break-all">{{ preview.classpath }}</p>
             </div>
             <!-- 游戏参数 -->
-            <div class="px-3 py-2.5">
-              <p class="text-xs font-medium text-gray-500 mb-1">游戏参数（{{ preview.game_args.length }}）</p>
-              <p class="text-xs text-gray-800 font-mono whitespace-pre-wrap break-all">{{ preview.game_args.join('\n') }}</p>
+            <div class="px-4 py-3">
+              <p class="text-xs font-bold text-gray-900 mb-2">游戏参数（{{ preview.game_args.length }}）</p>
+              <div class="flex flex-wrap gap-1.5">
+                <Tag v-for="(arg, i) in preview.game_args" :key="i" size="small" color="green">{{ arg }}</Tag>
+              </div>
             </div>
             <!-- 目录信息 -->
-            <div class="px-3 py-2.5">
-              <p class="text-xs font-medium text-gray-500 mb-1">目录信息</p>
-              <p class="text-xs text-gray-800 font-mono whitespace-pre-wrap break-all">
-                游戏目录: {{ preview.game_dir }}
-                资源目录: {{ preview.assets_dir }}
-                资源索引: {{ preview.asset_index }}
-              </p>
+            <div class="px-4 py-3">
+              <p class="text-xs font-bold text-gray-900 mb-1.5">目录信息</p>
+              <div class="space-y-1 text-xs text-gray-700 font-mono break-all">
+                <p><span class="font-semibold text-gray-500">游戏目录：</span>{{ preview.game_dir }}</p>
+                <p><span class="font-semibold text-gray-500">资源目录：</span>{{ preview.assets_dir }}</p>
+                <p><span class="font-semibold text-gray-500">资源索引：</span>{{ preview.asset_index }}</p>
+              </div>
             </div>
             <!-- 账号信息 -->
-            <div class="px-3 py-2.5">
-              <p class="text-xs font-medium text-gray-500 mb-1">账号信息</p>
-              <p class="text-xs text-gray-800 font-mono whitespace-pre-wrap break-all">
-                用户名: {{ preview.username }}
-                UUID: {{ preview.uuid }}
-                登录类型: {{ preview.login_type }}
-                {{ preview.server_url ? `外置服务器: ${preview.server_url}` : '' }}
-              </p>
+            <div class="px-4 py-3">
+              <p class="text-xs font-bold text-gray-900 mb-1.5">账号信息</p>
+              <div class="space-y-1 text-xs text-gray-700 font-mono break-all">
+                <p><span class="font-semibold text-gray-500">用户名：</span>{{ preview.username }}</p>
+                <p><span class="font-semibold text-gray-500">UUID：</span>{{ preview.uuid }}</p>
+                <p><span class="font-semibold text-gray-500">登录类型：</span>{{ preview.login_type }}</p>
+                <p v-if="preview.server_url"><span class="font-semibold text-gray-500">外置服务器：</span>{{ preview.server_url }}</p>
+              </div>
             </div>
           </div>
         </div>
