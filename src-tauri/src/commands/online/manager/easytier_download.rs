@@ -171,8 +171,10 @@ pub(super) async fn install_version(
     if result.status != DownloadStatus::Completed {
         return Err(result.error.unwrap_or_else(|| "下载失败".to_string()));
     }
-
-    emit_progress(app, "extract", 80, "解压安装");
+    // 下载完成：强制推进到 80%（分片下载实际字节与 HEAD 探测值可能有偏差，
+    // 字节映射可能停在 80 以下，需收尾补发避免进度条停留中途）
+    emit_progress(app, "download", 80, "下载完成");
+    emit_progress(app, "extract", 85, "解压安装");
     let extract_dir =
         std::env::temp_dir().join(format!("molaunch-easytier-extract-{}", std::process::id()));
     if extract_dir.exists() {

@@ -78,8 +78,11 @@ const hasUpdate = computed(() => {
   const s = installStatus.value
   return !!s?.installed && !!s.latestVersion && s.version !== s.latestVersion
 })
-/** 下载中：以进度事件 phase 为准（download 阶段事件驱动展示，不依赖状态轮询） */
-const showProgress = computed(() => installProgress.value?.phase === 'download')
+/** 进度展示：download / extract 阶段事件驱动（done/error 清除），避免状态轮询 */
+const showProgress = computed(() => {
+  const ph = installProgress.value?.phase
+  return ph === 'download' || ph === 'extract'
+})
 
 /** 状态 Tag：检查中 gray / 下载中 blue / 未安装 red / 有新版本 gold / 已安装 green */
 const tagColor = computed(() => {
@@ -91,7 +94,11 @@ const tagColor = computed(() => {
 })
 
 const tagText = computed(() => {
-  if (showProgress.value) return `下载中 ${installProgress.value?.percent ?? 0}%`
+  if (showProgress.value) {
+    const ph = installProgress.value?.phase
+    const prefix = ph === 'extract' ? '解压安装' : '下载中'
+    return `${prefix} ${installProgress.value?.percent ?? 0}%`
+  }
   const s = installStatus.value
   if (!s) return '检查中'
   if (!s.installed) return '未安装'
