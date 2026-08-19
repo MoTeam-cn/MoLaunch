@@ -5,7 +5,7 @@ use std::path::{Path, PathBuf};
 use std::sync::atomic::Ordering;
 use std::time::Duration;
 
-use serde::{Deserialize, Serialize};
+use serde::Serialize;
 use tauri::Emitter;
 
 use crate::handler;
@@ -13,6 +13,7 @@ use crate::log_info;
 use crate::log_warn;
 use crate::state::AppState;
 use crate::utils::dispatcher::Dispatcher;
+use crate::utils::github_download::GithubProxy;
 
 /// easytier GitHub 仓库
 const EASYTIER_REPO: &str = "EasyTier/EasyTier";
@@ -20,21 +21,10 @@ const EASYTIER_REPO: &str = "EasyTier/EasyTier";
 const GITHUB_API_PRIMARY: &str = "https://api.github.com";
 /// GitHub API 备选源（仅 API 功能）
 const GITHUB_API_FALLBACK: &str = "https://github-api.mocdn.net";
-/// 官方下载源
-const GITHUB_DOWNLOAD_BASE: &str = "https://github.com";
 /// 安装进度事件名
 const EASYTIER_INSTALL_PROGRESS_EVENT: &str = "easytier-install-progress";
 /// 版本标记文件名
 const VERSION_FILE: &str = "version.txt";
-
-/// 前端传入的 GitHub 镜像源（type: path 追加路径 / type: full 追加完整 URL）
-#[derive(Debug, Clone, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub struct GithubProxy {
-    #[serde(rename = "type")]
-    pub proxy_type: String,
-    pub base: String,
-}
 
 /// `easytier_install_status` 返回
 #[derive(Debug, Serialize)]
@@ -71,22 +61,24 @@ fn cli_name() -> &'static str {
 }
 
 /// 查询最新版本号（主源失败回退备选；失败返回错误由前端提示）
-pub async fn fetch_latest_release(client: &reqwest::Client) -> Result<String, String> {
+pub async fn fetch_latest_release() -> Result<String, String> {
+    let client = crate::http::get_client();
     let primary = format!("{GITHUB_API_PRIMARY}/repos/{EASYTIER_REPO}/releases/latest");
-    match fetch_tag_name(client, &primary).await {
+    match fetch_tag_name(&client, &primary).await {
         Ok(tag) => Ok(tag),
         Err(e) => {
             log_warn!("[EasyTier] GitHub API 主源失败: {e}，回退备选源");
             let fallback = format!("{GITHUB_API_FALLBACK}/repos/{EASYTIER_REPO}/releases/latest");
-            fetch_tag_name(client, &fallback).await
+            fetch_tag_name(&client, &fallback).await
         }
     }
 }
 
-/// 请求 release API 解析 tag_name（去 v 前缀）
+/// 请求 release API 解析 tag_name（去 v 前缀，单请求 30s 超时）
 async fn fetch_tag_name(client: &reqwest::Client, url: &str) -> Result<String, String> {
     let resp = client
         .get(url)
+        .timeout(Duration::from_secs(30))
         .send()
         .await
         .map_err(|e| format!("请求失败: {e}"))?;
@@ -155,106 +147,6 @@ fn emit_progress(app: &tauri::AppHandle, phase: &'static str, percent: u8, messa
         EASYTIER_INSTALL_PROGRESS_EVENT,
         serde_json::json!({ "phase": phase, "percent": percent, "message": message }),
     );
-}
-
-/// 下载 zip 到目标路径（官方 URL 优先，失败走镜像竞速）
-async fn download_zip(
-    client: &reqwest::Client,
-    version: &str,
-    target: &Path,
-    proxies: &[GithubProxy],
-    on_progress: &(dyn Fn(u64, Option<u64>) + Send + Sync),
-) -> Result<(), String> {
-    let asset = asset_name(version);
-    let official =
-        format!("{GITHUB_DOWNLOAD_BASE}/{EASYTIER_REPO}/releases/download/v{version}/{asset}");
-    if download_to(client, &official, target, on_progress)
-        .await
-        .is_ok()
-    {
-        return Ok(());
-    }
-    log_warn!("[EasyTier] 官方源下载失败，尝试镜像竞速");
-    let mut candidates = Vec::with_capacity(proxies.len());
-    for p in proxies {
-        let base = p.base.trim_end_matches('/');
-        let url = if p.proxy_type == "path" {
-            format!("{base}/{EASYTIER_REPO}/releases/download/v{version}/{asset}")
-        } else {
-            format!("{base}{official}")
-        };
-        candidates.push(url);
-    }
-    let fastest = pick_fastest(client, &candidates).await?;
-    download_to(client, &fastest, target, on_progress).await
-}
-
-/// 镜像竞速：并发 HEAD + Range 0-1 测速（单请求 10s 超时），取响应最快者
-async fn pick_fastest(client: &reqwest::Client, candidates: &[String]) -> Result<String, String> {
-    let mut handles = Vec::with_capacity(candidates.len());
-    for url in candidates {
-        let client = client.clone();
-        let url = url.clone();
-        handles.push(tokio::spawn(async move {
-            let start = std::time::Instant::now();
-            let resp = client
-                .get(&url)
-                .header("Range", "bytes=0-1")
-                .timeout(Duration::from_secs(10))
-                .send()
-                .await;
-            match resp {
-                Ok(r) if r.status().is_success() || r.status().as_u16() == 206 => {
-                    Some((start.elapsed(), url))
-                }
-                _ => None,
-            }
-        }));
-    }
-    let mut best: Option<(Duration, String)> = None;
-    for h in handles {
-        if let Ok(Some((elapsed, url))) = h.await {
-            if best.as_ref().map(|(t, _)| elapsed < *t).unwrap_or(true) {
-                best = Some((elapsed, url));
-            }
-        }
-    }
-    best.map(|(_, url)| url)
-        .ok_or_else(|| "所有镜像源均不可用".to_string())
-}
-
-/// 流式下载文件（reqwest bytes_stream，按字节回调进度：done/total）
-async fn download_to(
-    client: &reqwest::Client,
-    url: &str,
-    target: &Path,
-    on_progress: &(dyn Fn(u64, Option<u64>) + Send + Sync),
-) -> Result<(), String> {
-    use futures_util::StreamExt;
-    use std::io::Write;
-    let resp = client
-        .get(url)
-        .send()
-        .await
-        .map_err(|e| format!("请求失败: {e}"))?;
-    if !resp.status().is_success() {
-        return Err(format!("HTTP {}", resp.status()));
-    }
-    if let Some(parent) = target.parent() {
-        std::fs::create_dir_all(parent).map_err(|e| format!("创建目录失败: {e}"))?;
-    }
-    let total = resp.content_length();
-    let mut out = std::fs::File::create(target).map_err(|e| format!("创建文件失败: {e}"))?;
-    let mut stream = resp.bytes_stream();
-    let mut done: u64 = 0;
-    while let Some(chunk) = stream.next().await {
-        let chunk = chunk.map_err(|e| format!("读取响应失败: {e}"))?;
-        done += chunk.len() as u64;
-        on_progress(done, total);
-        out.write_all(&chunk)
-            .map_err(|e| format!("写入文件失败: {e}"))?;
-    }
-    Ok(())
 }
 
 /// 解压 zip 到目标目录（剥离共享顶层目录 + Zip Slip 防护）
@@ -337,7 +229,7 @@ async fn install_version(
     if state.easytier.lock().await.is_some() {
         return Err("easytier 正在组网运行中，请先退出联机网络再更新内核".to_string());
     }
-    let client = crate::http::build_client_with_user_agent("MoLaunch", Some(120_000));
+    let client = crate::http::get_client();
     let dir = install_dir()?;
     let asset = asset_name(version);
     let zip_path = std::env::temp_dir().join(format!("molaunch-easytier-{asset}"));
@@ -357,7 +249,16 @@ async fn install_version(
             emit_progress(app, "download", pct, &format!("下载中 {pct}%"));
         }
     };
-    download_zip(&client, version, &zip_path, &proxies, &on_progress).await?;
+    crate::utils::github_download::download_release_zip(
+        &client,
+        EASYTIER_REPO,
+        version,
+        &asset,
+        &zip_path,
+        &proxies,
+        &on_progress,
+    )
+    .await?;
 
     emit_progress(app, "extract", 80, "解压安装");
     let extract_dir =
@@ -401,8 +302,7 @@ async fn install_version(
 
 /// 下载安装最新版（`easytier_install` / `easytier_update` 共用）
 async fn install_latest(state: &AppState, app: &tauri::AppHandle) -> Result<(), String> {
-    let client = crate::http::build_client_with_user_agent("MoLaunch", Some(30_000));
-    let version = fetch_latest_release(&client).await?;
+    let version = fetch_latest_release().await?;
     install_version(state, app, &version).await
 }
 
@@ -429,8 +329,7 @@ pub fn register(d: &mut Dispatcher) {
             let (installed, version) = (is_installed(), installed_version().unwrap_or_default());
             // 已安装时查询最新版本（提示更新）；未安装无需查询
             let latest_version = if installed {
-                let client = crate::http::build_client_with_user_agent("MoLaunch", Some(30_000));
-                fetch_latest_release(&client).await.unwrap_or_default()
+                fetch_latest_release().await.unwrap_or_default()
             } else {
                 String::new()
             };

@@ -79,8 +79,7 @@ pub struct AppState {
     /// 隧道状态由内核写入同目录 tunnel.ini，`redstone_status` 轮询读取。
     pub redstone: Arc<TokioMutex<Option<crate::commands::redstone::tunnel::HongshiTunnel>>>,
     /// 前端筛选的 GitHub 镜像源（easytier 内核下载竞速选源用，`set_github_proxies` 写入）
-    pub github_proxies:
-        Arc<TokioMutex<Vec<crate::commands::online::manager::easytier_install::GithubProxy>>>,
+    pub github_proxies: Arc<TokioMutex<Vec<crate::utils::github_download::GithubProxy>>>,
     /// easytier 内核安装进行中标志（防重入：`easytier_install` / `ensure_installed` 共用）
     pub easytier_installing: Arc<std::sync::atomic::AtomicBool>,
     /// 应用句柄（Tauri setup 钩子中注入）
