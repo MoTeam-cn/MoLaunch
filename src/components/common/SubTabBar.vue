@@ -32,7 +32,7 @@ function selectTab(id: string) {
 
 <template>
   <div
-    class="flex items-center gap-1 overflow-x-auto border-b border-gray-200 bg-white px-1"
+    class="sub-tab-bar flex items-center gap-1 overflow-x-auto border-b border-gray-200 bg-white px-1"
     :class="sticky ? 'sticky top-0 z-20 shadow-sm' : ''"
   >
     <!-- 保留原生 button：Tab 切换项（relative 布局 + 底部指示线 + active 状态），
@@ -57,3 +57,27 @@ function selectTab(id: string) {
     </button>
   </div>
 </template>
+
+<style scoped>
+/* 细滚动条：默认隐藏，鼠标悬停在子菜单区域时显示 */
+.sub-tab-bar::-webkit-scrollbar {
+  height: 4px;
+}
+
+.sub-tab-bar::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.sub-tab-bar::-webkit-scrollbar-thumb {
+  background: transparent;
+  border-radius: 9999px;
+}
+
+.sub-tab-bar:hover::-webkit-scrollbar-thumb {
+  background: #d1d5db;
+}
+
+.sub-tab-bar:hover::-webkit-scrollbar-thumb:hover {
+  background: #9ca3af;
+}
+</style>

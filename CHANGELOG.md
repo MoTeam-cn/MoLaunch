@@ -10,7 +10,7 @@
 
 ### Changed
 
-- **顶部子菜单（SubTabBar）支持横向滚动**（[SubTabBar.vue](src/components/common/SubTabBar.vue)）：子页签增多（如开发者页面 9 个）时容器宽度不足会换行，改为 `overflow-x-auto` + 子项 `flex-none` / `whitespace-nowrap`，超出宽度时横向滚动（复用全局滚动条样式），不再换行。
+- **顶部子菜单（SubTabBar）支持横向滚动**（[SubTabBar.vue](src/components/common/SubTabBar.vue)）：子页签增多（如开发者页面 9 个）时容器宽度不足会换行，改为 `overflow-x-auto` + 子项 `flex-none` / `whitespace-nowrap`，超出宽度时横向滚动，不再换行；滚动条细化为 4px，默认隐藏、鼠标悬停在子菜单区域时显示。
 
 - **厂商列表/认证中心「系统默认」厂商改用 gofrp 图标**（[frp-provider.ts](src/utils/frp-provider.ts) / [ProviderList.vue](src/components/frp/ProviderList.vue) / [AuthCenter.vue](src/components/frp/AuthCenter.vue)）：系统默认厂商后端不返回 icon，前端原回退到通用图标（ServerStackIcon/ShieldCheckIcon）；新增 `providerIconSrc` 公共函数，系统默认厂商（`system-default`）固定使用 gofrp 图标，外部厂商仍用 manifest 提供的图标，两个页面复用。
 
