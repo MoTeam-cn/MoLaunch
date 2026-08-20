@@ -26,6 +26,54 @@
 
 - **内部实现细节日志降级为 DEBUG 级别**（[easytier_actions.rs](src-tauri/src/commands/online/manager/easytier_actions.rs) / [language.rs](src-tauri/src/minecraft/language.rs)）：按日志规范，将联机 easytier 内部状态同步（白名单重建、port-forward 建立、监视循环端口更新、手动端口写入）与游戏语言配置写入/文件存在性检查等内部细节日志由 INFO 降为 DEBUG；保留用户可感知关键节点（加入/停止网络、开房/关房、发现 MC 服务、自动关房）为 INFO。
 
+- **mod_translation mod.rs 业务函数迁移**（[mod.rs](src-tauri/src/mod_translation/mod.rs) → [controller.rs](src-tauri/src/mod_translation/controller.rs) / [progress.rs](src-tauri/src/mod_translation/progress.rs) / [status.rs](src-tauri/src/mod_translation/status.rs)）：mod.rs 仅保留模块声明与类型 re-export，命令入口 / 进度管理 / 状态推送业务函数迁移到独立子文件，消除 mod.rs 业务逻辑堆积。
+
+- **ModMetadata 类型下沉消除架构倒置**（[types.rs](src-tauri/src/minecraft/community/types.rs) / [mods/types.rs](src-tauri/src/commands/version/mods/types.rs) / [mods/mod.rs](src-tauri/src/commands/version/mods/mod.rs) / [builder.rs](src-tauri/src/commands/version/mods/metadata/builder.rs) / [preload/types.rs](src-tauri/src/minecraft/community/preload/types.rs)）：ModMetadata 定义从 commands 层下沉到 minecraft 领域层，commands 层改为 re-export，消除领域层反向依赖命令层的架构倒置。
+
+- **超限 Vue 组件按区块拆分**（[RecipeGeneratorPage.vue](src/views/tools/creation/recipe-generator/RecipeGeneratorPage.vue)(688→291) / [NatTopologyGraph.vue](src/components/online/NatTopologyGraph.vue)(528→291) / [ResourcePackEditor.vue](src/views/tools/data/ResourcePackEditor.vue)(510→250) / [SettingsOnline.vue](src/views/settings/SettingsOnline.vue)(475→37) / [GradientTextPage.vue](src/views/tools/creation/GradientTextPage.vue)(424→76) / [ModTranslationResult.vue](src/views/experimental/ModTranslationResult.vue)(392→90) / [RecipeSlotsEditor.vue](src/views/tools/creation/recipe-generator/RecipeSlotsEditor.vue)(316→190)）：按区块拆子组件（同目录或 components/settings/），纯函数提取到独立 .ts（recipe-state.ts / slot-display.ts / topology-option.ts），全部降至 300 行以下。
+
+- **前后端格式化函数收敛去重**（[format.ts](src/utils/format.ts) / [format.rs](src-tauri/src/utils/format.rs) / [NbtSaveDrawer.vue](src/views/tools/data/NbtSaveDrawer.vue) / [RedStoneKernelPanel.vue](src/components/online/RedStoneKernelPanel.vue)）：删除无调用者的 formatSpeedCompact / speed_with，两处内联 formatSize 改用公共 formatBytes。
+
+- **合并 Alert 与 AlertV2 组件**（[Alert.vue](src/components/common/Alert.vue) / AlertV2.vue（删除））：Alert.vue 新增 variant prop（bar / soft）统一两套风格，19 个 AlertV2 调用方迁移，全项目无残留引用。
+
+- **折叠动画抽取 composable 去重**（[useCollapseAnimation.ts](src/composables/useCollapseAnimation.ts)（新增））：7 处手写 grid-template-rows 过渡 + 图标旋转统一收敛（VersionSelect / CleanupGroupList / MoLaunchIntro / SeedMapIntro / MessageDrawer / NavSidebar / VersionGroupCard），v-for 等外部状态场景用 contentClassOf / iconClassOf 纯函数。
+
+- **内联可复用函数提取到 utils**（[format.ts](src/utils/format.ts) / [cleanup-group.ts](src/utils/cleanup-group.ts)（新增））：formatTime / maskDeviceId 提取到 format.ts，groupIcon 提取到 cleanup-group.ts，DownloadedFileList / LaunchHistoryPanel / CleanupGroupList / LuckyTool 删除内联实现。
+
+- **stores 层事件监听下沉消除反向依赖**（[tauriEvent.ts](src/utils/tauriEvent.ts)（新增）/ [launch.ts](src/stores/launch.ts)（新增））：useTauriEvent 下沉为 utils 工具（14 个引用方更新），useLaunchState 下沉为独立 Pinia store，stores 不再反向依赖 composables。
+
+- **原生 title 替换为自定义 Tooltip 组件**（NbtTreeNode / ResourcePackEditor / RpLangTable / RpPixelEditor / RecipeGeneratorPage / ItemPalette / TagPalette / RecipeTagPopup / RecipeItemIcon 共 17 处）：原生 title 属性替换为项目自定义 Tooltip 组件（block / overflowOnly 模式适配 grid 布局），保留 aria-label 无障碍属性。
+
+- **系统命令调用收敛到 shell 模块**（[exec.rs](src-tauri/src/minecraft/system/shell/exec.rs)（新增）/ [install_windows.rs](src-tauri/src/commands/system/updater/install_windows.rs) / [linux.rs](src-tauri/src/deeplink/protocol/linux.rs)）：shell 模块新增 run_detached / run_command_status 封装，5 处 std::process::Command 调用改走 shell 模块。
+
+### Fixed
+
+- **皮肤下载 URL 与路径校验防 SSRF 与任意文件写**（[net.rs](src-tauri/src/utils/net.rs) / [dispatcher.rs](src-tauri/src/commands/skin/dispatcher.rs) / [manager.rs](src-tauri/src/commands/skin/manager.rs)）：新增 validate_public_http_url（协议白名单 http/https + 拒绝内网 / 回环 / 链路本地 / localhost / userinfo），download_url_to_file 增加 URL 校验与下载目录 canonicalize 校验。
+
+- **下载入口统一 URL 校验防 SSRF**（[net.rs](src-tauri/src/utils/net.rs) / [download.rs](src-tauri/src/commands/tools/download.rs) / [resource.rs](src-tauri/src/commands/community/install/resource.rs) / [check.rs](src-tauri/src/commands/system/updater/check.rs) / [install_windows.rs](src-tauri/src/commands/system/updater/install_windows.rs)）：普通下载入口统一 validate_public_http_url；updater 下载新增 validate_updater_download_url，域名限定白名单（api.molaunch.moiu.cn / download.mocdn.net）。
+
+- **资源导出路径限定工作目录防任意写入**（[resource.rs](src-tauri/src/commands/community/install/resource.rs) / [export.rs](src-tauri/src/commands/plugins/export.rs) / [explore.rs](src-tauri/src/commands/tools/resourcepack/explore.rs)）：download_resource_to_path / export_plugin_sample / rp_export 增加 canonicalize + starts_with 目录校验，越界路径拒绝。
+
+- **NBT 读写限定存档目录防任意文件访问**（[api.rs](src-tauri/src/commands/tools/nbt/api.rs)）：parse / save 增加 saves 目录 canonicalize 校验，目录外路径拒绝。
+
+- **启动脚本导出 token 占位符化并校验导出路径**（[export.rs](src-tauri/src/commands/version/script_export/export.rs)）：在线账号 access_token / client_token 改为占位符（%ACCESS_TOKEN% / ${ACCESS_TOKEN}）+ 运行时提示输入，save_path 校验（绝对路径 / 拒绝 .. / 父目录存在）。
+
+- **macOS 提权 AppleScript 参数转义防注入**（[admin.rs](src-tauri/src/minecraft/system/shell/admin.rs)）：relaunch_as_admin 改用 quoted form of 逐参数包裹，消除字符串拼接注入。
+
+- **run_osascript 用户可控字段转义防注入**（[window.rs](src-tauri/src/minecraft/system/shell/window.rs)）：提取公共 apple_script_literal 转义函数并固化调用约定，调用方对用户可控字段转义。
+
+- **IPC 调试器增加开发者模式门禁**（[IpcDebuggerTab.vue](src/views/settings/developer/IpcDebuggerTab.vue)）：调用后端 is_developer_unlocked 校验，未解锁时禁用调试器并提示解锁路径。
+
+- **delete_tunnel id 路径穿越防护**（[crud.rs](src-tauri/src/commands/frp/tunnel/crud.rs)）：id 仅允许安全字符（[A-Za-z0-9_-]），拒绝 .. 路径穿越删除。
+
+- **自定义布局远程脚本沙箱化**（[htmlShadowRenderer.ts](src/plugins/custom-layout/htmlShadowRenderer.ts) / [HtmlLayoutPanel.vue](src/plugins/custom-layout/HtmlLayoutPanel.vue) / [index.vue](src/plugins/custom-layout/index.vue) / [plugins-layout.ts](src/stores/plugins/plugins-layout.ts)）：URL 来源 scheme / 域名白名单校验，脚本执行迁移到 sandbox iframe，UI 对远程布局明确警示。
+
+- **capabilities fs 权限增加 scope 白名单**（[migrated.json](src-tauri/capabilities/migrated.json)）：fs 权限限定 .Molaunch 数据目录 / 下载目录 / 版本目录等，shell:allow-open 限定可打开文件类型。
+
+- **前端 open 调用增加 scheme 校验与路径规范化**（[openExternal.ts](src/utils/openExternal.ts)（新增）/ [ExternalLoginPanel.vue](src/components/common/ExternalLoginPanel.vue) / [useFrpAuthCenter.ts](src/composables/useFrpAuthCenter.ts) / [SettingsAdvanced.vue](src/views/settings/SettingsAdvanced.vue) / [useResourceDownload.ts](src/composables/useResourceDownload.ts)）：open 前统一校验 ^https?://（抽公共函数复用），a 标签补 rel="noopener noreferrer"，file_name 路径规范化校验（拒绝 .. / 绝对路径 / 非法字符）。
+
+- **日志 URL 脱敏与解压路径校验**（[net.rs](src-tauri/src/utils/net.rs) / [dispatcher.rs](src-tauri/src/commands/skin/dispatcher.rs) / [check.rs](src-tauri/src/commands/system/updater/check.rs) / [helpers.rs](src-tauri/src/commands/tools/archive/helpers.rs)）：新增 sanitize_url_for_log（仅保留 scheme://host + path，去 query / fragment / userinfo）；unzip_to_dir 改为手动逐条目解压，跳过 symlink 条目 + canonicalize 校验防 zip slip。
+
 ## [0.3.7-rc2] - 2026-08-20
 
 ### Docs
