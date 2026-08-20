@@ -9,10 +9,9 @@
  * - 网络延迟测试
  * - 地址测速
  *
- * 深链支持：URL `?subtab=latency` 可直接切到对应子页签。
+ * 深链支持：URL `?subtab=latency` 可直接切到对应子页签（由 SubTabBar 内置持久化恢复）。
  */
-import { onMounted, ref, defineAsyncComponent } from 'vue'
-import { useRoute } from 'vue-router'
+import { ref, defineAsyncComponent } from 'vue'
 const SubTabBar = defineAsyncComponent(() => import('@/components/common/SubTabBar.vue'))
 import { BoltIcon, ScissorsIcon, ServerIcon, ShieldCheckIcon, SignalIcon } from '@heroicons/vue/24/outline'
 const ModDependencyChecker = defineAsyncComponent(() => import('./mod-tools/ModDependencyChecker.vue'))
@@ -29,15 +28,6 @@ const subTabs = [
   { id: 'addr', label: '地址测速', icon: SignalIcon },
 ]
 const activeSubTab = ref('dependency')
-
-const route = useRoute()
-
-onMounted(() => {
-  const subtab = route.query.subtab as string | undefined
-  if (subtab && subTabs.some((t) => t.id === subtab)) {
-    activeSubTab.value = subtab
-  }
-})
 </script>
 
 <template>

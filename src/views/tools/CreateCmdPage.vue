@@ -10,10 +10,9 @@
  * - 召唤实体（/summon）
  * - 成就生成器（导出 PNG）
  *
- * 深链支持：URL `?subtab=recipe-generator` 可直接切到对应子页签。
+ * 深链支持：URL `?subtab=recipe-generator` 可直接切到对应子页签（由 SubTabBar 内置持久化恢复）。
  */
-import { onMounted, ref, defineAsyncComponent } from 'vue'
-import { useRoute } from 'vue-router'
+import { ref, defineAsyncComponent } from 'vue'
 const SubTabBar = defineAsyncComponent(() => import('@/components/common/SubTabBar.vue'))
 import {
   CubeIcon,
@@ -39,15 +38,6 @@ const subTabs = [
   { id: 'achievement', label: '成就生成器', icon: TrophyIcon },
 ]
 const activeSubTab = ref('gradient-text')
-
-const route = useRoute()
-
-onMounted(() => {
-  const subtab = route.query.subtab as string | undefined
-  if (subtab && subTabs.some((t) => t.id === subtab)) {
-    activeSubTab.value = subtab
-  }
-})
 </script>
 
 <template>

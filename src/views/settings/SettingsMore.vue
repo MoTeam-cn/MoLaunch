@@ -13,10 +13,10 @@
  * 主文件统一管理加载状态并经 props 下发给子页签。
  *
  * 深链支持：URL `?subtab=tutorial` 可直接切到「教程」子页签（联机页 FRP 子菜单
- * 「教程」按钮通过 `/apps/settings?tab=about&subtab=tutorial` 跳转）。
+ * 「教程」按钮通过 `/apps/settings?tab=about&subtab=tutorial` 跳转，
+ * 由 SubTabBar 内置 URL 持久化恢复）。
  */
 import { ref, onMounted, defineAsyncComponent } from 'vue'
-import { useRoute } from 'vue-router'
 const SubTabBar = defineAsyncComponent(() => import('@/components/common/SubTabBar.vue'))
 import { getAboutData, type AboutData } from '@/utils/api/about'
 import {
@@ -42,8 +42,6 @@ const subTabs = [
 ]
 const activeSubTab = ref('about')
 
-const route = useRoute()
-
 // ── 关于页面数据（异步加载，统一管理后下发给子页签） ──
 const aboutData = ref<AboutData | null>(null)
 const loading = ref(true)
@@ -62,12 +60,6 @@ async function loadAboutData() {
 }
 
 onMounted(() => {
-  // 支持外部页面深链到指定子页签（如联机页 FRP 子菜单「教程」按钮跳转）
-  // URL 形如 /apps/settings?tab=about&subtab=tutorial
-  const subtab = route.query.subtab as string | undefined
-  if (subtab && subTabs.some(t => t.id === subtab)) {
-    activeSubTab.value = subtab
-  }
   void loadAboutData()
 })
 </script>

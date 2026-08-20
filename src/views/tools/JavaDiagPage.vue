@@ -8,10 +8,9 @@
  * - 已安装版本 Java 环境检测
  * - Java 运行时列表
  *
- * 深链支持：URL `?subtab=manager` 可直接切到对应子页签。
+ * 深链支持：URL `?subtab=manager` 可直接切到对应子页签（由 SubTabBar 内置持久化恢复）。
  */
-import { onMounted, ref, defineAsyncComponent } from 'vue'
-import { useRoute } from 'vue-router'
+import { ref, defineAsyncComponent } from 'vue'
 const SubTabBar = defineAsyncComponent(() => import('@/components/common/SubTabBar.vue'))
 import { ArrowDownTrayIcon, MagnifyingGlassIcon, ServerStackIcon } from '@heroicons/vue/24/outline'
 const JavaDownloader = defineAsyncComponent(() => import('./java/JavaDownloader.vue'))
@@ -24,15 +23,6 @@ const subTabs = [
   { id: 'manager', label: '运行时列表', icon: ServerStackIcon },
 ]
 const activeSubTab = ref('downloader')
-
-const route = useRoute()
-
-onMounted(() => {
-  const subtab = route.query.subtab as string | undefined
-  if (subtab && subTabs.some((t) => t.id === subtab)) {
-    activeSubTab.value = subtab
-  }
-})
 </script>
 
 <template>

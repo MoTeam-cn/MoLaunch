@@ -10,10 +10,9 @@
  * - 资源包编辑器（不进入游戏可视化查看/编辑资源包）
  * - 种子地图
  *
- * 深链支持：URL `?subtab=screenshot` 可直接切到对应子页签。
+ * 深链支持：URL `?subtab=screenshot` 可直接切到对应子页签（由 SubTabBar 内置持久化恢复）。
  */
-import { onMounted, ref, defineAsyncComponent } from 'vue'
-import { useRoute } from 'vue-router'
+import { ref, defineAsyncComponent } from 'vue'
 const SubTabBar = defineAsyncComponent(() => import('@/components/common/SubTabBar.vue'))
 import { CameraIcon, CubeIcon, FolderIcon, MapIcon, PhotoIcon, TableCellsIcon } from '@heroicons/vue/24/outline'
 const ArchiveManager = defineAsyncComponent(() => import('./archive/ArchiveManager.vue'))
@@ -32,15 +31,6 @@ const subTabs = [
   { id: 'seedmap', label: '种子地图', icon: MapIcon },
 ]
 const activeSubTab = ref('archive')
-
-const route = useRoute()
-
-onMounted(() => {
-  const subtab = route.query.subtab as string | undefined
-  if (subtab && subTabs.some((t) => t.id === subtab)) {
-    activeSubTab.value = subtab
-  }
-})
 </script>
 
 <template>

@@ -10,10 +10,9 @@
  * - 版本 JSON 编辑
  * - 正版玩家皮肤下载
  *
- * 深链支持：URL `?subtab=palette` 可直接切到对应子页签。
+ * 深链支持：URL `?subtab=palette` 可直接切到对应子页签（由 SubTabBar 内置持久化恢复）。
  */
-import { onMounted, ref, defineAsyncComponent } from 'vue'
-import { useRoute } from 'vue-router'
+import { ref, defineAsyncComponent } from 'vue'
 const SubTabBar = defineAsyncComponent(() => import('@/components/common/SubTabBar.vue'))
 import { CodeBracketIcon, FaceSmileIcon, MapPinIcon, SwatchIcon, UserIcon, WrenchScrewdriverIcon } from '@heroicons/vue/24/outline'
 const LuckyTool = defineAsyncComponent(() => import('../quick-tools/LuckyTool.vue'))
@@ -32,15 +31,6 @@ const subTabs = [
   { id: 'skin', label: '皮肤下载', icon: UserIcon },
 ]
 const activeSubTab = ref('luck')
-
-const route = useRoute()
-
-onMounted(() => {
-  const subtab = route.query.subtab as string | undefined
-  if (subtab && subTabs.some((t) => t.id === subtab)) {
-    activeSubTab.value = subtab
-  }
-})
 </script>
 
 <template>

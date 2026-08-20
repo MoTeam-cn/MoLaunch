@@ -6,6 +6,8 @@
 
 ### Changed
 
+- **顶部子菜单（SubTabBar）内置 URL 持久化**（[SubTabBar.vue](src/components/common/SubTabBar.vue) / [useTabPersistence.ts](src/composables/useTabPersistence.ts) / [SettingsMore.vue](src/views/settings/SettingsMore.vue) / [CommonPage.vue](src/views/tools/CommonPage.vue) / [StoragePage.vue](src/views/tools/StoragePage.vue) / [CreateCmdPage.vue](src/views/tools/CreateCmdPage.vue) / [JavaDiagPage.vue](src/views/tools/JavaDiagPage.vue) / [ModNetworkPage.vue](src/views/tools/ModNetworkPage.vue)）：① **SubTabBar 内置持久化**：选中态双向同步到 `?subtab=`（`persistKey` prop 可自定义，避免与左侧菜单 `?tab=` 冲突），刷新页面保留当前子页签，深链 `?subtab=xxx` 直接恢复；② **useTabPersistence 支持自定义 query key**：新增第 4 参数 `key`（默认 `'tab'`），NavSidebar 调用不变；③ **移除 6 处页面 onMounted 单向读 `?subtab=` 逻辑**（SettingsMore / CommonPage / StoragePage / CreateCmdPage / JavaDiagPage / ModNetworkPage），由 SubTabBar 内置恢复替代，Login / SettingsDeveloper 自动获得刷新保持能力。
+
 - **开发者存储信息页补充新目录**（[developer.rs](src-tauri/src/commands/system/developer.rs) / [developer.ts](src/utils/api/developer.ts) / [StorageTab.vue](src/views/settings/developer/StorageTab.vue)）：`StorageDirs` 补充下载目录（`.Molaunch/Download/`）、frp 数据目录（`.Molaunch/frp/`，隧道配置/厂商状态/frpc 日志/配置）与 AppData 全局共享的 easytier 内核目录（`easytier/`）、更新器目录（`updater/`）、待安装更新文件（`last.exe`，定位），存储信息页与 AppData 全局共享卡片同步展示。
 
 ## [0.3.7-rc2] - 2026-08-20

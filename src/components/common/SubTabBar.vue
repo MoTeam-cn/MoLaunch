@@ -5,11 +5,14 @@
  * 用于页面内的子页签切换（如：关于 / 鸣谢 / 教程）。
  * 支持 sticky 固定模式，滚动时子菜单栏吸顶。
  * 底部选中指示条为单条滑动动画（跟随 active tab 平滑移动）。
+ * 内置 URL 持久化：选中态同步到 ?subtab=，刷新页面保留当前子页签
+ * （persistKey 可自定义，避免与左侧菜单 ?tab= 冲突）。
  *
  * 用法：
  * <SubTabBar v-model="activeTab" :tabs="tabs" sticky />
  */
 import { ref, nextTick, watch, onMounted } from 'vue'
+import { useTabPersistence } from '@/composables/useTabPersistence'
 
 interface Tab {
   id: string
@@ -21,10 +24,13 @@ interface Props {
   tabs: Tab[]
   modelValue: string
   sticky?: boolean
+  /** URL query 键名（默认 'subtab'） */
+  persistKey?: string
 }
 
 const props = withDefaults(defineProps<Props>(), {
   sticky: false,
+  persistKey: 'subtab',
 })
 const emit = defineEmits<{ 'update:modelValue': [value: string] }>()
 
@@ -33,6 +39,14 @@ const hovered = ref(false)
 const containerRef = ref<HTMLElement | null>(null)
 /** 滑动指示条位置（left/width，相对容器内容原点） */
 const indicatorStyle = ref({ left: '0px', width: '0px' })
+
+// tab 选中态 URL 持久化（刷新页面保留当前子页签；深链 ?subtab=xxx 直接恢复）
+useTabPersistence(
+  () => props.modelValue,
+  (tab) => props.tabs.some((t) => t.id === tab),
+  (tab) => emit('update:modelValue', tab),
+  props.persistKey,
+)
 
 /** 计算 active tab 的位置，驱动指示条滑动 */
 function updateIndicator() {
