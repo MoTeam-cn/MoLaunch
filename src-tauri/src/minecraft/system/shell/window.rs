@@ -13,6 +13,11 @@ use super::exec::shell_err;
 ///
 /// 返回 stdout（已 trim）。脚本失败时返回错误字符串（含 stderr）。
 /// 需要用户在"系统设置 > 隐私与安全性 > 辅助功能"中授权启动器。
+///
+/// 安全说明：`script` 由调用方构造，用户可控字段（如窗口标题）必须先用
+/// [`apple_script_literal`] 转义后再拼入脚本，防止 AppleScript 注入。
+/// 当前调用方：`is_window_visible` 仅含数字 pid（内部固定脚本，输入源可信）；
+/// `set_window_title` 已对 title 做 `\` 与 `"` 转义。
 #[cfg(target_os = "macos")]
 pub fn run_osascript(script: &str) -> Result<std::process::Output, String> {
     log_info!("[Shell] osascript -e <script>");
@@ -21,6 +26,26 @@ pub fn run_osascript(script: &str) -> Result<std::process::Output, String> {
         .arg(script)
         .output()
         .map_err(|e| shell_err("osascript", e))
+}
+
+/// 将字符串转义为 AppleScript 字符串字面量（转义反斜杠与双引号）
+///
+/// 与 admin.rs 中同名私有函数逻辑一致，此处为公共版本供调用方复用。
+/// AppleScript 字符串字面量中仅 `\` 与 `"` 需要转义；`$()` 等 shell 特殊字符
+/// 经 `osascript -e` 直接传给解释器、不经过 shell，无注入风险。
+#[cfg(target_os = "macos")]
+pub fn apple_script_literal(s: &str) -> String {
+    let mut out = String::with_capacity(s.len() + 2);
+    out.push('"');
+    for c in s.chars() {
+        match c {
+            '\\' => out.push_str("\\\\"),
+            '"' => out.push_str("\\\""),
+            _ => out.push(c),
+        }
+    }
+    out.push('"');
+    out
 }
 
 /// Linux：xdotool search --pid <pid> [--onlyvisible]
