@@ -8,14 +8,14 @@ import { showError } from '@/utils/modal'
 import { formatTimestamp } from '@/utils/format'
 const Tooltip = defineAsyncComponent(() => import('@/components/common/Tooltip.vue'))
 const Button = defineAsyncComponent(() => import('@/components/common/Button.vue'))
+const NavSidebar = defineAsyncComponent(() => import('@/components/common/NavSidebar.vue'))
 const LoaderSelect = defineAsyncComponent(() => import('./LoaderSelect.vue'))
 const VersionSection = defineAsyncComponent(() => import('@/components/version/VersionSection.vue'))
 const Community = defineAsyncComponent(() => import('./Community.vue'))
-const DownloadSidebar = defineAsyncComponent(() => import('./downloads/DownloadSidebar.vue'))
 import {
   CubeIcon, ArchiveBoxIcon,
   StarIcon, BeakerIcon, ClockIcon, SparklesIcon,
-  ArrowPathIcon, FaceSmileIcon,
+  ArrowPathIcon, FaceSmileIcon, FolderOpenIcon,
   PuzzlePieceIcon, SwatchIcon, BoltIcon, CircleStackIcon,
 } from '@heroicons/vue/24/outline'
 import { resolveVersionIcon as resolveIconByType } from '@/composables/useVersionMeta'
@@ -36,10 +36,6 @@ const activeCategory = ref('vanilla')
 const selectedVersion = ref<string | null>(null)
 
 // 官方下载分类（仅保留原版游戏；模组加载器/整合包已由社区资源替代）
-const topCategories = [
-  { id: 'vanilla', label: '原版游戏', icon: CubeIcon },
-]
-
 const communityCategories: { id: string; type: ResourceType; label: string; icon: any }[] = [
   { id: 'community:Mod', type: 'Mod', label: 'Mod', icon: PuzzlePieceIcon },
   { id: 'community:ModPack', type: 'ModPack', label: '整合包', icon: ArchiveBoxIcon },
@@ -47,6 +43,12 @@ const communityCategories: { id: string; type: ResourceType; label: string; icon
   { id: 'community:Shader', type: 'Shader', label: '光影', icon: BoltIcon },
   { id: 'community:DataPack', type: 'DataPack', label: '数据包', icon: CircleStackIcon },
 ]
+
+// 侧边栏分类（原版游戏 + 社区资源分组，供 NavSidebar 渲染）
+const categories = computed(() => [
+  { id: 'vanilla', label: '原版游戏', icon: CubeIcon },
+  ...communityCategories.map((c) => ({ id: c.id, label: c.label, icon: c.icon, group: '社区资源' })),
+])
 
 const communityResourceType = computed<ResourceType | null>(() =>
   activeCategory.value.startsWith('community:')
@@ -130,14 +132,15 @@ onMounted(async () => {
 
 <template>
   <div class="flex h-full rounded-xl overflow-hidden bg-white shadow-sm">
-    <!-- 左侧菜单 -->
-    <DownloadSidebar
-      :top-categories="topCategories"
-      :community-categories="communityCategories"
-      :active-category="activeCategory"
-      @select="handleSelectCategory"
-      @open-game-dir="handleOpenGameDir"
-    />
+    <!-- 左侧菜单（公共组件，tab 同步到 URL query；底部插槽渲染「打开游戏目录」按钮） -->
+    <NavSidebar :model-value="activeCategory" :categories="categories" @update:model-value="handleSelectCategory">
+      <div class="p-3 border-t border-gray-200">
+        <Button type="ghost" long @click="handleOpenGameDir">
+          <template #icon><FolderOpenIcon class="w-4 h-4" /></template>
+          打开游戏目录
+        </Button>
+      </div>
+    </NavSidebar>
 
     <!-- 右侧内容 -->
     <div class="flex-1 flex flex-col overflow-hidden">

@@ -36,6 +36,8 @@ interface NavCategory {
   disabled?: boolean
   /** 可选封禁态：灰色置灰但点击仍 emit，由父组件拦截弹窗提示原因（区别于 disabled：disabled 完全不响应点击） */
   sealed?: boolean
+  /** 可选分组标题（如「社区资源」）：与上一项 group 不同时渲染分组标题 + 分隔线 */
+  group?: string
 }
 
 const props = defineProps<{
@@ -126,14 +128,20 @@ useTabPersistence(
 <template>
   <aside class="w-48 bg-white border-r border-gray-200 flex flex-col shrink-0">
     <div data-inner-scroll class="flex-1 overflow-y-auto py-4">
-      <div v-for="cat in categories" :key="cat.id">
+      <template v-for="(cat, idx) in categories" :key="cat.id">
+        <!-- 分组标题：group 非空且与上一项不同时渲染（分隔线 + 标题） -->
+        <div v-if="cat.group && cat.group !== categories[idx - 1]?.group">
+          <div v-if="idx > 0" class="my-2 mx-4 border-t border-gray-200"></div>
+          <div class="px-4 py-1 text-[11px] font-semibold text-gray-400 uppercase tracking-wide">{{ cat.group }}</div>
+        </div>
         <!-- 保留原生 button：导航菜单项（w-full 布局 + active 状态 + 图标 + 展开箭头），
              Button.vue 的 scoped size 类固定 height/padding 无法承载列表项布局 -->
         <!-- 父项（无 children 时为普通项，有 children 时为可展开项） -->
         <button
           type="button"
-          class="w-full flex items-center px-4 py-2.5 text-sm font-medium transition-colors"
+          class="w-full flex items-center py-2.5 text-sm font-medium transition-colors"
           :class="[
+            cat.group ? 'pl-8 pr-4' : 'px-4',
             cat.disabled || cat.sealed
               ? 'text-gray-300 cursor-not-allowed'
               : isParentActive(cat)
@@ -181,7 +189,9 @@ useTabPersistence(
             </button>
           </div>
         </div>
-      </div>
+      </template>
     </div>
+    <!-- 底部插槽（如「打开游戏目录」按钮） -->
+    <slot />
   </aside>
 </template>
