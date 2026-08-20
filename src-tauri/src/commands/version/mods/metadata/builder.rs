@@ -1,11 +1,12 @@
 //! Mod 元数据读取编排：MetaBuilder 累积合并 → 版本号 fallback 与有效性校验 → 译名查询
 //! 4 个来源读取函数（merge_*）位于 `sources`。
 
-use super::super::types::{ModMeta, ModMetadata};
+use super::super::types::ModMeta;
 use super::sources::{
     merge_fabric_mod_json, merge_fml_cache_annotation, merge_mcmod_info, merge_mods_toml,
     read_manifest_version,
 };
+use crate::minecraft::community::types::ModMetadata;
 
 /// 从 jar 文件内读取 mod 元数据：译名、描述、版本号、slug
 ///

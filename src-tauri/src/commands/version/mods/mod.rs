@@ -16,12 +16,12 @@ pub mod update;
 pub mod watcher;
 
 // 对外暴露类型和辅助函数（保持向后兼容路径）
-// 注意：ModMetadata 在 metadata.rs 中是私有 use 引入的（use super::types::ModMetadata），
-// 故必须从 types 直接重导出，不能走 metadata 中转
+// ModMetadata 定义已下沉至 minecraft::community::types（消除架构倒置），此处 re-export 保持旧路径
+#[allow(unused_imports)] // 向后兼容 re-export：preload 已直接引用领域层，保留旧路径供外部引用
+pub(crate) use crate::minecraft::community::types::ModMetadata;
 pub(crate) use helpers::get_mods_dir;
 pub(crate) use metadata::read_mod_metadata;
 pub use types::ModInfo;
-pub(crate) use types::ModMetadata;
 
 /// 统一版本 Mod 管理 IPC 入口
 ///

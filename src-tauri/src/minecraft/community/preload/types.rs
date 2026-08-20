@@ -2,8 +2,7 @@
 
 use serde::Serialize;
 
-use crate::commands::version::mods::ModMetadata;
-use crate::minecraft::community::types::{ResourceProject, ResourceType};
+use crate::minecraft::community::types::{ModMetadata, ResourceProject, ResourceType};
 
 /// 预加载范围配置（mods / packs 共用）
 ///

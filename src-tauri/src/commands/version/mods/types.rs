@@ -1,8 +1,8 @@
 //! Mod 数据类型
 //! 包含：
 //! - ModInfo：list_mods 命令返回的单个 Mod 信息（前端消费）
-//! - ModMetadata：jar 内 mod 元数据（pub(crate)，供 preload 命令消费）
 //! - ModMeta：jar 内 mod 元数据中间结构（仅 mods 子模块内部使用）
+//! - ModMetadata：定义已下沉至 minecraft::community::types，本模块 re-export 保持旧路径
 
 use serde::{Deserialize, Serialize};
 
@@ -37,18 +37,6 @@ pub struct ModInfo {
     /// 用于「详情」按钮关联 CF/MR 平台工程和「前往百科」按钮查 mcmod.cn 直链
     #[serde(default)]
     pub slug: String,
-}
-
-/// jar 内 mod metadata 最终结果（供 preload 模块使用）
-#[derive(Debug, Clone, Default, serde::Serialize)]
-pub(crate) struct ModMetadata {
-    pub slug: String,
-    pub description: String,
-    pub version: String,
-    pub translated_name: String,
-    /// 依赖的 mod_id 列表（来自 fabric.mod.json 的 depends / mods.toml 的 [[dependencies]]）
-    /// mcmod.info 和 fml_cache_annotation 来源无依赖信息，保持空 vec
-    pub dependencies: Vec<String>,
 }
 
 /// jar 内 mod metadata 中间结构（仅在 mods 子模块内部使用，由 read_fabric_mod_meta 等填充，finalize_metadata 转换为 ModMetadata）

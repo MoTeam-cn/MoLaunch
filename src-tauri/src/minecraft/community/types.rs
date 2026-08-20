@@ -232,3 +232,15 @@ pub struct SearchResult {
     pub page: u32,
     pub page_size: u32,
 }
+
+/// jar 内 mod metadata 最终结果（供 preload 模块使用）
+#[derive(Debug, Clone, Default, Serialize)]
+pub(crate) struct ModMetadata {
+    pub slug: String,
+    pub description: String,
+    pub version: String,
+    pub translated_name: String,
+    /// 依赖的 mod_id 列表（来自 fabric.mod.json 的 depends / mods.toml 的 [[dependencies]]）
+    /// mcmod.info 和 fml_cache_annotation 来源无依赖信息，保持空 vec
+    pub dependencies: Vec<String>,
+}
