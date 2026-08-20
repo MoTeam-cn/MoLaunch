@@ -7,6 +7,7 @@
  */
 import { ref, computed, nextTick, defineAsyncComponent } from 'vue'
 import DOMPurify from 'dompurify'
+import { useCollapseAnimation } from '@/composables/useCollapseAnimation'
 import {
   ExclamationTriangleIcon,
   XCircleIcon,
@@ -40,7 +41,7 @@ interface ModalOptions {
 }
 
 const visible = ref(false)
-const showDetails = ref(false)
+const { isOpen, toggle, contentClass, iconClass } = useCollapseAnimation()
 /** 消息队列：同时触发多条时排队，当前一条关闭后依次展示，保证不丢任何一条 */
 const queue = ref<ModalOptions[]>([])
 const options = ref<ModalOptions>({
@@ -74,7 +75,7 @@ function openCurrent() {
   const opts = queue.value[0]
   if (!opts) return
   options.value = opts
-  showDetails.value = false
+  isOpen.value = false
   inputValue.value = opts.inputValue ?? ''
   visible.value = true
   // 输入框模式下自动聚焦
@@ -226,19 +227,16 @@ defineExpose({
       <Button
         type="text"
         size="mini"
-        :aria-expanded="showDetails"
-        @click="showDetails = !showDetails"
+        :aria-expanded="isOpen"
+        @click="toggle"
       >
         查看详情
         <ChevronDownIcon
-          class="h-3.5 w-3.5 transition-transform duration-300 ease-in-out"
-          :class="showDetails ? 'rotate-180' : ''"
+          class="h-3.5 w-3.5"
+          :class="iconClass"
         />
       </Button>
-      <div
-        class="grid transition-all duration-300 ease-in-out"
-        :class="showDetails ? 'grid-rows-[1fr]' : 'grid-rows-[0fr]'"
-      >
+      <div :class="contentClass">
         <div class="overflow-hidden">
           <div class="mt-2 p-2.5 bg-gray-50 rounded text-xs text-gray-600 font-mono break-all max-h-40 overflow-y-auto">
             {{ options.details }}

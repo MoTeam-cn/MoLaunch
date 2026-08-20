@@ -12,15 +12,12 @@
  * - UI 设计理念（单列布局 / Arco Design 紧凑风格）
  * - 数据存储与安全（本地加密、设备 ID 绑定）
  */
-import { ref, defineAsyncComponent } from 'vue'
+import { defineAsyncComponent } from 'vue'
 import { ChevronDownIcon, BeakerIcon } from '@heroicons/vue/24/outline'
+import { useCollapseAnimation } from '@/composables/useCollapseAnimation'
 const Tag = defineAsyncComponent(() => import('@/components/common/Tag.vue'))
 
-const isOpen = ref(false)
-
-function toggle() {
-  isOpen.value = !isOpen.value
-}
+const { isOpen, toggle, contentClass, iconClass } = useCollapseAnimation()
 </script>
 
 <template>
@@ -39,16 +36,13 @@ function toggle() {
         <Tag size="small" color="gray">点击展开</Tag>
       </div>
       <ChevronDownIcon
-        class="h-4 w-4 flex-none text-gray-400 transition-transform duration-300 ease-in-out"
-        :class="isOpen ? 'rotate-180' : ''"
+        class="h-4 w-4 flex-none text-gray-400"
+        :class="iconClass"
       />
     </button>
 
     <!-- 内容区（grid-template-rows 0fr→1fr 平滑高度过渡） -->
-    <div
-      class="grid transition-all duration-300 ease-in-out"
-      :class="isOpen ? 'grid-rows-[1fr]' : 'grid-rows-[0fr]'"
-    >
+    <div :class="contentClass">
       <div class="overflow-hidden">
         <div class="border-t border-gray-100 px-4 py-3">
           <p class="text-[12px] leading-relaxed text-gray-600">
