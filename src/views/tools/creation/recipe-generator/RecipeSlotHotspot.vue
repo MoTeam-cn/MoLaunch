@@ -12,7 +12,7 @@ import type { Display } from './slot-display'
 
 withDefaults(
   defineProps<{
-    slot: RecipeSlot
+    slotId: RecipeSlot
     box: RecipeLayoutSlotBox
     display: Display | null
     disabled: boolean
@@ -52,9 +52,9 @@ function slotBoxStyle(box: RecipeLayoutSlotBox) {
       disabled,
     }"
     :style="slotBoxStyle(box)"
-    :data-recipe-slot="slot"
-    @click="!disabled && emit('click', slot)"
-    @wheel="!disabled && emit('wheel', $event, slot)"
+    :data-recipe-slot="slotId"
+    @click="!disabled && emit('click', slotId)"
+    @wheel="!disabled && emit('wheel', $event, slotId)"
     @mouseenter="emit('hover', $event, disabled ? null : display)"
     @mouseleave="emit('leave')"
   >

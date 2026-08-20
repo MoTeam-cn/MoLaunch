@@ -138,7 +138,7 @@ function clearCloseTimer() {
       <RecipeSlotHotspot
         v-for="entry in layoutSlots"
         :key="entry.slot"
-        :slot="entry.slot"
+        :slot-id="entry.slot"
         :box="entry.box"
         :display="entry.display"
         :disabled="entry.disabled"

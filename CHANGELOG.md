@@ -2,6 +2,12 @@
 
 本项目所有重要变更均会记录在此文件中。格式参考 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/)。
 
+## [Unreleased]
+
+### Fixed
+
+- **修复 ESLint 检查错误（14 处）**（[RecipeSettingsForm.vue](src/views/tools/creation/recipe-generator/RecipeSettingsForm.vue) / [RecipeSlotHotspot.vue](src/views/tools/creation/recipe-generator/RecipeSlotHotspot.vue) / [RecipeSlotsEditor.vue](src/views/tools/creation/recipe-generator/RecipeSlotsEditor.vue) / [htmlShadowRenderer.ts](src/plugins/custom-layout/htmlShadowRenderer.ts) / [format.ts](src/utils/format.ts)）：① RecipeSettingsForm 的 `recipe` prop 改为 `defineModel` 双向绑定（消除 11 处 vue/no-mutating-props 直接修改 prop）；② RecipeSlotHotspot 的 `slot` prop 更名为 `slotId`（slot 为 Vue 保留属性名，消除 vue/no-deprecated-slot-attribute）；③ htmlShadowRenderer 危险脚本正则去掉字符类内不必要的 `\[` 转义（no-useless-escape）；④ format.ts 文件名控制字符检查由正则字面量改为 charCodeAt 码点判断（no-control-regex）。
+
 ## [0.3.7-rc3] - 2026-08-20
 
 ### Added

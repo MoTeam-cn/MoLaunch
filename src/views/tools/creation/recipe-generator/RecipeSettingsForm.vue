@@ -15,13 +15,15 @@ import {
 } from '@/utils/recipe-generator/versions'
 import type { JavaVersionId, RecipeState } from '@/utils/recipe-generator/types'
 
-const props = defineProps<{
-  recipe: RecipeState
+defineProps<{
   selectedVersion: JavaVersionId
   versionOptions: { label: string; value: string }[]
   typeOptions: { label: string; value: string }[]
   categoryOptions: { label: string; value: string }[]
 }>()
+
+/** 配方状态（v-model 双向绑定，父组件持有 reactive 对象） */
+const recipe = defineModel<RecipeState>({ required: true })
 
 const emit = defineEmits<{
   'update:selected-version': [version: JavaVersionId]
@@ -29,7 +31,7 @@ const emit = defineEmits<{
 
 function onCookingTimeChange(value: string | number) {
   const str = String(value).trim()
-  props.recipe.cooking.time = str === '' ? null : Number(str)
+  recipe.value.cooking.time = str === '' ? null : Number(str)
 }
 </script>
 

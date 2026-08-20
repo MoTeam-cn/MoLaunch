@@ -114,7 +114,7 @@ function setupMolaunchApi() {
  * - 主窗口 DOM 篡改（document.body / documentElement 内容替换、document.write）
  */
 const DANGEROUS_SCRIPT_PATTERNS: RegExp[] = [
-  /molaunch\s*[\[.]\s*['"]?(spawnProcess|createWindow)['"]?/i,
+  /molaunch\s*[[.]\s*['"]?(spawnProcess|createWindow)['"]?/i,
   /__TAURI_INTERNALS__/,
   /__TAURI__/,
   /document\.(body|documentElement)\.(innerHTML|outerHTML)\s*=/,

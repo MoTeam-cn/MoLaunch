@@ -229,7 +229,7 @@ async function exportPack() {
       <!-- 右：功能区（配方设置） -->
       <div class="recipe-functions">
         <RecipeSettingsForm
-          :recipe="recipe"
+          v-model="recipe"
           :selected-version="selectedVersion"
           :version-options="VERSION_OPTIONS"
           :type-options="typeOptions"

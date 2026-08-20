@@ -95,8 +95,12 @@ export function isSafeFileName(name: string): boolean {
   if (/[\\/]/.test(name)) return false
   if (name === '.' || name === '..') return false
   if (/^[a-zA-Z]:/.test(name)) return false
-  // 拒绝 Windows 非法字符与控制字符
-  if (/[<>:"|?*\x00-\x1f]/.test(name)) return false
+  // 拒绝 Windows 非法字符
+  if (/[<>:"|?*]/.test(name)) return false
+  // 拒绝控制字符（\x00-\x1f，正则字面量含控制字符会触发 no-control-regex，改用码点判断）
+  for (let i = 0; i < name.length; i++) {
+    if (name.charCodeAt(i) < 0x20) return false
+  }
   return true
 }
 
