@@ -4,6 +4,10 @@
 
 ## [Unreleased]
 
+### Added
+
+- **easytier 自建信令节点方案文档**（[EASYTIER_SELF_HOSTED_NODE_DESIGN.md](docs/EASYTIER_SELF_HOSTED_NODE_DESIGN.md)）：分析确认陶瓦默认公共节点已全部失效、HMCL/Axolotl 均未注入私有节点（HMCL 用 Glavo 动态节点列表 `terracotta.glavo.site/nodes`，Axolotl 用 `wss://center.node.1tmc.top`）；决定不挤第三方生态，记录自建 easytier 公共节点方案（服务器 `--public-server -p 11010` 部署 + 客户端 `easytier_public_peers` 配置 + 可选动态节点列表），含实施清单与风险注意。
+
 ### Fixed
 
 - **消除 macOS 构建 dead_code 警告**（[admin.rs](src-tauri/src/minecraft/system/shell/admin.rs) / [window.rs](src-tauri/src/minecraft/system/shell/window.rs)）：`relaunch_as_admin` 改用 window.rs 公共 `apple_script_literal` 转义函数，删除 admin.rs 中逻辑完全一致的私有重复实现，消除 macOS 上公共函数从未被调用的 `dead_code` 警告。
