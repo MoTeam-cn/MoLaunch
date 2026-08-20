@@ -1,8 +1,8 @@
 //! 皮肤模块统一分发逻辑（skin 域 manager 模块）
 //!
 //! 使用 `utils::dispatcher::Dispatcher` 注册式分发，7 个 action 覆盖皮肤/披风查询、
-//! 上传、装备、下载。`download_url_to_file` 不需要 state；`get_skin_cape_info` /
-//! `get_skin_url` / `get_cape_url` 需要 `&app` 用于图片缓存。
+//! 上传、装备、下载。`download_url_to_file` 需要 state（路径校验用下载目录）；
+//! `get_skin_cape_info` / `get_skin_url` / `get_cape_url` 需要 `&app` 用于图片缓存。
 
 use once_cell::sync::Lazy;
 use serde::Deserialize;
@@ -98,10 +98,10 @@ static DISPATCHER: Lazy<Dispatcher> = Lazy::new(|| {
 
     d.register(
         "download_url_to_file",
-        handler!(_state, _app, params, {
+        handler!(state, _app, params, {
             let p: DownloadUrlToFileParams =
                 serde_json::from_value(params).map_err(|e| format!("参数解析失败: {}", e))?;
-            download_url_to_file(p.url, p.path).await?;
+            download_url_to_file(&state, p.url, p.path).await?;
             serde_json::to_value(()).map_err(|e| e.to_string())
         }),
     );
