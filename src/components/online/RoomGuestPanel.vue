@@ -21,6 +21,7 @@ const Tooltip = defineAsyncComponent(() => import('@/components/common/Tooltip.v
 const Alert = defineAsyncComponent(() => import('@/components/common/Alert.vue'))
 const ModpackRequirementCard = defineAsyncComponent(() => import('./ModpackRequirementCard.vue'))
 const RoomToolsDrawer = defineAsyncComponent(() => import('./RoomToolsDrawer.vue'))
+const EasyTierPeerList = defineAsyncComponent(() => import('./EasyTierPeerList.vue'))
 import { showConfirm } from '@/utils/modal'
 import { toastError, toastSuccess } from '@/utils/toast'
 import { copyToClipboard } from '@/utils/clipboard'
@@ -238,6 +239,8 @@ onUnmounted(() => {
         <ExclamationTriangleIcon class="w-3.5 h-3.5 mt-0.5 shrink-0" />
         <span>{{ easytier.error.value }}</span>
       </div>
+      <!-- 组网设备列表（组网人数 + 各节点虚拟 IP，5s 轮询） -->
+      <EasyTierPeerList />
     </Card>
 
     <!-- 进服地址 -->

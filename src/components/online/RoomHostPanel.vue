@@ -19,6 +19,7 @@ const Input = defineAsyncComponent(() => import('@/components/common/Input.vue')
 const HostRoomInfoCard = defineAsyncComponent(() => import('./HostRoomInfoCard.vue'))
 const EasyTierStatusBadge = defineAsyncComponent(() => import('./EasyTierStatusBadge.vue'))
 const RoomToolsDrawer = defineAsyncComponent(() => import('./RoomToolsDrawer.vue'))
+const EasyTierPeerList = defineAsyncComponent(() => import('./EasyTierPeerList.vue'))
 import { XCircleIcon, ExclamationTriangleIcon, Cog6ToothIcon } from '@heroicons/vue/24/outline'
 
 const store = useOnlineStore()
@@ -110,6 +111,8 @@ onMounted(() => {
         <ExclamationTriangleIcon class="w-3.5 h-3.5 mt-0.5 shrink-0" />
         <span>{{ roomHost.easytier.error.value }}</span>
       </div>
+      <!-- 组网设备列表（组网人数 + 各节点虚拟 IP，5s 轮询） -->
+      <EasyTierPeerList />
       <div class="mt-3 pt-3 border-t border-gray-100 text-xs text-gray-500">
         联机中心自动托管 MC 端口：游戏开放局域网后自动发现并更新进服端口，加入方组网后同步探测
       </div>

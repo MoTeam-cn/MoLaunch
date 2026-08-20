@@ -9,6 +9,7 @@ import type {
   EasyTierInstallStatus,
   EasyTierJoinParams,
   EasyTierJoinResult,
+  EasyTierPeer,
   EasyTierStatusResult,
   GithubProxy,
   ScaffoldingClientProbeParams,
@@ -31,6 +32,11 @@ export function stopEasyTier(): Promise<{ success: boolean }> {
 /** 查询当前 easytier 运行状态（joined/version/pid/rpcPortal） */
 export function getEasyTierStatus(): Promise<EasyTierStatusResult> {
   return onlineManager<EasyTierStatusResult>(ONLINE_ACTIONS.EASYTIER_STATUS)
+}
+
+/** 查询当前虚拟网络节点列表（过滤中继后，含本机；未组网返回空数组） */
+export function getEasyTierPeers(): Promise<EasyTierPeer[]> {
+  return onlineManager<EasyTierPeer[]>(ONLINE_ACTIONS.EASYTIER_PEERS)
 }
 
 /** 查询 easytier 内核安装状态（installed/version/latestVersion/downloading） */

@@ -101,6 +101,7 @@ export const ONLINE_ACTIONS = {
   EASYTIER_JOIN: 'easytier_join',
   EASYTIER_STOP: 'easytier_stop',
   EASYTIER_STATUS: 'easytier_status',
+  EASYTIER_PEERS: 'easytier_peers',
   // easytier 内核外部下载安装
   EASYTIER_INSTALL_STATUS: 'easytier_install_status',
   EASYTIER_INSTALL: 'easytier_install',

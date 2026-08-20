@@ -56,6 +56,18 @@ export interface EasyTierStatusResult {
   virtualIp: string
 }
 
+/** `easytier_peers` 返回的虚拟网络节点（过滤中继后，含本机） */
+export interface EasyTierPeer {
+  /** 节点 hostname（房主为 `scaffolding-mc-server-{center_port}`） */
+  hostname: string
+  /** 虚拟 IP（如 `10.144.144.1`） */
+  virtualIp: string
+  /** 是否本机节点 */
+  isSelf: boolean
+  /** 与中继节点的 RTT 延迟（ms，未测得时为 `-`） */
+  latencyMs: string
+}
+
 /** `easytier_install_status` 返回（easytier 内核安装状态） */
 export interface EasyTierInstallStatus {
   /** 是否已安装（core 文件存在） */

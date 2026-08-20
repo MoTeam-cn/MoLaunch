@@ -276,6 +276,17 @@ pub fn register(d: &mut Dispatcher) {
         }),
     );
 
+    d.register(
+        "easytier_peers",
+        handler!(state, _app, _params, {
+            let guard = state.easytier.lock().await;
+            match &*guard {
+                Some(et) => serde_json::to_value(et.peers().await?).map_err(|e| e.to_string()),
+                None => Ok(serde_json::json!([])),
+            }
+        }),
+    );
+
     host::register_host(d);
     guest::register_guest(d);
 }

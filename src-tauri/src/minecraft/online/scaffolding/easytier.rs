@@ -9,6 +9,7 @@
 
 use crate::log_debug;
 use crate::minecraft::online::scaffolding::server::CENTER_HOSTNAME_PREFIX;
+use serde::Serialize;
 use std::path::{Path, PathBuf};
 use tokio::io::{AsyncBufReadExt, BufReader};
 use tokio::process::{Child, Command};
@@ -22,6 +23,20 @@ pub struct PortForwardRule {
     pub proto: String,
     pub bind_addr: String,
     pub dst_addr: String,
+}
+
+/// 虚拟网络节点摘要（过滤中继：easytier 中继节点无虚拟 IP，不计入）
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct PeerInfo {
+    /// 节点 hostname（房主为 `scaffolding-mc-server-{center_port}`，房客为自定义/默认）
+    pub hostname: String,
+    /// 虚拟 IP（如 `10.144.144.1`）
+    pub virtual_ip: String,
+    /// 是否本机节点（easytier `cost=Local` 表示本机）
+    pub is_self: bool,
+    /// 与中继节点的 RTT 延迟（ms，未测得时为 `-`）
+    pub latency_ms: String,
 }
 
 /// easytier-core 子进程句柄
@@ -215,15 +230,42 @@ impl EasyTier {
         ))
     }
 
-    /// 虚拟网络在线节点数（`peer list` 返回节点数组，含本机）。
+    /// 虚拟网络在线设备列表（`peer list` 过滤中继节点后，含本机）。
     ///
-    /// 若配置了公共中继节点（`--peers`）会一并计入导致偏大，服务端会按房间人数上限钳制。
-    pub async fn peer_count(&self) -> Result<usize, String> {
+    /// easytier 中继节点（如 `PublicServer_moteam-servers`）无虚拟 IP（`ipv4` 为空），
+    /// 据此过滤，保证组网人数/设备列表只反映真实在线设备。
+    pub async fn peers(&self) -> Result<Vec<PeerInfo>, String> {
         let nodes = self.easytier_cli(&["peer", "list"]).await?;
         let Some(nodes) = nodes.as_array() else {
             return Err("easytier-cli 输出不是 JSON 数组".to_string());
         };
-        Ok(nodes.len())
+        let mut peers: Vec<PeerInfo> = Vec::new();
+        for node in nodes {
+            let ip = node.get("ipv4").and_then(|v| v.as_str()).unwrap_or("");
+            if ip.is_empty() {
+                continue; // 中继节点无虚拟 IP，过滤
+            }
+            peers.push(PeerInfo {
+                hostname: node
+                    .get("hostname")
+                    .and_then(|v| v.as_str())
+                    .unwrap_or("")
+                    .to_string(),
+                virtual_ip: ip.to_string(),
+                is_self: node.get("cost").and_then(|v| v.as_str()) == Some("Local"),
+                latency_ms: node
+                    .get("lat_ms")
+                    .and_then(|v| v.as_str())
+                    .unwrap_or("-")
+                    .to_string(),
+            });
+        }
+        Ok(peers)
+    }
+
+    /// 虚拟网络在线设备数（过滤中继节点后，含本机）。
+    pub async fn peer_count(&self) -> Result<usize, String> {
+        Ok(self.peers().await?.len())
     }
 
     /// 添加用户态端口转发（本地 `bind_addr` 监听到虚拟网络内 `dst_addr`）。
