@@ -13,7 +13,7 @@
  */
 import { ref, computed, onMounted, defineAsyncComponent } from 'vue'
 import { ArrowDownTrayIcon, CheckCircleIcon } from '@heroicons/vue/24/outline'
-const Button = defineAsyncComponent(() => import('@/components/common/Button.vue'))
+const SegmentedButtons = defineAsyncComponent(() => import('@/components/common/SegmentedButtons.vue'))
 const Input = defineAsyncComponent(() => import('@/components/common/Input.vue'))
 const Tag = defineAsyncComponent(() => import('@/components/common/Tag.vue'))
 const AlertV2 = defineAsyncComponent(() => import('@/components/common/AlertV2.vue'))
@@ -31,24 +31,26 @@ import {
 const PRESETS = [25, 21, 17, 16, 8]
 
 const javaStore = useJavaStore()
-const activePreset = ref<number>(21)
-const customMode = ref(false)
+/** 快速选择：预设档位数字或 'custom'（自定义档） */
+const quickSelect = ref<number | 'custom'>(21)
 const customText = ref('')
+
+const customMode = computed(() => quickSelect.value === 'custom')
+const activePreset = computed<number>(() => (typeof quickSelect.value === 'number' ? quickSelect.value : 21))
+
+const quickOptions = computed(() => [
+  ...PRESETS.map((p) => ({ label: `Java ${p}`, value: p })),
+  { label: '自定义', value: 'custom' },
+])
+
+function onQuickSelect(v: string | number | boolean) {
+  quickSelect.value = v as number | 'custom'
+  customText.value = ''
+}
 
 onMounted(() => {
   if (!javaStore.javaLoaded) javaStore.detectJava()
 })
-
-function selectPreset(major: number) {
-  activePreset.value = major
-  customMode.value = false
-  customText.value = ''
-}
-
-function selectCustom() {
-  customMode.value = true
-  customText.value = ''
-}
 
 /** 自定义输入是否违规（自定义模式下有输入但格式/范围不合法） */
 const customInvalid = computed(
@@ -104,18 +106,7 @@ async function onDownloaded() {
       <!-- 快速选择：预设档位 + 自定义 -->
       <div class="flex flex-wrap items-center gap-2">
         <span class="text-xs text-gray-500 flex-none">快速选择：</span>
-        <Button
-          v-for="p in PRESETS"
-          :key="p"
-          :type="!customMode && activePreset === p ? 'primary' : 'outline'"
-          size="small"
-          @click="selectPreset(p)"
-        >
-          Java {{ p }}
-        </Button>
-        <Button :type="customMode ? 'primary' : 'outline'" size="small" @click="selectCustom">
-          自定义
-        </Button>
+        <SegmentedButtons :model-value="quickSelect" :options="quickOptions" @update:model-value="onQuickSelect" />
       </div>
 
       <!-- 自定义输入（仅自定义档选中时显示，宽度自适应不限制） -->

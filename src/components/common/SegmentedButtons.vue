@@ -19,7 +19,7 @@
 import { computed, defineAsyncComponent } from 'vue'
 const Button = defineAsyncComponent(() => import('@/components/common/Button.vue'))
 
-export interface SegmentedOption<T = string> {
+export interface SegmentedOption<T = string | number | boolean> {
   label: string
   value: T
   /** 可选：禁用该项 */

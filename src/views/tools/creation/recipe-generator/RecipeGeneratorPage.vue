@@ -13,6 +13,7 @@ const Drawer = defineAsyncComponent(() => import('@/components/common/Drawer.vue
 const Select = defineAsyncComponent(() => import('@/components/common/Select.vue'))
 const Input = defineAsyncComponent(() => import('@/components/common/Input.vue'))
 const Checkbox = defineAsyncComponent(() => import('@/components/common/Checkbox.vue'))
+const SegmentedButtons = defineAsyncComponent(() => import('@/components/common/SegmentedButtons.vue'))
 import { toastError, toastInfo, toastSuccess } from '@/utils/toast'
 import {
   buildSlotContext,
@@ -122,6 +123,11 @@ const atlasUrl = ref('')
 // 初始为 true：避免首帧渲染时 atlas 仍为 null，把空对象传给子组件触发 prop 校验警告
 const loading = ref(true)
 const activeTab = ref<'items' | 'tags'>('items')
+
+const paletteTabOptions = [
+  { label: '物品', value: 'items' },
+  { label: '标签', value: 'tags' },
+]
 
 const context = computed<RecipeSlotContext>(() => buildSlotContext(items.value, tags.value))
 
@@ -478,18 +484,7 @@ async function exportPack() {
             </button>
           </div>
         </div>
-        <div class="recipe-palette-tabs">
-          <span
-            class="recipe-palette-tab"
-            :class="{ active: activeTab === 'items' }"
-            @click="activeTab = 'items'"
-          >物品</span>
-          <span
-            class="recipe-palette-tab"
-            :class="{ active: activeTab === 'tags' }"
-            @click="activeTab = 'tags'"
-          >标签</span>
-        </div>
+        <SegmentedButtons v-model="activeTab" :options="paletteTabOptions" button-class="flex-1" />
         <ItemPalette
           v-if="activeTab === 'items'"
           :items="items"
@@ -689,25 +684,5 @@ async function exportPack() {
 .recipe-dpad-icon {
   width: 0.9rem;
   height: 0.9rem;
-}
-
-.recipe-palette-tabs {
-  display: flex;
-  border-bottom: 1px solid #f0f1f3;
-}
-
-.recipe-palette-tab {
-  flex: 1;
-  padding: 0.6rem 0;
-  color: #86909c;
-  font-size: 0.8rem;
-  text-align: center;
-  cursor: pointer;
-}
-
-.recipe-palette-tab.active {
-  color: var(--color-primary-500);
-  font-weight: 600;
-  border-bottom: 2px solid var(--color-primary-500);
 }
 </style>

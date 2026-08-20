@@ -12,6 +12,7 @@ import {
   QuestionMarkCircleIcon,
 } from '@heroicons/vue/24/outline'
 const Button = defineAsyncComponent(() => import('@/components/common/Button.vue'))
+const SegmentedButtons = defineAsyncComponent(() => import('@/components/common/SegmentedButtons.vue'))
 const Tooltip = defineAsyncComponent(() => import('@/components/common/Tooltip.vue'))
 const Tag = defineAsyncComponent(() => import('@/components/common/Tag.vue'))
 const AlertV2 = defineAsyncComponent(() => import('@/components/common/AlertV2.vue'))
@@ -27,9 +28,10 @@ const memResult = ref<MemoryOptimizeResult | null>(null)
 
 const memModeTooltip = '轻量模式：仅清空所有进程的工作集，释放几十~几百 MB，响应快、几乎无副作用。\n强力模式：额外清空系统待机内存列表（standby list），可释放数 GB，但已缓存的应用下次启动会变慢。'
 
-function setMemMode(mode: MemoryOptimizeMode) {
-  memMode.value = mode
-}
+const memModeOptions = [
+  { label: '轻量', value: 'light' },
+  { label: '强力', value: 'strong' },
+]
 
 async function optimizeMemory() {
   // 强力模式需二次确认
@@ -76,18 +78,7 @@ async function optimizeMemory() {
       <div class="flex items-center justify-between gap-3">
         <div class="flex items-center gap-2">
           <span class="text-xs font-medium text-gray-700">优化模式</span>
-          <div class="flex gap-1.5">
-            <Button
-              :type="memMode === 'light' ? 'primary' : 'outline'"
-              size="small"
-              @click="setMemMode('light')"
-            >轻量</Button>
-            <Button
-              :type="memMode === 'strong' ? 'primary' : 'outline'"
-              size="small"
-              @click="setMemMode('strong')"
-            >强力</Button>
-          </div>
+          <SegmentedButtons v-model="memMode" :options="memModeOptions" />
         </div>
         <Button
           type="primary"
