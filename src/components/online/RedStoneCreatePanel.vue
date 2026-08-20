@@ -38,7 +38,7 @@ const selectedOption = computed(() => serverOptions.value.find((o) => o.value ==
   <div class="space-y-4">
     <Card title="中转服务器">
       <div class="space-y-3">
-        <Alert variant="soft" v-if="serverError" type="error" :message="serverError" />
+        <Alert v-if="serverError" variant="soft" type="error" :message="serverError" />
         <div v-if="useManualServer" class="flex items-center gap-2">
           <div class="flex-1">
             <Input v-model="server" placeholder="手动填写中转服务器地址（如 hk.hongshi.site）" />

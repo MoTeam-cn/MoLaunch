@@ -110,8 +110,8 @@ watch(() => props.visible, (v) => {
           <div class="modal-scroll p-5">
             <!-- 离线账号：顶部提示皮肤生效范围 -->
             <Alert
-              variant="soft"
               v-if="isOffline"
+              variant="soft"
               type="info"
               message="离线皮肤通过 UUID 调整 + 资源包替换实现，游戏内将显示选定皮肤。1.19.3+ 也会精确显示，但仅本地可见。"
               class="mb-4"
@@ -119,8 +119,8 @@ watch(() => props.visible, (v) => {
 
             <!-- 外置账号：服务器不支持上传时提示 -->
             <Alert
-              variant="soft"
               v-if="authlibNoUpload"
+              variant="soft"
               type="info"
               message="此 yggdrasil 服务器不支持上传皮肤或披风（uploadableTextures 为空）。仅可查看当前角色材质。"
               class="mb-4"
@@ -128,8 +128,8 @@ watch(() => props.visible, (v) => {
 
             <!-- 外置账号：未在皮肤站设置皮肤，已用 Steve 默认皮肤顶上 -->
             <Alert
-              variant="soft"
               v-if="isAuthlib && authlibUsingDefaultSkin"
+              variant="soft"
               type="info"
               message="当前账号未在皮肤站设置皮肤，已显示默认 Steve 皮肤。上传皮肤后将替换为此账号的形象。"
               class="mb-4"

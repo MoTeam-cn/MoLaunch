@@ -95,8 +95,8 @@ async function optimizeMemory() {
 
       <!-- 强力模式警告 -->
       <Alert
-        variant="soft"
         v-if="memMode === 'strong'"
+        variant="soft"
         type="warning"
         message="强力模式会清空系统待机内存列表（standby list），可能释放数 GB 内存，但已缓存的应用（如浏览器、其他游戏）下次启动会变慢。建议仅在内存严重不足时使用。"
       />

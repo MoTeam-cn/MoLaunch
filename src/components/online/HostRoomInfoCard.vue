@@ -65,8 +65,8 @@ async function copyFullCode() {
 <template>
   <Card title="房间信息">
     <Alert
-      variant="soft"
       v-if="portChanged"
+      variant="soft"
       type="warning"
       class="mb-3"
       :message="portAlertMessage"

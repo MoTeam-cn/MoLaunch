@@ -83,7 +83,7 @@ function pick(item: AssetItem) {
                   :size="30"
                   :label="entry.zh || entry.name"
                 />
-                <Tooltip :text="`${entry.name}（${entry.zh}）`" overflowOnly block>
+                <Tooltip :text="`${entry.name}（${entry.zh}）`" overflow-only block>
                   <span class="item-palette-name">
                     {{ entry.zh || entry.name }}
                   </span>
