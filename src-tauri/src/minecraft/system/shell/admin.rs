@@ -134,11 +134,16 @@ pub fn relaunch_as_admin(args: &[String]) -> Result<(), String> {
 
     #[cfg(target_os = "macos")]
     {
-        let script = format!(
-            "do shell script \"{} {}\" with administrator privileges",
-            exe_path.display(),
-            args.join(" ")
-        );
+        // 每个参数用 quoted form of 转义后逐个拼接，避免字符串拼接注入 AppleScript
+        let mut script = String::from("do shell script (quoted form of ");
+        script.push_str(&apple_script_literal(&exe_path.to_string_lossy()));
+        script.push(')');
+        for arg in args {
+            script.push_str(" & \" \" & (quoted form of ");
+            script.push_str(&apple_script_literal(arg));
+            script.push(')');
+        }
+        script.push_str(" with administrator privileges");
         std::process::Command::new("osascript")
             .arg("-e")
             .arg(&script)
@@ -157,4 +162,20 @@ pub fn relaunch_as_admin(args: &[String]) -> Result<(), String> {
     }
 
     Ok(())
+}
+
+/// 将字符串转义为 AppleScript 字符串字面量（转义反斜杠与双引号）
+#[cfg(target_os = "macos")]
+fn apple_script_literal(s: &str) -> String {
+    let mut out = String::with_capacity(s.len() + 2);
+    out.push('"');
+    for c in s.chars() {
+        match c {
+            '\\' => out.push_str("\\\\"),
+            '"' => out.push_str("\\\""),
+            _ => out.push(c),
+        }
+    }
+    out.push('"');
+    out
 }
