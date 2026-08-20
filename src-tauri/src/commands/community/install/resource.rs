@@ -150,7 +150,9 @@ pub async fn download_resource_to_path(
     let download_canon = download_dir
         .canonicalize()
         .map_err(|e| format!("下载目录不可用: {}", e))?;
-    let parent = save_path.parent().ok_or_else(|| "目标路径无效".to_string())?;
+    let parent = save_path
+        .parent()
+        .ok_or_else(|| "目标路径无效".to_string())?;
     let parent_canon = parent
         .canonicalize()
         .map_err(|e| format!("目标目录不可用: {}", e))?;

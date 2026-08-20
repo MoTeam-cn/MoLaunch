@@ -43,9 +43,7 @@ pub async fn export_plugin_sample(dest_path: String, as_zip: bool) -> Result<(),
     let parent_canon = parent
         .canonicalize()
         .map_err(|e| format!("目标目录不可用: {}", e))?;
-    let file_name = dest
-        .file_name()
-        .ok_or_else(|| "目标路径无效".to_string())?;
+    let file_name = dest.file_name().ok_or_else(|| "目标路径无效".to_string())?;
     let dest = parent_canon.join(file_name);
     if !dest.starts_with(&root_canon) {
         return Err("导出路径超出插件目录范围".to_string());
