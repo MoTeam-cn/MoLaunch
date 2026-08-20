@@ -1,6 +1,6 @@
 <script setup lang="ts">
 /**
- * 设置 - 联机 Tab：ApiServerCard + easytier 内核/中继节点 + 设备管理
+ * 设置 - 联机 Tab：ApiServerCard + easytier 内核/公共节点 + 设备管理
  */
 import { onMounted, defineAsyncComponent } from 'vue'
 import { useOnlineStore } from '@/stores/online'
@@ -28,7 +28,7 @@ onMounted(() => {
     <!-- GitHub 镜像源（easytier 等外部下载竞速选源） -->
     <GithubProxiesEditor />
 
-    <!-- easytier 公共中继节点 -->
+    <!-- easytier 公共节点（信令节点/中继节点均可，默认信令节点内置不显示） -->
     <EasyTierPeersEditor />
 
     <!-- 设备管理 -->

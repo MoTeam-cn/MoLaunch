@@ -190,6 +190,20 @@ pub fn load_config() -> Result<Option<AppConfig>, String> {
         }
     }
 
+    // Online.easytier_public_peers（easytier 公共节点，JSON 序列化存储）
+    if let Some(list_json) = config.get("Online", "easytier_public_peers") {
+        match serde_json::from_str::<Vec<String>>(&list_json) {
+            Ok(peers) => {
+                if !peers.is_empty() {
+                    app_config.online.easytier_public_peers = peers;
+                }
+            }
+            Err(e) => {
+                log_warn!("Failed to parse easytier_public_peers list: {}", e);
+            }
+        }
+    }
+
     // TLS（信任源模式，未配置时保留默认 builtin）
     app_config.tls.trust_mode = config.get_or("TLS", "trust_mode", &app_config.tls.trust_mode);
 

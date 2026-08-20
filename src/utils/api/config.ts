@@ -68,9 +68,9 @@ export interface ConfigSnapshot {
   // 开发者模式（从注册表读，developerUnlocked 为只读）
   developerUnlocked: boolean
   developerMode: boolean
-  // 联机（api-server 地址 / 公共 easytier 中继节点）
+  // 联机（api-server 地址 / 公共 easytier 节点）
   onlineApiServerUrl: string
-  /** 公共 easytier 中继节点列表（--peers 参数，格式 tcp://host:port / udp://host:port） */
+  /** 公共 easytier 节点列表（--peers 参数；信令节点与中继节点均可；默认信令节点内置，前端不展示） */
   onlineEasytierPublicPeers: string[]
   /** 用户自定义 GitHub 镜像源（easytier 等外部下载竞速选源用，type: path / full） */
   onlineGithubProxies: GithubProxy[]
@@ -152,7 +152,7 @@ export interface ConfigPatch {
   developerMode?: boolean
   // 联机（api-server 地址，空字符串后端会忽略不更新）
   onlineApiServerUrl?: string
-  /** 公共 easytier 中继节点列表（--peers 参数；空数组表示清空） */
+  /** 公共 easytier 节点列表（--peers 参数；空数组表示清空） */
   onlineEasytierPublicPeers?: string[]
   /** 用户自定义 GitHub 镜像源（空数组表示清空） */
   onlineGithubProxies?: GithubProxy[]

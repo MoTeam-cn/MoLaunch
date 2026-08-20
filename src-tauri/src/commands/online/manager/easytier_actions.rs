@@ -130,13 +130,26 @@ async fn configured_network_identity(state: &AppState) -> String {
     state.config.lock().await.online.network_identity.clone()
 }
 
-/// 读取配置中的公共 easytier 中继节点，展开为 `--peers` 参数序列
+/// 项目自建 easytier 信令节点（默认内置，前端设置页不展示）：保证组网必有可用信令节点
+const DEFAULT_SIGNALING_PEER: &str = "wss://node1.molaunch.moiu.cn";
+
+/// 读取配置中的公共 easytier 节点，展开为 `--peers` 参数序列。
+///
+/// 配置缺失或用户未配置时兜底注入默认信令节点，保证 `--peers` 永远非空。
 async fn configured_easytier_peers(state: &AppState) -> Vec<String> {
     let peers = &state.config.lock().await.online.easytier_public_peers;
+    let mut list: Vec<String> = peers
+        .iter()
+        .map(|p| p.trim().to_string())
+        .filter(|p| !p.is_empty())
+        .collect();
+    if !list.iter().any(|p| p == DEFAULT_SIGNALING_PEER) {
+        list.push(DEFAULT_SIGNALING_PEER.to_string());
+    }
     let mut args = Vec::new();
-    for p in peers.iter().filter(|p| !p.trim().is_empty()) {
+    for p in list {
         args.push("--peers".to_string());
-        args.push(p.trim().to_string());
+        args.push(p);
     }
     args
 }

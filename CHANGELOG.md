@@ -14,6 +14,8 @@
 
 - **联机按钮即时 loading 防呆**（[useCreateRoomForm.ts](src/composables/useCreateRoomForm.ts) / [useRoomHost.ts](src/composables/useRoomHost.ts) / [RoomGuestPanel.vue](src/components/online/RoomGuestPanel.vue) / [LobbyBrowser.vue](src/components/online/LobbyBrowser.vue)）：创建/关闭房间/退出房间/加入房间按钮点击后**立即**进入 loading 态（Button 组件 loading 时自动禁用），不再等前置异步步骤（easytier 内核检查、hostStop、easytier.stop）完成后才点亮，消除点击后的明显延迟感。
 
+- **easytier 公共节点设置更名为「公共节点」并内置默认信令节点**（[config.ini](src-tauri/resources/defaults/config.ini) / [load.rs](src-tauri/src/config/load.rs) / [save.rs](src-tauri/src/config/save.rs) / [easytier_actions.rs](src-tauri/src/commands/online/manager/easytier_actions.rs) / [EasyTierPeersEditor.vue](src/components/settings/EasyTierPeersEditor.vue)）：① 设置-联机 中「easytier 公共中继节点」更名为「easytier 公共节点」，说明信令节点与中继节点均可填写；② 默认配置新增项目自建信令节点 `wss://node1.molaunch.moiu.cn`（不支持中继），`easytier_public_peers` 增加 INI 加载/持久化闭环（与 github_proxies 对称）；③ 运行时 `--peers` 组装兜底注入默认信令节点（配置缺失/被清空也保证组网必有可用信令节点）；④ 前端编辑器加载时过滤默认信令节点不展示，用户仅管理自定义节点。
+
 ### Fixed
 
 - **修复房主心跳上报在线人数不生效**（[room_api.rs](src-tauri/src/minecraft/online/signaling/room_api.rs)）：`signaling_heartbeat_room` 请求体字段误用 camelCase（`playerCount`），与 api-server `HeartbeatRequest` 的 snake_case 契约（`player_count`）不匹配，服务端反序列化恒为 None → `COALESCE` 保持初始值 → 大厅房间人数永远显示 1。字段已对齐 snake_case，房主心跳上报的 easytier 在线人数（过滤中继后）可正常更新至大厅。
