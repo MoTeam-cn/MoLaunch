@@ -44,7 +44,7 @@ pub async fn get_auth_status(state: &AppState, provider_id: &str) -> Result<Auth
         });
     }
 
-    // 检查 access_token 是否存在（SDK DES 解密读取）
+    // 检查 access_token 是否存在（SDK 解密读取）
     let record = storage::load_token_record(provider_id).await?;
     let authenticated = record.is_some();
 

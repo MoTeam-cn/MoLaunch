@@ -41,7 +41,7 @@ struct ApiKeyCache {
 /// SDK 引用：首次请求时通过 `set_sdk` 注入，避免启动时持有
 static SDK_REF: OnceLock<Arc<TokioMutex<Option<SdkInstance>>>> = OnceLock::new();
 
-/// 解密后的 api_key 缓存（懒加载，避免启动时 DES 解密触发杀软）
+/// 解密后的 api_key 缓存（懒加载，避免启动时 SDK 解密触发杀软）
 static API_KEY_CACHE: OnceLock<RwLock<ApiKeyCache>> = OnceLock::new();
 
 /// 注入 SDK 引用（lib.rs 启动时调用）

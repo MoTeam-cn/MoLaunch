@@ -19,7 +19,7 @@ pub(crate) const CF_MIRROR_BASE: &str = "https://mod.mcimirror.top/curseforge/v1
 /// - 1=缓慢时换镜像：优先官方（若有 API Key），失败后由 cf_get 回退镜像
 /// - 2=尽量官方：优先官方（若有 API Key），否则镜像
 ///
-/// 异步：首次调用会触发 SDK DES 解密 api_key 并缓存，后续直接读缓存
+/// 异步：首次调用会触发 SDK 解密 api_key 并缓存，后续直接读缓存
 pub(crate) async fn get_cf_config() -> (String, Option<String>, u8) {
     let (enabled, api_key) = super::super::secure_storage::get_config_async().await;
     let source = super::super::get_source_pref();

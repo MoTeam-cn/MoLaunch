@@ -14,7 +14,7 @@ use super::types::{ConfigEntry, ConfigPatch};
 /// 返回格式：`[{ "key": "proxyMode", "value": "none" }, ...]`
 ///
 /// CurseForge 的 `api_key` 使用异步读取（`get_config_async`），
-/// 首次调用会触发 SDK DES 解密并缓存，避免此前懒加载导致首次返回空字符串的 bug。
+/// 首次调用会触发 SDK 解密并缓存，避免此前懒加载导致首次返回空字符串的 bug。
 pub async fn get_config(
     state: &AppState,
     keys: Option<Vec<String>>,

@@ -151,7 +151,7 @@ pub struct StorageDirs {
     pub appdata_certs: String,
     /// 全局共享 frpc 厂商二进制目录（AppData/providers/）
     pub appdata_providers: String,
-    /// 全局共享 FRP 认证 token 目录（AppData/frp_auth/，SDK DES 加密）
+    /// 全局共享 FRP 认证 token 目录（AppData/frp_auth/，SDK AES 加密）
     pub appdata_frp_auth: String,
     /// 全局共享联机数据目录（AppData/online/）
     pub appdata_online: String,

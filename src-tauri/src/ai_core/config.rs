@@ -8,7 +8,7 @@ use serde::{Deserialize, Serialize};
 pub struct AiConfig {
     /// 服务地址，如 http://127.0.0.1:11434/v1
     pub base_url: String,
-    /// API Key（明文，保存时经 SDK DES 加密后写入 config.ini）
+    /// API Key（明文，保存时经 SDK AES 加密后写入 config.ini）
     pub api_key: String,
     /// 超时秒数
     pub timeout_secs: u64,

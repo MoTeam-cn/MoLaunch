@@ -1,6 +1,6 @@
 //! API Key 认证流程
 //!
-//! 用户手动获取 Key 填入，直接作为 access_token 存储（SDK DES 加密写入文件），
+//! 用户手动获取 Key 填入，直接作为 access_token 存储（SDK AES 加密写入文件），
 //! 无过期时间、无 refresh_token。调用厂商 API 时由 api_spec 模块注入请求头。
 
 use super::super::provider::{read_provider_manifest, resolve_auth_type};

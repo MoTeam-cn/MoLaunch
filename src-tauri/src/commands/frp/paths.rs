@@ -35,7 +35,7 @@ pub fn providers_state_path() -> PathBuf {
 
 /// 厂商认证 token 文件路径（全局共享 `%APPDATA%/.Molaunch/frp_auth/{provider_id}.json`）
 ///
-/// 整份 token 记录经 SDK DES 加密后写入。与 frpc 厂商二进制（providers/）一致，
+/// 整份 token 记录经 SDK AES 加密后写入。与 frpc 厂商二进制（providers/）一致，
 /// 属设备级共享数据（跨启动器实例共享，便携版换目录/更新不丢认证），
 /// 非便携式实例数据（tunnels.json 等随实例走）。
 /// 环境变量缺失时降级回便携式目录（极少发生）。
