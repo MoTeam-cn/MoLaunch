@@ -4,6 +4,10 @@
 
 ## [Unreleased]
 
+### Added
+
+- **前后端安全与代码质量排查文档**（[SECURITY_AUDIT_REPORT.md](docs/SECURITY_AUDIT_REPORT.md) / [SECURITY_AUDIT_TASKS.md](docs/SECURITY_AUDIT_TASKS.md)）：3 个子 agent 并行排查（后端安全 / 前端安全 / 重复耦合与规范），产出详细排查日志与结构化修复任务清单（SEC-01~14 + Q01~12），供后续 agent 按任务 ID 自动化创建子 agent 修复。
+
 ### Changed
 
 - **页面内选项切换统一为 SegmentedButtons 组件**（[SegmentedButtons.vue](src/components/common/SegmentedButtons.vue) / [MemoryOptimizer.vue](src/views/quick-tools/MemoryOptimizer.vue) / [JavaDownloader.vue](src/views/tools/java/JavaDownloader.vue) / [RecipeGeneratorPage.vue](src/views/tools/creation/recipe-generator/RecipeGeneratorPage.vue)）：① **SegmentedButtons 类型放宽**：`SegmentedOption` 默认类型参数由 `string` 放宽为 `string | number | boolean`，支持数字值选项；② **内存优化模式**：轻量/强力切换由手写 Button 高亮改为 SegmentedButtons；③ **Java 下载器快速选择**：预设档位 + 自定义由手写 Button 列表改为 SegmentedButtons，`activePreset` + `customMode` 两个状态合并为单一 `quickSelect`（`number | 'custom'`）；④ **配方生成器抽屉**：物品/标签切换由自写 `span` + active class 改为 SegmentedButtons（等宽填充），删除自写 `.recipe-palette-tabs` 样式。
