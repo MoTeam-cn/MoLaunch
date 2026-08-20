@@ -15,6 +15,7 @@
 ### Style
 
 - **cargo fmt 修复 CI 格式检查**（[easytier_install.rs](src-tauri/src/commands/online/manager/easytier_install.rs) / [github_download.rs](src-tauri/src/utils/github_download.rs) / [probe.rs](src-tauri/src/utils/probe.rs)）：`log_debug!` 宏调用压缩为单行、文件末尾补空行，通过 `cargo fmt --check`。
+- **修复 CI Clippy 报错：sort_by 改 sort_by_key**（[archive.rs](src-tauri/src/commands/frp/binary/archive.rs)）：`candidates.sort_by(|a, b| a.0.len().cmp(&b.0.len()))` 触发 `clippy::unnecessary_sort_by`（`-D warnings` 下编译失败），改为 `sort_by_key(|a| a.0.len())`，语义不变。
 
 ### Changed
 

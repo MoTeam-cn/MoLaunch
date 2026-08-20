@@ -124,7 +124,7 @@ pub(super) fn extract_frpc_from_tar_gz(
         return Err("tar.gz 中未找到 frpc 二进制（期望文件名 frpc 或 frpc.exe）".to_string());
     }
     // 路径短优先（浅层目录）
-    candidates.sort_by(|a, b| a.0.len().cmp(&b.0.len()));
+    candidates.sort_by_key(|a| a.0.len());
     let (best_name, bytes) = candidates.remove(0);
     log_info!(
         "[Frp] 从 tar.gz 提取: {}（共 {} 个候选）",
