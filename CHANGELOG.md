@@ -18,6 +18,8 @@
 
 ### Fixed
 
+- **修复程序关闭时卡 3 秒**（[TopNavLayout.vue](src/components/layout/TopNavLayout.vue)）：退出路径 `doExit()` 联机清理用 `Promise.race(清理, 3s)` 兜底，但房主退房链路 `room_close` 的 HTTP 请求（CSRF 获取 + 关闭登记）走全局 client 的 30s 超时，api-server 响应慢/不可达时清理无法在 3s 内完成，定时器必先触发导致关窗延迟 3 秒。现将联机清理超时缩短为 1s（本地停止 easytier/联机中心为毫秒级，远端退房仅尽力尝试，服务端 keepalive 超时兜底），关窗即时响应。
+
 - **修复房主心跳上报在线人数不生效**（[room_api.rs](src-tauri/src/minecraft/online/signaling/room_api.rs)）：`signaling_heartbeat_room` 请求体字段误用 camelCase（`playerCount`），与 api-server `HeartbeatRequest` 的 snake_case 契约（`player_count`）不匹配，服务端反序列化恒为 None → `COALESCE` 保持初始值 → 大厅房间人数永远显示 1。字段已对齐 snake_case，房主心跳上报的 easytier 在线人数（过滤中继后）可正常更新至大厅。
 
 - **修复 easytier port-forward 命令 JSON 解析失败**（[easytier.rs](src-tauri/src/minecraft/online/scaffolding/easytier.rs)）：`easytier_cli` 对全部命令强制 `-o json` + JSON 解析，但实测 `port-forward add/remove` 输出为**文本**（`Port forward rule add: ...`）而非 JSON，导致 no-tun 端口转发规则**从未真正建立成功**（房客探测/进服链路断裂）。现将命令执行拆分为 `easytier_cli_raw`（校验 exit code、返回 stdout 原文，供文本命令使用）与 `easytier_cli`（JSON 解析，供 `peer list` / `node info` 使用）；`add/remove_port_forward` 改走 raw 入口。同时实测确认 `peer list` / `node info` / `port-forward list` / `connector list` 均返回 JSON，适配无误。

@@ -77,6 +77,9 @@ function handleDownloadClick() {
 const showExitDialog = ref(false)
 // 退出防重入：托盘退出事件与关闭按钮可能并发触发 doExit
 const exiting = ref(false)
+// 退出时联机清理超时（ms）：本地停止毫秒级完成；远端 room_close 可能因网络慢挂起
+// （后端 HTTP 无短超时），仅尽力尝试，超时后交给后端统一清理与服务端 keepalive 兜底
+const ONLINE_CLEANUP_TIMEOUT_MS = 1000
 
 /**
  * 关闭主窗口入口（右上角关闭按钮 / 后端 Alt+F4 等关闭请求统一走这里）
@@ -111,12 +114,12 @@ async function doExit() {
   // 关闭窗口前先保存配置
   await safeCall(() => tauri.saveConfigToFile(), 'save config before close')
   // 联机状态清理：房主先停联机中心再关闭登记，房客停 easytier 并清空本地状态
-  // 3s 超时保护，网络问题不卡住关窗；API 失败不阻塞关窗（服务端 keepalive 超时兜底）
+  // 短超时保护，网络问题不卡住关窗；API 失败不阻塞关窗（服务端 keepalive 超时兜底）
   const role = onlineStore.roomState.role
   if (role === 'host') {
     await Promise.race([
       getOnlineSession().host.handleCloseRoom().catch(() => toastError('离开房间失败')),
-      new Promise<void>((r) => setTimeout(r, 3000)),
+      new Promise<void>((r) => setTimeout(r, ONLINE_CLEANUP_TIMEOUT_MS)),
     ])
   } else if (role === 'guest') {
     await Promise.race([
@@ -127,7 +130,7 @@ async function doExit() {
           onlineStore.resetRoomState()
         }
       })().catch(() => toastError('离开房间失败')),
-      new Promise<void>((r) => setTimeout(r, 3000)),
+      new Promise<void>((r) => setTimeout(r, ONLINE_CLEANUP_TIMEOUT_MS)),
     ])
   }
   // Windows 便携版：退出前检查是否有待安装更新（appdata/last.exe）
