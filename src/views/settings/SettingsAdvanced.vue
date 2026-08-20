@@ -223,6 +223,7 @@ watch(logLevel, (v) => markDirty('logLevel', v))
             <a
               href="https://console.curseforge.com/?#/api-keys"
               target="_blank"
+              rel="noopener noreferrer"
               class="inline-flex items-center gap-1 text-xs text-primary-600 hover:text-primary-700"
             >
               申请地址

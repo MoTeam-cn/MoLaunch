@@ -7,7 +7,7 @@
  */
 import { onMounted, onUnmounted, computed, ref } from 'vue'
 import { useFrpStore } from '@/stores/frp'
-import { open } from '@tauri-apps/plugin-shell'
+import { openExternal } from '@/utils/openExternal'
 import { showConfirm } from '@/utils/modal'
 import { toastInfo, toastError } from '@/utils/toast'
 import type { AuthStatus, ProviderInfo } from '@/types/frp'
@@ -71,7 +71,7 @@ export function useFrpAuthCenter() {
 
   /** 打开外部链接 */
   async function openUrl(url: string): Promise<void> {
-    try { await open(url) } catch { toastError('打开链接失败') }
+    try { await openExternal(url) } catch { toastError('打开链接失败') }
   }
 
   /** 启动 OAuth2 认证 */

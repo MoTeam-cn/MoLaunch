@@ -13,7 +13,7 @@
  */
 
 import { computed, ref, defineAsyncComponent } from 'vue'
-import { open } from '@tauri-apps/plugin-shell'
+import { openExternal } from '@/utils/openExternal'
 import { authlibFetchServerMeta, authlibLogin, authlibSelectProfile } from '@/utils/api/authlib'
 import { normalizeAuthlibServerUrl, willAutoCompletePath } from '@/utils/authlib-url'
 import type { AuthlibProfile, AuthlibServerMeta } from '@/types/auth'
@@ -141,7 +141,7 @@ function onProfileClose() {
 /** 打开注册链接 */
 function openRegister() {
   if (serverMeta.value?.register_url) {
-    open(serverMeta.value.register_url).catch(() => toastError('打开注册页面失败'))
+    openExternal(serverMeta.value.register_url).catch(() => toastError('打开注册页面失败'))
   }
 }
 </script>

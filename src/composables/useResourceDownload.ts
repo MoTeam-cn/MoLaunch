@@ -10,6 +10,7 @@ import type { ResourceProject, ResourceVersion } from '@/types/community'
 import { getProjectDetail, downloadResourceToPath, formatDownloadFilename } from '@/utils/api/community'
 import { getVersionLoaderInfo } from '@/utils/api/version'
 import { getVersionGameVersion, getVersionModsDir } from '@/utils/api/personalization'
+import { isSafeFileName } from '@/utils/format'
 import { useVersionStore } from '@/stores/version'
 import { pickSavePath } from '@/utils/fileDialog'
 import { toastSuccess, toastError, toastInfo } from '@/utils/toast'
@@ -115,6 +116,11 @@ export function useResourceDownload(options: UseResourceDownloadOptions) {
 
     try {
       const finalFileName = await formatDownloadFilename(v.file_name, options.project.translated_name)
+      // 防御性校验：远程 file_name 可能含 ../ 穿越或绝对路径，拒绝后再拼接本地路径
+      if (!isSafeFileName(finalFileName)) {
+        toastError(`文件名不合法，已取消下载：${finalFileName}`)
+        return
+      }
 
       // 禁止更新 Mod 拦截：如果目标文件在 mods 目录已存在（即"更新"场景），阻止下载
       if (options.disableModUpdate && options.modsDir) {

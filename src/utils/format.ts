@@ -97,6 +97,23 @@ export function formatDateTime(
 }
 
 /**
+ * 校验文件名是否安全（拒绝路径穿越、绝对路径与非法字符）
+ *
+ * 用于远程资源返回的 file_name 拼接本地路径前的防御性校验，
+ * 防止 `../` 穿越或绝对路径逃逸到目标目录之外。
+ */
+export function isSafeFileName(name: string): boolean {
+  if (!name || name.length > 255) return false
+  // 拒绝路径分隔符（/ \）、穿越（..）与绝对路径（盘符前缀）
+  if (/[\\/]/.test(name)) return false
+  if (name === '.' || name === '..') return false
+  if (/^[a-zA-Z]:/.test(name)) return false
+  // 拒绝 Windows 非法字符与控制字符
+  if (/[<>:"|?*\x00-\x1f]/.test(name)) return false
+  return true
+}
+
+/**
  * 格式化 Unix 时间戳（秒）为 YYYY-MM-DD HH:mm[:ss]（本地时区）
  *
  * 用于展示登录时间、JWT 过期时间等场景。无效或非正数返回 '-'。
