@@ -9,15 +9,12 @@
 import { computed, onBeforeUnmount, onMounted, ref, defineAsyncComponent } from 'vue'
 import type { RecipeSlot, RecipeSlotContext, SlotValue } from '@/utils/recipe-generator/types'
 import type { AtlasLayout } from '@/utils/recipe-generator/resources'
-import {
-  RECIPE_IMAGE_HEIGHT,
-  RECIPE_IMAGE_WIDTH,
-  type RecipeLayout,
-  type RecipeLayoutSlotBox,
-} from './recipe-layouts'
-import { resolveTagDisplay, type TagDisplay, type TagMember } from '@/utils/recipe-generator/tag-resolve'
-const RecipeItemIcon = defineAsyncComponent(() => import('./RecipeItemIcon.vue'))
+import type { RecipeLayout } from './recipe-layouts'
+import { RECIPE_IMAGE_WIDTH } from './recipe-layouts'
+import { barrierDisplayFor, displayFor, type Display } from './slot-display'
+const RecipeSlotHotspot = defineAsyncComponent(() => import('./RecipeSlotHotspot.vue'))
 const RecipeTagPopup = defineAsyncComponent(() => import('./RecipeTagPopup.vue'))
+import type { TagDisplay } from '@/utils/recipe-generator/tag-resolve'
 
 const TWO_BY_TWO_DISABLED_SLOTS = new Set<RecipeSlot>([
   'crafting.3',
@@ -46,47 +43,16 @@ const emit = defineEmits<{
   'edit-slot': [slot: RecipeSlot]
 }>()
 
-type Display = { texture: string | null; label: string; count: number; members?: TagMember[] }
-
-function displayFor(value: SlotValue | undefined): Display | null {
-  if (!value) return null
-  if (value.kind === 'item') {
-    const item = props.context.itemsById[value.id]
-    const name = item?.name ?? value.id
-    return {
-      texture: item?.texture ?? null,
-      label: item && item.zh ? `${name}（${item.zh}）` : name,
-      count: value.count ?? 1,
-    }
-  }
-  if (value.kind === 'custom_item') {
-    const item = props.context.customItemsByUid[value.uid]
-    return {
-      texture: item?.texture || null,
-      label: item?.name ?? '未知自定义物品',
-      count: value.count ?? 1,
-    }
-  }
-  if (value.kind === 'vanilla_tag' || value.kind === 'custom_tag') {
-    const display = resolveTagDisplay(value, props.context)
-    return { texture: display.texture, label: display.label, count: 1, members: display.members }
-  }
-  return null
-}
-
-const barrierDisplay = computed<Display | null>(() => {
-  const item = props.context.itemsById['minecraft:barrier']
-  return item ? { texture: item.texture, label: item.name, count: 1 } : null
-})
-
 const layoutSlots = computed(() =>
-  (Object.entries(props.layout.slots) as [RecipeSlot, RecipeLayoutSlotBox][]).map(([slot, box]) => ({
+  (Object.entries(props.layout.slots) as [RecipeSlot, { x1: number; y1: number; x2: number; y2: number }][]).map(([slot, box]) => ({
     slot,
     box,
-    display: displayFor(props.values[slot]),
+    display: displayFor(props.values[slot], props.context),
     disabled: props.twoByTwo && TWO_BY_TWO_DISABLED_SLOTS.has(slot),
   })),
 )
+
+const barrierDisplay = computed<Display | null>(() => barrierDisplayFor(props.context))
 
 const stageRef = ref<HTMLElement | null>(null)
 const stageWidth = ref(0)
@@ -106,16 +72,7 @@ onBeforeUnmount(() => {
   stageObserver = null
 })
 
-function slotBoxStyle(box: RecipeLayoutSlotBox) {
-  return {
-    left: `${(box.x1 / RECIPE_IMAGE_WIDTH) * 100}%`,
-    top: `${(box.y1 / RECIPE_IMAGE_HEIGHT) * 100}%`,
-    width: `${((box.x2 - box.x1) / RECIPE_IMAGE_WIDTH) * 100}%`,
-    height: `${((box.y2 - box.y1) / RECIPE_IMAGE_HEIGHT) * 100}%`,
-  }
-}
-
-function slotIconSize(box: RecipeLayoutSlotBox): number {
+function slotIconSize(box: { x1: number; y1: number; x2: number; y2: number }): number {
   if (!stageWidth.value) return 32
   const backgroundSize = Math.min(box.x2 - box.x1, box.y2 - box.y1)
   return Math.max(1, Math.round((backgroundSize / RECIPE_IMAGE_WIDTH) * stageWidth.value * 0.9))
@@ -178,44 +135,23 @@ function clearCloseTimer() {
       class="recipe-layout-stage"
       :style="{ backgroundImage: `url('${layout.image}')` }"
     >
-      <div
+      <RecipeSlotHotspot
         v-for="entry in layoutSlots"
         :key="entry.slot"
-        class="recipe-layout-hotspot"
-        :class="{
-          filled: !!entry.display && !entry.disabled,
-          editing: editingSlot === entry.slot && !entry.disabled,
-          'is-tag': !!entry.display?.members?.length,
-          disabled: entry.disabled,
-        }"
-        :style="slotBoxStyle(entry.box)"
-        :data-recipe-slot="entry.slot"
-        @click="!entry.disabled && onSlotClick(entry.slot)"
-        @wheel="!entry.disabled && onSlotWheel($event, entry.slot)"
-        @mouseenter="onSlotHover($event, entry.disabled ? null : entry.display)"
-        @mouseleave="scheduleClose"
-      >
-        <RecipeItemIcon
-          v-if="entry.disabled && barrierDisplay"
-          :texture="barrierDisplay.texture"
-          :atlas-url="atlasUrl"
-          :atlas="atlas"
-          :size="slotIconSize(entry.box)"
-          :label="barrierDisplay.label"
-        />
-        <RecipeItemIcon
-          v-else-if="entry.display"
-          :texture="entry.display.texture"
-          :atlas-url="atlasUrl"
-          :atlas="atlas"
-          :size="slotIconSize(entry.box)"
-          :label="entry.display.label"
-        />
-        <span v-if="entry.display && !entry.disabled" class="recipe-slot-count">
-          {{ entry.display.count }}
-        </span>
-        <span v-if="entry.display?.members?.length && !entry.disabled" class="recipe-slot-tag-badge">#</span>
-      </div>
+        :slot="entry.slot"
+        :box="entry.box"
+        :display="entry.display"
+        :disabled="entry.disabled"
+        :editing="editingSlot === entry.slot"
+        :barrier-display="barrierDisplay"
+        :atlas-url="atlasUrl"
+        :atlas="atlas"
+        :icon-size="slotIconSize(entry.box)"
+        @click="onSlotClick"
+        @wheel="onSlotWheel"
+        @hover="onSlotHover"
+        @leave="scheduleClose"
+      />
     </div>
 
     <Teleport to="body">
@@ -250,67 +186,5 @@ function clearCloseTimer() {
   background-color: #f7f8fa;
   background-repeat: no-repeat;
   background-size: cover;
-}
-
-.recipe-layout-hotspot {
-  position: absolute;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  border: 2px dashed transparent;
-  border-radius: 4px;
-  background: rgba(255, 255, 255, 0.12);
-  cursor: pointer;
-  transition:
-    border-color 0.15s ease,
-    background-color 0.15s ease;
-}
-
-.recipe-layout-hotspot:hover {
-  border-color: var(--color-primary-500);
-  background: rgba(255, 255, 255, 0.32);
-}
-
-.recipe-layout-hotspot.filled {
-  border-style: solid;
-  border-color: rgba(255, 255, 255, 0.55);
-  background: rgba(0, 0, 0, 0.18);
-}
-
-.recipe-layout-hotspot.editing {
-  border-color: var(--color-primary-500);
-  box-shadow: 0 0 0 2px rgb(var(--color-primary-rgb-500) / 0.4);
-}
-
-.recipe-layout-hotspot.disabled {
-  border-style: solid;
-  border-color: rgba(255, 255, 255, 0.25);
-  background: rgba(0, 0, 0, 0.42);
-  cursor: not-allowed;
-}
-
-.recipe-slot-count {
-  position: absolute;
-  right: 1px;
-  bottom: 0;
-  padding: 0 2px;
-  border-radius: 2px;
-  background: rgba(0, 0, 0, 0.6);
-  color: #fff;
-  font-size: 10px;
-  font-weight: 600;
-  line-height: 14px;
-  pointer-events: none;
-}
-
-.recipe-slot-tag-badge {
-  position: absolute;
-  top: 2px;
-  left: 4px;
-  color: var(--color-primary-500);
-  font-size: 11px;
-  font-weight: 700;
-  line-height: 1;
-  pointer-events: none;
 }
 </style>

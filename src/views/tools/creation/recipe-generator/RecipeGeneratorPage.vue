@@ -6,15 +6,9 @@
  * 结果槽滚轮可调整产出数量；顶部切换版本/类型，实时校验并预览配方 JSON。
  */
 import { computed, onMounted, reactive, ref, watch, defineAsyncComponent } from 'vue'
-import { ArrowDownIcon, ArrowLeftIcon, ArrowRightIcon, ArrowUpIcon } from '@heroicons/vue/24/outline'
-const Button = defineAsyncComponent(() => import('@/components/common/Button.vue'))
-const Alert = defineAsyncComponent(() => import('@/components/common/Alert.vue'))
-const Drawer = defineAsyncComponent(() => import('@/components/common/Drawer.vue'))
-const Select = defineAsyncComponent(() => import('@/components/common/Select.vue'))
-const Input = defineAsyncComponent(() => import('@/components/common/Input.vue'))
-const Checkbox = defineAsyncComponent(() => import('@/components/common/Checkbox.vue'))
-const SegmentedButtons = defineAsyncComponent(() => import('@/components/common/SegmentedButtons.vue'))
-const Tooltip = defineAsyncComponent(() => import('@/components/common/Tooltip.vue'))
+const RecipeDisplayPanel = defineAsyncComponent(() => import('./RecipeDisplayPanel.vue'))
+const RecipeSettingsForm = defineAsyncComponent(() => import('./RecipeSettingsForm.vue'))
+const RecipeSlotDrawer = defineAsyncComponent(() => import('./RecipeSlotDrawer.vue'))
 import { toastError, toastInfo, toastSuccess } from '@/utils/toast'
 import {
   buildSlotContext,
@@ -27,16 +21,11 @@ import {
 } from '@/utils/recipe-generator/resources'
 import {
   coerceRecipeTypeForVersion,
-  DEFAULT_COOKING_TIME,
   getRecipeCategoryOptions,
   getSupportedRecipeTypes,
-  isRecipeTypeAvailable,
   LATEST_JAVA_VERSION,
   RECIPE_CATEGORY_LABELS,
   RECIPE_TYPE_LABELS,
-  supportsRecipeCategory,
-  supportsShowNotification,
-  supportsSmithingTrimPattern,
 } from '@/utils/recipe-generator/versions'
 import {
   CRAFTING_GRID_SLOTS,
@@ -45,63 +34,16 @@ import {
 import {
   getInputSlots,
   getResultSlots,
-  slotCaption,
 } from '@/utils/recipe-generator/formatter'
 import { validateRecipe } from '@/utils/recipe-generator/validation'
 import { exportRecipePack } from '@/utils/recipe-generator/exporter'
 import { sanitizeRecipeName } from '@/utils/recipe-generator/datapack'
 import type { JavaVersionId, RecipeSlot, RecipeSlotContext, RecipeState, SlotValue } from '@/utils/recipe-generator/types'
 import { getRecipeLayout } from './recipe-layouts'
-const RecipeSlotsEditor = defineAsyncComponent(() => import('./RecipeSlotsEditor.vue'))
-const ItemPalette = defineAsyncComponent(() => import('./ItemPalette.vue'))
-const TagPalette = defineAsyncComponent(() => import('./TagPalette.vue'))
-
-let uidCounter = 0
-function createUid(prefix: string): string {
-  uidCounter += 1
-  return `${prefix}-${Date.now().toString(36)}-${uidCounter}`
-}
-
-function createDefaultRecipe(): RecipeState {
-  return {
-    id: createUid('recipe'),
-    recipeType: 'crafting',
-    group: '',
-    category: 'misc',
-    showNotification: true,
-    nameMode: 'manual',
-    name: 'my_recipe',
-    slots: {},
-    crafting: { shapeless: false, keepWhitespace: false, twoByTwo: false },
-    cooking: { time: null, experience: 0 },
-    smithing: { trimPattern: '' },
-  }
-}
+import { createDefaultRecipe, VERSION_OPTIONS } from './recipe-state'
 
 const selectedVersion = ref<JavaVersionId>(LATEST_JAVA_VERSION)
 const recipe = reactive<RecipeState>(createDefaultRecipe())
-
-const versionOptions = [
-  { label: '1.12', value: '1.12' },
-  { label: '1.13', value: '1.13' },
-  { label: '1.14', value: '1.14' },
-  { label: '1.15', value: '1.15' },
-  { label: '1.16', value: '1.16' },
-  { label: '1.17', value: '1.17' },
-  { label: '1.18', value: '1.18' },
-  { label: '1.19', value: '1.19' },
-  { label: '1.20', value: '1.20' },
-  { label: '1.21', value: '1.21' },
-  { label: '1.21.2', value: '1.21.2' },
-  { label: '1.21.4', value: '1.21.4' },
-  { label: '1.21.5', value: '1.21.5' },
-  { label: '1.21.6', value: '1.21.6' },
-  { label: '1.21.7', value: '1.21.7' },
-  { label: '1.21.9', value: '1.21.9' },
-  { label: '1.21.11', value: '1.21.11' },
-  { label: '26.1', value: '26.1' },
-  { label: '26.2', value: '26.2' },
-]
 
 const typeOptions = computed(() =>
   getSupportedRecipeTypes(selectedVersion.value).map((type) => ({
@@ -123,12 +65,6 @@ const atlas = ref<AtlasLayout | null>(null)
 const atlasUrl = ref('')
 // 初始为 true：避免首帧渲染时 atlas 仍为 null，把空对象传给子组件触发 prop 校验警告
 const loading = ref(true)
-const activeTab = ref<'items' | 'tags'>('items')
-
-const paletteTabOptions = [
-  { label: '物品', value: 'items' },
-  { label: '标签', value: 'tags' },
-]
 
 const context = computed<RecipeSlotContext>(() => buildSlotContext(items.value, tags.value))
 
@@ -188,20 +124,6 @@ const recipeName = computed(() => (recipe.name.trim() ? recipe.name.trim() : 're
 const editingSlot = ref<RecipeSlot | null>(null)
 const drawerVisible = ref(false)
 
-const drawerTitle = computed(() => {
-  if (!editingSlot.value) return '选择物品'
-  const label = slotCaption(editingSlot.value)
-  const isCraftingGrid = editingSlot.value.startsWith('crafting.') && !editingSlot.value.endsWith('.result')
-  return isCraftingGrid ? `选择物品（第 ${label} 格）` : `选择${label}`
-})
-
-const drawerHint = computed(() => {
-  if (!editingSlot.value) return ''
-  const label = slotCaption(editingSlot.value)
-  const isCraftingGrid = editingSlot.value.startsWith('crafting.') && !editingSlot.value.endsWith('.result')
-  return isCraftingGrid ? `第 ${label} 格` : label
-})
-
 watch(drawerVisible, (visible) => {
   if (!visible) editingSlot.value = null
 })
@@ -209,49 +131,6 @@ watch(drawerVisible, (visible) => {
 function openSlotDrawer(slot: RecipeSlot) {
   editingSlot.value = slot
   drawerVisible.value = true
-}
-
-/** 当前编辑槽位四方向可移动性（crafting 按网格行列，其余为线性列表） */
-const drawerNav = computed(() => {
-  if (!editingSlot.value) return null
-  const slots = editableSlots.value
-  const index = slots.indexOf(editingSlot.value)
-  if (index < 0) return null
-  const size = recipe.recipeType === 'crafting' ? (recipe.crafting.twoByTwo ? 2 : 3) : 0
-  if (size > 0) {
-    const col = index % size
-    const row = Math.floor(index / size)
-    return {
-      up: row > 0,
-      down: row < size - 1,
-      left: col > 0,
-      right: col < size - 1,
-    }
-  }
-  return {
-    up: index > 0,
-    down: index < slots.length - 1,
-    left: index > 0,
-    right: index < slots.length - 1,
-  }
-})
-
-function moveEditing(direction: 'up' | 'down' | 'left' | 'right') {
-  const nav = drawerNav.value
-  if (!nav || !nav[direction]) return
-  const slots = editableSlots.value
-  const index = slots.indexOf(editingSlot.value!)
-  const size = recipe.recipeType === 'crafting' ? (recipe.crafting.twoByTwo ? 2 : 3) : 0
-  let next: number
-  if (size > 0) {
-    if (direction === 'up') next = index - size
-    else if (direction === 'down') next = index + size
-    else if (direction === 'left') next = index - 1
-    else next = index + 1
-  } else {
-    next = direction === 'up' || direction === 'left' ? index - 1 : index + 1
-  }
-  editingSlot.value = slots[next]
 }
 
 function pickValue(value: SlotValue) {
@@ -279,11 +158,6 @@ function updateSlot(slot: RecipeSlot, value: SlotValue | undefined) {
 function updateCount(slot: RecipeSlot, count: number) {
   const value = recipe.slots[slot]
   if (value && (value.kind === 'item' || value.kind === 'custom_item')) value.count = count
-}
-
-function onCookingTimeChange(value: string | number) {
-  const str = String(value).trim()
-  recipe.cooking.time = str === '' ? null : Number(str)
 }
 
 async function copyJson() {
@@ -332,174 +206,53 @@ async function exportPack() {
     <div v-if="loading" class="text-center py-10 text-sm text-gray-400">正在加载版本资源…</div>
     <div v-else class="recipe-generator-body">
       <!-- 左：展示区（槽位编辑 + 校验 + JSON 预览） -->
-      <section class="recipe-panel recipe-display">
-        <RecipeSlotsEditor
-          :layout="recipeLayout!"
-          :values="recipe.slots"
-          :context="context"
-          :atlas-url="atlasUrl"
-          :atlas="atlas!"
-          :two-by-two="recipe.crafting.twoByTwo && recipe.recipeType === 'crafting'"
-          :editing-slot="editingSlot"
-          @update-slot="updateSlot"
-          @update-count="updateCount"
-          @edit-slot="openSlotDrawer"
-        />
-        <p class="text-xs text-gray-400">
-          点击空格子从抽屉选择物品/标签，点击已放置格子可清除，滚轮调整数量
-        </p>
-
-        <div v-if="issues.length" class="recipe-issues">
-          <Alert
-            v-for="item in issues"
-            :key="item.code"
-            type="warning"
-            :message="item.message"
-            :truncate="false"
-          />
-        </div>
-
-        <div class="recipe-preview">
-          <div class="recipe-preview-toolbar">
-            <span class="text-sm font-medium text-gray-700">配方 JSON</span>
-            <div class="flex gap-2">
-              <Button size="small" :disabled="!recipeJson" @click="copyJson">复制</Button>
-              <Button type="primary" size="small" :disabled="!isValid" :loading="exporting" @click="exportPack">
-                导出数据包
-              </Button>
-            </div>
-          </div>
-          <pre v-if="recipeJsonText" class="recipe-preview-code">{{ recipeJsonText }}</pre>
-          <div v-else class="recipe-preview-empty">填写配方后此处显示生成的 JSON</div>
-        </div>
-      </section>
+      <RecipeDisplayPanel
+        :layout="recipeLayout!"
+        :values="recipe.slots"
+        :context="context"
+        :atlas-url="atlasUrl"
+        :atlas="atlas!"
+        :two-by-two="recipe.crafting.twoByTwo && recipe.recipeType === 'crafting'"
+        :editing-slot="editingSlot"
+        :issues="issues"
+        :json-text="recipeJsonText"
+        :json="recipeJson"
+        :valid="isValid"
+        :exporting="exporting"
+        @update-slot="updateSlot"
+        @update-count="updateCount"
+        @edit-slot="openSlotDrawer"
+        @copy="copyJson"
+        @export="exportPack"
+      />
 
       <!-- 右：功能区（配方设置） -->
       <div class="recipe-functions">
-        <section class="recipe-panel recipe-settings">
-          <h3 class="recipe-panel-title">配方设置</h3>
-          <div class="recipe-form">
-            <label class="recipe-field">
-              <span class="recipe-field-label">目标版本</span>
-              <Select v-model="selectedVersion" :options="versionOptions" size="small" />
-            </label>
-            <label class="recipe-field">
-              <span class="recipe-field-label">配方类型</span>
-              <Select v-model="recipe.recipeType" :options="typeOptions" size="small" />
-            </label>
-            <label class="recipe-field">
-              <span class="recipe-field-label">配方名称</span>
-              <Input v-model="recipe.name" size="small" placeholder="文件名（自动清理非法字符）" />
-            </label>
-            <label v-if="recipe.recipeType !== 'smithing' && recipe.recipeType !== 'smithing_trim' && recipe.recipeType !== 'smithing_transform'" class="recipe-field">
-              <span class="recipe-field-label">分组</span>
-              <Input v-model="recipe.group" size="small" placeholder="可空" />
-            </label>
-            <label v-if="supportsRecipeCategory(selectedVersion, recipe.recipeType) && categoryOptions.length" class="recipe-field">
-              <span class="recipe-field-label">分类</span>
-              <Select v-model="recipe.category" :options="categoryOptions" size="small" />
-            </label>
-
-            <div v-if="recipe.recipeType === 'crafting'" class="recipe-checkbox-group">
-              <Checkbox v-model="recipe.crafting.shapeless">无序合成</Checkbox>
-              <Checkbox v-model="recipe.crafting.twoByTwo">2×2 网格</Checkbox>
-              <Checkbox v-model="recipe.crafting.keepWhitespace">保留空格</Checkbox>
-            </div>
-            <div v-if="isRecipeTypeAvailable(selectedVersion, recipe.recipeType) && (recipe.recipeType === 'smelting' || recipe.recipeType === 'blasting' || recipe.recipeType === 'smoking' || recipe.recipeType === 'campfire_cooking')" class="recipe-checkbox-group">
-              <label class="recipe-field-inline">
-                <span>经验</span>
-                <Input v-model.number="recipe.cooking.experience" type="number" size="small" min="0" step="0.1" />
-              </label>
-              <label class="recipe-field-inline">
-                <span>时长</span>
-                <Input
-                  :model-value="recipe.cooking.time ?? ''"
-                  type="number"
-                  size="small"
-                  min="1"
-                  :placeholder="String(DEFAULT_COOKING_TIME[recipe.recipeType])"
-                  @update:model-value="onCookingTimeChange"
-                />
-              </label>
-            </div>
-            <div v-if="recipe.recipeType === 'smithing_trim' && supportsSmithingTrimPattern(selectedVersion)" class="recipe-field">
-              <span class="recipe-field-label">纹饰图案</span>
-              <Input v-model="recipe.smithing.trimPattern" size="small" placeholder="minecraft:silence_armor_trim_smithing_template" />
-            </div>
-            <div v-if="supportsShowNotification(selectedVersion, recipe.recipeType, recipe.crafting.shapeless)" class="recipe-checkbox-group">
-              <Checkbox v-model="recipe.showNotification">显示完成通知</Checkbox>
-            </div>
-          </div>
-        </section>
+        <RecipeSettingsForm
+          :recipe="recipe"
+          :selected-version="selectedVersion"
+          :version-options="VERSION_OPTIONS"
+          :type-options="typeOptions"
+          :category-options="categoryOptions"
+          @update:selected-version="selectedVersion = $event"
+        />
       </div>
     </div>
 
     <!-- 贴图选择抽屉：点击空格子展开 -->
-    <Drawer
+    <RecipeSlotDrawer
       v-model:visible="drawerVisible"
-      :title="drawerTitle"
-      placement="right"
-      :width="380"
-      :mask-closable="true"
-      :esc-to-close="true"
-    >
-      <div class="recipe-drawer-palette">
-        <div class="recipe-drawer-nav">
-          <p class="recipe-drawer-hint">您正在为「{{ drawerHint }}」选择物品</p>
-          <div class="recipe-drawer-dpad">
-            <Tooltip text="上移一格">
-              <button
-                class="recipe-dpad-btn"
-                :disabled="!drawerNav?.up"
-                aria-label="上移一格"
-                @click="moveEditing('up')"
-              >
-                <ArrowUpIcon class="recipe-dpad-icon" />
-              </button>
-            </Tooltip>
-            <Tooltip text="下移一格">
-              <button
-                class="recipe-dpad-btn"
-                :disabled="!drawerNav?.down"
-                aria-label="下移一格"
-                @click="moveEditing('down')"
-              >
-                <ArrowDownIcon class="recipe-dpad-icon" />
-              </button>
-            </Tooltip>
-            <Tooltip text="左移一格">
-              <button
-                class="recipe-dpad-btn"
-                :disabled="!drawerNav?.left"
-                aria-label="左移一格"
-                @click="moveEditing('left')"
-              >
-                <ArrowLeftIcon class="recipe-dpad-icon" />
-              </button>
-            </Tooltip>
-            <Tooltip text="右移一格">
-              <button
-                class="recipe-dpad-btn"
-                :disabled="!drawerNav?.right"
-                aria-label="右移一格"
-                @click="moveEditing('right')"
-              >
-                <ArrowRightIcon class="recipe-dpad-icon" />
-              </button>
-            </Tooltip>
-          </div>
-        </div>
-        <SegmentedButtons v-model="activeTab" :options="paletteTabOptions" button-class="flex-1" />
-        <ItemPalette
-          v-if="activeTab === 'items'"
-          :items="items"
-          :atlas-url="atlasUrl"
-          :atlas="atlas!"
-          @pick="pickValue"
-        />
-        <TagPalette v-else :tags="tags" @pick="pickValue" />
-      </div>
-    </Drawer>
+      :editing-slot="editingSlot"
+      :slots="editableSlots"
+      :recipe-type="recipe.recipeType"
+      :two-by-two="recipe.crafting.twoByTwo"
+      :items="items"
+      :tags="tags"
+      :atlas="atlas!"
+      :atlas-url="atlasUrl"
+      @move-to="editingSlot = $event"
+      @pick="pickValue"
+    />
   </div>
 </template>
 
@@ -530,164 +283,9 @@ async function exportPack() {
   }
 }
 
-.recipe-panel {
-  border: 1px solid #e5e6eb;
-  border-radius: 8px;
-  background: #fff;
-  overflow: hidden;
-}
-
-.recipe-panel-title {
-  margin: 0;
-  padding: 0.75rem 1rem;
-  border-bottom: 1px solid #f0f1f3;
-  font-size: 0.85rem;
-  font-weight: 600;
-  color: #1d2129;
-}
-
-.recipe-form {
-  display: flex;
-  flex-direction: column;
-  gap: 0.6rem;
-  padding: 0.75rem 1rem 1rem;
-}
-
-.recipe-field {
-  display: flex;
-  flex-direction: column;
-  gap: 0.3rem;
-}
-
-.recipe-field-label {
-  color: #4e5969;
-  font-size: 0.75rem;
-}
-
-.recipe-field-inline {
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-  color: #4e5969;
-  font-size: 0.75rem;
-}
-
-.recipe-checkbox-group {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.75rem;
-  font-size: 0.8rem;
-}
-
-.recipe-display {
-  display: flex;
-  flex-direction: column;
-  gap: 0.75rem;
-  padding: 1rem;
-}
-
-.recipe-issues {
-  display: flex;
-  flex-direction: column;
-  gap: 0.5rem;
-}
-
-.recipe-preview {
-  display: flex;
-  flex-direction: column;
-  gap: 0.5rem;
-}
-
-.recipe-preview-toolbar {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-}
-
-.recipe-preview-code {
-  max-height: 20rem;
-  margin: 0;
-  padding: 0.75rem;
-  overflow: auto;
-  border: 1px solid #e5e6eb;
-  border-radius: 6px;
-  background: #f7f8fa;
-  color: #4e5969;
-  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
-  font-size: 0.72rem;
-  line-height: 1.5;
-  white-space: pre;
-}
-
-.recipe-preview-empty {
-  padding: 2rem 0;
-  border: 1px dashed #e5e6eb;
-  border-radius: 6px;
-  color: #86909c;
-  font-size: 0.75rem;
-  text-align: center;
-}
-
 .recipe-functions {
   display: flex;
   flex-direction: column;
   gap: 1rem;
-}
-
-.recipe-drawer-palette {
-  display: flex;
-  flex-direction: column;
-  gap: 0.75rem;
-  height: 100%;
-  min-height: 0;
-}
-
-.recipe-drawer-nav {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 0.5rem;
-}
-
-.recipe-drawer-hint {
-  color: #86909c;
-  font-size: 0.75rem;
-}
-
-.recipe-drawer-dpad {
-  display: flex;
-  gap: 0.25rem;
-}
-
-.recipe-dpad-btn {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 1.5rem;
-  height: 1.5rem;
-  border: 1px solid #e5e6eb;
-  border-radius: 4px;
-  background: #fff;
-  color: #4e5969;
-  cursor: pointer;
-  transition:
-    border-color 0.15s ease,
-    background-color 0.15s ease,
-    color 0.15s ease;
-}
-
-.recipe-dpad-btn:hover:not(:disabled) {
-  border-color: var(--color-primary-500);
-  color: var(--color-primary-500);
-}
-
-.recipe-dpad-btn:disabled {
-  opacity: 0.35;
-  cursor: not-allowed;
-}
-
-.recipe-dpad-icon {
-  width: 0.9rem;
-  height: 0.9rem;
 }
 </style>
