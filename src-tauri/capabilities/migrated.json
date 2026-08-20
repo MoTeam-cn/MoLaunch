@@ -31,6 +31,15 @@
     "fs:allow-remove",
     "fs:allow-rename",
     "fs:allow-copy-file",
+    {
+      "identifier": "fs:scope",
+      "allow": [
+        "$EXE/.minecraft/**",
+        "$EXE/.Molaunch/**",
+        "$HOME/AppData/Roaming/.Molaunch/**",
+        "$HOME/.config/Molaunch/**"
+      ]
+    },
     "notification:default",
     "process:default",
     "process:allow-restart"
