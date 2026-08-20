@@ -2,106 +2,116 @@
 /**
  * HTML 自定义布局渲染面板
  *
- * 使用 shadow DOM 渲染用户自定义 HTML 内容：
- * - CSS 隔离：shadow root 内的样式不影响主页面，主页面的样式也不泄漏到 shadow 内
- * - JS 执行：用户脚本通过 new Function 在主窗口上下文执行，可直接调用 window.molaunch SDK
- * - 无 iframe：消除 sandbox="allow-scripts allow-same-origin" 安全警告
- *
- * 与 CustomLayoutPanel 的 html section 区别：
- * - 本组件用于纯 HTML 格式的完整自定义布局（非 JSON/XML 结构化布局）
- * - window.molaunch 通过 Proxy 代理到 pluginSdk（开放所有只读 SDK 方法）
+ * 使用 sandbox="allow-scripts" iframe 渲染用户自定义 HTML 内容（无 allow-same-origin，沙箱隔离）：
+ * - 脚本在 iframe 内执行，无法访问主窗口 DOM / cookie / localStorage
+ * - window.molaunch 经 postMessage 桥接到父级 pluginSdk，父级按只读方法白名单鉴权
+ * - 复用 sandbox-bootstrap 的注入脚本（与外部插件沙箱同一协议）
  */
-import { ref, onMounted, watch, nextTick } from 'vue'
+import { ref, onMounted, onUnmounted, watch } from 'vue'
 import { pluginSdk } from '@/plugins/sdk'
+import { buildSandboxHtml } from '@/plugins/sandbox/sandbox-bootstrap'
 import { ExclamationTriangleIcon } from '@heroicons/vue/24/outline'
-import { safeCallSync } from '@/utils/async'
 
 const props = defineProps<{
   /** HTML 内容 */
   content: string
 }>()
 
-/** 容器引用 */
-const containerRef = ref<HTMLDivElement | null>(null)
+/** iframe 引用 */
+const iframeRef = ref<HTMLIFrameElement | null>(null)
+/** 注入到 iframe 的 HTML（srcdoc） */
+const sandboxHtml = ref('')
 /** 加载错误 */
 const error = ref<string | null>(null)
 
-/** 不允许自定义 HTML 调用的方法（spawnProcess / createWindow 仅外部插件可用） */
-const BLOCKED_METHODS = new Set(['spawnProcess', 'createWindow'])
+/** 允许调用的只读 SDK 方法白名单（spawnProcess / createWindow 等敏感方法一律拒绝） */
+const ALLOWED_METHODS = new Set([
+  'getConfig',
+  'listInstalledVersions',
+  'listInstalledVersionsWithType',
+  'listLaunchHistory',
+  'getSystemMemory',
+  'getRunningGamePid',
+  'getCacheStats',
+])
+/** 始终允许的方法（无敏感数据） */
+const ALWAYS_ALLOWED = new Set(['emit', 'log'])
 
-/** 确保 window.molaunch API 已定义（通过 Proxy 代理到 pluginSdk） */
-let molaunchApiReady = false
-function setupMolaunchApi() {
-  if (molaunchApiReady) return
-  molaunchApiReady = true
-
-  const proxy = new Proxy({} as Record<string, (...args: unknown[]) => Promise<unknown>>, {
-    get(_, prop) {
-      const method = prop as string
-      if (BLOCKED_METHODS.has(method)) {
-        return () => Promise.reject(new Error(`自定义 HTML 布局不支持 ${method} 方法`))
-      }
-      const fn = (pluginSdk as unknown as Record<string, (...a: unknown[]) => Promise<unknown>>)[method]
-      if (typeof fn === 'function') {
-        return (...args: unknown[]) => fn.apply(pluginSdk, args)
-      }
-      return undefined
-    },
-  })
-
-  ;(window as unknown as Record<string, unknown>).molaunch = proxy
-}
-
-/** 用 shadow DOM 渲染 HTML 内容 */
-function renderHtml() {
-  const container = containerRef.value
-  if (!container) return
-
+/** 构建沙箱 HTML（注入 bootstrap 脚本，window.molaunch 在用户脚本运行前就绪） */
+function buildSandbox() {
   try {
     if (!props.content.trim()) {
       error.value = 'HTML 内容为空'
+      sandboxHtml.value = ''
       return
     }
-
-    // 获取或创建 shadow root
-    let shadow = container.shadowRoot
-    if (!shadow) {
-      shadow = container.attachShadow({ mode: 'open' })
-    }
-    shadow.innerHTML = ''
-
-    // 注入用户 HTML
-    const wrapper = document.createElement('div')
-    wrapper.innerHTML = props.content
-    shadow.appendChild(wrapper)
-
-    // 确保 window.molaunch API 可用
-    setupMolaunchApi()
-
-    // 提取并执行 <script> 标签（innerHTML 插入的 script 不会自动执行）
-    const scripts = wrapper.querySelectorAll('script')
-    scripts.forEach((scriptEl) => {
-      const code = scriptEl.textContent || ''
-      if (code.trim()) {
-        safeCallSync(() => new Function(code)(), '[HtmlLayout] run user script')
-      }
-      // 移除已执行的 script 标签
-      scriptEl.remove()
-    })
-
+    sandboxHtml.value = buildSandboxHtml(props.content, 'custom-layout')
     error.value = null
   } catch (e) {
     error.value = String(e)
   }
 }
 
+/**
+ * 处理来自 iframe 的请求消息
+ *
+ * 根据方法名转发到 pluginSdk，并按白名单拒绝未授权调用。
+ */
+async function handleMessage(event: MessageEvent) {
+  // 仅接受来自当前 iframe 的消息
+  if (event.source !== iframeRef.value?.contentWindow) return
+
+  const data = event.data
+  if (!data || typeof data !== 'object') return
+
+  // 沙箱就绪通知
+  if (data.type === 'ready') return
+
+  // 请求消息
+  if (data.type === 'request' && typeof data.id === 'string' && typeof data.method === 'string') {
+    const { id, method, args } = data
+    const sandboxWindow = iframeRef.value?.contentWindow
+
+    // 权限校验：未在白名单内拒绝
+    if (!ALWAYS_ALLOWED.has(method) && !ALLOWED_METHODS.has(method)) {
+      sandboxWindow?.postMessage(
+        { type: 'response', id, error: `权限拒绝：自定义 HTML 布局不支持 ${method} 方法` },
+        '*',
+      )
+      return
+    }
+
+    // 转发到 pluginSdk
+    try {
+      const sdkMethod = (pluginSdk as unknown as Record<string, (...a: unknown[]) => Promise<unknown>>)[method]
+      if (typeof sdkMethod !== 'function') {
+        throw new Error(`未知 SDK 方法: ${method}`)
+      }
+      const result = await sdkMethod.apply(pluginSdk, args ?? [])
+      sandboxWindow?.postMessage(
+        { type: 'response', id, result },
+        '*',
+      )
+    } catch (e) {
+      sandboxWindow?.postMessage(
+        { type: 'response', id, error: e instanceof Error ? e.message : String(e) },
+        '*',
+      )
+    }
+    return
+  }
+}
+
 onMounted(() => {
-  nextTick(renderHtml)
+  window.addEventListener('message', handleMessage)
+  buildSandbox()
 })
 
-watch(() => props.content, () => {
-  nextTick(renderHtml)
+onUnmounted(() => {
+  window.removeEventListener('message', handleMessage)
 })
+
+watch(() => props.content, buildSandbox)
 </script>
 
 <template>
@@ -116,7 +126,18 @@ watch(() => props.content, () => {
       <p class="mt-1 text-xs text-gray-500">{{ error }}</p>
     </div>
 
-    <!-- shadow DOM 容器 -->
-    <div ref="containerRef" class="h-full w-full" />
+    <!-- 沙箱 iframe -->
+    <!--
+      sandbox="allow-scripts" 允许执行 JS，但不赋予同源，无法访问父窗口 DOM / cookie / localStorage
+      srcdoc 注入 HTML 内容（避免文件协议路径问题）
+    -->
+    <iframe
+      v-else
+      ref="iframeRef"
+      class="h-full w-full border-0"
+      sandbox="allow-scripts"
+      :srcdoc="sandboxHtml"
+      title="custom-layout-sandbox"
+    />
   </div>
 </template>

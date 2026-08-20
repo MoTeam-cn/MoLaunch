@@ -12,7 +12,29 @@ import type {
   CustomLayoutConfig,
 } from '@/types/plugin'
 import { fetchCustomLayoutContent } from '@/utils/pluginInstaller'
+import { isUrlAllowed } from '@/config/picker-templates'
 import { toastError } from '@/utils/toast'
+
+/** 自定义布局 URL 域名白名单（支持 *.example.com 通配符） */
+export const CUSTOM_LAYOUT_ALLOWED_DOMAINS = [
+  'moteam.top',
+  '*.moteam.top',
+  '*.molaunch.moiu.cn',
+]
+
+/**
+ * 校验自定义布局 URL 是否允许加载
+ *
+ * 仅允许 https scheme，且域名必须在白名单内（复用 picker-templates 的 isUrlAllowed 匹配逻辑）。
+ */
+export function isCustomLayoutUrlAllowed(url: string): boolean {
+  try {
+    if (new URL(url).protocol !== 'https:') return false
+    return isUrlAllowed(url, CUSTOM_LAYOUT_ALLOWED_DOMAINS)
+  } catch {
+    return false
+  }
+}
 
 export interface PluginsLayoutDeps {
   /** 已注册的插件清单（内置 + 外部） */
@@ -69,6 +91,9 @@ export function usePluginsLayoutSlice(deps: PluginsLayoutDeps) {
     const cfg = customLayoutConfig.value
     if (cfg.source !== 'url' || !cfg.url) {
       throw new Error('当前布局来源不是 URL 或 URL 为空')
+    }
+    if (!isCustomLayoutUrlAllowed(cfg.url)) {
+      throw new Error(`布局 URL 不在白名单内（仅允许 https 且域名需在允许列表）：${cfg.url}`)
     }
 
     try {
