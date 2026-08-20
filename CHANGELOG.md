@@ -10,6 +10,8 @@
 
 - **修复 clippy `needless_match` 告警**（[check.rs](src-tauri/src/commands/system/updater/check.rs)）：`platform_target` 的恒等 match 改为直接返回 `std::env::consts::OS`，消除 `-D warnings` 下的 CI 编译失败。
 
+- **修复 clippy `chunks_exact_to_as_chunks` 告警**（[icmp.rs](src-tauri/src/commands/tools/network/icmp.rs)）：Internet checksum 的 16 位字迭代改用 `as_chunks::<2>()`（语义等价），消除 `-D warnings` 下的 CI 编译失败。
+
 ## [0.3.7-rc4] - 2026-08-21
 
 ### Added

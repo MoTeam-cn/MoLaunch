@@ -130,11 +130,11 @@ fn parse_echo_reply(buf: &[u8], sock_type: SockType) -> Option<(u16, u16)> {
 /// Internet checksum（RFC 1071），返回补码（发送端先置 0 再对报文求和取反）
 fn checksum(data: &[u8]) -> u16 {
     let mut sum = 0u32;
-    let mut chunks = data.chunks_exact(2);
-    for pair in &mut chunks {
+    let (pairs, remainder) = data.as_chunks::<2>();
+    for pair in pairs {
         sum += u32::from(u16::from_be_bytes([pair[0], pair[1]]));
     }
-    if let Some(&b) = chunks.remainder().first() {
+    if let Some(&b) = remainder.first() {
         sum += u32::from(b) << 8;
     }
     while sum >> 16 != 0 {
