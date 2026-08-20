@@ -47,8 +47,8 @@ for (const line of block.split('\n')) {
   }
 }
 
-// 生成新块：版本标题 + 合并后的分组
-const date = new Date().toISOString().slice(0, 10);
+// 生成新块：版本标题 + 合并后的分组（日期按 UTC+8 本地时区 Asia/Shanghai 计算）
+const date = new Date(Date.now() + 8 * 3600 * 1000).toISOString().slice(0, 10);
 const out = [`## [${VERSION}] - ${date}`];
 for (const [title, items] of groups) {
   out.push('', `### ${title}`, '');
