@@ -6,6 +6,7 @@ use std::fs::File;
 use std::io::{Read, Write};
 use std::path::{Path, PathBuf};
 
+use crate::log_warn;
 use crate::minecraft::isolation::{get_effective_game_dir, IsolationMode};
 use crate::state::{resolve_game_dir, AppState};
 
@@ -115,14 +116,51 @@ pub(super) fn zip_directory(
     Ok(())
 }
 
-/// 解压 zip 到目录
+/// 解压 zip 到目录（防 zip slip：条目路径必须落在目标目录内；跳过 symlink 条目）
 pub(super) fn unzip_to_dir(src_zip: &Path, output_dir: &Path) -> Result<(), String> {
     let file = File::open(src_zip).map_err(|e| format!("打开 zip 失败: {}", e))?;
     let mut archive = zip::ZipArchive::new(file).map_err(|e| format!("读取 zip 失败: {}", e))?;
     std::fs::create_dir_all(output_dir).map_err(|e| format!("创建输出目录失败: {}", e))?;
-    archive
-        .extract(output_dir)
-        .map_err(|e| format!("解压失败: {}", e))?;
+    let canonical_dst = output_dir
+        .canonicalize()
+        .map_err(|e| format!("输出目录不可用: {}", e))?;
+
+    for i in 0..archive.len() {
+        let mut entry = archive
+            .by_index(i)
+            .map_err(|e| format!("读取 zip 条目失败: {}", e))?;
+        let name = entry.name().to_string();
+
+        // 跳过 symlink 条目（防解压出指向目标目录外的链接）
+        if entry.is_symlink() {
+            log_warn!("[Archive] 跳过 symlink 条目: {}", name);
+            continue;
+        }
+
+        // 路径安全：拒绝绝对路径与路径穿越段（防 zip slip）
+        crate::utils::path::ensure_safe_relative_path(&name)
+            .map_err(|e| format!("zip 条目路径非法: {} ({})", name, e))?;
+
+        let target = output_dir.join(&name);
+        if entry.is_dir() {
+            std::fs::create_dir_all(&target).map_err(|e| format!("创建目录失败: {}", e))?;
+            continue;
+        }
+
+        if let Some(parent) = target.parent() {
+            std::fs::create_dir_all(parent).map_err(|e| format!("创建父目录失败: {}", e))?;
+            if !parent
+                .canonicalize()
+                .map_err(|e| format!("canonicalize 失败: {}", e))?
+                .starts_with(&canonical_dst)
+            {
+                return Err(format!("Zip Slip 检测: {}", name));
+            }
+        }
+
+        let mut out = File::create(&target).map_err(|e| format!("创建文件失败: {}", e))?;
+        std::io::copy(&mut entry, &mut out).map_err(|e| format!("写入文件失败: {}", e))?;
+    }
     Ok(())
 }
 

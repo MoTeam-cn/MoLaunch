@@ -37,7 +37,11 @@ pub async fn download_url_to_file(
     url: String,
     path: String,
 ) -> Result<(), String> {
-    log_info!("[Skin] 下载 URL 到文件: {} -> {}", url, path);
+    log_info!(
+        "[Skin] 下载 URL 到文件: {} -> {}",
+        crate::utils::net::sanitize_url_for_log(&url),
+        path
+    );
 
     // 路径安全：canonicalize 后校验目标必须位于下载目录内（防任意路径写入）
     let save_path = PathBuf::from(&path);

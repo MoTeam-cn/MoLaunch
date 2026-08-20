@@ -87,9 +87,29 @@ pub fn validate_updater_download_url(raw: &str) -> Result<(), String> {
     Ok(())
 }
 
+/// 脱敏 URL 用于日志：仅保留 scheme + host + path，去掉 query/fragment/userinfo
+///
+/// 防止 query 中的 token 等敏感参数进入日志；解析失败时原样返回（不丢信息）。
+pub fn sanitize_url_for_log(raw: &str) -> String {
+    if raw.is_empty() {
+        return String::new();
+    }
+    match Url::parse(raw) {
+        Ok(url) => {
+            let mut out = format!("{}://{}", url.scheme(), url.host_str().unwrap_or(""));
+            if let Some(port) = url.port() {
+                out.push_str(&format!(":{}", port));
+            }
+            out.push_str(url.path());
+            out
+        }
+        Err(_) => raw.to_string(),
+    }
+}
+
 #[cfg(test)]
 mod tests {
-    use super::{is_private_address, validate_public_http_url};
+    use super::{is_private_address, sanitize_url_for_log, validate_public_http_url};
 
     #[test]
     fn test_is_private_address() {
@@ -121,5 +141,24 @@ mod tests {
         assert!(validate_public_http_url("https://localhost/a").is_err());
         assert!(validate_public_http_url("https://cache-image.localhost/a.png").is_err());
         assert!(validate_public_http_url("https://169.254.1.1/a").is_err());
+    }
+
+    #[test]
+    fn test_sanitize_url_for_log() {
+        assert_eq!(
+            sanitize_url_for_log("https://api.example.com/v1/manifest?token=secret&a=1#frag"),
+            "https://api.example.com/v1/manifest"
+        );
+        assert_eq!(
+            sanitize_url_for_log("https://user:pass@example.com:8443/a/b.png?t=1"),
+            "https://example.com:8443/a/b.png"
+        );
+        assert_eq!(
+            sanitize_url_for_log("https://example.com/"),
+            "https://example.com/"
+        );
+        assert_eq!(sanitize_url_for_log(""), "");
+        // 解析失败原样返回
+        assert_eq!(sanitize_url_for_log("not a url"), "not a url");
     }
 }

@@ -136,7 +136,11 @@ pub async fn check_update(state: &AppState, _app: &AppHandle) -> Result<UpdateIn
         .ok()
         .map(|creds| creds.device_token);
 
-    log::info!("[Updater] 检查更新: {} (auth: {})", url, jwt.is_some());
+    log::info!(
+        "[Updater] 检查更新: {} (auth: {})",
+        crate::utils::net::sanitize_url_for_log(&url),
+        jwt.is_some()
+    );
 
     // 4. 构建请求（有 JWT 则携带 Authorization 头）
     let client = crate::http::get_client();
