@@ -10,6 +10,7 @@ import { computed, defineAsyncComponent, onMounted, ref, watch } from 'vue'
 const Button = defineAsyncComponent(() => import('@/components/common/Button.vue'))
 const Tag = defineAsyncComponent(() => import('@/components/common/Tag.vue'))
 const Select = defineAsyncComponent(() => import('@/components/common/Select.vue'))
+const Tooltip = defineAsyncComponent(() => import('@/components/common/Tooltip.vue'))
 const RpFileTreeNode = defineAsyncComponent(() => import('./RpFileTreeNode.vue'))
 const RpMcmetaForm = defineAsyncComponent(() => import('./RpMcmetaForm.vue'))
 const RpTexturePreview = defineAsyncComponent(() => import('./RpTexturePreview.vue'))
@@ -305,12 +306,13 @@ async function saveAsZip() {
         </button>
         <div class="ml-auto flex items-center gap-1.5">
           <span class="text-xs text-gray-400">版本</span>
-          <Select
-            v-model="selectedVersionId"
-            :options="versionOptions"
-            class="w-40"
-            title="选择资源包隔离目录（按 MC 版本）"
-          />
+          <Tooltip text="选择资源包隔离目录（按 MC 版本）">
+            <Select
+              v-model="selectedVersionId"
+              :options="versionOptions"
+              class="w-40"
+            />
+          </Tooltip>
         </div>
       </div>
       <div v-show="listOpen" class="mt-2 grid max-h-[132px] grid-cols-2 gap-2 overflow-y-auto md:grid-cols-3">

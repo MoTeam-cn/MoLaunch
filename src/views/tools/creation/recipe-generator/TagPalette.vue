@@ -2,11 +2,12 @@
 /**
  * 合成配方调色板 - 原版标签：按中文名/ID 搜索，每行多个标签，点击放置到槽位
  */
-import { computed, ref } from 'vue'
+import { computed, ref, defineAsyncComponent } from 'vue'
 import { RecycleScroller } from 'vue-virtual-scroller'
 import 'vue-virtual-scroller/index.css'
 import type { SlotValue } from '@/utils/recipe-generator/types'
 import { tagLabel } from '@/utils/recipe-generator/tag-zh'
+const Tooltip = defineAsyncComponent(() => import('@/components/common/Tooltip.vue'))
 
 const props = defineProps<{
   tags: Record<string, string[]>
@@ -73,17 +74,18 @@ function pick(id: string) {
     >
       <template #default="{ item }">
         <div class="tag-palette-row">
-          <button
-            v-for="entry in item.tags"
-            :key="entry.id"
-            type="button"
-            class="tag-palette-entry"
-            :title="`#${entry.id} · ${entry.count} 个物品`"
-            @click="pick(entry.id)"
-          >
-            <span class="tag-palette-name">#{{ tagLabel(entry.id) }}</span>
-            <span class="tag-palette-count">{{ entry.count }}</span>
-          </button>
+          <template v-for="entry in item.tags" :key="entry.id">
+            <Tooltip :text="`#${entry.id} · ${entry.count} 个物品`" block>
+              <button
+                type="button"
+                class="tag-palette-entry"
+                @click="pick(entry.id)"
+              >
+                <span class="tag-palette-name">#{{ tagLabel(entry.id) }}</span>
+                <span class="tag-palette-count">{{ entry.count }}</span>
+              </button>
+            </Tooltip>
+          </template>
         </div>
       </template>
     </RecycleScroller>

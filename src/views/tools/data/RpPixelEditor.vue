@@ -16,6 +16,7 @@ import {
   XMarkIcon,
 } from '@heroicons/vue/24/outline'
 const Button = defineAsyncComponent(() => import('@/components/common/Button.vue'))
+const Tooltip = defineAsyncComponent(() => import('@/components/common/Tooltip.vue'))
 import { toastError, toastSuccess } from '@/utils/toast'
 import { rpWrite } from '@/utils/api/tools'
 
@@ -256,22 +257,22 @@ onBeforeUnmount(() => {
 
     <div class="flex flex-wrap items-center gap-1.5 rounded border border-gray-200 bg-gray-50 p-2">
       <span class="text-xs text-gray-500">颜色</span>
-      <button
-        v-for="c in MC_COLORS"
-        :key="c"
-        type="button"
-        class="h-5 w-5 rounded-sm border border-black/10"
-        :class="color.toLowerCase() === c.toLowerCase() ? 'ring-2 ring-blue-500 ring-offset-1' : ''"
-        :style="{ backgroundColor: c }"
-        :title="c"
-        @click="color = c"
-      />
-      <label
-        class="relative ml-1 h-5 w-5 cursor-pointer overflow-hidden rounded-sm border border-gray-300 bg-white"
-        title="自定义颜色"
-      >
-        <input v-model="color" type="color" class="absolute inset-0 h-full w-full cursor-pointer opacity-0" />
-      </label>
+      <Tooltip v-for="c in MC_COLORS" :key="c" :text="c">
+        <button
+          type="button"
+          class="h-5 w-5 rounded-sm border border-black/10"
+          :class="color.toLowerCase() === c.toLowerCase() ? 'ring-2 ring-blue-500 ring-offset-1' : ''"
+          :style="{ backgroundColor: c }"
+          @click="color = c"
+        />
+      </Tooltip>
+      <Tooltip text="自定义颜色">
+        <label
+          class="relative ml-1 h-5 w-5 cursor-pointer overflow-hidden rounded-sm border border-gray-300 bg-white"
+        >
+          <input v-model="color" type="color" class="absolute inset-0 h-full w-full cursor-pointer opacity-0" />
+        </label>
+      </Tooltip>
       <span class="ml-1 text-xs text-gray-500">{{ color }}</span>
     </div>
 

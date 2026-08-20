@@ -8,6 +8,7 @@ import 'vue-virtual-scroller/index.css'
 import type { AssetItem, AtlasLayout } from '@/utils/recipe-generator/resources'
 import type { SlotValue } from '@/utils/recipe-generator/types'
 const RecipeItemIcon = defineAsyncComponent(() => import('./RecipeItemIcon.vue'))
+const Tooltip = defineAsyncComponent(() => import('@/components/common/Tooltip.vue'))
 import { matchItem } from '@/utils/recipe-generator/itemSearch'
 
 const props = defineProps<{
@@ -68,25 +69,28 @@ function pick(item: AssetItem) {
     >
       <template #default="{ item }">
         <div class="item-palette-row">
-          <button
-            v-for="entry in item.items"
-            :key="entry.id"
-            type="button"
-            class="item-palette-entry"
-            :title="entry.name"
-            @click="pick(entry)"
-          >
-            <RecipeItemIcon
-              :texture="entry.texture"
-              :atlas-url="atlasUrl"
-              :atlas="atlas"
-              :size="30"
-              :label="entry.zh || entry.name"
-            />
-            <span class="item-palette-name" :title="`${entry.name}（${entry.zh}）`">
-              {{ entry.zh || entry.name }}
-            </span>
-          </button>
+          <template v-for="entry in item.items" :key="entry.id">
+            <Tooltip :text="entry.name" block>
+              <button
+                type="button"
+                class="item-palette-entry"
+                @click="pick(entry)"
+              >
+                <RecipeItemIcon
+                  :texture="entry.texture"
+                  :atlas-url="atlasUrl"
+                  :atlas="atlas"
+                  :size="30"
+                  :label="entry.zh || entry.name"
+                />
+                <Tooltip :text="`${entry.name}（${entry.zh}）`" overflowOnly block>
+                  <span class="item-palette-name">
+                    {{ entry.zh || entry.name }}
+                  </span>
+                </Tooltip>
+              </button>
+            </Tooltip>
+          </template>
         </div>
       </template>
     </RecycleScroller>

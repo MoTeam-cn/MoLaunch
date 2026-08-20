@@ -5,6 +5,7 @@
 import { computed, ref, watch, defineAsyncComponent } from 'vue'
 import { CheckIcon, LanguageIcon, PlusIcon, TrashIcon, ExclamationTriangleIcon } from '@heroicons/vue/24/outline'
 const Button = defineAsyncComponent(() => import('@/components/common/Button.vue'))
+const Tooltip = defineAsyncComponent(() => import('@/components/common/Tooltip.vue'))
 import { toastError, toastSuccess } from '@/utils/toast'
 import { rpWrite } from '@/utils/api/tools'
 
@@ -142,13 +143,14 @@ async function doSave() {
               />
             </td>
             <td class="px-2 py-1">
+              <Tooltip text="删除">
               <button
                 class="rounded p-1 text-gray-400 hover:bg-red-50 hover:text-red-500"
-                title="删除"
                 @click="removeRow(i)"
               >
                 <TrashIcon class="h-3.5 w-3.5" />
               </button>
+            </Tooltip>
             </td>
           </tr>
         </tbody>

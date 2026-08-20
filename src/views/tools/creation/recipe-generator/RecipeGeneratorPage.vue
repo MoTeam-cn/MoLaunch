@@ -14,6 +14,7 @@ const Select = defineAsyncComponent(() => import('@/components/common/Select.vue
 const Input = defineAsyncComponent(() => import('@/components/common/Input.vue'))
 const Checkbox = defineAsyncComponent(() => import('@/components/common/Checkbox.vue'))
 const SegmentedButtons = defineAsyncComponent(() => import('@/components/common/SegmentedButtons.vue'))
+const Tooltip = defineAsyncComponent(() => import('@/components/common/Tooltip.vue'))
 import { toastError, toastInfo, toastSuccess } from '@/utils/toast'
 import {
   buildSlotContext,
@@ -446,42 +447,46 @@ async function exportPack() {
         <div class="recipe-drawer-nav">
           <p class="recipe-drawer-hint">您正在为「{{ drawerHint }}」选择物品</p>
           <div class="recipe-drawer-dpad">
-            <button
-              class="recipe-dpad-btn"
-              :disabled="!drawerNav?.up"
-              title="上移一格"
-              aria-label="上移一格"
-              @click="moveEditing('up')"
-            >
-              <ArrowUpIcon class="recipe-dpad-icon" />
-            </button>
-            <button
-              class="recipe-dpad-btn"
-              :disabled="!drawerNav?.down"
-              title="下移一格"
-              aria-label="下移一格"
-              @click="moveEditing('down')"
-            >
-              <ArrowDownIcon class="recipe-dpad-icon" />
-            </button>
-            <button
-              class="recipe-dpad-btn"
-              :disabled="!drawerNav?.left"
-              title="左移一格"
-              aria-label="左移一格"
-              @click="moveEditing('left')"
-            >
-              <ArrowLeftIcon class="recipe-dpad-icon" />
-            </button>
-            <button
-              class="recipe-dpad-btn"
-              :disabled="!drawerNav?.right"
-              title="右移一格"
-              aria-label="右移一格"
-              @click="moveEditing('right')"
-            >
-              <ArrowRightIcon class="recipe-dpad-icon" />
-            </button>
+            <Tooltip text="上移一格">
+              <button
+                class="recipe-dpad-btn"
+                :disabled="!drawerNav?.up"
+                aria-label="上移一格"
+                @click="moveEditing('up')"
+              >
+                <ArrowUpIcon class="recipe-dpad-icon" />
+              </button>
+            </Tooltip>
+            <Tooltip text="下移一格">
+              <button
+                class="recipe-dpad-btn"
+                :disabled="!drawerNav?.down"
+                aria-label="下移一格"
+                @click="moveEditing('down')"
+              >
+                <ArrowDownIcon class="recipe-dpad-icon" />
+              </button>
+            </Tooltip>
+            <Tooltip text="左移一格">
+              <button
+                class="recipe-dpad-btn"
+                :disabled="!drawerNav?.left"
+                aria-label="左移一格"
+                @click="moveEditing('left')"
+              >
+                <ArrowLeftIcon class="recipe-dpad-icon" />
+              </button>
+            </Tooltip>
+            <Tooltip text="右移一格">
+              <button
+                class="recipe-dpad-btn"
+                :disabled="!drawerNav?.right"
+                aria-label="右移一格"
+                @click="moveEditing('right')"
+              >
+                <ArrowRightIcon class="recipe-dpad-icon" />
+              </button>
+            </Tooltip>
           </div>
         </div>
         <SegmentedButtons v-model="activeTab" :options="paletteTabOptions" button-class="flex-1" />

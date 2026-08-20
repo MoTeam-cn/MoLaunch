@@ -6,6 +6,7 @@ import { nextTick, onBeforeUnmount, reactive, ref, watch, defineAsyncComponent }
 import type { AtlasLayout } from '@/utils/recipe-generator/resources'
 import type { TagDisplay } from '@/utils/recipe-generator/tag-resolve'
 const RecipeItemIcon = defineAsyncComponent(() => import('./RecipeItemIcon.vue'))
+const Tooltip = defineAsyncComponent(() => import('@/components/common/Tooltip.vue'))
 
 const props = defineProps<{
   display: TagDisplay
@@ -88,20 +89,19 @@ onBeforeUnmount(() => {
     </div>
     <div ref="viewportRef" class="recipe-tag-popup-viewport">
       <div ref="trackRef" class="recipe-tag-popup-track" :class="{ 'is-sliding': isSliding }">
-        <div
-          v-for="member in display.members"
-          :key="member.id"
-          class="recipe-tag-popup-item"
-          :title="member.label"
-        >
-          <RecipeItemIcon
-            :texture="member.texture"
-            :atlas-url="atlasUrl"
-            :atlas="atlas"
-            :size="34"
-            :label="member.label"
-          />
-        </div>
+        <template v-for="member in display.members" :key="member.id">
+          <Tooltip :text="member.label">
+            <div class="recipe-tag-popup-item">
+              <RecipeItemIcon
+                :texture="member.texture"
+                :atlas-url="atlasUrl"
+                :atlas="atlas"
+                :size="34"
+                :label="member.label"
+              />
+            </div>
+          </Tooltip>
+        </template>
       </div>
     </div>
   </div>

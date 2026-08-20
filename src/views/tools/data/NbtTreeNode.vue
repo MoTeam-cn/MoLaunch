@@ -16,6 +16,7 @@ import {
 } from '@heroicons/vue/24/outline'
 const Tag = defineAsyncComponent(() => import('@/components/common/Tag.vue'))
 const Input = defineAsyncComponent(() => import('@/components/common/Input.vue'))
+const Tooltip = defineAsyncComponent(() => import('@/components/common/Tooltip.vue'))
 import type { NbtNode } from '@/utils/api/tools'
 
 const props = withDefaults(
@@ -235,21 +236,22 @@ function removeNode() {
 
       <!-- 操作按钮（编辑模式 + hover 显示） -->
       <div v-if="editable && !isRoot" class="hidden group-hover:flex flex-none items-center gap-1">
-        <button
-          v-if="isContainer"
-          class="rounded p-0.5 text-gray-400 hover:text-primary-600 transition-colors"
-          title="新增"
-          @click.stop="node.tag_type === 'compound' ? startAdd() : addListItem()"
-        >
-          <PlusIcon class="h-3.5 w-3.5" />
-        </button>
-        <button
-          class="rounded p-0.5 text-gray-400 hover:text-red-500 transition-colors"
-          title="删除"
-          @click.stop="removeNode"
-        >
-          <TrashIcon class="h-3.5 w-3.5" />
-        </button>
+        <Tooltip v-if="isContainer" text="新增">
+          <button
+            class="rounded p-0.5 text-gray-400 hover:text-primary-600 transition-colors"
+            @click.stop="node.tag_type === 'compound' ? startAdd() : addListItem()"
+          >
+            <PlusIcon class="h-3.5 w-3.5" />
+          </button>
+        </Tooltip>
+        <Tooltip text="删除">
+          <button
+            class="rounded p-0.5 text-gray-400 hover:text-red-500 transition-colors"
+            @click.stop="removeNode"
+          >
+            <TrashIcon class="h-3.5 w-3.5" />
+          </button>
+        </Tooltip>
       </div>
     </div>
 
@@ -262,12 +264,16 @@ function removeNode() {
       >
         <option v-for="t in NBT_TYPES" :key="t" :value="t">{{ t }}</option>
       </select>
-      <button class="rounded p-1 text-gray-500 hover:text-primary-600" title="确认" @click="confirmAdd">
-        <CheckIcon class="h-3.5 w-3.5" />
-      </button>
-      <button class="rounded p-1 text-gray-500 hover:text-gray-700" title="取消" @click="addMode = false">
-        <XMarkIcon class="h-3.5 w-3.5" />
-      </button>
+      <Tooltip text="确认">
+        <button class="rounded p-1 text-gray-500 hover:text-primary-600" @click="confirmAdd">
+          <CheckIcon class="h-3.5 w-3.5" />
+        </button>
+      </Tooltip>
+      <Tooltip text="取消">
+        <button class="rounded p-1 text-gray-500 hover:text-gray-700" @click="addMode = false">
+          <XMarkIcon class="h-3.5 w-3.5" />
+        </button>
+      </Tooltip>
     </div>
 
     <!-- 子节点（展开时） -->

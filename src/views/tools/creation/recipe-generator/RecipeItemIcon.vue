@@ -2,8 +2,9 @@
 /**
  * 物品图标：从内置纹理图集切图显示（16x16 源图按像素缩放）
  */
-import { computed } from 'vue'
+import { computed, defineAsyncComponent } from 'vue'
 import type { AtlasLayout } from '@/utils/recipe-generator/resources'
+const Tooltip = defineAsyncComponent(() => import('@/components/common/Tooltip.vue'))
 
 const props = withDefaults(
   defineProps<{
@@ -33,14 +34,15 @@ const backgroundStyle = computed(() => {
 </script>
 
 <template>
-  <span
-    class="recipe-item-icon"
-    :style="backgroundStyle"
-    :title="label"
-    :aria-label="label"
-  >
-    <span v-if="!region" class="recipe-item-icon-placeholder">?</span>
-  </span>
+  <Tooltip :text="label">
+    <span
+      class="recipe-item-icon"
+      :style="backgroundStyle"
+      :aria-label="label"
+    >
+      <span v-if="!region" class="recipe-item-icon-placeholder">?</span>
+    </span>
+  </Tooltip>
 </template>
 
 <style scoped>
