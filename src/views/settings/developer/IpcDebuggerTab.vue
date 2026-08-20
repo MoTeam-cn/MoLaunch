@@ -5,13 +5,15 @@
  * 选择 Tauri 命令名（Select 下拉，后端 generate_handler 注册的命令）+ JSON 参数直接 invoke，
  * 查看返回结果或错误。
  */
-import { ref, computed, defineAsyncComponent } from 'vue'
+import { ref, computed, defineAsyncComponent, onMounted } from 'vue'
 const Button = defineAsyncComponent(() => import('@/components/common/Button.vue'))
 const Input = defineAsyncComponent(() => import('@/components/common/Input.vue'))
 const Select = defineAsyncComponent(() => import('@/components/common/Select.vue'))
 const Alert = defineAsyncComponent(() => import('@/components/common/Alert.vue'))
 import { invoke } from '@tauri-apps/api/core'
 import { toastError } from '@/utils/toast'
+import { safeCall } from '@/utils/async'
+import { isDeveloperUnlocked } from '@/utils/api/developer'
 import { BeakerIcon, PlayIcon, ClipboardDocumentIcon } from '@heroicons/vue/24/outline'
 
 /** 后端 generate_handler 注册的全部命令（lib.rs invoke_handler 列表） */
@@ -49,10 +51,25 @@ const result = ref<string | null>(null)
 const error = ref<string | null>(null)
 const elapsed = ref<number | null>(null)
 
+/** 开发者模式是否已解锁（后端 is_developer_unlocked 校验，未解锁禁用调试器） */
+const unlocked = ref(false)
+
+/** 查询后端开发者模式解锁状态（与 DevToolsTab 一致的后端校验） */
+async function refreshUnlocked() {
+  const r = await safeCall(() => isDeveloperUnlocked(), 'query developer unlocked', () => toastError('查询开发者模式状态失败'))
+  if (typeof r === 'boolean') unlocked.value = r
+}
+
+onMounted(refreshUnlocked)
+
 /** Select 下拉选项（命令名列表） */
 const commandOptions = computed(() => KNOWN_COMMANDS.map(c => ({ label: c, value: c })))
 
 async function run() {
+  if (!unlocked.value) {
+    toastError('需先解锁开发者模式才能使用 IPC 调试器')
+    return
+  }
   const name = command.value.trim()
   if (!name) {
     toastError('请输入命令名')
@@ -104,18 +121,24 @@ async function copyResult() {
         IPC 命令调试器
       </h3>
 
-      <div class="mx-5 mb-4">
+      <div class="mx-5 mb-4 space-y-3">
         <Alert
           type="info"
           :truncate="false"
           message="输入后端注册的 Tauri 命令名与 JSON 参数直接 invoke，用于排查 IPC 调用问题。参数留空或 {} 表示无参数；manager 类命令需传 { req: { action, params } } 结构。"
+        />
+        <Alert
+          v-if="!unlocked"
+          type="warning"
+          :truncate="false"
+          message="IPC 调试器可调用后端全部命令（含下载、清理、快照加解密等危险操作），需先解锁开发者模式（鸣谢 → 法律信息）并在「进阶设置」中开启后才能使用。"
         />
       </div>
 
       <div class="px-5 pb-5 space-y-4">
         <div>
           <p class="text-sm font-medium text-gray-900 mb-1.5">命令名</p>
-          <Select v-model="command" :options="commandOptions" placeholder="请选择命令" />
+          <Select v-model="command" :options="commandOptions" placeholder="请选择命令" :disabled="!unlocked" />
         </div>
 
         <div>
@@ -125,12 +148,13 @@ async function copyResult() {
             textarea
             :rows="4"
             resize="vertical"
+            :disabled="!unlocked"
             placeholder='{"req": {"action": "get_launch_history", "params": null}}'
           />
         </div>
 
         <div class="flex items-center gap-2">
-          <Button type="primary" :loading="loading" @click="run">
+          <Button type="primary" :loading="loading" :disabled="!unlocked" @click="run">
             <template #icon><PlayIcon class="w-4 h-4" /></template>
             执行
           </Button>
