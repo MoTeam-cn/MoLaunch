@@ -10,7 +10,7 @@ mod perms;
 mod window;
 
 pub use admin::{is_admin, relaunch_as_admin};
-pub use exec::{kill_process_tree, run_executable_output};
+pub use exec::{kill_process_tree, run_command_status, run_detached, run_executable_output};
 pub use open::{open_path, open_url, reveal_in_file_manager};
 pub use perms::{make_executable, restrict_dir_permissions, restrict_file_permissions};
 

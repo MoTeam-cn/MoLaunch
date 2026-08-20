@@ -61,17 +61,20 @@ pub(super) async fn download_and_install_windows(
     );
 
     // 4. 启动 updater.exe 子进程（传递 --signature 供 updater 二次校验）
-    std::process::Command::new(&updater_path)
-        .arg("--old-exe")
-        .arg(&current_exe)
-        .arg("--new-exe")
-        .arg(&new_exe)
-        .arg("--pid")
-        .arg(pid.to_string())
-        .arg("--signature")
-        .arg(&info.signature)
-        .spawn()
-        .map_err(|e| format!("启动 updater.exe 失败: {e}"))?;
+    crate::minecraft::system::shell::run_detached(
+        &updater_path.to_string_lossy(),
+        &[
+            "--old-exe".to_string(),
+            current_exe.to_string_lossy().into_owned(),
+            "--new-exe".to_string(),
+            new_exe.to_string_lossy().into_owned(),
+            "--pid".to_string(),
+            pid.to_string(),
+            "--signature".to_string(),
+            info.signature.clone(),
+        ],
+    )
+    .map_err(|e| format!("启动 updater.exe 失败: {e}"))?;
 
     // 5. 退出主程序（updater 接管）
     app.exit(0);
@@ -202,17 +205,20 @@ pub(super) async fn apply_pending_update_impl(_app: &AppHandle) -> Result<bool, 
         pid
     );
 
-    std::process::Command::new(&updater_path)
-        .arg("--old-exe")
-        .arg(&current_exe)
-        .arg("--new-exe")
-        .arg(&last_exe)
-        .arg("--pid")
-        .arg(pid.to_string())
-        .arg("--signature")
-        .arg(&signature)
-        .spawn()
-        .map_err(|e| format!("启动 updater.exe 失败: {e}"))?;
+    crate::minecraft::system::shell::run_detached(
+        &updater_path.to_string_lossy(),
+        &[
+            "--old-exe".to_string(),
+            current_exe.to_string_lossy().into_owned(),
+            "--new-exe".to_string(),
+            last_exe.to_string_lossy().into_owned(),
+            "--pid".to_string(),
+            pid.to_string(),
+            "--signature".to_string(),
+            signature.clone(),
+        ],
+    )
+    .map_err(|e| format!("启动 updater.exe 失败: {e}"))?;
 
     Ok(true)
 }

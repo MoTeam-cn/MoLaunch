@@ -45,16 +45,18 @@ pub(super) fn register_linux() -> Result<(), String> {
         .map_err(|e| format!("写入 desktop 文件失败: {}", e))?;
 
     // 注册为默认 handler
-    let _ = std::process::Command::new("xdg-mime")
-        .args([
-            "default",
-            &desktop_file_name(),
-            &format!("x-scheme-handler/{}", PROTOCOL),
-        ])
-        .status();
-    let _ = std::process::Command::new("update-desktop-database")
-        .arg(&dir)
-        .status();
+    let _ = crate::minecraft::system::shell::run_command_status(
+        "xdg-mime",
+        &[
+            "default".to_string(),
+            desktop_file_name(),
+            format!("x-scheme-handler/{}", PROTOCOL),
+        ],
+    );
+    let _ = crate::minecraft::system::shell::run_command_status(
+        "update-desktop-database",
+        &[dir.to_string_lossy().into_owned()],
+    );
 
     Ok(())
 }
@@ -66,13 +68,14 @@ pub(super) fn unregister_linux() -> Result<(), String> {
             std::fs::remove_file(&file).map_err(|e| format!("删除 desktop 文件失败: {}", e))?;
         }
     }
-    let _ = std::process::Command::new("xdg-mime")
-        .args([
-            "uninstall",
-            "mimeinfo",
-            "/dev/null", // 无实际卸载语义，占位避免 xdg 报错；真正清理靠删除 desktop 文件
-        ])
-        .status();
+    let _ = crate::minecraft::system::shell::run_command_status(
+        "xdg-mime",
+        &[
+            "uninstall".to_string(),
+            "mimeinfo".to_string(),
+            "/dev/null".to_string(), // 无实际卸载语义，占位避免 xdg 报错；真正清理靠删除 desktop 文件
+        ],
+    );
     Ok(())
 }
 

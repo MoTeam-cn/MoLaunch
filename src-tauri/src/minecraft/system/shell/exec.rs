@@ -43,6 +43,40 @@ pub fn run_executable_output(
     cmd.output().map_err(|e| shell_err(program, e))
 }
 
+/// 启动外部可执行文件并分离运行（不等待退出）
+///
+/// 统一封装 `std::process::Command::spawn`：`[Shell]` 前缀日志、统一错误格式。
+/// 适用于 updater.exe 替换主程序等"启动后立即返回"的场景。
+/// 不适用：需要同步等待输出（用 `run_executable_output`）。
+pub fn run_detached(program: &str, args: &[String]) -> Result<(), String> {
+    log_info!("[Shell] run_detached: {} {}", program, args.join(" "));
+    std::process::Command::new(program)
+        .args(args)
+        .spawn()
+        .map_err(|e| shell_err(program, e))?;
+    Ok(())
+}
+
+/// 同步执行外部命令并等待退出（忽略输出）
+///
+/// 统一封装 `std::process::Command::status`：`[Shell]` 前缀日志、统一错误格式。
+/// 适用于 xdg-mime / update-desktop-database 等"执行即生效、无需输出"的系统命令。
+/// 命令退出码非 0 时返回错误（调用方可按需忽略）。
+pub fn run_command_status(program: &str, args: &[String]) -> Result<(), String> {
+    log_info!("[Shell] run_command_status: {} {}", program, args.join(" "));
+    let status = std::process::Command::new(program)
+        .args(args)
+        .status()
+        .map_err(|e| shell_err(program, e))?;
+    if status.success() {
+        Ok(())
+    } else {
+        let msg = format!("{} exited with {}", program, status);
+        log_error!("[Shell] {}", msg);
+        Err(msg)
+    }
+}
+
 /// 杀掉进程树（含子进程）
 ///
 /// - Windows: `taskkill /PID <pid> /T /F`（/T 杀子进程，/F 强制结束）
