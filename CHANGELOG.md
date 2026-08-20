@@ -12,6 +12,8 @@
 
 ### Fixed
 
+- **修复 easytier port-forward 命令 JSON 解析失败**（[easytier.rs](src-tauri/src/minecraft/online/scaffolding/easytier.rs)）：`easytier_cli` 对全部命令强制 `-o json` + JSON 解析，但实测 `port-forward add/remove` 输出为**文本**（`Port forward rule add: ...`）而非 JSON，导致 no-tun 端口转发规则**从未真正建立成功**（房客探测/进服链路断裂）。现将命令执行拆分为 `easytier_cli_raw`（校验 exit code、返回 stdout 原文，供文本命令使用）与 `easytier_cli`（JSON 解析，供 `peer list` / `node info` 使用）；`add/remove_port_forward` 改走 raw 入口。同时实测确认 `peer list` / `node info` / `port-forward list` / `connector list` 均返回 JSON，适配无误。
+
 - **修复大厅房间人数统计偏大**（[easytier.rs](src-tauri/src/minecraft/online/scaffolding/easytier.rs)）：`peer_count` 原按 `peer list` 节点数组长度统计，会误计 easytier 中继节点（如 `PublicServer_moteam-servers`，无虚拟 IP）导致房间人数偏大。现改为**过滤 `ipv4` 为空的节点后计数**（仅统计真实组网设备，含本机），房主心跳上报的在线人数与房间实际人数一致。
 
 - **修复搭桥联机 no-tun 下无法探测联机中心**（[client.rs](src-tauri/src/minecraft/online/scaffolding/client.rs) / [guest.rs](src-tauri/src/commands/online/manager/easytier_actions/guest.rs)）：no-tun 模式无虚拟网卡，系统网络栈无虚拟 IP 路由，`discover_mc` 直接 `TcpStream::connect(10.144.144.1:8040)` 必然超时。现改为**先建联机中心 port-forward（本地端口 → 虚拟 IP）再经本地端口探测**（`discover_mc_at`），MC 端口与联机中心相同则复用本地转发端口，否则单独建立进服转发；房主/房客两端均可正确发现联机中心并获取进服地址。

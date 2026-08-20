@@ -271,26 +271,30 @@ impl EasyTier {
     /// 添加用户态端口转发（本地 `bind_addr` 监听到虚拟网络内 `dst_addr`）。
     ///
     /// no-tun 下无虚拟网卡，本地应用须经转发才能访问虚拟网络（房主侧白名单端口）。
+    /// `port-forward add` 输出为文本，走 `easytier_cli_raw`（仅校验 exit code）。
     pub async fn add_port_forward(
         &self,
         proto: &str,
         bind_addr: &str,
         dst_addr: &str,
     ) -> Result<(), String> {
-        self.easytier_cli(&["port-forward", "add", proto, bind_addr, dst_addr])
+        self.easytier_cli_raw(&["port-forward", "add", proto, bind_addr, dst_addr])
             .await?;
         Ok(())
     }
 
     /// 移除用户态端口转发（按 `proto` + `bind_addr` 定位；规则不存在时同样返回失败）
     pub async fn remove_port_forward(&self, proto: &str, bind_addr: &str) -> Result<(), String> {
-        self.easytier_cli(&["port-forward", "remove", proto, bind_addr])
+        self.easytier_cli_raw(&["port-forward", "remove", proto, bind_addr])
             .await?;
         Ok(())
     }
 
-    /// 执行 easytier-cli 命令并解析 JSON 输出（`-p {rpc} -o json {args}`）
-    async fn easytier_cli(&self, args: &[&str]) -> Result<serde_json::Value, String> {
+    /// 执行 easytier-cli 命令（`-p {rpc} -o json {args}`），成功时返回 stdout 原文。
+    ///
+    /// 注意：`port-forward add/remove` 等命令输出为文本而非 JSON（实测
+    /// `Port forward rule add: ...`），必须经此入口执行，再按需解析。
+    async fn easytier_cli_raw(&self, args: &[&str]) -> Result<Vec<u8>, String> {
         if !self.cli_path.is_file() {
             return Err(format!(
                 "easytier-cli 不存在: {}（请与 easytier-core 同目录放置）",
@@ -314,8 +318,13 @@ impl EasyTier {
                 String::from_utf8_lossy(&output.stderr)
             ));
         }
-        serde_json::from_slice(&output.stdout)
-            .map_err(|e| format!("easytier-cli 输出解析失败: {e}"))
+        Ok(output.stdout)
+    }
+
+    /// 执行 easytier-cli 命令并解析 JSON 输出（`peer list` / `node info` 等）
+    async fn easytier_cli(&self, args: &[&str]) -> Result<serde_json::Value, String> {
+        let out = self.easytier_cli_raw(args).await?;
+        serde_json::from_slice(&out).map_err(|e| format!("easytier-cli 输出解析失败: {e}"))
     }
 
     /// 本机虚拟 IP（房主固定 `10.144.144.1`；房客 DHCP 动态分配，未回显时为 None）
