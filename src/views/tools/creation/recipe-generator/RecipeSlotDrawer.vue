@@ -94,12 +94,13 @@ function moveEditing(direction: 'up' | 'down' | 'left' | 'right') {
 
 <template>
   <Drawer
-    v-model:visible="visible"
+    :visible="visible"
     :title="drawerTitle"
     placement="right"
     :width="380"
     :mask-closable="true"
     :esc-to-close="true"
+    @update:visible="emit('update:visible', $event)"
   >
     <div class="recipe-drawer-palette">
       <div class="recipe-drawer-nav">

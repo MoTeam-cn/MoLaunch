@@ -2,12 +2,6 @@
 
 本项目所有重要变更均会记录在此文件中。格式参考 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/)。
 
-## [Unreleased]
-
-### Changed
-
-- **导入 NAT 分享改为抽屉组件**（[NatShareImportDialog.vue](src/components/online/NatShareImportDialog.vue)（新增）/ [NatTopologyGraph.vue](src/components/online/NatTopologyGraph.vue)）：设备页「导入 NAT 分享」由全局输入弹窗（showPrompt）收敛为右侧 Drawer 抽屉（参考联机大厅加入房间抽屉 LobbyJoinDialog 模式），分享内容改用多行文本域，解析失败内联展示错误保持打开可重试，成功收起抽屉；消除弹窗与页面布局冲突。
-
 ## [0.3.7-rc3] - 2026-08-20
 
 ### Added
@@ -15,6 +9,8 @@
 - **前后端安全与代码质量排查文档**（[SECURITY_AUDIT_REPORT.md](docs/SECURITY_AUDIT_REPORT.md) / [SECURITY_AUDIT_TASKS.md](docs/SECURITY_AUDIT_TASKS.md)）：3 个子 agent 并行排查（后端安全 / 前端安全 / 重复耦合与规范），产出详细排查日志与结构化修复任务清单（SEC-01~14 + Q01~12），供后续 agent 按任务 ID 自动化创建子 agent 修复。
 
 ### Changed
+
+- **导入 NAT 分享改为抽屉组件**（[NatShareImportDialog.vue](src/components/online/NatShareImportDialog.vue)（新增）/ [NatTopologyGraph.vue](src/components/online/NatTopologyGraph.vue)）：设备页「导入 NAT 分享」由全局输入弹窗（showPrompt）收敛为右侧 Drawer 抽屉（参考联机大厅加入房间抽屉 LobbyJoinDialog 模式），分享内容改用多行文本域，解析失败内联展示错误保持打开可重试，成功收起抽屉；消除弹窗与页面布局冲突。
 
 - **移除 easytier 内置资源更新链路**（[update-easytier.yml](.github/workflows/update-easytier.yml)（删除）/ [update-easytier.cjs](scripts/update-easytier.cjs)（删除））：easytier 已从内置资源改为外部下载（运行时按需拉取），删除每日自动同步 easytier-core 内置产物的 GitHub 工作流及其配套更新脚本，避免孤儿文件与无效调度。
 
