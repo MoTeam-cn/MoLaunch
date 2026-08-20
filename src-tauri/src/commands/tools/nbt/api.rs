@@ -1,6 +1,6 @@
 //! NBT 公共命令（parse / save / list_save_files）与普通 NBT 文件保存。
 
-use std::path::Path;
+use std::path::{Path, PathBuf};
 
 use fastnbt::{SerOpts, Value as NbtValue};
 
@@ -17,14 +17,30 @@ use super::convert::{convert_nbt, node_to_value};
 use super::mca::{parse_mca, save_mca_chunk};
 use super::scan::collect_save_files;
 
+/// 校验 file_path 位于存档目录（saves）内，返回规范化后的绝对路径
+///
+/// canonicalize 解析符号链接与 `..` 后，再校验前缀，防止任意文件读写。
+async fn resolve_saves_file(state: &AppState, file_path: &str) -> Result<PathBuf, String> {
+    let saves_dir = super::super::archive::resolve_saves_dir(state, None).await;
+    let saves_canon = saves_dir
+        .canonicalize()
+        .map_err(log_err("存档目录不存在"))?;
+    let file_canon = Path::new(file_path)
+        .canonicalize()
+        .map_err(log_err("NBT 文件不存在"))?;
+    if !file_canon.starts_with(&saves_canon) {
+        return Err("NBT 文件必须在存档目录内".to_string());
+    }
+    Ok(file_canon)
+}
+
 /// 解析 NBT / mca 文件，返回 NbtNode 树（或 mca 的区块列表）
 ///
 /// 读取 `params.file_path` 指定的文件：普通 NBT（gzip 或原始）解析为树；
 /// .mca 按 Anvil 容器解析，返回全部有效区块的 NBT 树。
 pub async fn parse(state: &AppState, params: NbtParseParams) -> Result<serde_json::Value, String> {
-    let _ = state; // 当前未使用 state，保留以符合统一命令签名
-    let file_path = params.file_path.clone();
-    log_info!("[NBT] 解析文件: {}", file_path);
+    let file_path = resolve_saves_file(state, &params.file_path).await?;
+    log_info!("[NBT] 解析文件: {}", file_path.display());
 
     let (root_name, root_value, file_type, chunks) = tokio::task::spawn_blocking(
         move || -> Result<(String, Option<NbtValue>, String, Vec<NbtChunkInfo>), String> {
@@ -33,7 +49,7 @@ pub async fn parse(state: &AppState, params: NbtParseParams) -> Result<serde_jso
                 return Err("NBT 文件为空".to_string());
             }
             // mca 容器：解析全部区块
-            if file_path.to_lowercase().ends_with(".mca") {
+            if file_path.to_string_lossy().to_lowercase().ends_with(".mca") {
                 let chunks = parse_mca(&raw)?;
                 return Ok((String::new(), None, "mca".to_string(), chunks));
             }
@@ -81,25 +97,29 @@ pub async fn parse(state: &AppState, params: NbtParseParams) -> Result<serde_jso
 /// 普通 NBT 文件：NbtNode 树序列化后写回（原 gzip 则保持 gzip）。
 /// mca 文件：整体重打包（保留其他区块原字节与时间戳表），写回指定区块。
 pub async fn save(state: &AppState, params: NbtSaveParams) -> Result<serde_json::Value, String> {
-    let _ = state;
-    let file_path = params.file_path;
+    let file_path = resolve_saves_file(state, &params.file_path).await?;
     let fp = file_path.clone();
     let root = params.root;
     let chunk_index = params.chunk_index;
-    log_info!("[NBT] 保存文件: {} (chunk: {:?})", file_path, chunk_index);
+    log_info!(
+        "[NBT] 保存文件: {} (chunk: {:?})",
+        file_path.display(),
+        chunk_index
+    );
 
     tokio::task::spawn_blocking(move || -> Result<(), String> {
-        if fp.to_lowercase().ends_with(".mca") {
+        let fp_str = fp.to_str().ok_or("路径包含非 UTF-8 字符")?;
+        if fp_str.to_lowercase().ends_with(".mca") {
             let idx = chunk_index.ok_or("mca 文件保存必须指定区块索引")?;
-            save_mca_chunk(&fp, idx, &root)
+            save_mca_chunk(fp_str, idx, &root)
         } else {
-            save_nbt_file(&fp, &root)
+            save_nbt_file(fp_str, &root)
         }
     })
     .await
     .map_err(log_err("NBT 保存任务失败"))??;
 
-    log_info!("[NBT] 保存成功: {}", file_path);
+    log_info!("[NBT] 保存成功: {}", file_path.display());
     let result = NbtSaveResult { success: true };
     serde_json::to_value(&result).map_err(|e| e.to_string())
 }
