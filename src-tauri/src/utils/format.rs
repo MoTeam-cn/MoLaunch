@@ -36,11 +36,6 @@ pub fn speed(bytes_per_sec: u64) -> String {
     format!("{}/s", bytes(bytes_per_sec))
 }
 
-/// 格式化速度为人类可读字符串（指定小数位数）
-pub fn speed_with(bytes_per_sec: u64, decimals: usize) -> String {
-    format!("{}/s", bytes_with(bytes_per_sec, decimals))
-}
-
 /// 按字符数截断文本（安全处理中文等多字节字符）
 ///
 /// 超出 `max` 字符时截断并追加省略号；否则原样返回。

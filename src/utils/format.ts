@@ -22,19 +22,6 @@ export function formatSpeed(bytesPerSecond: number): string {
 }
 
 /**
- * 紧凑速度格式（用于下载进度条等空间受限场景）
- *
- * - >= 1 MB/s：显示 "X.X MB/s"
- * - >= 1 KB/s：显示 "X KB/s"
- * - 否则：显示 "X B/s"
- */
-export function formatSpeedCompact(bytesPerSec: number): string {
-  if (bytesPerSec >= 1_048_576) return (bytesPerSec / 1_048_576).toFixed(1) + ' MB/s'
-  if (bytesPerSec >= 1024) return (bytesPerSec / 1024).toFixed(0) + ' KB/s'
-  return bytesPerSec + ' B/s'
-}
-
-/**
  * 格式化以 MB 为单位的内存数值为可读字符串
  *
  * - >= 1024 MB 显示为 GB（1 位小数，去掉无意义的 .0 后缀）

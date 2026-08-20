@@ -43,17 +43,10 @@ const parsedLogs = computed(() => parseLogLines(rawLogs.value.join('\n')))
 
 const fileOptions = computed(() =>
   logFiles.value.map((f) => ({
-    label: `${f.fileName}（${formatSize(f.sizeBytes)}）`,
+    label: `${f.fileName}（${formatBytes(f.sizeBytes, 1)}）`,
     value: f.fileName,
   })),
 )
-
-/** 格式化日志文件大小 */
-function formatSize(bytes: number): string {
-  if (bytes >= 1 << 20) return `${(bytes / (1 << 20)).toFixed(1)} MB`
-  if (bytes >= 1 << 10) return `${(bytes / (1 << 10)).toFixed(1)} KB`
-  return `${bytes} B`
-}
 
 /** 加载内核状态（进程存活 + tunnel.ini 解析） */
 async function loadStatus() {

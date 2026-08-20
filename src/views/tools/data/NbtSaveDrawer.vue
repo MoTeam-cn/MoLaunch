@@ -16,6 +16,7 @@ import type { ArchiveItem, NbtSaveFileItem } from '@/utils/api/tools'
 import { listInstalledVersionsWithType } from '@/utils/api/version'
 import type { InstalledVersionInfo } from '@/utils/api/version'
 import { toastError } from '@/utils/toast'
+import { formatBytes } from '@/utils/format'
 
 const props = withDefaults(defineProps<{ visible?: boolean }>(), { visible: false })
 
@@ -50,12 +51,6 @@ const kindMeta: Record<string, { label: string; color: string }> = {
   player: { label: '玩家数据', color: 'green' },
   region: { label: '区块', color: 'purple' },
   other: { label: '其他', color: 'gray' },
-}
-
-function formatSize(bytes: number): string {
-  if (bytes < 1024) return `${bytes} B`
-  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`
-  return `${(bytes / 1024 / 1024).toFixed(1)} MB`
 }
 
 async function loadVersions() {
@@ -183,7 +178,7 @@ function handleCancel() {
             <FolderOpenIcon class="h-4 w-4 flex-none text-gray-400" />
             <div class="min-w-0 flex-1">
               <div class="truncate text-gray-800">{{ f.rel_path }}</div>
-              <div class="text-xs text-gray-400">{{ formatSize(f.size) }}</div>
+              <div class="text-xs text-gray-400">{{ formatBytes(f.size, 1) }}</div>
             </div>
             <Tag size="small" :color="kindMeta[f.kind]?.color ?? 'gray'">
               {{ kindMeta[f.kind]?.label ?? f.kind }}
