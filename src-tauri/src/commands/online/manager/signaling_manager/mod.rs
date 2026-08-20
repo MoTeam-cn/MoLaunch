@@ -13,3 +13,4 @@ use registry::{load_creds, make_client};
 
 pub use params::*;
 pub use registry::register_signaling_actions;
+pub(crate) use room_actions::host_heartbeat_now;

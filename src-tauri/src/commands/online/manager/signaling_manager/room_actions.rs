@@ -5,6 +5,7 @@ use crate::log_debug;
 use crate::log_error;
 use crate::log_info;
 use crate::minecraft::online::signaling::CreateRoomRequest;
+use crate::state::AppState;
 use crate::utils::dispatcher::Dispatcher;
 
 use super::{CreateRoomParams, JoinRoomParams, RoomCodeParams};
@@ -128,26 +129,36 @@ fn register_heartbeat_room(d: &mut Dispatcher) {
         handler!(state, _app, params, {
             let p: RoomCodeParams =
                 serde_json::from_value(params).map_err(|e| format!("参数解析失败: {}", e))?;
-            let creds = super::load_creds(&state).await?;
-            let client = super::make_client(&state).await;
-            // 房主经 easytier peer list 统计在线人数（查询失败不阻断心跳，降级为不带人数）
-            let player_count = match &*state.easytier.lock().await {
-                Some(et) => et.peer_count().await.ok(),
-                None => None,
-            };
-            log_debug!(
-                "[Online] room_heartbeat: code={}, player_count={:?}",
-                p.room_code,
-                player_count
-            );
-            let result = client
-                .signaling_heartbeat_room(&creds, &p.room_code, player_count)
-                .await
-                .map_err(|e| {
-                    log_error!("[Online] room_heartbeat 失败: {}", e);
-                    e.to_string()
-                })?;
-            serde_json::to_value(result).map_err(|e| e.to_string())
+            host_heartbeat_now(&state, &p.room_code).await
         }),
     );
+}
+
+/// 执行一次房主心跳上报（`room_heartbeat` action 与成员监听循环共用）。
+///
+/// 人数经 easytier peer list 统计（过滤中继后）；统计失败或 easytier 未运行时
+/// 降级为不带人数（服务端 `COALESCE` 保持原值），保证心跳不中断。
+pub(crate) async fn host_heartbeat_now(
+    state: &AppState,
+    room_code: &str,
+) -> Result<serde_json::Value, String> {
+    let creds = super::load_creds(state).await?;
+    let client = super::make_client(state).await;
+    let player_count = match &*state.easytier.lock().await {
+        Some(et) => et.peer_count().await.ok(),
+        None => None,
+    };
+    log_debug!(
+        "[Online] room_heartbeat: code={}, player_count={:?}",
+        room_code,
+        player_count
+    );
+    let result = client
+        .signaling_heartbeat_room(&creds, room_code, player_count)
+        .await
+        .map_err(|e| {
+            log_error!("[Online] room_heartbeat 失败: {}", e);
+            e.to_string()
+        })?;
+    serde_json::to_value(result).map_err(|e| e.to_string())
 }

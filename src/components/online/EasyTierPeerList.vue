@@ -4,9 +4,11 @@
  *
  * 每 5 秒经 `easytier_peers` IPC 查询虚拟网络节点（过滤中继，含本机），展示组网
  * 人数与各节点 hostname / 虚拟 IP / 延迟，房主与房客均可据此判断对方是否已组网。
+ * 同时监听后端 `easytier-status` 事件（新成员加入触发），收到后立即刷新。
  */
 import { onMounted, onUnmounted, ref, defineAsyncComponent } from 'vue'
 import { getEasyTierPeers } from '@/utils/api/online-manager'
+import { useTauriEvent } from '@/utils/tauriEvent'
 import type { EasyTierPeer } from '@/types/online'
 import { UsersIcon } from '@heroicons/vue/24/outline'
 const Tag = defineAsyncComponent(() => import('@/components/common/Tag.vue'))
@@ -25,7 +27,11 @@ async function refresh(): Promise<void> {
   }
 }
 
+// 后端检测到新成员加入时推送 easytier-status 事件，立即刷新组网列表
+const { start: startPeersEvent } = useTauriEvent('easytier-status', () => void refresh())
+
 onMounted(() => {
+  startPeersEvent()
   void refresh()
   timer = setInterval(() => void refresh(), REFRESH_INTERVAL_MS)
 })

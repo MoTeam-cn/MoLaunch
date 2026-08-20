@@ -10,6 +10,8 @@
 
 - **房间面板新增组网设备实时展示**（[easytier.rs](src-tauri/src/minecraft/online/scaffolding/easytier.rs) / [easytier_actions.rs](src-tauri/src/commands/online/manager/easytier_actions.rs) / [EasyTierPeerList.vue](src/components/online/EasyTierPeerList.vue) / [RoomHostPanel.vue](src/components/online/RoomHostPanel.vue) / [RoomGuestPanel.vue](src/components/online/RoomGuestPanel.vue)）：新增 `easytier_peers` IPC 返回虚拟网络节点列表（过滤中继，含 hostname / 虚拟 IP / 本机标记 / 延迟）；房主与房客面板「连接状态」卡片下新增组网设备列表组件，每 5 秒自动刷新组网人数与各节点虚拟 IP，双方可据此判断对方是否已组网成功。
 
+- **新成员加入虚拟网络立即心跳上报**（[host.rs](src-tauri/src/commands/online/manager/easytier_actions/host.rs) / [room_actions.rs](src-tauri/src/commands/online/manager/signaling_manager/room_actions.rs) / [EasyTierPeerList.vue](src/components/online/EasyTierPeerList.vue)）：房主启动联机中心后新增成员监听任务，每 5 秒比对 easytier 在线节点（过滤中继、排除本机），检测到**新增成员即立即心跳上报一次**（不等 2 分钟定时，也不打断其队列），大厅房间人数即时刷新；同时推送 `easytier-status` 事件，前端组网设备列表收到即刷新，无需等待 5 秒轮询。开房后首次快照即上报一次当前人数，`scaffolding_host_stop` / 自动关房时自动中止。
+
 ### Fixed
 
 - **修复房主心跳上报在线人数不生效**（[room_api.rs](src-tauri/src/minecraft/online/signaling/room_api.rs)）：`signaling_heartbeat_room` 请求体字段误用 camelCase（`playerCount`），与 api-server `HeartbeatRequest` 的 snake_case 契约（`player_count`）不匹配，服务端反序列化恒为 None → `COALESCE` 保持初始值 → 大厅房间人数永远显示 1。字段已对齐 snake_case，房主心跳上报的 easytier 在线人数（过滤中继后）可正常更新至大厅。

@@ -1,7 +1,11 @@
 //! 房主联机动作（一站式启动 / 停止 / 手动端口 / 白名单重建）
 
+use std::collections::HashSet;
+use std::time::Duration;
+
 use serde::{Deserialize, Serialize};
 
+use crate::commands::online::manager::signaling_manager::host_heartbeat_now;
 use crate::handler;
 use crate::log_debug;
 use crate::log_info;
@@ -129,6 +133,42 @@ pub(super) async fn rebuild_host_easytier(
     Ok(())
 }
 
+/// 房主成员监听循环：每 5s 比对 easytier 在线节点（过滤中继，排除本机），
+/// 出现新成员时立即心跳上报一次（不等 2 分钟定时，也不打断其队列），并推送
+/// `easytier-status` 事件供前端实时刷新组网列表。easytier 被停止（置 None）时退出。
+///
+/// 首次快照视为全新增：开房后立即上报一次当前人数，后续仅新增节点时触发。
+async fn host_member_heartbeat_loop(state: AppState, app: tauri::AppHandle, room_code: String) {
+    let mut last: HashSet<String> = HashSet::new();
+    loop {
+        let current = {
+            let guard = state.easytier.lock().await;
+            match &*guard {
+                Some(et) => et.peers().await.ok().map(|list| {
+                    list.into_iter()
+                        .filter(|p| !p.is_self)
+                        .map(|p| p.hostname.clone())
+                        .collect::<HashSet<_>>()
+                }),
+                None => None,
+            }
+        };
+        let Some(current) = current else {
+            return;
+        };
+        let joined = !current.is_empty() && current.difference(&last).next().is_some();
+        last = current;
+        if joined {
+            log_info!("[Online] 检测到新成员加入虚拟网络，立即心跳上报");
+            if let Err(e) = host_heartbeat_now(&state, &room_code).await {
+                log_debug!("[Online] 成员加入心跳失败（不影响后续监听）: {e}");
+            }
+            emit_easytier_status(&app, &state).await;
+        }
+        tokio::time::sleep(Duration::from_secs(5)).await;
+    }
+}
+
 /// 注册房主动作到 dispatcher
 pub(super) fn register_host(d: &mut Dispatcher) {
     d.register(
@@ -138,10 +178,14 @@ pub(super) fn register_host(d: &mut Dispatcher) {
                 serde_json::from_value(params).map_err(|e| format!("参数解析失败: {e}"))?;
             let (network_name, network_secret) = room_code::parse(&p.room_code)?;
 
-            // 停止旧实例（后台监视 + easytier + 联机中心），保证幂等
+            // 停止旧实例（后台监视 + 成员监听 + easytier + 联机中心），保证幂等
             let old_watch = state.scaffolding_host_watch.lock().await.take();
             if let Some(old_watch) = old_watch {
                 old_watch.abort();
+            }
+            let old_heartbeat = state.scaffolding_heartbeat.lock().await.take();
+            if let Some(old_heartbeat) = old_heartbeat {
+                old_heartbeat.abort();
             }
             *state.manual_mc_port.lock().await = None;
             let old_easytier = state.easytier.lock().await.take();
@@ -209,6 +253,15 @@ pub(super) fn register_host(d: &mut Dispatcher) {
             });
             *state.scaffolding_host_watch.lock().await = Some(watch.abort_handle());
 
+            // 启动成员监听任务：新成员加入虚拟网络即心跳上报（不打断 2 分钟定时）
+            let hb_state = state.clone();
+            let hb_app = app.clone();
+            let hb_room = p.room_code.clone();
+            let hb = tokio::spawn(async move {
+                host_member_heartbeat_loop(hb_state, hb_app, hb_room).await;
+            });
+            *state.scaffolding_heartbeat.lock().await = Some(hb.abort_handle());
+
             log_info!(
                 "[Online] 房主联机中心已启动: center_port={}, hostname={}, mc_port={:?}",
                 center_port,
@@ -230,10 +283,14 @@ pub(super) fn register_host(d: &mut Dispatcher) {
     d.register(
         "scaffolding_host_stop",
         handler!(state, app, _params, {
-            // 中止后台监视任务，清除手动端口覆盖
+            // 中止后台监视与成员监听任务，清除手动端口覆盖
             let watch = state.scaffolding_host_watch.lock().await.take();
             if let Some(watch) = watch {
                 watch.abort();
+            }
+            let heartbeat = state.scaffolding_heartbeat.lock().await.take();
+            if let Some(heartbeat) = heartbeat {
+                heartbeat.abort();
             }
             *state.manual_mc_port.lock().await = None;
             *state.host_network_cred.lock().await = None;

@@ -64,6 +64,10 @@ pub struct AppState {
     ///
     /// `scaffolding_host_start` spawn 并存储，`scaffolding_host_stop` 与自动关房时 abort 并置 None。
     pub scaffolding_host_watch: Arc<TokioMutex<Option<tokio::task::AbortHandle>>>,
+    /// 房主成员监听任务句柄（新成员加入虚拟网络即心跳上报，不等 2 分钟定时）
+    ///
+    /// `scaffolding_host_start` spawn 并存储，`scaffolding_host_stop` abort 并置 None。
+    pub scaffolding_heartbeat: Arc<TokioMutex<Option<tokio::task::AbortHandle>>>,
     /// 房主手动指定的 MC 端口（最高权重：自动探测不覆盖；None 为自动模式）
     ///
     /// 由 `scaffolding_host_set_mc_port` 写入，`scaffolding_host_start`/`scaffolding_host_stop` 复位。
@@ -152,6 +156,7 @@ impl AppState {
             host_network_cred: Arc::new(TokioMutex::new(None)),
             scaffolding_server: Arc::new(TokioMutex::new(None)),
             scaffolding_host_watch: Arc::new(TokioMutex::new(None)),
+            scaffolding_heartbeat: Arc::new(TokioMutex::new(None)),
             manual_mc_port: Arc::new(TokioMutex::new(None)),
             lan_fake_server: Arc::new(TokioMutex::new(None)),
             redstone: Arc::new(TokioMutex::new(None)),
