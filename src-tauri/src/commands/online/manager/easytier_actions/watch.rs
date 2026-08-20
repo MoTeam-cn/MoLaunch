@@ -26,18 +26,6 @@ const WATCH_INTERVAL: Duration = Duration::from_secs(5);
 /// 端口连续不可达次数阈值（6 次 = 30s，触发自动关房）
 const AUTO_CLOSE_FAIL_LIMIT: u32 = 6;
 
-/// MC 局域网默认端口（Java 版「对局域网开放」默认端口），端口重选时的优先目标。
-/// 游戏进程其他监听端口（JVM 服务等）几乎不会占用其附近，据此区分 MC 端口。
-const DEFAULT_MC_LAN_PORT: u16 = 25565;
-
-/// 在端口集合中选出最可能的 MC 局域网端口：取最接近 25565 者。
-fn pick_mc_port(ports: &[u16]) -> u16 {
-    *ports
-        .iter()
-        .min_by_key(|p| p.abs_diff(DEFAULT_MC_LAN_PORT))
-        .unwrap_or(&ports[0])
-}
-
 /// 房主后台监视循环：每 5s 扫描游戏监听端口并回写联机中心。
 ///
 /// - 手动端口设置时跳过自动更新（最高权重），不自动关房；
@@ -52,9 +40,6 @@ pub(super) async fn host_watch_loop(
 ) {
     let mut current_mc_port: Option<u16> = None;
     let mut fail_count: u32 = 0;
-    // 端口重选防抖：候选端口需连续两轮一致才生效，避免游戏进程其他监听端口
-    // （JVM 服务等）瞬时抖动触发频繁重建 easytier，导致房客端端口随之跳变
-    let mut pending_mc_port: Option<u16> = None;
     loop {
         if state.easytier.lock().await.is_none() {
             return;
@@ -90,20 +75,15 @@ pub(super) async fn host_watch_loop(
             }
         } else {
             fail_count = 0;
-            // 已知端口仍在监听且仍是最优候选则保持不变；否则重选 MC 端口。
-            // 重选结果需连续两轮一致才生效（防抖），避免 JVM 动态端口抖动触发频繁 rebuild
-            let best = pick_mc_port(&ports);
+            // 已知端口仍在监听则保持不变；否则取与已知端口最接近者（无已知时取升序第一个）
             let chosen = match current_mc_port {
-                Some(cur) if ports.contains(&cur) && cur == best => cur,
+                Some(cur) if ports.contains(&cur) => cur,
                 _ => {
-                    if pending_mc_port == Some(best) {
-                        pending_mc_port = None;
-                        best
-                    } else {
-                        pending_mc_port = Some(best);
-                        // 首轮先沿用旧端口（未探测到时直接采用），待下一轮确认后切换
-                        current_mc_port.unwrap_or(best)
-                    }
+                    let target = current_mc_port.unwrap_or(0);
+                    *ports
+                        .iter()
+                        .min_by_key(|p| p.abs_diff(target))
+                        .unwrap_or(&ports[0])
                 }
             };
             if current_mc_port != Some(chosen) {
