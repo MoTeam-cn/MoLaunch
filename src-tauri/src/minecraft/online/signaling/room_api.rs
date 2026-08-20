@@ -80,7 +80,8 @@ impl OnlineClient {
         player_count: Option<usize>,
     ) -> Result<BusinessResult<serde_json::Value>, ClientError> {
         let path = path_with_room_code(api_paths::SIGNALING_ROOM_HEARTBEAT, room_code);
-        let body = player_count.map(|n| serde_json::json!({ "playerCount": n }));
+        // 字段名对齐 api-server `HeartbeatRequest`（snake_case 契约）
+        let body = player_count.map(|n| serde_json::json!({ "player_count": n }));
         self.call_v1::<serde_json::Value>(creds, "POST", &path, body.as_ref(), true)
             .await
     }

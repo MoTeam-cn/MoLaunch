@@ -12,6 +12,8 @@
 
 ### Fixed
 
+- **修复房主心跳上报在线人数不生效**（[room_api.rs](src-tauri/src/minecraft/online/signaling/room_api.rs)）：`signaling_heartbeat_room` 请求体字段误用 camelCase（`playerCount`），与 api-server `HeartbeatRequest` 的 snake_case 契约（`player_count`）不匹配，服务端反序列化恒为 None → `COALESCE` 保持初始值 → 大厅房间人数永远显示 1。字段已对齐 snake_case，房主心跳上报的 easytier 在线人数（过滤中继后）可正常更新至大厅。
+
 - **修复 easytier port-forward 命令 JSON 解析失败**（[easytier.rs](src-tauri/src/minecraft/online/scaffolding/easytier.rs)）：`easytier_cli` 对全部命令强制 `-o json` + JSON 解析，但实测 `port-forward add/remove` 输出为**文本**（`Port forward rule add: ...`）而非 JSON，导致 no-tun 端口转发规则**从未真正建立成功**（房客探测/进服链路断裂）。现将命令执行拆分为 `easytier_cli_raw`（校验 exit code、返回 stdout 原文，供文本命令使用）与 `easytier_cli`（JSON 解析，供 `peer list` / `node info` 使用）；`add/remove_port_forward` 改走 raw 入口。同时实测确认 `peer list` / `node info` / `port-forward list` / `connector list` 均返回 JSON，适配无误。
 
 - **修复大厅房间人数统计偏大**（[easytier.rs](src-tauri/src/minecraft/online/scaffolding/easytier.rs)）：`peer_count` 原按 `peer list` 节点数组长度统计，会误计 easytier 中继节点（如 `PublicServer_moteam-servers`，无虚拟 IP）导致房间人数偏大。现改为**过滤 `ipv4` 为空的节点后计数**（仅统计真实组网设备，含本机），房主心跳上报的在线人数与房间实际人数一致。
