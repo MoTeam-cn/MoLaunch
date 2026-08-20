@@ -111,37 +111,55 @@ pub async fn export_launch_script(
     let extra_jvm_args = split_args(&setup.advanced.jvm_args);
     let extra_game_args = split_args(&setup.advanced.game_args);
 
+    let login_type_str = login_type.clone().unwrap_or_else(|| "Legacy".to_string());
+    let is_legacy = login_type_str == "Legacy";
+
     // 构建认证信息
-    // 从 auth_storage 获取当前用户的真实 token，写入脚本后可直接启动；
-    // 安全提示已写入脚本头部，文件权限限制为当前用户
-    let (real_access_token, real_client_token, real_server_url, real_xuid) = {
+    // 安全修复：在线账号的 access_token/client_token 不写入脚本文件，改为占位符
+    // （.bat: %ACCESS_TOKEN% / %CLIENT_TOKEN%，.sh: ${ACCESS_TOKEN} / ${CLIENT_TOKEN}），
+    // 运行时由脚本提示用户输入；离线账号 token 即离线 UUID（非凭据），保持原样
+    let (access_token_ph, client_token_ph) = if is_windows {
+        ("%ACCESS_TOKEN%".to_string(), "%CLIENT_TOKEN%".to_string())
+    } else {
+        ("${ACCESS_TOKEN}".to_string(), "${CLIENT_TOKEN}".to_string())
+    };
+    let (access_token, client_token, real_server_url, real_xuid, token_is_placeholder) = {
         match state.auth_storage.load().await {
             Ok(auth_state) => {
                 if let Some(ref current) = auth_state.current_user {
                     if current.uuid == uuid {
-                        (
-                            current.access_token.clone(),
-                            current.client_token.clone(),
-                            current.server_url.clone(),
-                            current.xuid.clone().unwrap_or_default(),
-                        )
+                        if is_legacy {
+                            (
+                                current.access_token.clone(),
+                                current.client_token.clone(),
+                                current.server_url.clone(),
+                                current.xuid.clone().unwrap_or_default(),
+                                false,
+                            )
+                        } else {
+                            (
+                                access_token_ph,
+                                client_token_ph,
+                                current.server_url.clone(),
+                                current.xuid.clone().unwrap_or_default(),
+                                true,
+                            )
+                        }
                     } else {
-                        (String::new(), String::new(), None, String::new())
+                        (String::new(), String::new(), None, String::new(), false)
                     }
                 } else {
-                    (String::new(), String::new(), None, String::new())
+                    (String::new(), String::new(), None, String::new(), false)
                 }
             }
-            Err(_) => (String::new(), String::new(), None, String::new()),
+            Err(_) => (String::new(), String::new(), None, String::new(), false),
         }
     };
-    let login_type_str = login_type.clone().unwrap_or_else(|| "Legacy".to_string());
-    let is_legacy = login_type_str == "Legacy";
     let auth_info = crate::minecraft::launch::AuthInfo {
         username: username.clone(),
         uuid,
-        access_token: real_access_token,
-        client_token: real_client_token,
+        access_token,
+        client_token,
         login_type: login_type_str,
         server_url: real_server_url,
         xuid: real_xuid,
@@ -220,6 +238,27 @@ pub async fn export_launch_script(
     } else {
         format!("{}.sh", save_path)
     };
+    // 安全校验导出路径：绝对路径 + 文件名安全 + 父目录存在，防止任意路径写入
+    let save_path_buf = std::path::Path::new(&save_path);
+    let file_name = save_path_buf
+        .file_name()
+        .and_then(|n| n.to_str())
+        .ok_or_else(|| "导出路径缺少文件名".to_string())?;
+    crate::utils::path::sanitize_file_name(file_name)?;
+    if !save_path_buf.is_absolute() {
+        return Err("导出路径必须是绝对路径".to_string());
+    }
+    if save_path_buf
+        .components()
+        .any(|c| matches!(c, std::path::Component::ParentDir))
+    {
+        return Err("导出路径包含非法路径段（..）".to_string());
+    }
+    if let Some(parent) = save_path_buf.parent() {
+        if !parent.is_dir() {
+            return Err(format!("导出目录不存在: {}", parent.display()));
+        }
+    }
     log_warn!("Exporting launch script to: {}", save_path);
 
     let game_dir_display = launch_args.game_dir.clone();
@@ -233,9 +272,58 @@ pub async fn export_launch_script(
         game_args: &launch_args.game_args,
         pre_launch_cmd: setup.advanced.run_cmd.as_ref(),
     };
-    let script = super::content::build_script_content(&script_info, is_windows);
+    let mut script = super::content::build_script_content(&script_info, is_windows);
+    // 在线账号：在 Java 启动命令前注入运行时令牌输入提示（占位符由用户输入填充）
+    if token_is_placeholder {
+        script = inject_token_prompt(&script, is_windows, &java_str);
+    }
     super::content::write_script_file(&script, &save_path, is_windows)?;
 
     log_info!("Launch script exported to: {}", save_path);
     Ok(())
+}
+
+/// 在 Java 启动命令前注入运行时令牌输入提示（.bat 用 set /p，.sh 用 read）
+///
+/// 占位符（%ACCESS_TOKEN% / ${ACCESS_TOKEN}）在脚本执行时由用户输入填充，
+/// 避免真实 token 明文落盘；CLIENT_TOKEN 仅在脚本实际引用时提示。
+fn inject_token_prompt(script: &str, is_windows: bool, java_str: &str) -> String {
+    let marker = if is_windows {
+        format!("\"{}\"", java_str.replace('/', "\\"))
+    } else {
+        format!("\"{}\"", java_str)
+    };
+    let mut prompt = String::new();
+    if is_windows {
+        prompt.push_str(
+            "if not defined ACCESS_TOKEN set /p ACCESS_TOKEN=请输入 Minecraft 访问令牌（从 MoLaunch 账号设置复制）:\n",
+        );
+        if script.contains("%CLIENT_TOKEN%") {
+            prompt.push_str(
+                "if not defined CLIENT_TOKEN set /p CLIENT_TOKEN=请输入客户端令牌（可留空）:\n",
+            );
+        }
+    } else {
+        prompt.push_str(
+            "if [ -z \"${ACCESS_TOKEN:-}\" ]; then\n    read -r -p '请输入 Minecraft 访问令牌（从 MoLaunch 账号设置复制）: ' ACCESS_TOKEN\nfi\n",
+        );
+        if script.contains("${CLIENT_TOKEN}") {
+            prompt.push_str(
+                "if [ -z \"${CLIENT_TOKEN:-}\" ]; then\n    read -r -p '请输入客户端令牌（可留空）: ' CLIENT_TOKEN\nfi\n",
+            );
+        }
+    }
+    match script.find(&marker) {
+        Some(pos) => {
+            let mut s = String::with_capacity(script.len() + prompt.len());
+            s.push_str(&script[..pos]);
+            s.push_str(&prompt);
+            s.push_str(&script[pos..]);
+            s
+        }
+        None => {
+            log_warn!("[ExportScript] 未找到 Java 启动命令，跳过令牌输入提示注入");
+            script.to_string()
+        }
+    }
 }
