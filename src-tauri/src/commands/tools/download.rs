@@ -31,11 +31,8 @@ pub async fn download_file(
     let url = params.url;
     let file_name = params.file_name;
 
-    // 协议白名单校验
-    let lower_url = url.to_lowercase();
-    if !lower_url.starts_with("http://") && !lower_url.starts_with("https://") {
-        return Err("下载地址必须以 http:// 或 https:// 开头".to_string());
-    }
+    // URL 安全校验（协议白名单 + 拒绝内网/回环/链路本地，防 SSRF）
+    crate::utils::net::validate_public_http_url(&url)?;
 
     // 文件名安全校验
     sanitize_file_name(&file_name)?;

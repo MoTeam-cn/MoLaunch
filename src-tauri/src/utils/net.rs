@@ -70,6 +70,23 @@ pub fn validate_public_http_url(raw: &str) -> Result<(), String> {
     Ok(())
 }
 
+/// updater 下载 URL 白名单域名（防 SSRF/防 manifest 篡改）
+const UPDATER_ALLOWED_HOSTS: [&str; 2] = ["api.molaunch.moiu.cn", "download.mocdn.net"];
+
+/// 校验 updater 下载 URL：协议 http/https + 域名白名单
+///
+/// 在 `validate_public_http_url` 基础上追加域名白名单限制，
+/// 仅允许官方 API/CDN 域名，拒绝其他任何域名（含内网地址）。
+pub fn validate_updater_download_url(raw: &str) -> Result<(), String> {
+    validate_public_http_url(raw)?;
+    let url = Url::parse(raw).map_err(|_| format!("URL 非法: {}", raw))?;
+    let host = url.host_str().unwrap_or_default().to_ascii_lowercase();
+    if !UPDATER_ALLOWED_HOSTS.contains(&host.as_str()) {
+        return Err(format!("更新下载域名不在白名单内: {}", host));
+    }
+    Ok(())
+}
+
 #[cfg(test)]
 mod tests {
     use super::{is_private_address, validate_public_http_url};

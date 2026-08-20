@@ -228,6 +228,8 @@ async fn download_with_manager(
     local_path: &std::path::Path,
     emit_progress: Option<&AppHandle>,
 ) -> Result<u64, String> {
+    // 域名白名单校验（防 SSRF/防 manifest 篡改）
+    crate::utils::net::validate_updater_download_url(url)?;
     let task = DownloadTask {
         id: "update-exe".to_string(),
         urls: vec![url.to_string()],

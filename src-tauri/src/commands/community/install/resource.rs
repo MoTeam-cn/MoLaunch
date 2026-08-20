@@ -28,6 +28,9 @@ pub async fn download_resource(
 ) -> Result<DownloadResult, String> {
     log_info!("[Community] Downloading {} from {}", req.file_name, req.url);
 
+    // URL 安全校验（协议白名单 + 拒绝内网/回环/链路本地，防 SSRF）
+    crate::utils::net::validate_public_http_url(&req.url)?;
+
     let game_dir = crate::state::resolve_game_dir_from_state(state).await;
     let config = state.config.lock().await;
     let final_file_name = apply_filename_format(
@@ -134,6 +137,9 @@ pub async fn download_resource_to_path(
     save_path: String,
 ) -> Result<DownloadResult, String> {
     log_info!("[Community] 下载 {} 到 {}", file_name, save_path);
+
+    // URL 安全校验（协议白名单 + 拒绝内网/回环/链路本地，防 SSRF）
+    crate::utils::net::validate_public_http_url(&url)?;
 
     let save_path = PathBuf::from(&save_path);
 

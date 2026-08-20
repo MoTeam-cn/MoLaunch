@@ -192,6 +192,16 @@ pub async fn check_update(state: &AppState, _app: &AppHandle) -> Result<UpdateIn
 
     log::info!("[Updater] 发现新版本: {} -> {}", current_version, version);
 
+    let download_url = data
+        .and_then(|d| d.get("url"))
+        .and_then(|v| v.as_str())
+        .unwrap_or("")
+        .to_string();
+    // 域名白名单校验（防 manifest 被篡改后指向任意地址）
+    if !download_url.is_empty() {
+        crate::utils::net::validate_updater_download_url(&download_url)?;
+    }
+
     Ok(UpdateInfo {
         available: true,
         version: version.to_string(),
@@ -204,11 +214,7 @@ pub async fn check_update(state: &AppState, _app: &AppHandle) -> Result<UpdateIn
             .and_then(|d| d.get("force_update"))
             .and_then(|v| v.as_bool())
             .unwrap_or(false),
-        download_url: data
-            .and_then(|d| d.get("url"))
-            .and_then(|v| v.as_str())
-            .unwrap_or("")
-            .to_string(),
+        download_url,
         signature: data
             .and_then(|d| d.get("signature"))
             .and_then(|v| v.as_str())
