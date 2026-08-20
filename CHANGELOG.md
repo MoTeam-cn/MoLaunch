@@ -2,6 +2,12 @@
 
 本项目所有重要变更均会记录在此文件中。格式参考 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/)。
 
+## [Unreleased]
+
+### Changed
+
+- **导入 NAT 分享改为抽屉组件**（[NatShareImportDialog.vue](src/components/online/NatShareImportDialog.vue)（新增）/ [NatTopologyGraph.vue](src/components/online/NatTopologyGraph.vue)）：设备页「导入 NAT 分享」由全局输入弹窗（showPrompt）收敛为右侧 Drawer 抽屉（参考联机大厅加入房间抽屉 LobbyJoinDialog 模式），分享内容改用多行文本域，解析失败内联展示错误保持打开可重试，成功收起抽屉；消除弹窗与页面布局冲突。
+
 ## [0.3.7-rc3] - 2026-08-20
 
 ### Added

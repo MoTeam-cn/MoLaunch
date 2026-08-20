@@ -16,15 +16,13 @@ import type { NatDetectionResult } from '@/types/online'
 import { NAT_TYPE_META } from '@/utils/online/nat'
 import {
   serializeNatShare,
-  parseNatShare,
   judgeP2PFeasibility,
   type NatShareData,
   type P2PVerdict,
 } from '@/utils/online/nat-share'
 import { buildTopologyOption } from '@/utils/online/topology-option'
 import { copyToClipboard } from '@/utils/clipboard'
-import { showPrompt } from '@/utils/modal'
-import { toastSuccess, toastError, toastWarning } from '@/utils/toast'
+import { toastSuccess, toastWarning } from '@/utils/toast'
 import {
   ShareIcon,
   ChevronDownIcon,
@@ -38,6 +36,7 @@ const Collapse = defineAsyncComponent(() => import('@/components/common/Collapse
 const Button = defineAsyncComponent(() => import('@/components/common/Button.vue'))
 const Tag = defineAsyncComponent(() => import('@/components/common/Tag.vue'))
 const Tooltip = defineAsyncComponent(() => import('@/components/common/Tooltip.vue'))
+const NatShareImportDialog = defineAsyncComponent(() => import('./NatShareImportDialog.vue'))
 
 const props = defineProps<{ result: NatDetectionResult | null }>()
 
@@ -64,6 +63,8 @@ const stunServers = computed(() => props.result?.stunServers ?? [])
 // ============ NAT 分享 ============
 const friendShare = ref<NatShareData | null>(null)
 const verdict = ref<P2PVerdict | null>(null)
+/** 导入 NAT 分享抽屉开关 */
+const importOpen = ref(false)
 
 const myNatLabel = computed(() =>
   props.result ? (NAT_TYPE_META[props.result.type]?.label ?? '未知') : '',
@@ -91,25 +92,18 @@ async function handleShare() {
 }
 
 function handleImport() {
-  const result = props.result
-  if (!result) {
+  if (!props.result) {
     toastWarning('请先检测 NAT 类型')
     return
   }
-  showPrompt(
-    '导入 NAT 分享',
-    '粘贴朋友分享的 NAT 内容，朋友侧节点将加入拓扑图并判断联机可能性：',
-    (value) => {
-      const data = parseNatShare(value)
-      if (!data) {
-        toastError('分享内容无效，请确认完整复制')
-        return
-      }
-      friendShare.value = data
-      verdict.value = judgeP2PFeasibility(result.type, data.type)
-    },
-    { placeholder: 'MoLaunchNATv1|...' },
-  )
+  importOpen.value = true
+}
+
+/** 导入成功：更新朋友侧节点并判断联机可能性 */
+function onImported(data: NatShareData) {
+  if (!props.result) return
+  friendShare.value = data
+  verdict.value = judgeP2PFeasibility(props.result.type, data.type)
 }
 
 // ============ ECharts 拓扑图 ============
@@ -287,5 +281,11 @@ onBeforeUnmount(() => {
         </template>
       </div>
     </Collapse>
+
+    <NatShareImportDialog
+      v-if="importOpen && props.result"
+      @imported="onImported"
+      @close="importOpen = false"
+    />
   </div>
 </template>
