@@ -80,17 +80,18 @@ pub async fn resolve_center_addr(
     }
 }
 
-/// 房客发现流程：校验中心连通性、协商协议列表、获取 MC 服务器端口。
+/// 房客发现流程：校验联机中心连通性、协商协议列表、获取 MC 服务器端口。
 ///
-/// 返回 (mc_ip, mc_port)，mc_ip 即联机中心虚拟 IP。
-pub async fn discover_mc(center_ip: &str, center_port: u16) -> Result<(String, u16), String> {
+/// `connect_ip` / `connect_port` 为实际探测地址：no-tun 下系统栈无法直连虚拟 IP，
+/// 调用方须先建立 easytier port-forward 并经本地端口探测。返回 MC 服务器端口。
+pub async fn discover_mc_at(connect_ip: &str, connect_port: u16) -> Result<u16, String> {
     let connect = timeout(
         REQUEST_TIMEOUT,
-        TcpStream::connect((center_ip, center_port)),
+        TcpStream::connect((connect_ip, connect_port)),
     )
     .await
-    .map_err(|_| format!("连接联机中心 {center_ip}:{center_port} 超时"))?
-    .map_err(|e| format!("连接联机中心 {center_ip}:{center_port} 失败: {e}"))?;
+    .map_err(|_| format!("连接联机中心 {connect_ip}:{connect_port} 超时"))?
+    .map_err(|e| format!("连接联机中心 {connect_ip}:{connect_port} 失败: {e}"))?;
 
     let mut stream = connect;
     let _ = stream.set_nodelay(true);
@@ -135,5 +136,5 @@ pub async fn discover_mc(center_ip: &str, center_port: u16) -> Result<(String, u
         return Err(format!("c:server_port 失败，状态 {status}"));
     }
     let mc_port = u16::from_be_bytes([data[0], data[1]]);
-    Ok((center_ip.to_string(), mc_port))
+    Ok(mc_port)
 }

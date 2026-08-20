@@ -281,6 +281,24 @@ impl EasyTier {
         self.virtual_ip.as_deref()
     }
 
+    /// 查询本机实际虚拟 IP。
+    ///
+    /// 房主（静态 `-i`）直接返回配置值；房客（`--dhcp`）经 easytier-cli `node info`
+    /// 查询 DHCP 分配地址（`ipv4_addr` 形如 `10.144.144.2/24`，取前缀部分）。
+    pub async fn query_virtual_ip(&self) -> Option<String> {
+        if let Some(ip) = self.virtual_ip() {
+            return Some(ip.to_string());
+        }
+        let Ok(info) = self.easytier_cli(&["node", "info"]).await else {
+            return None;
+        };
+        info.get("ipv4_addr")
+            .and_then(|v| v.as_str())
+            .and_then(|s| s.split('/').next())
+            .filter(|s| !s.is_empty())
+            .map(|s| s.to_string())
+    }
+
     /// easytier-core 版本号（`--version` 查询失败时为空字符串）
     pub fn version(&self) -> &str {
         &self.version

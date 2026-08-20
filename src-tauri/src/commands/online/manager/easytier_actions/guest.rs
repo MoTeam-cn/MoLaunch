@@ -4,7 +4,6 @@ use serde::{Deserialize, Serialize};
 
 use crate::handler;
 use crate::log_debug;
-use crate::log_error;
 use crate::log_info;
 use crate::minecraft::online::scaffolding::client as scaffolding_client;
 use crate::minecraft::online::scaffolding::code as room_code;
@@ -174,19 +173,18 @@ pub(super) fn register_guest(d: &mut Dispatcher) {
                 )
                 .await?
             };
-            let (mc_ip, mc_port) =
-                match scaffolding_client::discover_mc(&center_ip, center_port).await {
-                    Ok(x) => x,
-                    Err(e) => {
-                        log_error!("[Online] 房客探测联机中心失败: {e}");
-                        return Err(e);
-                    }
-                };
-            // no-tun 下建立本地 port-forward：MC 客户端连接 127.0.0.1:local_port
-            let local_port = ensure_guest_port_forwards(&state, &mc_ip, mc_port).await?;
+            // no-tun 下系统栈无法直连虚拟 IP：先建联机中心本地转发，再经本地端口探测
+            let center_local = ensure_guest_port_forwards(&state, &center_ip, center_port).await?;
+            let mc_port = scaffolding_client::discover_mc_at("127.0.0.1", center_local).await?;
+            // 进服转发：MC 端口与联机中心相同则复用本地端口，否则单独建立
+            let local_port = if mc_port == center_port {
+                center_local
+            } else {
+                ensure_guest_port_forwards(&state, &center_ip, mc_port).await?
+            };
             log_info!(
                 "[Online] 房客发现房主 MC 服务: {}:{}（本地转发 127.0.0.1:{}）",
-                mc_ip,
+                center_ip,
                 mc_port,
                 local_port
             );
@@ -212,16 +210,15 @@ pub(super) fn register_guest(d: &mut Dispatcher) {
                     .ok_or_else(|| "easytier 未加入网络".to_string())?;
                 scaffolding_client::resolve_center_addr(None, None, easytier).await?
             };
-            let (mc_ip, mc_port) =
-                match scaffolding_client::discover_mc(&center_ip, center_port).await {
-                    Ok(x) => x,
-                    Err(e) => {
-                        log_error!("[Online] 房客轮询联机中心失败: {e}");
-                        return Err(e);
-                    }
-                };
+            // no-tun 下先建联机中心本地转发，再经本地端口探测
+            let center_local = ensure_guest_port_forwards(&state, &center_ip, center_port).await?;
+            let mc_port = scaffolding_client::discover_mc_at("127.0.0.1", center_local).await?;
             // 端口变化时经 ensure_guest_port_forwards 重建本地转发规则
-            let local_port = ensure_guest_port_forwards(&state, &mc_ip, mc_port).await?;
+            let local_port = if mc_port == center_port {
+                center_local
+            } else {
+                ensure_guest_port_forwards(&state, &center_ip, mc_port).await?
+            };
             serde_json::to_value(ScaffoldingClientProbeResponse {
                 success: true,
                 mc_ip: "127.0.0.1".to_string(),

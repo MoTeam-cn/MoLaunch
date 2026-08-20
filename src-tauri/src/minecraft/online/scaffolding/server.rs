@@ -149,10 +149,11 @@ impl ScaffoldingServer {
         &self.state
     }
 
-    /// 停止服务
+    /// 停止服务（abort accept 循环以释放监听端口）
     pub async fn stop(self) {
         self.stop.store(true, Ordering::SeqCst);
         if let Some(handle) = self.handle {
+            handle.abort();
             let _ = handle.await;
         }
     }

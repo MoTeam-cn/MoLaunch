@@ -10,6 +10,12 @@
 
 ### Fixed
 
+- **修复搭桥联机 no-tun 下无法探测联机中心**（[client.rs](src-tauri/src/minecraft/online/scaffolding/client.rs) / [guest.rs](src-tauri/src/commands/online/manager/easytier_actions/guest.rs)）：no-tun 模式无虚拟网卡，系统网络栈无虚拟 IP 路由，`discover_mc` 直接 `TcpStream::connect(10.144.144.1:8040)` 必然超时。现改为**先建联机中心 port-forward（本地端口 → 虚拟 IP）再经本地端口探测**（`discover_mc_at`），MC 端口与联机中心相同则复用本地转发端口，否则单独建立进服转发；房主/房客两端均可正确发现联机中心并获取进服地址。
+
+- **修复 ScaffoldingServer 停止不释放监听端口**（[server.rs](src-tauri/src/minecraft/online/scaffolding/server.rs)）：`stop()` 仅设置 AtomicBool 标志（accept 循环不检查），listener 随 task 永不退出导致端口一直占用。现 stop 时 **abort accept 循环**，listener 随之 drop 释放端口，避免联机中心默认端口 13448 被旧实例残留占用、新实例退化为随机端口。
+
+- **修复房客 DHCP 模式虚拟 IP 显示为空**（[easytier.rs](src-tauri/src/minecraft/online/scaffolding/easytier.rs) / [easytier_actions.rs](src-tauri/src/commands/online/manager/easytier_actions.rs)）：`virtual_ip()` 对 `--dhcp` 房客恒返回 None（无静态 IP），easytier 状态页虚拟 IP 留空。新增 `query_virtual_ip()`：房主直接返回静态 IP，房客经 `easytier-cli node info` 查询 DHCP 实际分配地址（`ipv4_addr` 取前缀），`easytier-status` 事件与状态查询统一使用真实虚拟 IP。
+
 - **消除 macOS 构建 dead_code 警告**（[admin.rs](src-tauri/src/minecraft/system/shell/admin.rs) / [window.rs](src-tauri/src/minecraft/system/shell/window.rs)）：`relaunch_as_admin` 改用 window.rs 公共 `apple_script_literal` 转义函数，删除 admin.rs 中逻辑完全一致的私有重复实现，消除 macOS 上公共函数从未被调用的 `dead_code` 警告。
 
 - **修复 ESLint 检查错误（14 处）**（[RecipeSettingsForm.vue](src/views/tools/creation/recipe-generator/RecipeSettingsForm.vue) / [RecipeSlotHotspot.vue](src/views/tools/creation/recipe-generator/RecipeSlotHotspot.vue) / [RecipeSlotsEditor.vue](src/views/tools/creation/recipe-generator/RecipeSlotsEditor.vue) / [htmlShadowRenderer.ts](src/plugins/custom-layout/htmlShadowRenderer.ts) / [format.ts](src/utils/format.ts)）：① RecipeSettingsForm 的 `recipe` prop 改为 `defineModel` 双向绑定（消除 11 处 vue/no-mutating-props 直接修改 prop）；② RecipeSlotHotspot 的 `slot` prop 更名为 `slotId`（slot 为 Vue 保留属性名，消除 vue/no-deprecated-slot-attribute）；③ htmlShadowRenderer 危险脚本正则去掉字符类内不必要的 `\[` 转义（no-useless-escape）；④ format.ts 文件名控制字符检查由正则字面量改为 charCodeAt 码点判断（no-control-regex）。

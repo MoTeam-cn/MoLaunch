@@ -33,16 +33,21 @@ fn default_no_tun() -> bool {
 }
 
 /// 构造 easytier 运行状态 payload（`easytier-status` 事件推送 / `easytier_status` IPC 查询共用）
-fn easytier_status_payload(easytier: &Option<EasyTier>) -> serde_json::Value {
+///
+/// 房客 DHCP 模式经 `query_virtual_ip` 查询实际分配地址（no-tun 下无虚拟网卡，须经 CLI 回显）。
+async fn easytier_status_payload(easytier: &Option<EasyTier>) -> serde_json::Value {
     match easytier {
-        Some(e) => serde_json::json!({
-            "joined": true,
-            "version": e.version(),
-            "pid": e.pid(),
-            "rpcPortal": e.rpc_portal(),
-            "networkName": e.network_name(),
-            "virtualIp": e.virtual_ip().unwrap_or(""),
-        }),
+        Some(e) => {
+            let virtual_ip = e.query_virtual_ip().await.unwrap_or_default();
+            serde_json::json!({
+                "joined": true,
+                "version": e.version(),
+                "pid": e.pid(),
+                "rpcPortal": e.rpc_portal(),
+                "networkName": e.network_name(),
+                "virtualIp": virtual_ip,
+            })
+        }
         None => serde_json::json!({
             "joined": false,
             "version": "",
@@ -57,7 +62,7 @@ fn easytier_status_payload(easytier: &Option<EasyTier>) -> serde_json::Value {
 /// 构造并推送 easytier 运行状态事件（加入/停止后调用，供设备页展示）
 async fn emit_easytier_status(app: &tauri::AppHandle, state: &AppState) {
     let guard = state.easytier.lock().await;
-    let payload = easytier_status_payload(&guard);
+    let payload = easytier_status_payload(&guard).await;
     let _ = app.emit(EASYTIER_STATUS_EVENT, payload);
 }
 
@@ -267,7 +272,7 @@ pub fn register(d: &mut Dispatcher) {
         "easytier_status",
         handler!(state, _app, _params, {
             let guard = state.easytier.lock().await;
-            serde_json::to_value(easytier_status_payload(&guard)).map_err(|e| e.to_string())
+            serde_json::to_value(easytier_status_payload(&guard).await).map_err(|e| e.to_string())
         }),
     );
 
