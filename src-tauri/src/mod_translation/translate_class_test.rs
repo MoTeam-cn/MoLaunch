@@ -1,7 +1,8 @@
 //! class 翻译路由单元测试（经 translate_class.rs 的 #[path] 子模块引入）
 
 use super::*;
-use crate::mod_translation::types::{Loader, Quote};
+use crate::mod_translation::ledger::ClassDecisionLedger;
+use crate::mod_translation::types::{ClassCandidate, JarInspection, Loader, Quote};
 
 fn sample_inspection(candidates: Vec<ClassCandidate>) -> JarInspection {
     JarInspection {

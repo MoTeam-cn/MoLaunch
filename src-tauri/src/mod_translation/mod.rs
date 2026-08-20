@@ -26,6 +26,6 @@ pub mod translate_lang;
 pub mod types;
 
 pub use self::controller::{analyze_jar, cancel_task, start_task};
-pub(crate) use self::progress::{current_stage_progress, AI_TIMEOUT_SECS};
+pub(crate) use self::progress::current_stage_progress;
 pub use self::status::current_status;
 pub use self::types::*;

@@ -22,6 +22,8 @@
 
 ### Refactored
 
+- **超限 Rust 文件拆分（单文件 ≤350 行）**（[easytier_actions.rs](src-tauri/src/commands/online/manager/easytier_actions.rs) → `easytier_actions/{host,guest,watch}.rs` / [explore.rs](src-tauri/src/commands/tools/resourcepack/explore.rs) → `explore/{io,parse,tree}.rs` / [repair_loader.rs](src-tauri/src/commands/version/list/repair_loader.rs) → `repair_loader/{detect,repair,merge}.rs` / [core.rs](src-tauri/src/minecraft/download/manager/core.rs) → `manager/{batch,lease}.rs` / [pack_common.rs](src-tauri/src/commands/version/pack_common.rs) → `pack_common/{resolve,entries,update}.rs` / mod_translation 超限文件 → `analyze/{coverage,loader,sources}.rs`、`class/{classify,discover,pool,rewrite}.rs`、`json_value/{parser,value}.rs`、`lang/{free_text,json,keyvalue,structured}.rs`、`ledger/{class_decision,task_memory,work_graph}.rs`、`task/{prepare,run}.rs`、`translate_class/{apply,prompt,route}.rs`）：按单文件 ≤350 行规范拆分超限模块，父文件仅保留入口函数与子模块声明/重导出，测试经 `#[cfg(test)]` 重导出访问子模块实现；拆分后 `cargo fmt` / `cargo check` / `cargo check --tests` 全部通过（0 error / 0 warning）。
+
 - **内部实现细节日志降级为 DEBUG 级别**（[easytier_actions.rs](src-tauri/src/commands/online/manager/easytier_actions.rs) / [language.rs](src-tauri/src/minecraft/language.rs)）：按日志规范，将联机 easytier 内部状态同步（白名单重建、port-forward 建立、监视循环端口更新、手动端口写入）与游戏语言配置写入/文件存在性检查等内部细节日志由 INFO 降为 DEBUG；保留用户可感知关键节点（加入/停止网络、开房/关房、发现 MC 服务、自动关房）为 INFO。
 
 ## [0.3.7-rc2] - 2026-08-20
