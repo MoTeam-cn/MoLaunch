@@ -20,6 +20,7 @@ const Tooltip = defineAsyncComponent(() => import('@/components/common/Tooltip.v
 const Tag = defineAsyncComponent(() => import('@/components/common/Tag.vue'))
 import type { CleanupItem } from '@/utils/api/tools'
 import { formatBytes } from '@/utils/format'
+import { useCollapseAnimation } from '@/composables/useCollapseAnimation'
 
 interface CleanupGroup {
   key: string
@@ -89,6 +90,13 @@ function itemDisplayName(displayName: string): string {
   const idx = displayName.indexOf(' - ')
   return idx > 0 ? displayName.substring(0, idx) : displayName
 }
+
+// 折叠动画 class（v-for 外部状态场景，用纯函数；折叠时图标 -rotate-90、展开不旋转）
+const { contentClassOf, iconClassOf } = useCollapseAnimation({
+  iconTransition: 'transition-transform duration-300',
+  rotateClass: '',
+  collapsedRotateClass: '-rotate-90',
+})
 </script>
 
 <template>
@@ -104,8 +112,8 @@ function itemDisplayName(displayName: string): string {
         @click="emit('toggleGroup', group.key)"
       >
         <ChevronDownIcon
-          class="h-4 w-4 flex-none text-gray-400 transition-transform duration-300"
-          :class="collapsedGroups.has(group.key) ? '-rotate-90' : ''"
+          class="h-4 w-4 flex-none text-gray-400"
+          :class="iconClassOf(!collapsedGroups.has(group.key))"
         />
         <component :is="groupIcon(group.key)" class="h-4 w-4 flex-none text-primary-500" />
         <div class="flex-1 min-w-0">
@@ -137,8 +145,7 @@ function itemDisplayName(displayName: string): string {
 
       <!-- 分组内容（折叠动画） -->
       <div
-        class="grid transition-all duration-300 ease-in-out"
-        :class="collapsedGroups.has(group.key) ? 'grid-rows-[0fr]' : 'grid-rows-[1fr]'"
+        :class="contentClassOf(!collapsedGroups.has(group.key))"
       >
         <div class="overflow-hidden">
           <div class="divide-y divide-gray-100">

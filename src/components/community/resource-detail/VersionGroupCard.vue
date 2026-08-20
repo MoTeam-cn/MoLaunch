@@ -12,6 +12,7 @@
 import type { ResourceProject, ResourceVersion } from '@/types/community'
 import { ModLoaderFlags } from '@/types/community'
 import { formatBytes, formatDownloads } from '@/utils/format'
+import { useCollapseAnimation } from '@/composables/useCollapseAnimation'
 import { ref, defineAsyncComponent } from 'vue'
 import {
   ChevronDownIcon,
@@ -74,6 +75,13 @@ function releaseColor(rt: string): string {
   if (rt === 'Beta') return 'gold'
   return 'gray'
 }
+
+// 折叠动画 class（expanded 由外部传入，用纯函数；400ms 内容过渡 + 图标容器 transition-all）
+const { contentClassOf, iconClassOf } = useCollapseAnimation({
+  contentTransition: 'transition-[grid-template-rows] duration-[400ms] ease-[cubic-bezier(0.4,0,0.2,1)]',
+  iconTransition: 'transition-all duration-300 ease-[cubic-bezier(0.4,0,0.2,1)]',
+  collapsedRotateClass: 'rotate-0',
+})
 </script>
 
 <template>
@@ -105,10 +113,11 @@ function releaseColor(rt: string): string {
           :class="expanded ? 'text-primary-400' : 'text-gray-400'"
         >{{ versions.length }} 个版本</span>
         <span
-          class="inline-flex items-center justify-center w-5 h-5 rounded-full transition-all duration-300 ease-[cubic-bezier(0.4,0,0.2,1)]"
-          :class="expanded
-            ? 'bg-primary-100 text-primary-600 rotate-180'
-            : 'bg-gray-100 text-gray-500 rotate-0'"
+          class="inline-flex items-center justify-center w-5 h-5 rounded-full"
+          :class="[
+            expanded ? 'bg-primary-100 text-primary-600' : 'bg-gray-100 text-gray-500',
+            iconClassOf(expanded),
+          ]"
         >
           <ChevronDownIcon class="w-3.5 h-3.5" />
         </span>
@@ -118,8 +127,7 @@ function releaseColor(rt: string): string {
     <!-- 卡片内容（懒挂载 + grid-template-rows 0fr→1fr 过渡） -->
     <div
       v-if="mounted"
-      class="grid transition-[grid-template-rows] duration-[400ms] ease-[cubic-bezier(0.4,0,0.2,1)]"
-      :class="expanded ? 'grid-rows-[1fr]' : 'grid-rows-[0fr]'"
+      :class="contentClassOf(expanded)"
     >
       <div class="overflow-hidden">
         <div

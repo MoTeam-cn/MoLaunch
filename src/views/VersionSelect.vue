@@ -15,6 +15,7 @@ import { useVersionSettings } from '@/composables/useVersionSettings'
 import * as tauri from '@/utils/tauri'
 import grassIcon from '@/assets/blocks/Grass.png'
 import { inferVersionType, typeMetaMap, type VersionTypeMeta } from '@/composables/useVersionMeta'
+import { useCollapseAnimation } from '@/composables/useCollapseAnimation'
 const Button = defineAsyncComponent(() => import('@/components/common/Button.vue'))
 const Tag = defineAsyncComponent(() => import('@/components/common/Tag.vue'))
 const FolderSidebar = defineAsyncComponent(() => import('./version-select/FolderSidebar.vue'))
@@ -78,6 +79,9 @@ function toggleGroup(key: string) {
 function isCollapsed(key: string) {
   return !expandedKeys.value.has(key)
 }
+
+// 折叠动画 class（v-for 外部状态场景，用纯函数）
+const { contentClassOf, iconClassOf } = useCollapseAnimation()
 
 const selectedId = computed({
   get: () => versionStore.selectedVersion,
@@ -223,14 +227,13 @@ onMounted(() => loadInstalled())
                 <Tag size="small" color="gray">{{ group.versions.length }}</Tag>
               </div>
               <ChevronDownIcon
-                class="h-4 w-4 flex-none text-gray-400 transition-transform duration-300 ease-in-out"
-                :class="isCollapsed(group.key) ? '' : 'rotate-180'"
+                class="h-4 w-4 flex-none text-gray-400"
+                :class="iconClassOf(!isCollapsed(group.key))"
               />
             </button>
             <!-- 内容区（grid-template-rows 0fr→1fr 平滑高度过渡，与 MoLaunchIntro.vue 一致） -->
             <div
-              class="grid transition-all duration-300 ease-in-out"
-              :class="isCollapsed(group.key) ? 'grid-rows-[0fr]' : 'grid-rows-[1fr]'"
+              :class="contentClassOf(!isCollapsed(group.key))"
             >
               <div class="overflow-hidden">
                 <ul class="divide-y divide-gray-100 border-t border-gray-100">

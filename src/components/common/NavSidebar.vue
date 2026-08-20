@@ -22,6 +22,7 @@
 import { ref, watch, computed, type Component } from 'vue'
 import { LockClosedIcon, ChevronDownIcon } from '@heroicons/vue/24/outline'
 import { useTabPersistence } from '@/composables/useTabPersistence'
+import { useCollapseAnimation } from '@/composables/useCollapseAnimation'
 
 interface NavCategory {
   id: string
@@ -74,6 +75,14 @@ function isExpanded(id: string): boolean {
 function toggleExpand(id: string) {
   expandedMap.value = { ...expandedMap.value, [id]: !expandedMap.value[id] }
 }
+
+// 折叠动画 class（v-for 外部状态场景，用纯函数；200ms 过渡 + 内容区 opacity 渐隐）
+const { contentClassOf, iconClassOf } = useCollapseAnimation({
+  contentTransition: 'transition-all duration-200 ease-out',
+  iconTransition: 'transition-transform duration-200',
+  expandedExtra: 'opacity-100',
+  collapsedExtra: 'opacity-0',
+})
 
 /** 父项点击：disabled 不响应；sealed 封禁交给父组件拦截提示（不展开子菜单）；有 children 则 toggle 展开，无 children 则 emit id */
 function handleClick(cat: NavCategory) {
@@ -157,16 +166,15 @@ useTabPersistence(
           <LockClosedIcon v-if="cat.sealed" class="w-4 h-4 text-gray-300 shrink-0" />
           <ChevronDownIcon
             v-else-if="cat.children && cat.children.length > 0"
-            class="w-4 h-4 text-gray-400 transition-transform duration-200"
-            :class="isExpanded(cat.id) ? 'rotate-180' : ''"
+            class="w-4 h-4 text-gray-400"
+            :class="iconClassOf(isExpanded(cat.id))"
           />
         </button>
 
         <!-- 子菜单（grid-template-rows 动画：0fr → 1fr） -->
         <div
           v-if="cat.children && cat.children.length > 0"
-          class="grid transition-all duration-200 ease-out"
-          :class="isExpanded(cat.id) ? 'grid-rows-[1fr] opacity-100' : 'grid-rows-[0fr] opacity-0'"
+          :class="contentClassOf(isExpanded(cat.id))"
         >
           <div class="overflow-hidden">
             <button
