@@ -30,13 +30,15 @@ const cacheEntries = computed<{ label: string; path: string }[]>(() => {
   ]
 })
 
-/** 存储信息卡片条目（数据根目录 / 配置文件 / 日志目录） */
+/** 存储信息卡片条目（数据根目录 / 配置文件 / 日志目录 / 下载目录 / frp 数据目录） */
 const storageEntries = computed<{ label: string; path: string; locate?: boolean }[]>(() => {
   if (!props.storageDirs) return []
   return [
     { label: '数据根目录', path: props.storageDirs.base },
     { label: '配置文件', path: props.storageDirs.config, locate: true },
     { label: '日志目录', path: props.storageDirs.logs },
+    { label: '下载目录', path: props.storageDirs.download },
+    { label: 'frp 数据目录', path: props.storageDirs.frpData },
   ]
 })
 
@@ -49,6 +51,9 @@ const appdataEntries = computed<{ label: string; path: string; locate?: boolean 
     { label: 'frpc 厂商二进制', path: props.storageDirs.appdataProviders },
     { label: 'FRP 认证 token', path: props.storageDirs.appdataFrpAuth },
     { label: '联机数据', path: props.storageDirs.appdataOnline },
+    { label: 'easytier 内核', path: props.storageDirs.appdataEasytier },
+    { label: '更新器目录', path: props.storageDirs.appdataUpdater },
+    { label: '待安装更新', path: props.storageDirs.appdataLastExe, locate: true },
     { label: '账号认证文件', path: props.storageDirs.appdataAuthFile, locate: true },
   ].filter((entry) => entry.path.length > 0)
 })

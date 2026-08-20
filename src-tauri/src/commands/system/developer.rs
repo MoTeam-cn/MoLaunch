@@ -137,6 +137,10 @@ pub struct StorageDirs {
     pub cache: String,
     /// 临时目录（.Molaunch/temp/）
     pub temp: String,
+    /// 下载目录（.Molaunch/Download/）
+    pub download: String,
+    /// frp 数据目录（.Molaunch/frp/，隧道配置/厂商状态/frpc 日志/配置）
+    pub frp_data: String,
     /// 系统临时目录缓存（<temp>/MoLaunch/，含 TaskTemp 和 sdk）
     pub cache_temp: String,
     /// Minecraft 运行缓存目录（%APPDATA%/.minecraft/，Java Runtime）
@@ -153,6 +157,12 @@ pub struct StorageDirs {
     pub appdata_online: String,
     /// 全局共享账号认证文件（AppData/auth.json）
     pub appdata_auth_file: String,
+    /// 全局共享 easytier 内核目录（AppData/easytier/）
+    pub appdata_easytier: String,
+    /// 全局共享更新器目录（AppData/updater/，updater.exe）
+    pub appdata_updater: String,
+    /// 全局共享待安装更新文件（AppData/last.exe）
+    pub appdata_last_exe: String,
 }
 
 /// 获取所有存储目录路径（开发者页展示用）
@@ -164,6 +174,10 @@ pub fn get_storage_dirs() -> StorageDirs {
         logs: storage.logs_dir().to_string_lossy().to_string(),
         cache: cache::dir().to_string_lossy().to_string(),
         temp: storage.temp_dir().to_string_lossy().to_string(),
+        download: storage.download_dir().to_string_lossy().to_string(),
+        frp_data: crate::commands::frp::paths::frp_data_dir()
+            .to_string_lossy()
+            .to_string(),
         cache_temp: cache_temp::dir().to_string_lossy().to_string(),
         cache_app: cache_app::dir().to_string_lossy().to_string(),
         appdata_root: appdata_root_str(),
@@ -172,6 +186,9 @@ pub fn get_storage_dirs() -> StorageDirs {
         appdata_frp_auth: appdata_subdir_str("frp_auth"),
         appdata_online: appdata_subdir_str("online"),
         appdata_auth_file: appdata_file_str("auth.json"),
+        appdata_easytier: appdata_subdir_str("easytier"),
+        appdata_updater: appdata_subdir_str("updater"),
+        appdata_last_exe: appdata_file_str("last.exe"),
     }
 }
 

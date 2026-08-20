@@ -61,6 +61,10 @@ export interface StorageDirs {
   cache: string
   /** 运行路径临时目录（.Molaunch/temp/） */
   temp: string
+  /** 下载目录（.Molaunch/Download/） */
+  download: string
+  /** frp 数据目录（.Molaunch/frp/，隧道配置/厂商状态/frpc 日志/配置） */
+  frpData: string
   /** 系统临时目录缓存（<temp>/MoLaunch/，含 TaskTemp 和 sdk） */
   cacheTemp: string
   /** Minecraft 运行缓存目录（%APPDATA%/.minecraft/，Java Runtime） */
@@ -77,6 +81,12 @@ export interface StorageDirs {
   appdataOnline: string
   /** 全局共享账号认证文件（AppData/auth.json） */
   appdataAuthFile: string
+  /** 全局共享 easytier 内核目录（AppData/easytier/） */
+  appdataEasytier: string
+  /** 全局共享更新器目录（AppData/updater/，updater.exe） */
+  appdataUpdater: string
+  /** 全局共享待安装更新文件（AppData/last.exe） */
+  appdataLastExe: string
 }
 
 /** 获取所有存储目录路径 */
