@@ -8,6 +8,9 @@ use crate::log_info;
 #[cfg(unix)]
 use super::exec::shell_err;
 
+#[cfg(target_os = "macos")]
+use super::window::apple_script_literal;
+
 /// 检查当前进程是否以管理员权限运行
 ///
 /// - Windows: 通过 `OpenProcessToken` + `GetTokenInformation(TokenElevation)` 检测 UAC 提权
@@ -162,20 +165,4 @@ pub fn relaunch_as_admin(args: &[String]) -> Result<(), String> {
     }
 
     Ok(())
-}
-
-/// 将字符串转义为 AppleScript 字符串字面量（转义反斜杠与双引号）
-#[cfg(target_os = "macos")]
-fn apple_script_literal(s: &str) -> String {
-    let mut out = String::with_capacity(s.len() + 2);
-    out.push('"');
-    for c in s.chars() {
-        match c {
-            '\\' => out.push_str("\\\\"),
-            '"' => out.push_str("\\\""),
-            _ => out.push(c),
-        }
-    }
-    out.push('"');
-    out
 }

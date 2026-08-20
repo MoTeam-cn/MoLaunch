@@ -6,6 +6,8 @@
 
 ### Fixed
 
+- **消除 macOS 构建 dead_code 警告**（[admin.rs](src-tauri/src/minecraft/system/shell/admin.rs) / [window.rs](src-tauri/src/minecraft/system/shell/window.rs)）：`relaunch_as_admin` 改用 window.rs 公共 `apple_script_literal` 转义函数，删除 admin.rs 中逻辑完全一致的私有重复实现，消除 macOS 上公共函数从未被调用的 `dead_code` 警告。
+
 - **修复 ESLint 检查错误（14 处）**（[RecipeSettingsForm.vue](src/views/tools/creation/recipe-generator/RecipeSettingsForm.vue) / [RecipeSlotHotspot.vue](src/views/tools/creation/recipe-generator/RecipeSlotHotspot.vue) / [RecipeSlotsEditor.vue](src/views/tools/creation/recipe-generator/RecipeSlotsEditor.vue) / [htmlShadowRenderer.ts](src/plugins/custom-layout/htmlShadowRenderer.ts) / [format.ts](src/utils/format.ts)）：① RecipeSettingsForm 的 `recipe` prop 改为 `defineModel` 双向绑定（消除 11 处 vue/no-mutating-props 直接修改 prop）；② RecipeSlotHotspot 的 `slot` prop 更名为 `slotId`（slot 为 Vue 保留属性名，消除 vue/no-deprecated-slot-attribute）；③ htmlShadowRenderer 危险脚本正则去掉字符类内不必要的 `\[` 转义（no-useless-escape）；④ format.ts 文件名控制字符检查由正则字面量改为 charCodeAt 码点判断（no-control-regex）。
 
 ## [0.3.7-rc3] - 2026-08-20
