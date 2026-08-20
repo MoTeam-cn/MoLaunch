@@ -32,6 +32,25 @@ pub async fn read_layout_sample(format: String) -> Result<String, String> {
 pub async fn export_plugin_sample(dest_path: String, as_zip: bool) -> Result<(), String> {
     let dest = PathBuf::from(&dest_path);
 
+    // 路径安全：canonicalize 后校验目标必须位于插件目录内（防任意路径写入）
+    let root = super::helpers::plugins_root();
+    crate::utils::fs::ensure_dir(&root)?;
+    let root_canon = root
+        .canonicalize()
+        .map_err(|e| format!("插件目录不可用: {}", e))?;
+    let parent = dest.parent().ok_or_else(|| "目标路径无效".to_string())?;
+    crate::utils::fs::ensure_dir(parent)?;
+    let parent_canon = parent
+        .canonicalize()
+        .map_err(|e| format!("目标目录不可用: {}", e))?;
+    let file_name = dest
+        .file_name()
+        .ok_or_else(|| "目标路径无效".to_string())?;
+    let dest = parent_canon.join(file_name);
+    if !dest.starts_with(&root_canon) {
+        return Err("导出路径超出插件目录范围".to_string());
+    }
+
     if as_zip {
         export_zip(&dest).map_err(log_err("Failed to export plugin sample as ZIP"))?;
         log_info!("插件示例已导出为 ZIP: {}", dest.display());

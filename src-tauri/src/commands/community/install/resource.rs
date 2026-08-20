@@ -144,6 +144,24 @@ pub async fn download_resource_to_path(
         }
     }
 
+    // 路径安全：canonicalize 后校验目标必须位于下载目录内（防任意路径写入）
+    let download_dir = crate::commands::tools::download::resolve_external_download_dir(state).await;
+    crate::utils::fs::ensure_dir(&download_dir)?;
+    let download_canon = download_dir
+        .canonicalize()
+        .map_err(|e| format!("下载目录不可用: {}", e))?;
+    let parent = save_path.parent().ok_or_else(|| "目标路径无效".to_string())?;
+    let parent_canon = parent
+        .canonicalize()
+        .map_err(|e| format!("目标目录不可用: {}", e))?;
+    let file_name_part = save_path
+        .file_name()
+        .ok_or_else(|| "目标路径无效".to_string())?;
+    let save_path = parent_canon.join(file_name_part);
+    if !save_path.starts_with(&download_canon) {
+        return Err("下载路径超出下载目录范围".to_string());
+    }
+
     // 启动 DownloadSession：统一 reset_stages + flag 重置 + manager 构造
     let session =
         DownloadSession::start_grouped(state, "社区资源", vec![(&file_name, 1.0)], false).await;
