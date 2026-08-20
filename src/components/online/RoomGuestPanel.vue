@@ -69,9 +69,29 @@ const connStateClass = computed(() => {
 const POLL_INTERVAL_MS = 5000
 const POLL_MAX_FAILS = 3
 
+/** 房主关房状态轮询周期（10s）：轮询服务端 room_get，检测 status=closed 或房间不存在 */
+const ROOM_STATUS_POLL_INTERVAL_MS = 10_000
+
 /** 房主 MC 端口轮询定时器与失败计数 */
 let portPollTimer: ReturnType<typeof setInterval> | null = null
 let pollFailCount = 0
+
+/** 房主关房状态轮询定时器 */
+let roomStatusTimer: ReturnType<typeof setInterval> | null = null
+
+function stopRoomStatusPolling(): void {
+  if (roomStatusTimer) {
+    clearInterval(roomStatusTimer)
+    roomStatusTimer = null
+  }
+}
+
+function startRoomStatusPolling(): void {
+  stopRoomStatusPolling()
+  roomStatusTimer = setInterval(() => {
+    void pollRoomStatusTick()
+  }, ROOM_STATUS_POLL_INTERVAL_MS)
+}
 
 /** 手动指定端口（最高权重：自动轮询不再覆盖；null 为自动模式） */
 const manualPort = ref<number | null>(null)
@@ -142,6 +162,28 @@ async function reProbe() {
   }
 }
 
+/** 房主已关闭房间：停止轮询 + 停 easytier + 重置房间状态（面板自动切回加入表单） */
+async function handleHostClosedRoom(): Promise<void> {
+  stopPortPolling()
+  stopRoomStatusPolling()
+  toastError('房主已关闭房间，已自动退出')
+  try {
+    await easytier.stop()
+  } catch (e) {
+    toastError(`断开虚拟网络失败：${e instanceof Error ? e.message : String(e)}`)
+  } finally {
+    store.resetRoomState()
+  }
+}
+
+/** 轮询服务端房间状态：检测到房主关房（closed/房间不存在）时自动退出 */
+async function pollRoomStatusTick(): Promise<void> {
+  const status = await store.pollGuestRoomStatus()
+  if (status === 'closed') {
+    void handleHostClosedRoom()
+  }
+}
+
 /** 首次进入房间：组网 + 探测成功后提示可开始游玩并启动端口轮询 */
 async function initialProbe() {
   const res = await session.reconnect.reconnect()
@@ -182,11 +224,13 @@ async function copyText(text: string) {
 onMounted(() => {
   if (room.value.role === 'guest' && room.value.roomCode) {
     void initialProbe()
+    startRoomStatusPolling()
   }
 })
 
 onUnmounted(() => {
   stopPortPolling()
+  stopRoomStatusPolling()
 })
 </script>
 

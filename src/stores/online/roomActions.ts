@@ -21,8 +21,8 @@ export interface RoomActionDeps {
   roomCreateStep: Ref<RoomCreateStep>
 }
 
-/** 房间已关闭错误（旧 keepalive 轮询兼容，已无定时器使用） */
-export class RoomClosedError extends Error {}
+/** 加入方轮询房间状态结果：active=房间正常 / closed=房主已关闭 / error=瞬时失败下轮重试 */
+type RoomStatusPollResult = 'active' | 'closed' | 'error'
 
 /** 房主心跳间隔（毫秒，2 分钟；须小于服务端 heartbeat_timeout 180 秒） */
 const HEARTBEAT_INTERVAL_MS = 2 * 60 * 1000
@@ -155,5 +155,24 @@ export function useRoomActionsSlice(deps: RoomActionDeps) {
     return data
   }
 
-  return { hostCreateRoom, hostCloseRoom, guestJoinRoom, refreshRoomInfo }
+  /** 加入方轮询房间状态：检测房主是否已关闭房间（由 RoomGuestPanel 定时驱动） */
+  async function pollGuestRoomStatus(): Promise<RoomStatusPollResult> {
+    const roomCode = roomState.value.roomCode
+    if (!roomCode) return 'error'
+    try {
+      const result = await getRoomInfo(roomCode)
+      if (result.code === 1 && result.data) {
+        // waiting（创建后首跳前短暂存在）也视为正常，仅 closed 判定关房
+        return result.data.status === 'closed' ? 'closed' : 'active'
+      }
+      // 1001=房间已关闭/过期，1002=房间不存在（已被清理任务物理删除），均视为关房
+      if (result.code === 1001 || result.code === 1002) return 'closed'
+      return 'error'
+    } catch {
+      // IPC 层错误（网络抖动/认证重试中）不算关房，下个周期再试
+      return 'error'
+    }
+  }
+
+  return { hostCreateRoom, hostCloseRoom, guestJoinRoom, refreshRoomInfo, pollGuestRoomStatus }
 }

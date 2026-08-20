@@ -6,6 +6,8 @@
 
 ### Added
 
+- **加入方自动感知房主关闭房间**（[RoomGuestPanel.vue](src/components/online/RoomGuestPanel.vue) / [roomActions.ts](src/stores/online/roomActions.ts)）：加入方面板新增房间状态轮询（每 10 秒查询服务端 `room_get`），检测到 `status=closed` 或房间不存在（已被心跳超时清理物理删除）时自动执行「停止端口轮询 → 停 easytier → 重置房间状态 → 切回加入表单」，并提示「房主已关闭房间」。此前房主关房加入方无任何感知机制，只能等 MC 端口探测连续失败后手动退出。
+
 - **easytier 自建信令节点方案文档**（[EASYTIER_SELF_HOSTED_NODE_DESIGN.md](docs/EASYTIER_SELF_HOSTED_NODE_DESIGN.md)）：分析确认陶瓦默认公共节点已全部失效、HMCL/Axolotl 均未注入私有节点（HMCL 用 Glavo 动态节点列表 `terracotta.glavo.site/nodes`，Axolotl 用 `wss://center.node.1tmc.top`）；决定不挤第三方生态，记录自建 easytier 公共节点方案（服务器 `--public-server -p 11010` 部署 + 客户端 `easytier_public_peers` 配置 + 可选动态节点列表），含实施清单与风险注意。
 
 - **房间面板新增组网设备实时展示**（[easytier.rs](src-tauri/src/minecraft/online/scaffolding/easytier.rs) / [easytier_actions.rs](src-tauri/src/commands/online/manager/easytier_actions.rs) / [EasyTierPeerList.vue](src/components/online/EasyTierPeerList.vue) / [RoomHostPanel.vue](src/components/online/RoomHostPanel.vue) / [RoomGuestPanel.vue](src/components/online/RoomGuestPanel.vue)）：新增 `easytier_peers` IPC 返回虚拟网络节点列表（过滤中继，含 hostname / 虚拟 IP / 本机标记 / 延迟）；房主与房客面板「连接状态」卡片下新增组网设备列表组件，每 5 秒自动刷新组网人数与各节点虚拟 IP，双方可据此判断对方是否已组网成功。
