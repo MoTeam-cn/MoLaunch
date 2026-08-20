@@ -1,10 +1,11 @@
 /**
- * 启动状态管理 composable（从 stores/version.ts 抽出）
+ * 启动状态 Pinia store（从 composables/useLaunchState.ts 下沉）
  *
  * 封装启动游戏流程（进度 + Java 自动下载监听）、运行中状态（pid / 版本 ID）与游戏退出事件监听；
  * 与版本列表解耦，验证由调用方负责。
  */
 
+import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
 import { listen } from '@tauri-apps/api/event'
 import * as tauri from '@/utils/tauri'
@@ -41,7 +42,7 @@ const STAGE_NAMES: Record<string, string> = {
 /** 启动进度事件名（与后端 pipeline/execute.rs 的 emit 对应） */
 const LAUNCH_PROGRESS_EVENT = 'launch-progress'
 
-export function useLaunchState() {
+export const useLaunchStore = defineStore('launch', () => {
   // 启动状态
   const launching = ref(false)
   const launchingVersionId = ref<string | null>(null)
@@ -225,4 +226,4 @@ export function useLaunchState() {
     checkRunningGame,
     cleanupGameExitListener,
   }
-}
+})

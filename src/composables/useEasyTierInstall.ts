@@ -11,7 +11,7 @@
  */
 import { onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
-import { useTauriEvent } from '@/composables/useTauriEvent'
+import { useTauriEvent } from '@/utils/tauriEvent'
 import { getEasyTierInstallStatus } from '@/utils/api/online-manager/easytier'
 import { showModal } from '@/utils/modal'
 import type { EasyTierInstallProgress } from '@/types/online'

@@ -2,15 +2,15 @@
  * 版本状态管理
  *
  * 启动相关逻辑（launchGame/stopGame/cancelLaunch/进度轮询/Java 下载进度/游戏退出监听）
- * 已拆分到 `composables/useLaunchState.ts`，本 store 通过 composable 委托调用。
+ * 已拆分到 `stores/launch.ts`，本 store 通过 useLaunchStore 委托调用。
  */
 
-import { defineStore } from 'pinia'
+import { defineStore, storeToRefs } from 'pinia'
 import { ref, watch } from 'vue'
 import type { VersionInfo } from '@/types/version'
 import type { DownloadProgress } from '@/types/download'
 import * as tauri from '@/utils/tauri'
-import { useLaunchState } from '@/composables/useLaunchState'
+import { useLaunchStore } from '@/stores/launch'
 import { safeCall } from '@/utils/async'
 
 // 重新导出 DownloadStage/DownloadProgress，保持向后兼容（其他文件可能从 '@/stores/version' import）
@@ -29,12 +29,13 @@ export const useVersionStore = defineStore('version', () => {
   const downloadingVersion = ref<string | null>(null)
   const downloadProgress = ref<DownloadProgress | null>(null)
 
-  // 启动状态（委托给 useLaunchState composable）
+  // 启动状态（委托给 useLaunchStore store）
+  const launchStore = useLaunchStore()
   const {
     launching, launchingVersionId, runningPid, runningVersionId,
     launchProgress, launchStageName, javaDownloadProgress,
-    launchGame, stopGame, cancelLaunch, checkRunningGame, cleanupGameExitListener,
-  } = useLaunchState()
+  } = storeToRefs(launchStore)
+  const { launchGame, stopGame, cancelLaunch, checkRunningGame, cleanupGameExitListener } = launchStore
 
   // 版本选择器状态（用于在页面切换时保持状态）
   const selectedVersion = ref<string | null>(null)

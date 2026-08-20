@@ -3,7 +3,7 @@
  * 具体职责分别位于 aiChatMessages / aiChatStream，保持原有调用 API 不变。
  */
 import { ref, computed, onMounted, onUnmounted } from 'vue'
-import { useTauriEvent } from '@/composables/useTauriEvent'
+import { useTauriEvent } from '@/utils/tauriEvent'
 import {
   experimentalCreateConversation,
   experimentalListConversations,

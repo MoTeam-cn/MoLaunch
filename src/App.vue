@@ -42,7 +42,7 @@ import { initOnlineSession } from '@/composables/online/onlineSession'
 import { useDragDrop } from '@/composables/useDragDrop'
 import { useDevToolsGuard } from '@/composables/useDevToolsGuard'
 import { useExternalLinkGuard } from '@/composables/useExternalLinkGuard'
-import { useTauriEvent } from '@/composables/useTauriEvent'
+import { useTauriEvent } from '@/utils/tauriEvent'
 import type { EasyTierStatusResult } from '@/types/online'
 
 const sdkStore = useSdkStore()

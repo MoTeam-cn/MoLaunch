@@ -12,7 +12,7 @@ import { addressLatencyTest } from '@/utils/api/tools'
 import { copyToClipboard } from '@/utils/clipboard'
 import { toastError, toastInfo, toastSuccess } from '@/utils/toast'
 import { openPickerWindow } from '@/utils/picker-window'
-import { useTauriEvent } from '@/composables/useTauriEvent'
+import { useTauriEvent } from '@/utils/tauriEvent'
 import type { RedStoneServer, RedStoneStatusResult } from '@/types/redstone'
 
 const POLL_INTERVAL = 2000

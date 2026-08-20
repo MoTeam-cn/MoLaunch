@@ -5,7 +5,7 @@
  * 选项列表原地修改 checked 字段，避免重新渲染整个树。
  */
 import { ref, computed, onMounted, type ComputedRef } from 'vue'
-import { useTauriEvent } from '@/composables/useTauriEvent'
+import { useTauriEvent } from '@/utils/tauriEvent'
 import {
   getExportOptions,
   exportModpack,

@@ -16,7 +16,7 @@
  */
 import { ref, computed, onMounted, watch, defineAsyncComponent } from 'vue'
 import { useFrpStore } from '@/stores/frp'
-import { useTauriEvent } from '@/composables/useTauriEvent'
+import { useTauriEvent } from '@/utils/tauriEvent'
 import { parseLogLines, logLineClass, type LogLine } from '@/utils/log-display'
 import { translateLogLine } from '@/utils/frp-log-translate'
 import { diagnoseLogs, diagnoseBadgeClass, type DiagnoseResult } from '@/utils/frp-log-diagnose'

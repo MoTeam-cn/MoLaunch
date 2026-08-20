@@ -20,7 +20,7 @@ import {
   startTunnel as apiStartTunnel,
   stopTunnel as apiStopTunnel,
 } from '@/utils/api/frp-manager'
-import { useTauriEvent } from '@/composables/useTauriEvent'
+import { useTauriEvent } from '@/utils/tauriEvent'
 import { toastSuccess, toastError } from '@/utils/toast'
 
 /** 创建 Frp 隧道切片（无外部依赖） */

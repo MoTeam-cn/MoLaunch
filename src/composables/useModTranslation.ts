@@ -14,7 +14,7 @@ import {
   type ModTranslationTaskSnapshot,
 } from '@/utils/api/experimental-mod-translation'
 import { getCurrentWebview } from '@tauri-apps/api/webview'
-import { useTauriEvent } from '@/composables/useTauriEvent'
+import { useTauriEvent } from '@/utils/tauriEvent'
 import { setDragSuppressed } from '@/composables/useDragDrop/state'
 import { safeCall } from '@/utils/async'
 

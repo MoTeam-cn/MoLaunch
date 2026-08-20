@@ -1,5 +1,5 @@
 import { computed, onMounted, ref } from 'vue'
-import { useTauriEvent } from '@/composables/useTauriEvent'
+import { useTauriEvent } from '@/utils/tauriEvent'
 import { aiLoadConfig } from '@/utils/api/ai'
 import {
   experimentalManager,

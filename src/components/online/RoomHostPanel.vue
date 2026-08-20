@@ -10,7 +10,7 @@
 import { onMounted, ref, defineAsyncComponent } from 'vue'
 import { useOnlineStore } from '@/stores/online'
 import { useRoomHost } from '@/composables/useRoomHost'
-import { useTauriEvent } from '@/composables/useTauriEvent'
+import { useTauriEvent } from '@/utils/tauriEvent'
 import { toastError, toastSuccess } from '@/utils/toast'
 const Button = defineAsyncComponent(() => import('@/components/common/Button.vue'))
 const Card = defineAsyncComponent(() => import('@/components/common/Card.vue'))

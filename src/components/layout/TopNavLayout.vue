@@ -17,7 +17,7 @@ import { toastError } from '@/utils/toast'
 const Tooltip = defineAsyncComponent(() => import('@/components/common/Tooltip.vue'))
 const ExitConfirmDialog = defineAsyncComponent(() => import('./ExitConfirmDialog.vue'))
 import { topNavItems, experimentalNavItem } from './topNavItems'
-import { useTauriEvent } from '@/composables/useTauriEvent'
+import { useTauriEvent } from '@/utils/tauriEvent'
 import { useExperimental } from '@/composables/useExperimental'
 const appWindow = getCurrentWebviewWindow()
 const onlineStore = useOnlineStore()

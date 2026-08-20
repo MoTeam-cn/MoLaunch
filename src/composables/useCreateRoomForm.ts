@@ -18,7 +18,7 @@ import { generateScaffoldingCode } from '@/types/online'
 import type { ModpackMeta } from '@/types/online'
 import { toastError, toastSuccess, toastWarning } from '@/utils/toast'
 import { openPickerWindow } from '@/utils/picker-window'
-import { useTauriEvent } from '@/composables/useTauriEvent'
+import { useTauriEvent } from '@/utils/tauriEvent'
 
 /** 创建流程阶段（UI 步骤指示） */
 export type CreateStep = 'idle' | 'code' | 'register' | 'start'

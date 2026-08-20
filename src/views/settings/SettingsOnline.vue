@@ -7,7 +7,7 @@ import { useOnlineStore } from '@/stores/online'
 import { useConfigPage } from '@/composables/useConfigPage'
 import { toastError, toastSuccess } from '@/utils/toast'
 import { showConfirm } from '@/utils/modal'
-import { useTauriEvent } from '@/composables/useTauriEvent'
+import { useTauriEvent } from '@/utils/tauriEvent'
 import {
   getEasyTierInstallStatus,
   installEasyTier,

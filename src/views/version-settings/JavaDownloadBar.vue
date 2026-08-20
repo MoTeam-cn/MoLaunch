@@ -9,7 +9,7 @@
  * 供「Java 环境检测」与「Java 下载器」复用；仅当 targetMajor 有效时才渲染。
  */
 import { ref, onMounted, computed, defineAsyncComponent } from 'vue'
-import { useTauriEvent } from '@/composables/useTauriEvent'
+import { useTauriEvent } from '@/utils/tauriEvent'
 import * as tauri from '@/utils/tauri'
 import { toastSuccess, toastError } from '@/utils/toast'
 const Button = defineAsyncComponent(() => import('@/components/common/Button.vue'))
