@@ -124,11 +124,12 @@ function handleJoin(room: LobbyRoomItem) {
 /** 执行加入（含密码）：成功 ok=true；失败 ok=false + error 内联展示 */
 async function doJoin(room: LobbyRoomItem, password: string): Promise<{ ok: boolean; error?: string }> {
   if (inRoom.value) return { ok: false, error: '您当前已在房间中' }
-  // 前置依赖：easytier 内核未安装时不加入房间（弹窗引导前往设置页下载）
-  const kernelOk = await install.ensureKernel('加入房间')
-  if (!kernelOk) return { ok: false, error: 'easytier 内核未安装' }
+  // 点击后立即标记该房间加入中（内核检查/登记全程锁定按钮，避免延迟感）
   joiningId.value = room.publicIdentifier
   try {
+    // 前置依赖：easytier 内核未安装时不加入房间（弹窗引导前往设置页下载）
+    const kernelOk = await install.ensureKernel('加入房间')
+    if (!kernelOk) return { ok: false, error: 'easytier 内核未安装' }
     await store.guestJoinRoom(room.publicIdentifier, password)
     return { ok: true }
   } catch (e) {

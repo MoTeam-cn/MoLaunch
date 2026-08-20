@@ -28,10 +28,13 @@ export function useRoomHost() {
 
   /** 房主关闭房间（先停联机中心/easytier，再 room_close） */
   async function handleCloseRoom(): Promise<void> {
+    // 点击后立即置 loading（hostStop 期间锁定关闭按钮，避免延迟感）
+    store.roomLoading = true
     try {
       await scaffolding.hostStop()
-    } finally {
       await store.hostCloseRoom()
+    } finally {
+      store.roomLoading = false
     }
   }
 

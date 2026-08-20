@@ -159,6 +159,8 @@ function handleLeaveRoom() {
     '退出房间',
     '退出后将断开虚拟局域网连接。确定退出？',
     async () => {
+      // 点击确定后立即置 loading（easytier.stop 期间锁定退出按钮，避免延迟感）
+      store.roomLoading = true
       stopPortPolling()
       try {
         await easytier.stop()
@@ -166,6 +168,7 @@ function handleLeaveRoom() {
         toastError(`退出失败：${e instanceof Error ? e.message : String(e)}`)
       } finally {
         store.resetRoomState()
+        store.roomLoading = false
       }
     },
   )

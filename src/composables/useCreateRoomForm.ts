@@ -188,12 +188,12 @@ export function useCreateRoomForm() {
       return
     }
 
-    // 前置依赖：easytier 内核未安装时不创建房间（弹窗引导前往设置页下载）
-    const kernelOk = await install.ensureKernel('创建房间')
-    if (!kernelOk) return
-
+    // 点击后立即进入 loading 防呆（内核检查/登记/拉起全程锁定按钮）
     creating.value = true
     try {
+      // 前置依赖：easytier 内核未安装时不创建房间（弹窗引导前往设置页下载）
+      const kernelOk = await install.ensureKernel('创建房间')
+      if (!kernelOk) return
       createStep.value = 'code'
       const roomCode = generateScaffoldingCode()
 

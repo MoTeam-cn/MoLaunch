@@ -133,14 +133,21 @@ pub(super) async fn rebuild_host_easytier(
     Ok(())
 }
 
+/// 成员集合变化后的稳定等待窗口：连续进出时只在窗口内无新变化才最终上报一次
+const HEARTBEAT_SETTLE_DELAY: Duration = Duration::from_secs(5);
+
 /// 房主成员监听循环：每 5s 比对 easytier 在线节点（过滤中继，排除本机），
-/// 成员集合**任何变化**（加入/离开）都立即心跳上报一次（不等 2 分钟定时，
+/// 成员集合**任何变化**（加入/离开）先进入 5s 稳定窗口——期间再次变化则重置窗口
+/// （连续进出只上报最后一次），窗口结束无新变化才心跳上报一次（不等 2 分钟定时，
 /// 也不打断其队列），并推送 `easytier-status` 事件供前端实时刷新组网列表。
 /// easytier 被停止（置 None）时退出。
 ///
-/// 首次快照视为有变化：开房后立即上报一次当前人数，后续仅节点集合变化时触发。
+/// 首次快照视为有变化：开房 5s 后即上报一次当前人数（房主启动时已 emit 一次状态），
+/// 后续仅节点集合变化且 5s 稳定后触发。
 async fn host_member_heartbeat_loop(state: AppState, app: tauri::AppHandle, room_code: String) {
     let mut last: HashSet<String> = HashSet::new();
+    // 待上报标记：集合变化置位，稳定窗口结束（无新变化）才上报
+    let mut pending = false;
     loop {
         let current = {
             let guard = state.easytier.lock().await;
@@ -160,13 +167,17 @@ async fn host_member_heartbeat_loop(state: AppState, app: tauri::AppHandle, room
         let changed = current != last;
         last = current;
         if changed {
-            log_info!("[Online] 检测到虚拟网络成员变化，立即心跳上报");
+            pending = true;
+            log_debug!("[Online] 检测到虚拟网络成员变化，等待 5s 稳定后上报");
+        } else if pending {
+            pending = false;
+            log_info!("[Online] 虚拟网络成员已稳定，心跳上报");
             if let Err(e) = host_heartbeat_now(&state, &room_code).await {
                 log_debug!("[Online] 成员变化心跳失败（不影响后续监听）: {e}");
             }
             emit_easytier_status(&app, &state).await;
         }
-        tokio::time::sleep(Duration::from_secs(5)).await;
+        tokio::time::sleep(HEARTBEAT_SETTLE_DELAY).await;
     }
 }
 
