@@ -13,13 +13,12 @@ import {
   CheckIcon,
   CheckCircleIcon,
   ChevronDownIcon,
-  FolderIcon,
-  CubeIcon,
 } from '@heroicons/vue/24/outline'
 const Tooltip = defineAsyncComponent(() => import('@/components/common/Tooltip.vue'))
 const Tag = defineAsyncComponent(() => import('@/components/common/Tag.vue'))
 import type { CleanupItem } from '@/utils/api/tools'
 import { formatBytes } from '@/utils/format'
+import { groupIcon } from '@/utils/cleanup-group'
 import { useCollapseAnimation } from '@/composables/useCollapseAnimation'
 
 interface CleanupGroup {
@@ -80,10 +79,6 @@ function buildGroup(key: string, items: CleanupItem[]): CleanupGroup {
     }
   }
   return { key, label: key, items, groupSize, groupFileCount, selectedCount, selectedSize }
-}
-
-function groupIcon(key: string) {
-  return key === '全局' ? FolderIcon : CubeIcon
 }
 
 function itemDisplayName(displayName: string): string {

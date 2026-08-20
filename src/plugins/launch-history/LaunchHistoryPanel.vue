@@ -17,7 +17,7 @@ import {
   ArrowPathIcon,
 } from '@heroicons/vue/24/outline'
 const Button = defineAsyncComponent(() => import('@/components/common/Button.vue'))
-import { formatDateTime } from '@/utils/format'
+import { formatTime } from '@/utils/format'
 
 interface HistoryItem {
   version_id: string
@@ -41,11 +41,6 @@ async function loadHistory() {
   } finally {
     loading.value = false
   }
-}
-
-/** 格式化时间：RFC3339 → "MM-DD HH:mm" */
-function formatTime(rfc3339: string): string {
-  return formatDateTime(rfc3339, { withYear: false, invalidValue: rfc3339 })
 }
 
 /** 退出状态文案与样式 */
@@ -129,7 +124,7 @@ onUnmounted(() => {
           <div class="min-w-0 flex-1">
             <p class="truncate text-sm font-medium text-gray-900">{{ item.version_id }}</p>
             <p class="mt-0.5 text-xs text-gray-500">
-              {{ formatTime(item.launch_time) }} · {{ item.username }}
+              {{ formatTime(item.launch_time, { invalidValue: item.launch_time }) }} · {{ item.username }}
             </p>
           </div>
           <div class="ml-2 flex flex-none items-center gap-1 text-xs" :class="getExitStatus(item).cls">

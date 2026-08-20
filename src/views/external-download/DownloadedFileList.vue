@@ -4,7 +4,7 @@ import { defineAsyncComponent } from 'vue'
  * 已下载文件列表（icon + 文件名 + 大小/时间 + 删除按钮）
  */
 import type { ExternalDownloadEntry } from '@/utils/api/tools'
-import { formatBytes, formatDateTime } from '@/utils/format'
+import { formatBytes, formatTime } from '@/utils/format'
 const Tooltip = defineAsyncComponent(() => import('@/components/common/Tooltip.vue'))
 const Button = defineAsyncComponent(() => import('@/components/common/Button.vue'))
 const Tag = defineAsyncComponent(() => import('@/components/common/Tag.vue'))
@@ -17,11 +17,6 @@ defineProps<{
 const emit = defineEmits<{
   delete: [name: string]
 }>()
-
-function formatTime(unix: number): string {
-  if (!unix) return ''
-  return formatDateTime(unix * 1000, { withYear: false, invalidValue: '' })
-}
 </script>
 
 <template>
@@ -50,7 +45,7 @@ function formatTime(unix: number): string {
         <div class="min-w-0 flex-1">
           <div class="truncate text-sm font-medium text-gray-900">{{ file.name }}</div>
           <div class="mt-0.5 text-xs text-gray-400">
-            {{ formatBytes(file.size) }} · {{ formatTime(file.modified) }}
+            {{ formatBytes(file.size) }} · {{ formatTime(file.modified, { invalidValue: '' }) }}
           </div>
         </div>
         <Tooltip text="删除">

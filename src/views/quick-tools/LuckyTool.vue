@@ -13,6 +13,7 @@ import { getTodayLuck } from '@/utils/lucky'
 import type { TodayLuck } from '@/utils/lucky'
 import { getDeviceId } from '@/utils/api/java'
 import { toastError } from '@/utils/toast'
+import { maskDeviceId } from '@/utils/format'
 
 const luck = ref<TodayLuck | null>(null)
 const loading = ref(true)
@@ -28,12 +29,6 @@ const LEVEL_STYLES: Record<string, { tag: string; bar: string; text: string }> =
 }
 
 const levelStyle = computed(() => LEVEL_STYLES[luck.value?.level ?? ''] ?? LEVEL_STYLES['普通人'])
-
-/** 设备 ID 打码展示（保留前 4 后 4） */
-function maskDeviceId(id: string): string {
-  if (id.length <= 8) return id
-  return `${id.slice(0, 4)}****${id.slice(-4)}`
-}
 
 onMounted(async () => {
   try {

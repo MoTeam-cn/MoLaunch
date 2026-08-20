@@ -115,3 +115,26 @@ export function formatTimestamp(unixSeconds: number, options?: { withSeconds?: b
     : `${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`
   return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${time}`
 }
+
+/**
+ * 格式化时间为 MM-DD HH:mm（本地时区，不含年份）
+ *
+ * 支持 Date、日期字符串与毫秒时间戳，秒级时间戳（< 1e12）自动转毫秒；
+ * 无效值（0 / 空串 / 非法日期）返回 invalidValue（默认 '-'）。
+ */
+export function formatTime(
+  value: Date | string | number,
+  options?: { invalidValue?: string },
+): string {
+  if (!value) return options?.invalidValue ?? '-'
+  const ms = typeof value === 'number' && value < 1e12 ? value * 1000 : value
+  return formatDateTime(ms, { withYear: false, invalidValue: options?.invalidValue ?? '-' })
+}
+
+/**
+ * 设备 ID 打码展示（保留前 4 后 4，中间用 **** 遮盖）
+ */
+export function maskDeviceId(id: string): string {
+  if (id.length <= 8) return id
+  return `${id.slice(0, 4)}****${id.slice(-4)}`
+}
