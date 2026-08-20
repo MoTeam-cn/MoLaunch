@@ -20,6 +20,10 @@
 
 - **开发者存储信息页补充新目录**（[developer.rs](src-tauri/src/commands/system/developer.rs) / [developer.ts](src/utils/api/developer.ts) / [StorageTab.vue](src/views/settings/developer/StorageTab.vue)）：`StorageDirs` 补充下载目录（`.Molaunch/Download/`）、frp 数据目录（`.Molaunch/frp/`，隧道配置/厂商状态/frpc 日志/配置）与 AppData 全局共享的 easytier 内核目录（`easytier/`）、更新器目录（`updater/`）、待安装更新文件（`last.exe`，定位），存储信息页与 AppData 全局共享卡片同步展示。
 
+### Refactored
+
+- **内部实现细节日志降级为 DEBUG 级别**（[easytier_actions.rs](src-tauri/src/commands/online/manager/easytier_actions.rs) / [language.rs](src-tauri/src/minecraft/language.rs)）：按日志规范，将联机 easytier 内部状态同步（白名单重建、port-forward 建立、监视循环端口更新、手动端口写入）与游戏语言配置写入/文件存在性检查等内部细节日志由 INFO 降为 DEBUG；保留用户可感知关键节点（加入/停止网络、开房/关房、发现 MC 服务、自动关房）为 INFO。
+
 ## [0.3.7-rc2] - 2026-08-20
 
 ### Docs

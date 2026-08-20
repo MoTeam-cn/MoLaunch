@@ -2,7 +2,7 @@
 //!
 //! 启动前自动设置游戏语言，根据 MC 版本调整大小写（1.10- 大写，1.11+ 小写）。
 
-use crate::{log_info, log_warn};
+use crate::{log_debug, log_warn};
 use std::path::Path;
 
 /// 设置游戏语言（写入 options.txt 的 lang 字段）
@@ -22,7 +22,7 @@ pub fn set_game_language(
     // 根据 MC 版本调整大小写（1.10- 用大写，1.11+ 用小写）
     let required_lang = adjust_lang_case(target_lang, mc_version);
 
-    log_info!(
+    log_debug!(
         "[Language] set_game_language called: game_dir={:?}, version_id={}, mc_version={}, target_lang={} -> required={}",
         game_dir,
         version_id,
@@ -33,14 +33,14 @@ pub fn set_game_language(
 
     // 如果 options.txt 不存在，创建并写入语言设置
     if !options_path.exists() {
-        log_info!(
+        log_debug!(
             "[Language] options.txt not found, creating with lang={}",
             required_lang
         );
         let content = format!("lang:{}\n", required_lang);
         std::fs::write(&options_path, content)
             .map_err(|e| anyhow::anyhow!("Failed to create options.txt: {}", e))?;
-        log_info!(
+        log_debug!(
             "[Language] Created options.txt with lang={} for version {}",
             required_lang,
             version_id
@@ -50,7 +50,7 @@ pub fn set_game_language(
 
     // 读取当前语言
     let current_lang = read_ini_value(&options_path, "lang");
-    log_info!(
+    log_debug!(
         "[Language] options.txt exists, current lang={:?}",
         current_lang
     );
@@ -59,13 +59,13 @@ pub fn set_game_language(
     // 条件1: lang 键不存在 → 需要补充
     // 条件2: saves 文件夹不存在（新实例）→ 可以覆盖
     let saves_exist = game_dir.join("saves").exists();
-    log_info!("[Language] saves folder exists: {}", saves_exist);
+    log_debug!("[Language] saves folder exists: {}", saves_exist);
 
     // lang 字段不存在时直接补充（无论 saves 是否存在）
     if current_lang.is_none() {
-        log_info!("[Language] lang field missing, appending to options.txt");
+        log_debug!("[Language] lang field missing, appending to options.txt");
         write_ini_value(&options_path, "lang", &required_lang);
-        log_info!(
+        log_debug!(
             "[Language] Appended lang={} for version {}",
             required_lang,
             version_id
@@ -76,7 +76,7 @@ pub fn set_game_language(
     // lang 字段存在，检查是否已经是目标语言
     if let Some(ref current) = current_lang {
         if current == &required_lang {
-            log_info!(
+            log_debug!(
                 "[Language] Language already {}, no change needed",
                 required_lang
             );
@@ -95,7 +95,7 @@ pub fn set_game_language(
 
     // 写入语言设置
     // 先写 "-" 触发缓存清理，再写目标值
-    log_info!(
+    log_debug!(
         "[Language] Overwriting lang: {} -> {} (cache clear via '-')",
         current_lang.as_deref().unwrap_or("(none)"),
         required_lang
@@ -103,7 +103,7 @@ pub fn set_game_language(
     write_ini_value(&options_path, "lang", "-");
     write_ini_value(&options_path, "lang", &required_lang);
 
-    log_info!(
+    log_debug!(
         "[Language] Set language to {} for version {}",
         required_lang,
         version_id
@@ -228,7 +228,7 @@ pub fn set_force_unicode_font(game_dir: &Path, enable: bool) -> anyhow::Result<(
     let value = if enable { "true" } else { "false" };
     write_ini_value(&options_path, "forceUnicodeFont", value);
 
-    log_info!("[Language] Set forceUnicodeFont to {}", value);
+    log_debug!("[Language] Set forceUnicodeFont to {}", value);
 
     Ok(())
 }

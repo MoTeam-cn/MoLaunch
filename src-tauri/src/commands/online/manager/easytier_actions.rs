@@ -9,6 +9,7 @@
 use serde::{Deserialize, Serialize};
 
 use crate::handler;
+use crate::log_debug;
 use crate::log_error;
 use crate::log_info;
 use crate::log_warn;
@@ -231,7 +232,7 @@ async fn rebuild_host_easytier(
     }
     *state.easytier.lock().await = Some(easytier);
     emit_easytier_status(app, state).await;
-    log_info!("[Online] 房主 easytier 已重建（no-tun 白名单，mc_port={mc_port:?}）");
+    log_debug!("[Online] 房主 easytier 已重建（no-tun 白名单，mc_port={mc_port:?}）");
     Ok(())
 }
 
@@ -297,7 +298,7 @@ async fn ensure_guest_port_forwards(
         bind_addr,
         dst_addr: desired_dst.clone(),
     });
-    log_info!("[Online] 房客 port-forward 已建立: 127.0.0.1:{local_port} -> {desired_dst}");
+    log_debug!("[Online] 房客 port-forward 已建立: 127.0.0.1:{local_port} -> {desired_dst}");
     Ok(local_port)
 }
 
@@ -328,7 +329,7 @@ async fn host_watch_loop(
                     log_error!("[Online] 房主监视: 重建 easytier 白名单失败: {e}");
                     return;
                 }
-                log_info!("[Online] 房主监视: 手动 MC 端口 {manual} 已同步");
+                log_debug!("[Online] 房主监视: 手动 MC 端口 {manual} 已同步");
             }
             tokio::time::sleep(WATCH_INTERVAL).await;
             continue;
@@ -372,7 +373,7 @@ async fn host_watch_loop(
                     log_error!("[Online] 房主监视: 重建 easytier 白名单失败: {e}");
                     return;
                 }
-                log_info!("[Online] 房主监视: MC 端口已更新为 {chosen}");
+                log_debug!("[Online] 房主监视: MC 端口已更新为 {chosen}");
             }
         }
         tokio::time::sleep(WATCH_INTERVAL).await;
@@ -803,7 +804,7 @@ pub fn register(d: &mut Dispatcher) {
             if let Some(server) = state.scaffolding_server.lock().await.as_ref() {
                 server.state().set_mc_port(p.mc_port);
             }
-            log_info!("[Online] 房主手动 MC 端口: {:?}", p.mc_port);
+            log_debug!("[Online] 房主手动 MC 端口: {:?}", p.mc_port);
             serde_json::to_value(serde_json::json!({ "success": true })).map_err(|e| e.to_string())
         }),
     );
