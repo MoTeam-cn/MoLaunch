@@ -12,7 +12,7 @@ import { toastSuccess } from '@/utils/toast'
 import { useConfigPage } from '@/composables/useConfigPage'
 import { ServerStackIcon } from '@heroicons/vue/24/outline'
 
-/** 项目自建信令节点（默认内置，前端隐藏；与后端 DEFAULT_SIGNALING_PEER 保持一致） */
+/** 项目自建信令节点（默认内置，前端隐藏；与后端 publics.rs 的 DEFAULT_SIGNALING_PEER 保持一致） */
 const DEFAULT_SIGNALING_PEER = 'wss://node1.molaunch.moiu.cn'
 
 const peersText = ref('')

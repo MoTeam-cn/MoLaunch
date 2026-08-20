@@ -19,6 +19,7 @@ use tauri::Manager;
 
 mod guest;
 mod host;
+mod publics;
 mod watch;
 
 /// 房客侧默认 hostname（未配置 network_identity 时使用）
@@ -130,12 +131,10 @@ async fn configured_network_identity(state: &AppState) -> String {
     state.config.lock().await.online.network_identity.clone()
 }
 
-/// 项目自建 easytier 信令节点（默认内置，前端设置页不展示）：保证组网必有可用信令节点
-const DEFAULT_SIGNALING_PEER: &str = "wss://node1.molaunch.moiu.cn";
-
 /// 读取配置中的公共 easytier 节点，展开为 `--peers` 参数序列。
 ///
-/// 配置缺失或用户未配置时兜底注入默认信令节点，保证 `--peers` 永远非空。
+/// 用户配置缺失或未包含默认节点时兜底追加 `publics::default_peers()`，
+/// 保证 `--peers` 永远包含可用的项目信令节点。
 async fn configured_easytier_peers(state: &AppState) -> Vec<String> {
     let peers = &state.config.lock().await.online.easytier_public_peers;
     let mut list: Vec<String> = peers
@@ -143,8 +142,10 @@ async fn configured_easytier_peers(state: &AppState) -> Vec<String> {
         .map(|p| p.trim().to_string())
         .filter(|p| !p.is_empty())
         .collect();
-    if !list.iter().any(|p| p == DEFAULT_SIGNALING_PEER) {
-        list.push(DEFAULT_SIGNALING_PEER.to_string());
+    for default in publics::default_peers() {
+        if !list.iter().any(|p| p == default) {
+            list.push(default.to_string());
+        }
     }
     let mut args = Vec::new();
     for p in list {

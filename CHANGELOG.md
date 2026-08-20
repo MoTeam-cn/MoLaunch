@@ -14,7 +14,7 @@
 
 - **联机按钮即时 loading 防呆**（[useCreateRoomForm.ts](src/composables/useCreateRoomForm.ts) / [useRoomHost.ts](src/composables/useRoomHost.ts) / [RoomGuestPanel.vue](src/components/online/RoomGuestPanel.vue) / [LobbyBrowser.vue](src/components/online/LobbyBrowser.vue)）：创建/关闭房间/退出房间/加入房间按钮点击后**立即**进入 loading 态（Button 组件 loading 时自动禁用），不再等前置异步步骤（easytier 内核检查、hostStop、easytier.stop）完成后才点亮，消除点击后的明显延迟感。
 
-- **easytier 公共节点设置更名为「公共节点」并内置默认信令节点**（[config.ini](src-tauri/resources/defaults/config.ini) / [load.rs](src-tauri/src/config/load.rs) / [save.rs](src-tauri/src/config/save.rs) / [easytier_actions.rs](src-tauri/src/commands/online/manager/easytier_actions.rs) / [EasyTierPeersEditor.vue](src/components/settings/EasyTierPeersEditor.vue)）：① 设置-联机 中「easytier 公共中继节点」更名为「easytier 公共节点」，说明信令节点与中继节点均可填写；② 默认配置新增项目自建信令节点 `wss://node1.molaunch.moiu.cn`（不支持中继），`easytier_public_peers` 增加 INI 加载/持久化闭环（与 github_proxies 对称）；③ 运行时 `--peers` 组装兜底注入默认信令节点（配置缺失/被清空也保证组网必有可用信令节点）；④ 前端编辑器加载时过滤默认信令节点不展示，用户仅管理自定义节点。
+- **easytier 公共节点设置更名为「公共节点」并内置默认信令节点**（[publics.rs](src-tauri/src/commands/online/manager/easytier_actions/publics.rs)（新增）/ [easytier_actions.rs](src-tauri/src/commands/online/manager/easytier_actions.rs) / [EasyTierPeersEditor.vue](src/components/settings/EasyTierPeersEditor.vue)）：① 设置-联机 中「easytier 公共中继节点」更名为「easytier 公共节点」，说明信令节点与中继节点均可填写；② 新增 `publics.rs` 集中管理默认公共节点（项目自建信令节点 `wss://node1.molaunch.moiu.cn`，不支持中继，后续新增在此追加）；③ 房主/房客创建或加入虚拟网络组装 `--peers` 时，若用户配置未包含默认节点则兜底追加，保证组网必有可用信令节点；④ 前端编辑器加载时过滤默认信令节点不展示，用户仅管理自定义节点。
 
 ### Fixed
 

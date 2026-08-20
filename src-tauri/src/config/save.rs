@@ -178,13 +178,6 @@ pub fn save_config(config: &AppConfig) -> Result<(), String> {
 
     // Online
     ini.set("Online", "api_server_url", &config.online.api_server_url);
-    // easytier 公共节点（JSON 序列化存储，重启不丢失；默认信令节点由 defaults/config.ini 提供）
-    ini.set(
-        "Online",
-        "easytier_public_peers",
-        &serde_json::to_string(&config.online.easytier_public_peers)
-            .unwrap_or_else(|_| "[]".to_string()),
-    );
     // GitHub 镜像源（JSON 序列化存储，重启不丢失）
     ini.set(
         "Online",

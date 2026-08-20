@@ -66,8 +66,7 @@ pub struct OnlineConfig {
     /// 虚拟网络内节点标识（预留字段，用于房客侧 easytier hostname）
     #[serde(default)]
     pub network_identity: String,
-    /// 公共 easytier 节点列表（`--peers` 参数，格式 `tcp://host:port` / `wss://host` 等；
-    /// 信令节点与中继节点均可；默认信令节点由运行时兜底注入，前端不展示）
+    /// 公共 easytier 中继节点列表（`--peers` 参数，格式 `tcp://host:port` / `udp://host:port`；用于公网组网穿越 NAT）
     #[serde(default)]
     pub easytier_public_peers: Vec<String>,
     /// 用户自定义 GitHub 镜像源（easytier 内核等外部二进制下载竞速选源用，支持 full/path 模式）
