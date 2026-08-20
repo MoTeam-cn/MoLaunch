@@ -10,7 +10,7 @@
  *   弹窗并发起 AI 深度分析（后端 localAnalyze=true 只把命中关键词前后 ±15 行上下文发给 AI）。
  */
 import { ref, defineAsyncComponent } from 'vue'
-const AlertV2 = defineAsyncComponent(() => import('@/components/common/AlertV2.vue'))
+const Alert = defineAsyncComponent(() => import('@/components/common/Alert.vue'))
 const CrashAnalyzer = defineAsyncComponent(() => import('@/views/tools/data/CrashAnalyzer.vue'))
 const AiLogAnalyzer = defineAsyncComponent(() => import('@/components/experimental/AiLogAnalyzer.vue'))
 
@@ -28,7 +28,8 @@ function onLocalFollowup(text: string) {
 
 <template>
   <div class="space-y-4">
-    <AlertV2
+    <Alert
+      variant="soft"
       type="info"
       message="在下方输入框中粘贴日志，本地引擎会先检索问题范围；本地无法定位具体问题时，将自动弹出 AI 深度分析弹窗（只发送问题关键词附近上下文，日志全文不会上传）。"
     />

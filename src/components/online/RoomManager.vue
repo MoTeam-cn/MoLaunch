@@ -18,7 +18,7 @@ import { useEasyTierInstall } from '@/composables/useEasyTierInstall'
 const Button = defineAsyncComponent(() => import('@/components/common/Button.vue'))
 const Card = defineAsyncComponent(() => import('@/components/common/Card.vue'))
 const Input = defineAsyncComponent(() => import('@/components/common/Input.vue'))
-const AlertV2 = defineAsyncComponent(() => import('@/components/common/AlertV2.vue'))
+const Alert = defineAsyncComponent(() => import('@/components/common/Alert.vue'))
 const RoomHostPanel = defineAsyncComponent(() => import('./RoomHostPanel.vue'))
 const RoomGuestPanel = defineAsyncComponent(() => import('./RoomGuestPanel.vue'))
 const CreateRoomForm = defineAsyncComponent(() => import('./CreateRoomForm.vue'))
@@ -81,9 +81,9 @@ async function handleJoinRoom() {
 
     <!-- 加入房间表单（mode=join 且未在房间） -->
     <div v-else class="space-y-4">
-      <AlertV2 type="info" message="MoLaunch 联机与「陶瓦联机」基于同一 Scaffolding 协议：其他协议兼容启动器（陶瓦联机、PCL 等）获得的房间码均可在此直接加入" />
-      <AlertV2 type="info" message="联机基于 easytier 虚拟局域网：凭房间码加入后自动组网，进入房间后即可看到房主开服的进服地址" />
-      <AlertV2 type="info" message="如遇到违法违规房间，请及时向我们举报" />
+      <Alert variant="soft" type="info" message="MoLaunch 联机与「陶瓦联机」基于同一 Scaffolding 协议：其他协议兼容启动器（陶瓦联机、PCL 等）获得的房间码均可在此直接加入" />
+      <Alert variant="soft" type="info" message="联机基于 easytier 虚拟局域网：凭房间码加入后自动组网，进入房间后即可看到房主开服的进服地址" />
+      <Alert variant="soft" type="info" message="如遇到违法违规房间，请及时向我们举报" />
       <Card title="加入房间">
         <div class="space-y-4 py-1">
           <div class="flex items-start gap-3">

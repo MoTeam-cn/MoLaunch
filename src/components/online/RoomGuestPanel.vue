@@ -18,7 +18,7 @@ import { useEasyTier, type EasyTierStatus } from '@/composables/useEasyTier'
 const Button = defineAsyncComponent(() => import('@/components/common/Button.vue'))
 const Card = defineAsyncComponent(() => import('@/components/common/Card.vue'))
 const Tooltip = defineAsyncComponent(() => import('@/components/common/Tooltip.vue'))
-const AlertV2 = defineAsyncComponent(() => import('@/components/common/AlertV2.vue'))
+const Alert = defineAsyncComponent(() => import('@/components/common/Alert.vue'))
 const ModpackRequirementCard = defineAsyncComponent(() => import('./ModpackRequirementCard.vue'))
 const RoomToolsDrawer = defineAsyncComponent(() => import('./RoomToolsDrawer.vue'))
 import { showConfirm } from '@/utils/modal'
@@ -188,8 +188,8 @@ onUnmounted(() => {
 
 <template>
   <div class="space-y-4">
-    <AlertV2 type="info" message="联机基于 easytier 虚拟局域网：组网成功后，在 Minecraft「多人游戏 → 直接连接」输入下方进服地址即可进入房主房间" />
-    <AlertV2 type="info" message="如遇到违法违规房间，请及时向我们举报" />
+    <Alert variant="soft" type="info" message="联机基于 easytier 虚拟局域网：组网成功后，在 Minecraft「多人游戏 → 直接连接」输入下方进服地址即可进入房主房间" />
+    <Alert variant="soft" type="info" message="如遇到违法违规房间，请及时向我们举报" />
 
     <!-- 房间信息 -->
     <Card title="房间信息">

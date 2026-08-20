@@ -4,12 +4,12 @@
  *
  * 点击消息操作栏的复制按钮弹出：预览消息内容（Input 只读文本域，展示去除
  * Markdown 标记后的纯文本），选择复制为「渲染后文本」或「Markdown 原文」。
- * 点击遮罩外部或按 ESC 关闭；组件风格与项目统一（Button / AlertV2 / Input）。
+ * 点击遮罩外部或按 ESC 关闭；组件风格与项目统一（Button / Alert / Input）。
  */
 import { ref, watch, defineAsyncComponent } from 'vue'
 import { XMarkIcon } from '@heroicons/vue/24/outline'
 const Button = defineAsyncComponent(() => import('@/components/common/Button.vue'))
-const AlertV2 = defineAsyncComponent(() => import('@/components/common/AlertV2.vue'))
+const Alert = defineAsyncComponent(() => import('@/components/common/Alert.vue'))
 const Input = defineAsyncComponent(() => import('@/components/common/Input.vue'))
 import { markdownToPlainText } from '@/utils/markdown'
 import { copyToClipboard } from '@/utils/clipboard'
@@ -86,7 +86,7 @@ async function copyMarkdown() {
           </div>
 
           <!-- 提示 -->
-          <AlertV2 type="info" message="下方为去除 Markdown 标记后的纯文本预览，可按需选择复制格式" />
+          <Alert variant="soft" type="info" message="下方为去除 Markdown 标记后的纯文本预览，可按需选择复制格式" />
 
           <!-- 预览 -->
           <div class="mt-3">

@@ -17,7 +17,7 @@ import {
 } from '@heroicons/vue/24/outline'
 const Button = defineAsyncComponent(() => import('@/components/common/Button.vue'))
 const Tag = defineAsyncComponent(() => import('@/components/common/Tag.vue'))
-const AlertV2 = defineAsyncComponent(() => import('@/components/common/AlertV2.vue'))
+const Alert = defineAsyncComponent(() => import('@/components/common/Alert.vue'))
 const JavaDownloadBar = defineAsyncComponent(() => import('@/views/version-settings/JavaDownloadBar.vue'))
 import { useJavaStore } from '@/stores/java'
 import { toastSuccess, toastError } from '@/utils/toast'
@@ -125,7 +125,8 @@ onMounted(check)
       </Button>
     </div>
     <div class="px-5 pb-5 space-y-3">
-      <AlertV2
+      <Alert
+        variant="soft"
         type="info"
         message="逐个检查已安装的游戏版本是否需要尚未安装的 Java。缺少时可直接一键预下载到固定 runtime 目录，之后启动该版本时会自动命中。"
       />

@@ -17,12 +17,13 @@ import {
 import { redstoneLogFiles, redstoneReadLog, redstoneStatus } from '@/utils/api/redstone'
 import { parseLogLines, logLineClass } from '@/utils/log-display'
 import { toastError } from '@/utils/toast'
+import { formatBytes } from '@/utils/format'
 import type { RedStoneLogFileInfo, RedStoneStatusResult } from '@/types/redstone'
 const Card = defineAsyncComponent(() => import('@/components/common/Card.vue'))
 const Button = defineAsyncComponent(() => import('@/components/common/Button.vue'))
 const Select = defineAsyncComponent(() => import('@/components/common/Select.vue'))
 const Tag = defineAsyncComponent(() => import('@/components/common/Tag.vue'))
-const AlertV2 = defineAsyncComponent(() => import('@/components/common/AlertV2.vue'))
+const Alert = defineAsyncComponent(() => import('@/components/common/Alert.vue'))
 
 /** 内核状态（redstone_status 返回） */
 const status = ref<RedStoneStatusResult | null>(null)
@@ -161,7 +162,7 @@ onActivated(() => {
             <div class="mt-0.5">{{ status.created ?? '—' }}</div>
           </div>
         </div>
-        <AlertV2 type="info" message="红石内核按需释放到系统临时目录（&lt;temp&gt;/MoLaunch/hongshi/），退出即随系统清理；日志位于内核目录 logs/ 下，由内核与控制台同步输出" />
+        <Alert variant="soft" type="info" message="红石内核按需释放到系统临时目录（&lt;temp&gt;/MoLaunch/hongshi/），退出即随系统清理；日志位于内核目录 logs/ 下，由内核与控制台同步输出" />
       </div>
       <div v-else-if="!statusLoading" class="flex flex-col items-center justify-center py-10 gap-2 text-gray-400">
         <ShieldCheckIcon class="w-8 h-8" />

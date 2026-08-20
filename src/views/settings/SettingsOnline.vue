@@ -23,7 +23,7 @@ const ApiServerCard = defineAsyncComponent(() => import('@/components/settings/A
 const Input = defineAsyncComponent(() => import('@/components/common/Input.vue'))
 const Select = defineAsyncComponent(() => import('@/components/common/Select.vue'))
 const Tag = defineAsyncComponent(() => import('@/components/common/Tag.vue'))
-const AlertV2 = defineAsyncComponent(() => import('@/components/common/AlertV2.vue'))
+const Alert = defineAsyncComponent(() => import('@/components/common/Alert.vue'))
 const Tooltip = defineAsyncComponent(() => import('@/components/common/Tooltip.vue'))
 import {
   ArrowDownTrayIcon,
@@ -324,7 +324,8 @@ onMounted(() => {
             </div>
             <p class="text-xs text-gray-400 mt-1">{{ installProgress?.message }}</p>
             <!-- 下载安抚提示：GitHub 部分地区网络不稳定时避免用户干等 -->
-            <AlertV2
+            <Alert
+              variant="soft"
               type="warning"
               message="受网络环境影响，GitHub 在部分地区的访问可能不稳定。若内核下载出现速度慢或进度卡顿，属正常现象，请稍安勿躁，下载完成后会自动继续安装。"
               class="mt-3"

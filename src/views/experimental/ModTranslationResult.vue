@@ -9,7 +9,7 @@ const Select = defineAsyncComponent(() => import('@/components/common/Select.vue
 const Checkbox = defineAsyncComponent(() => import('@/components/common/Checkbox.vue'))
 const Collapse = defineAsyncComponent(() => import('@/components/common/Collapse.vue'))
 const Tag = defineAsyncComponent(() => import('@/components/common/Tag.vue'))
-const AlertV2 = defineAsyncComponent(() => import('@/components/common/AlertV2.vue'))
+const Alert = defineAsyncComponent(() => import('@/components/common/Alert.vue'))
 const Tooltip = defineAsyncComponent(() => import('@/components/common/Tooltip.vue'))
 import * as tauri from '@/utils/tauri'
 import { toastError } from '@/utils/toast'
@@ -145,7 +145,7 @@ async function handleOpenDir() {
     </div>
 
     <!-- 功能定位提示 -->
-    <AlertV2 type="warning" class="shrink-0" :link="{ url: MCMOD_I18N_URL }">
+    <Alert variant="soft" type="warning" class="shrink-0" :link="{ url: MCMOD_I18N_URL }">
       <template #default="{ openLink }">
         <p>
           本模组翻译功能仍处于调整优化阶段，受 AI 大模型幻觉影响，翻译准确率与可用性可能不尽如人意，我们会持续优化提示词。建议优先使用更稳定、更完善的
@@ -153,7 +153,7 @@ async function handleOpenDir() {
           本功能仅作为其尚未翻译或翻译较少的模组的备选方案。
         </p>
       </template>
-    </AlertV2>
+    </Alert>
 
     <!-- 左右分栏 -->
     <div class="flex flex-1 min-h-0 gap-4">
@@ -185,7 +185,7 @@ async function handleOpenDir() {
               <span class="text-gray-800">{{ props.analyzeResult.classCandidates.length }} 个候选</span>
             </div>
             <div v-if="props.analyzeResult.existingChinese.length" class="mt-3">
-              <AlertV2 type="warning">
+              <Alert variant="soft" type="warning">
                 <p>该模组已包含 {{ props.analyzeResult.existingChinese.length }} 个中文语言文件，翻译将覆盖以下文件：</p>
                 <ul class="mt-1 space-y-0.5">
                   <li
@@ -198,7 +198,7 @@ async function handleOpenDir() {
                     </Tooltip>
                   </li>
                 </ul>
-              </AlertV2>
+              </Alert>
             </div>
             <div v-if="props.analyzeResult.signed" class="flex items-center gap-2">
               <span class="text-yellow-600">JAR 含签名文件，重打包后签名将失效</span>

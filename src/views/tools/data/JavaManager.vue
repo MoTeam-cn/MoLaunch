@@ -7,7 +7,7 @@
  * 此处不再承载选择交互，避免与设置页职责重复。
  *
  * - 重新检测按钮触发 store.refreshJava()
- * - AlertV2 提示用户前往设置页切换 Java
+ * - Alert 提示用户前往设置页切换 Java
  */
 import { onMounted, defineAsyncComponent } from 'vue'
 import {
@@ -18,7 +18,7 @@ import {
 const Button = defineAsyncComponent(() => import('@/components/common/Button.vue'))
 const Tooltip = defineAsyncComponent(() => import('@/components/common/Tooltip.vue'))
 const Tag = defineAsyncComponent(() => import('@/components/common/Tag.vue'))
-const AlertV2 = defineAsyncComponent(() => import('@/components/common/AlertV2.vue'))
+const Alert = defineAsyncComponent(() => import('@/components/common/Alert.vue'))
 import { useJavaStore } from '@/stores/java'
 import { toastSuccess, toastError } from '@/utils/toast'
 
@@ -50,7 +50,8 @@ async function refresh() {
       </Button>
     </div>
     <div class="px-5 pb-5 space-y-3">
-      <AlertV2
+      <Alert
+        variant="soft"
         type="info"
         message="本页仅展示系统检测到的 Java 运行时。使用哪个 Java 请在「设置 → 启动设置」中切换（自动选择或指定），此处不做选择以免与设置页重复。"
       />

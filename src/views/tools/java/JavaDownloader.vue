@@ -5,7 +5,7 @@
  * 预设档位为 Mojang 官方 Runtime 可下载的五个（Java 25/21/17/16/8）+「自定义」档——
  * 自定义作为快速选择里的一个选项，选中后才显示输入框（校验 1~2 位纯数字、8~26 区间）。
  * 下载源固定为 Mojang 官方 Java Runtime；下载目录强制固定为 `%APPDATA%\.minecraft\runtime\`
- * （与官方启动器一致），用 AlertV2 说明原因；非官方版本（9/11/15/18/20/22~24 等自定义版本）
+ * （与官方启动器一致），用 Alert 说明原因；非官方版本（9/11/15/18/20/22~24 等自定义版本）
  * 提示官方 Runtime 可能未提供，下载失败时后端会返回明确原因。
  *
  * - 版本校验复用 `isJavaMajorValid`，官方档判断复用 `hasOfficialRuntime`
@@ -16,7 +16,7 @@ import { ArrowDownTrayIcon, CheckCircleIcon } from '@heroicons/vue/24/outline'
 const SegmentedButtons = defineAsyncComponent(() => import('@/components/common/SegmentedButtons.vue'))
 const Input = defineAsyncComponent(() => import('@/components/common/Input.vue'))
 const Tag = defineAsyncComponent(() => import('@/components/common/Tag.vue'))
-const AlertV2 = defineAsyncComponent(() => import('@/components/common/AlertV2.vue'))
+const Alert = defineAsyncComponent(() => import('@/components/common/Alert.vue'))
 const JavaDownloadBar = defineAsyncComponent(() => import('@/views/version-settings/JavaDownloadBar.vue'))
 import { useJavaStore } from '@/stores/java'
 import { toastSuccess } from '@/utils/toast'
@@ -95,7 +95,8 @@ async function onDownloaded() {
       <span class="ml-auto text-xs text-gray-400">已安装 {{ javaStore.javaList.length }} 个 Java</span>
     </div>
     <div class="px-5 pb-5 space-y-3">
-      <AlertV2
+      <Alert
+        variant="soft"
         type="warning"
         message="下载目录强制固定为 %APPDATA%\.minecraft\runtime\（与官方启动器一致）。原因：该目录跨游戏目录共享、不受版本隔离影响，且不会随游戏目录删除而丢失，下载后启动器与官方启动器均可直接使用。"
       />

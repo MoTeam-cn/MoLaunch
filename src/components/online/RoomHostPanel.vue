@@ -14,7 +14,7 @@ import { useTauriEvent } from '@/composables/useTauriEvent'
 import { toastError, toastSuccess } from '@/utils/toast'
 const Button = defineAsyncComponent(() => import('@/components/common/Button.vue'))
 const Card = defineAsyncComponent(() => import('@/components/common/Card.vue'))
-const AlertV2 = defineAsyncComponent(() => import('@/components/common/AlertV2.vue'))
+const Alert = defineAsyncComponent(() => import('@/components/common/Alert.vue'))
 const Input = defineAsyncComponent(() => import('@/components/common/Input.vue'))
 const HostRoomInfoCard = defineAsyncComponent(() => import('./HostRoomInfoCard.vue'))
 const EasyTierStatusBadge = defineAsyncComponent(() => import('./EasyTierStatusBadge.vue'))
@@ -95,8 +95,8 @@ onMounted(() => {
 
 <template>
   <div class="space-y-4">
-    <AlertV2 type="info" message="联机基于 easytier 虚拟局域网：请确认已在游戏中开启「对局域网开放」，联机中心会自动托管 MC 端口" />
-    <AlertV2 type="info" message="如遇到违法违规房间，请及时向我们举报" />
+    <Alert variant="soft" type="info" message="联机基于 easytier 虚拟局域网：请确认已在游戏中开启「对局域网开放」，联机中心会自动托管 MC 端口" />
+    <Alert variant="soft" type="info" message="如遇到违法违规房间，请及时向我们举报" />
 
     <HostRoomInfoCard />
 

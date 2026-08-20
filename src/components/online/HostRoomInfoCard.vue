@@ -10,7 +10,7 @@ import { useOnlineStore } from '@/stores/online'
 const Button = defineAsyncComponent(() => import('@/components/common/Button.vue'))
 const Card = defineAsyncComponent(() => import('@/components/common/Card.vue'))
 const Tooltip = defineAsyncComponent(() => import('@/components/common/Tooltip.vue'))
-const AlertV2 = defineAsyncComponent(() => import('@/components/common/AlertV2.vue'))
+const Alert = defineAsyncComponent(() => import('@/components/common/Alert.vue'))
 import { copyToClipboard } from '@/utils/clipboard'
 import {
   ServerStackIcon,
@@ -64,7 +64,8 @@ async function copyFullCode() {
 
 <template>
   <Card title="房间信息">
-    <AlertV2
+    <Alert
+      variant="soft"
       v-if="portChanged"
       type="warning"
       class="mb-3"

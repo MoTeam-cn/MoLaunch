@@ -15,7 +15,7 @@ const Button = defineAsyncComponent(() => import('@/components/common/Button.vue
 const SegmentedButtons = defineAsyncComponent(() => import('@/components/common/SegmentedButtons.vue'))
 const Tooltip = defineAsyncComponent(() => import('@/components/common/Tooltip.vue'))
 const Tag = defineAsyncComponent(() => import('@/components/common/Tag.vue'))
-const AlertV2 = defineAsyncComponent(() => import('@/components/common/AlertV2.vue'))
+const Alert = defineAsyncComponent(() => import('@/components/common/Alert.vue'))
 import { toastSuccess, toastError, toastInfo } from '@/utils/toast'
 import { showConfirmAsync } from '@/utils/modal'
 import { memoryOptimize } from '@/utils/api/tools'
@@ -94,7 +94,8 @@ async function optimizeMemory() {
       </div>
 
       <!-- 强力模式警告 -->
-      <AlertV2
+      <Alert
+        variant="soft"
         v-if="memMode === 'strong'"
         type="warning"
         message="强力模式会清空系统待机内存列表（standby list），可能释放数 GB 内存，但已缓存的应用（如浏览器、其他游戏）下次启动会变慢。建议仅在内存严重不足时使用。"

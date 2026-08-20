@@ -17,7 +17,7 @@ const Button = defineAsyncComponent(() => import('@/components/common/Button.vue
 const Input = defineAsyncComponent(() => import('@/components/common/Input.vue'))
 const Select = defineAsyncComponent(() => import('@/components/common/Select.vue'))
 const Tooltip = defineAsyncComponent(() => import('@/components/common/Tooltip.vue'))
-const AlertV2 = defineAsyncComponent(() => import('@/components/common/AlertV2.vue'))
+const Alert = defineAsyncComponent(() => import('@/components/common/Alert.vue'))
 const StructPopup = defineAsyncComponent(() => import('./StructPopup.vue'))
 const SeedMapIntro = defineAsyncComponent(() => import('./SeedMapIntro.vue'))
 const LoadSaveDrawer = defineAsyncComponent(() => import('./LoadSaveDrawer.vue'))
@@ -91,11 +91,13 @@ function handleLoadFromSave(payload: { seed: string; mcVersion: number; worldNam
 
     <!-- 测试警告（顶部醒目位置） -->
     <div class="px-5 pb-3 space-y-2">
-      <AlertV2
+      <Alert
+        variant="soft"
         type="error"
         message="此种子地图还在测试中，不保护地图准确率，还待进一步更新测试，同时感谢 cubiomes 项目提供算法支持，虽然我们是基于他魔改的分支版本 =_="
       />
-      <AlertV2
+      <Alert
+        variant="soft"
         type="success"
         message="本项目仍为半成品，目前测试 地图准确率不高，进一步优化好了，当然如果你有更好的方法 欢迎提出来"
       />

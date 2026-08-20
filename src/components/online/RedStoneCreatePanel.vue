@@ -20,7 +20,7 @@ const Button = defineAsyncComponent(() => import('@/components/common/Button.vue
 const Input = defineAsyncComponent(() => import('@/components/common/Input.vue'))
 const Select = defineAsyncComponent(() => import('@/components/common/Select.vue'))
 const Tag = defineAsyncComponent(() => import('@/components/common/Tag.vue'))
-const AlertV2 = defineAsyncComponent(() => import('@/components/common/AlertV2.vue'))
+const Alert = defineAsyncComponent(() => import('@/components/common/Alert.vue'))
 import { latencyTagColor, useRedStonePanel } from '@/composables/useRedStonePanel'
 
 const {
@@ -38,7 +38,7 @@ const selectedOption = computed(() => serverOptions.value.find((o) => o.value ==
   <div class="space-y-4">
     <Card title="中转服务器">
       <div class="space-y-3">
-        <AlertV2 v-if="serverError" type="error" :message="serverError" />
+        <Alert variant="soft" v-if="serverError" type="error" :message="serverError" />
         <div v-if="useManualServer" class="flex items-center gap-2">
           <div class="flex-1">
             <Input v-model="server" placeholder="手动填写中转服务器地址（如 hk.hongshi.site）" />
@@ -85,7 +85,7 @@ const selectedOption = computed(() => serverOptions.value.find((o) => o.value ==
             <template #icon><ArrowPathIcon class="w-4 h-4" /></template>刷新
           </Button>
         </div>
-        <AlertV2 type="info" message="服务器列表实时来自红石官网，选择就近节点延迟更低" />
+        <Alert variant="soft" type="info" message="服务器列表实时来自红石官网，选择就近节点延迟更低" />
       </div>
     </Card>
     <Card title="本地 MC 服务">
@@ -98,7 +98,7 @@ const selectedOption = computed(() => serverOptions.value.find((o) => o.value ==
             <template #icon><ServerStackIcon class="w-4 h-4" /></template>选择端口
           </Button>
         </div>
-        <AlertV2 type="info" message="内核采用懒连接转发，游戏可不预启动；端口已自动探测并监听后端推送回填，可手动修改" />
+        <Alert variant="soft" type="info" message="内核采用懒连接转发，游戏可不预启动；端口已自动探测并监听后端推送回填，可手动修改" />
       </div>
     </Card>
     <Card title="隧道状态">
@@ -128,7 +128,7 @@ const selectedOption = computed(() => serverOptions.value.find((o) => o.value ==
         <p class="text-xs text-gray-400">将地址发给好友即可直连进服；隧道 10 人上限 / 10Mbps</p>
       </div>
       <div v-else class="space-y-3">
-        <AlertV2 type="error" :message="errorMessage" />
+        <Alert variant="soft" type="error" :message="errorMessage" />
         <div class="flex items-center gap-2">
           <Button type="outline" :loading="restarting" @click="handleRestart">
             <template #icon><ArrowPathIcon class="w-4 h-4" /></template>重新创建
@@ -140,8 +140,8 @@ const selectedOption = computed(() => serverOptions.value.find((o) => o.value ==
       </div>
     </Card>
     <Card title="说明">
-      <AlertV2 type="info" message="隧道上限 10 人 / 10Mbps；每次创建地址不同，无需长期保留" />
-      <AlertV2 type="warning" message="隧道无玩家 10 分钟或运行满 6 小时后将自动关闭" />
+      <Alert variant="soft" type="info" message="隧道上限 10 人 / 10Mbps；每次创建地址不同，无需长期保留" />
+      <Alert variant="soft" type="warning" message="隧道无玩家 10 分钟或运行满 6 小时后将自动关闭" />
     </Card>
   </div>
 </template>
