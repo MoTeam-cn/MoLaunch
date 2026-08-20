@@ -14,8 +14,8 @@ use super::{
 pub fn register(d: &mut Dispatcher) {
     d.register(
         "list_providers",
-        handler!(state, _app, _params, {
-            let r = frp::provider::list_providers(&state).await?;
+        handler!(_state, _app, _params, {
+            let r = frp::provider::list_providers().await?;
             serde_json::to_value(r).map_err(|e| e.to_string())
         }),
     );

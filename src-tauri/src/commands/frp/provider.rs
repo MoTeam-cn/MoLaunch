@@ -8,7 +8,6 @@ mod provider_system;
 use super::binary::fetch_latest_frpc_version;
 use super::{providers_root, ProviderInfo, ProviderManifest};
 use crate::log_info;
-use crate::state::AppState;
 use std::path::PathBuf;
 
 // 子模块符号 re-export（保持 `crate::commands::frp::provider::xxx` 引用可用）
@@ -65,19 +64,18 @@ pub fn get_frpc_path_for_provider(provider_id: &str) -> Result<PathBuf, String> 
 ///
 /// 内置系统默认厂商始终返回。外部厂商扫描 `<base_dir>/providers/` 读 manifest.json，
 /// 损坏或 id 不匹配的跳过。系统默认厂商版本：已安装读 `frpc_version.txt`；
-/// 未安装请求 apiServer `GET /v1/frp/manifest`（传 `0.0.0`）取最新号，失败回退"未安装"。
-/// 注：apiServer 校验版本格式，空串返回 code=1001，须传 `0.0.0` 表示查最新。
-pub async fn list_providers(state: &AppState) -> Result<Vec<ProviderInfo>, String> {
+/// 未安装请求 GitHub API（fatedier/frp releases）取最新号，失败回退"未安装"。
+pub async fn list_providers() -> Result<Vec<ProviderInfo>, String> {
     let mut providers = Vec::new();
     let state_map = read_providers_state();
 
     // 内置：系统默认
     let frpc_ready = is_frpc_ready();
-    // 版本号：本地已安装用真实版本，未安装请求 apiServer 获取最新版本
+    // 版本号：本地已安装用真实版本，未安装请求 GitHub API 获取最新版本
     let version = if frpc_ready {
         read_frpc_version().unwrap_or_else(|| "未知".to_string())
     } else {
-        fetch_latest_frpc_version(state).await.unwrap_or_else(|e| {
+        fetch_latest_frpc_version().await.unwrap_or_else(|e| {
             log_info!("[Frp] 获取最新 frpc 版本失败，回退显示'未安装': {}", e);
             "未安装".to_string()
         })

@@ -71,6 +71,8 @@ base64 = "0.22"
 encoding_rs = "0.8"
 # gzip 解压（NBT 文件通常为 gzip 压缩，如 player .dat / level.dat）
 flate2 = "1"
+# tar.gz 解压（frp 官方 macOS/Linux 分发包格式，配合 flate2 解码 gzip）
+tar = "0.4"
 # NBT 解析（替代早期手动实现；simdnbt 依赖 nightly portable_simd 不可用，改用 fastnbt）
 # fastnbt 2.x：stable 兼容，serde 设计，社区验证，支持嵌套 TAG_List / 空 compound / 超大数组
 fastnbt = "2"
