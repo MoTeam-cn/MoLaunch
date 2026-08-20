@@ -152,7 +152,7 @@ pub async fn run_repair_passes(
             let on_progress = on_progress.clone();
             let collect_cancel = collect_cancel.clone();
             async move {
-                super::smooth_progress(
+                super::progress::smooth_progress(
                     "repair",
                     progress,
                     pass_end,
@@ -172,7 +172,7 @@ pub async fn run_repair_passes(
             return Ok(true);
         }
         // 进度推进到 collect 期间爬到的值，避免轮次间跳变
-        progress = super::current_stage_progress("repair").max(progress);
+        progress = super::progress::current_stage_progress("repair").max(progress);
         let mut groups: BTreeMap<String, Vec<RepairIssue>> = BTreeMap::new();
         for issue in issues {
             let path = issue.target_path.clone().unwrap_or_default();
@@ -215,7 +215,7 @@ pub async fn run_repair_passes(
                         repair_apply::apply_actions(workspace, source, &actions, work_graph)
                     {
                         log_warn!("[ModTranslation] 质量回修写回失败，跳过该批次: {e}");
-                        let current = super::current_stage_progress("repair");
+                        let current = super::progress::current_stage_progress("repair");
                         on_progress(
                             current.max(base),
                             &format!("质量回修写回失败，跳过: {e}"),
@@ -225,7 +225,7 @@ pub async fn run_repair_passes(
                 }
                 Err(e) => {
                     log_warn!("[ModTranslation] 质量回修批次失败，跳过: {e}");
-                    let current = super::current_stage_progress("repair");
+                    let current = super::progress::current_stage_progress("repair");
                     on_progress(
                         current.max(base),
                         &format!("质量回修批次失败，跳过: {e}"),
@@ -233,7 +233,7 @@ pub async fn run_repair_passes(
                     );
                 }
             }
-            progress = super::current_stage_progress("repair").max(progress);
+            progress = super::progress::current_stage_progress("repair").max(progress);
         }
     }
     let remaining = collect_issues(workspace, sources, work_graph);

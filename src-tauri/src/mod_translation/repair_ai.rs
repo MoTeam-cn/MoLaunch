@@ -54,12 +54,12 @@ pub(super) async fn request_actions(
                 PromptKind::ModTranslation,
                 user_content,
                 Some(model),
-                Some(crate::mod_translation::AI_TIMEOUT_SECS),
+                Some(crate::mod_translation::progress::AI_TIMEOUT_SECS),
             ) => result,
-            _ = crate::mod_translation::wait_cancel(cancel) => {
+            _ = crate::mod_translation::progress::wait_cancel(cancel) => {
                 return Err("任务已取消".to_string())
             }
-            _ = crate::mod_translation::smooth_progress(
+            _ = crate::mod_translation::progress::smooth_progress(
                 "repair",
                 base_progress,
                 cap_progress,
@@ -73,7 +73,7 @@ pub(super) async fn request_actions(
             Err(e) => {
                 let msg = format!("AI 修复方案调用失败: {e}");
                 log_warn!("[ModTranslation] {msg}");
-                let current = crate::mod_translation::current_stage_progress("repair");
+                let current = crate::mod_translation::progress::current_stage_progress("repair");
                 on_progress(current.max(base_progress), &msg, retry);
                 last_error = Some(msg);
                 continue;

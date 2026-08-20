@@ -194,10 +194,10 @@ async fn translate_batch(
                     PromptKind::ModTranslation,
                     user_prompt,
                     Some(model),
-                    Some(super::AI_TIMEOUT_SECS),
+                    Some(super::progress::AI_TIMEOUT_SECS),
                 ) => result,
-                _ = super::wait_cancel(cancel) => return Err("任务已取消".to_string()),
-                _ = super::smooth_progress(
+                _ = super::progress::wait_cancel(cancel) => return Err("任务已取消".to_string()),
+                _ = super::progress::smooth_progress(
                     "language",
                     base_progress,
                     batch_cap,

@@ -11,17 +11,19 @@ use crate::storage::cache::Cache;
 use crate::{log_error, log_info, log_warn};
 
 use super::analyze;
+use super::controller::clear_running;
 use super::jar;
 use super::ledger::{ClassDecisionLedger, WorkGraph, WorkGraphSnapshot};
 use super::memory::{self, TranslationMemory};
 use super::mod_name;
 use super::package;
+use super::progress::{init_stage_weights, mark_stage_complete};
 use super::repair;
 use super::resume::{self, Checkpoint};
+use super::status::{current_status, failed_snapshot, finish, update_status};
 use super::translate_class;
 use super::translate_lang;
-use super::types::{LanguageSource, ProgressFn, TaskSnapshot};
-use super::{failed_snapshot, finish, update_status, Prepared};
+use super::types::{JarInspection, LanguageSource, ProgressFn, RetryInfo, TaskSnapshot};
 
 /// 缓存工作区根目录（`.Molaunch/cache/mod-translation`）
 const WORKSPACE_ROOT: &str = "mod-translation";
@@ -29,6 +31,15 @@ const WORKSPACE_ROOT: &str = "mod-translation";
 const RESUME_IDENTITY: &str = "mod-translator-v1";
 /// 取消哨兵错误消息（各路由内部返回，据此判定为用户取消）
 const CANCEL_MSG: &str = "任务已取消";
+
+/// 已就绪的分析结果（analyze 与 start 之间传递工作区）
+#[derive(Clone)]
+pub(super) struct Prepared {
+    pub workspace: PathBuf,
+    pub inspection: JarInspection,
+    /// 断点续传检查点（复用续传工作区时存在）
+    pub checkpoint: Option<Checkpoint>,
+}
 
 /// 后台任务主体：语言翻译 → 质量回修 → class 文本 → 重打包。
 /// 取消/失败保留工作区与检查点供断点续传，成功完成后清理。
@@ -61,27 +72,27 @@ pub(super) async fn run_task(
             failed_snapshot("translate", "未找到可翻译的 en_us 文本，或内容已全部翻译"),
         );
         cleanup(&workspace);
-        super::clear_running();
+        clear_running();
         return;
     }
 
-    let task_id = super::current_status().task_id;
+    let task_id = current_status().task_id;
 
     // 断点续传：恢复检查点、工作图与 class 账本
     let mut checkpoint = checkpoint.unwrap_or_else(|| Checkpoint::fresh(task_id.clone()));
-    super::init_stage_weights(repair_enabled, class_text_enabled);
+    init_stage_weights(repair_enabled, class_text_enabled);
 
     // 断点续传：补全已完成阶段进度（前端分进度折叠区显示 100%）
     match checkpoint.stage.as_str() {
-        "language" => super::mark_stage_complete("language"),
+        "language" => mark_stage_complete("language"),
         "class" => {
-            super::mark_stage_complete("language");
-            super::mark_stage_complete("class");
+            mark_stage_complete("language");
+            mark_stage_complete("class");
         }
         "repair" => {
-            super::mark_stage_complete("language");
-            super::mark_stage_complete("class");
-            super::mark_stage_complete("repair");
+            mark_stage_complete("language");
+            mark_stage_complete("class");
+            mark_stage_complete("repair");
         }
         _ => {}
     }
@@ -107,7 +118,7 @@ pub(super) async fn run_task(
 
     let lang_progress = {
         let app = app.clone();
-        move |progress: f64, message: &str, retry: Option<super::RetryInfo>| {
+        move |progress: f64, message: &str, retry: Option<RetryInfo>| {
             update_status(&app, "language", progress, message, retry)
         }
     };
@@ -219,7 +230,7 @@ pub(super) async fn run_task(
             update_status(&app, "repair", 0.0, "质量复验中", None);
             let repair_progress: Arc<ProgressFn> = Arc::new({
                 let app = app.clone();
-                move |progress: f64, message: &str, retry: Option<super::RetryInfo>| {
+                move |progress: f64, message: &str, retry: Option<RetryInfo>| {
                     update_status(&app, "repair", progress, message, retry)
                 }
             });
@@ -255,7 +266,7 @@ pub(super) async fn run_task(
 
     // 4) 结果处理：取消/失败保留工作区供续传；成功打包后清理
     let outcome = if cancelled {
-        let current = super::current_status();
+        let current = current_status();
         Some(TaskSnapshot {
             status: "cancelled".to_string(),
             stage: "translate".to_string(),
@@ -299,7 +310,7 @@ pub(super) async fn run_task(
     if let Err(e) = memory.flush() {
         log_warn!("[ModTranslation] 保存翻译记忆失败: {e}");
     }
-    super::clear_running();
+    clear_running();
 }
 
 /// 解包到缓存工作区并分析；优先复用可续传工作区，否则新建 `job-<hash>` 并写续传标记

@@ -8,8 +8,8 @@ use crate::log_info;
 
 use super::jar;
 use super::ledger::{ClassDecisionLedger, WorkGraph, WorkKind, WorkStatus};
+use super::status::{failed_snapshot, update_status};
 use super::types::{JarInspection, ModNameResult, TaskSnapshot, TranslationReport};
-use super::{failed_snapshot, update_status};
 
 /// 重打包为 `<原名>-zh_cn.jar`，成功时附带完成报告（mod_name / 工作图统计 / class 统计）
 pub(super) fn package(
