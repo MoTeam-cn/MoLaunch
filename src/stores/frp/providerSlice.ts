@@ -42,12 +42,12 @@ export function useFrpProviderSlice() {
     }
   }
 
-  /** 下载/确保 frpc 二进制就绪 */
-  async function downloadFrpc(): Promise<boolean> {
+  /** 下载/确保 frpc 二进制就绪；force=true 强制重新下载（「有新版本」更新按钮） */
+  async function downloadFrpc(force = false): Promise<boolean> {
     frpcDownloading.value = true
     try {
-      await ensureFrpc()
-      toastSuccess('frpc 下载完成')
+      await ensureFrpc(force)
+      toastSuccess(force ? 'frpc 更新完成' : 'frpc 下载完成')
       // 刷新厂商列表以更新 frpcReady 状态
       await loadProviders()
       return true

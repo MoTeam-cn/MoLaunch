@@ -83,6 +83,16 @@ async function handleDownloadFrpc() {
   await store.downloadFrpc()
 }
 
+/** 强制更新系统默认厂商 frpc（「有新版本」按钮触发） */
+async function handleUpdateFrpc() {
+  await store.downloadFrpc(true)
+}
+
+/** 是否有新版本（云端最新版存在且与本地不同） */
+function hasUpdate(p: ProviderInfo): boolean {
+  return !!p.latestVersion && p.latestVersion !== p.version
+}
+
 /** 从文件夹安装厂商（manifest.toml + frpc 二进制） */
 async function handleInstallFromDir() {
   const dir = await pickDirectory({ title: '选择厂商目录（含 manifest.toml）' })
@@ -211,6 +221,12 @@ async function handleUpdate(p: ProviderInfo) {
               >
                 {{ distBadge(provider.distribution)!.text }}
               </span>
+              <span
+                v-if="provider.builtin && hasUpdate(provider)"
+                class="inline-flex items-center px-1.5 py-0.5 rounded text-xs font-medium bg-amber-50 text-amber-700"
+              >
+                有新版本 v{{ provider.latestVersion }}
+              </span>
             </div>
             <p class="text-xs text-gray-500 mt-1">{{ provider.description }}</p>
             <p class="text-xs text-gray-400 mt-0.5">
@@ -221,24 +237,41 @@ async function handleUpdate(p: ProviderInfo) {
           <!-- 操作区：frpc 就绪状态 + 内置厂商下载按钮 / 外部厂商启禁 + 卸载 -->
           <div class="shrink-0 flex flex-col items-end gap-1.5">
             <template v-if="provider.builtin">
-              <div v-if="provider.frpcReady" class="flex items-center gap-1 text-xs text-green-600">
-                <CheckCircleIcon class="w-4 h-4" />
-                <span>frpc 就绪</span>
-              </div>
-              <div v-else class="flex items-center gap-1 text-xs text-amber-600">
-                <ExclamationCircleIcon class="w-4 h-4" />
-                <span>frpc 未就绪</span>
-              </div>
-              <Button
-                v-if="!provider.frpcReady"
-                type="primary"
-                size="mini"
-                :loading="frpcDownloading"
-                @click="handleDownloadFrpc"
-              >
-                <template #icon><ArrowDownTrayIcon class="w-3.5 h-3.5" /></template>
-                下载 frpc
-              </Button>
+              <template v-if="provider.frpcReady">
+                <div v-if="hasUpdate(provider)" class="flex items-center gap-1 text-xs text-amber-600">
+                  <ArrowPathIcon class="w-4 h-4" />
+                  <span>有新版本 v{{ provider.latestVersion }}</span>
+                </div>
+                <div v-else class="flex items-center gap-1 text-xs text-green-600">
+                  <CheckCircleIcon class="w-4 h-4" />
+                  <span>frpc 就绪</span>
+                </div>
+                <Button
+                  v-if="hasUpdate(provider)"
+                  type="primary"
+                  size="mini"
+                  :loading="frpcDownloading"
+                  @click="handleUpdateFrpc"
+                >
+                  <template #icon><ArrowPathIcon class="w-3.5 h-3.5" /></template>
+                  更新
+                </Button>
+              </template>
+              <template v-else>
+                <div class="flex items-center gap-1 text-xs text-amber-600">
+                  <ExclamationCircleIcon class="w-4 h-4" />
+                  <span>frpc 未就绪</span>
+                </div>
+                <Button
+                  type="primary"
+                  size="mini"
+                  :loading="frpcDownloading"
+                  @click="handleDownloadFrpc"
+                >
+                  <template #icon><ArrowDownTrayIcon class="w-3.5 h-3.5" /></template>
+                  下载 frpc
+                </Button>
+              </template>
             </template>
             <template v-else>
               <div v-if="provider.frpcReady" class="flex items-center gap-1 text-xs text-green-600">

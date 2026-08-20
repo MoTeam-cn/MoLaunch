@@ -80,6 +80,7 @@ pub(super) fn build_provider_info(manifest: &ProviderManifest) -> ProviderInfo {
         builtin: false,
         auth_type,
         frpc_ready,
+        latest_version: None,
         enabled,
         distribution: manifest.binary.distribution.clone(),
         homepage: manifest.homepage.clone(),

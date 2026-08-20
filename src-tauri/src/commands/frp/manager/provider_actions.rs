@@ -23,9 +23,9 @@ pub fn register(d: &mut Dispatcher) {
     d.register(
         "ensure_frpc",
         handler!(state, _app, params, {
-            // 兼容空 params（{} 或 null）：unwrap_or_default 返回 provider_id=None
+            // 兼容空 params（{} 或 null）：unwrap_or_default 返回 provider_id=None, force=false
             let p: EnsureFrpcParams = serde_json::from_value(params).unwrap_or_default();
-            let r = frp::binary::ensure_frpc(&state, p.provider_id).await?;
+            let r = frp::binary::ensure_frpc(&state, p.provider_id, p.force).await?;
             serde_json::to_value(r).map_err(|e| e.to_string())
         }),
     );

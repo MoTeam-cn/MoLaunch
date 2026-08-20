@@ -13,6 +13,8 @@ export interface ProviderInfo {
   authType: string
   /** frpc 二进制是否就绪 */
   frpcReady: boolean
+  /** 云端最新版本（系统默认厂商已就绪时后端查询 GitHub 最新版，供对比提示更新） */
+  latestVersion?: string
   /** 是否启用（内置厂商始终 true） */
   enabled: boolean
   /** frpc 分发方式：bundled / url / system */

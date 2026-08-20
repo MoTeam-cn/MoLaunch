@@ -29,6 +29,9 @@ pub struct ProviderInfo {
     pub auth_type: String,
     /// frpc 二进制是否就绪
     pub frpc_ready: bool,
+    /// 云端最新版本（系统默认厂商已就绪时查询 GitHub 最新版，供前端对比提示更新）
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub latest_version: Option<String>,
     /// 是否启用（内置厂商始终 true）
     pub enabled: bool,
     /// frpc 分发方式：bundled / url / system（系统默认厂商专属）

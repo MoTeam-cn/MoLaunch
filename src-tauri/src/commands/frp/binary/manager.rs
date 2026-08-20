@@ -11,7 +11,7 @@ use crate::state::AppState;
 /// 下载 frpc 二进制
 ///
 /// `provider_id` 为 None 或 `system-default` 时走系统默认厂商下载逻辑
-/// （从 apiServer `/v1/frp/manifest` 获取 URL）。
+/// （GitHub API 取最新版本 + 镜像竞速下载）。
 /// 外部厂商根据 manifest.binary.distribution 处理：
 /// - bundled: 仅校验文件存在（厂商包自带 frpc）
 /// - url: 从配置的 URL 下载（HTTPS + 域名白名单 + SHA256 校验）
@@ -19,10 +19,16 @@ use crate::state::AppState;
 /// frpc 更新判断：以 manifest.binary.frpc_version 为准（如 "0.51.3"）。
 /// - 记录版本与 manifest 一致 → 视为就绪，不重复下载/替换
 /// - 文件缺失或版本不一致 → 执行更新（url 重下 / bundled 提示重装）
-pub async fn ensure_frpc(state: &AppState, provider_id: Option<String>) -> Result<String, String> {
+///
+/// `force=true` 时跳过就绪检查强制重新下载（系统默认厂商用于「有新版本」更新按钮）。
+pub async fn ensure_frpc(
+    state: &AppState,
+    provider_id: Option<String>,
+    force: bool,
+) -> Result<String, String> {
     let pid = provider_id.unwrap_or_else(|| SYSTEM_DEFAULT_ID.to_string());
     if pid == SYSTEM_DEFAULT_ID {
-        return system_default::ensure_system_default_frpc(state).await;
+        return system_default::ensure_system_default_frpc(state, force).await;
     }
     let manifest = read_provider_manifest(&pid)?;
 

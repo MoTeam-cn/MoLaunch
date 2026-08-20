@@ -51,14 +51,18 @@ fn frp_asset_name(version: &str) -> Result<(String, &'static str), String> {
 /// 系统默认厂商 frpc 下载
 ///
 /// 流程：
-/// 1. 已就绪 → 直接返回
+/// 1. 已就绪且非强制 → 直接返回
 /// 2. GitHub API 双源（主 `api.github.com` / 备选 `github-api.mocdn.net`）查询最新版本
 /// 3. 构造资产名与下载 URL：镜像竞速选最快（`github_proxies` 由前端启动时测速筛选），官方保底
 /// 4. 下载压缩包 → 按平台提取 frpc 二进制（zip / tar.gz）→ 写入 frpc_path()
 ///
+/// `force=true` 跳过就绪检查强制重新下载（前端「有新版本」更新按钮触发）。
 /// 失败时不保留半成品文件，避免下次误判为就绪。
-pub(super) async fn ensure_system_default_frpc(state: &AppState) -> Result<String, String> {
-    if is_frpc_ready() {
+pub(super) async fn ensure_system_default_frpc(
+    state: &AppState,
+    force: bool,
+) -> Result<String, String> {
+    if !force && is_frpc_ready() {
         return Ok(format!("frpc 已就绪: {}", frpc_path().display()));
     }
 

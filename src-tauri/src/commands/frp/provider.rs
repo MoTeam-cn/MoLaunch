@@ -72,13 +72,21 @@ pub async fn list_providers() -> Result<Vec<ProviderInfo>, String> {
     // 内置：系统默认
     let frpc_ready = is_frpc_ready();
     // 版本号：本地已安装用真实版本，未安装请求 GitHub API 获取最新版本
-    let version = if frpc_ready {
-        read_frpc_version().unwrap_or_else(|| "未知".to_string())
+    let (version, latest_version) = if frpc_ready {
+        // 已就绪：本地版本 + 查询云端最新版供前端对比提示更新（查询失败不影响列表）
+        let latest = fetch_latest_frpc_version().await.ok();
+        (
+            read_frpc_version().unwrap_or_else(|| "未知".to_string()),
+            latest,
+        )
     } else {
-        fetch_latest_frpc_version().await.unwrap_or_else(|e| {
-            log_info!("[Frp] 获取最新 frpc 版本失败，回退显示'未安装': {}", e);
-            "未安装".to_string()
-        })
+        (
+            fetch_latest_frpc_version().await.unwrap_or_else(|e| {
+                log_info!("[Frp] 获取最新 frpc 版本失败，回退显示'未安装': {}", e);
+                "未安装".to_string()
+            }),
+            None,
+        )
     };
     providers.push(ProviderInfo {
         id: SYSTEM_DEFAULT_ID.to_string(),
@@ -89,6 +97,7 @@ pub async fn list_providers() -> Result<Vec<ProviderInfo>, String> {
         builtin: true,
         auth_type: "none".to_string(),
         frpc_ready,
+        latest_version,
         enabled: true,
         distribution: "system".to_string(),
         homepage: None,
@@ -148,6 +157,7 @@ pub async fn list_providers() -> Result<Vec<ProviderInfo>, String> {
                 builtin: false,
                 auth_type,
                 frpc_ready,
+                latest_version: None,
                 enabled,
                 distribution: manifest.binary.distribution,
                 homepage: manifest.homepage,

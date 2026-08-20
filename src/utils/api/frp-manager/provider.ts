@@ -4,8 +4,9 @@ import { FRP_ACTIONS, frpManager } from './core'
 export function listProviders(): Promise<ProviderInfo[]> {
   return frpManager(FRP_ACTIONS.LIST_PROVIDERS)
 }
-export function ensureFrpc(): Promise<string> {
-  return frpManager<string>(FRP_ACTIONS.ENSURE_FRPC)
+/** 确保 frpc 就绪；force=true 跳过就绪检查强制重新下载（「有新版本」更新按钮） */
+export function ensureFrpc(force = false): Promise<string> {
+  return frpManager<string>(FRP_ACTIONS.ENSURE_FRPC, { force })
 }
 export function installProviderFromDir(sourceDir: string): Promise<ProviderInfo> {
   return frpManager<ProviderInfo>(FRP_ACTIONS.INSTALL_PROVIDER_FROM_DIR, { sourceDir })

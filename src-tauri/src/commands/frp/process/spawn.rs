@@ -17,7 +17,8 @@ pub(super) async fn spawn_frpc(
     state: &crate::state::AppState,
     tunnel: Tunnel,
 ) -> Result<SpawnedFrpc, String> {
-    crate::commands::frp::binary::ensure_frpc(state, Some(tunnel.provider_id.clone())).await?;
+    crate::commands::frp::binary::ensure_frpc(state, Some(tunnel.provider_id.clone()), false)
+        .await?;
     let frpc_path = provider::get_frpc_path_for_provider(&tunnel.provider_id)?;
     if !frpc_path.exists() {
         return Err(format!("frpc 二进制不存在: {}", frpc_path.display()));

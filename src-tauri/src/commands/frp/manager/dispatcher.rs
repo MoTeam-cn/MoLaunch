@@ -10,12 +10,14 @@ use crate::utils::dispatcher::{ActionRequest, Dispatcher};
 
 // 参数结构体
 
-/// ensure_frpc 参数（provider_id 可选，默认系统默认厂商）
+/// ensure_frpc 参数（provider_id 可选，默认系统默认厂商；force=true 强制重新下载）
 #[derive(Debug, serde::Deserialize, Default)]
 #[serde(rename_all = "camelCase")]
 pub struct EnsureFrpcParams {
     #[serde(default)]
     pub provider_id: Option<String>,
+    #[serde(default)]
+    pub force: bool,
 }
 
 /// 安装厂商参数（source_dir 可为文件夹路径或 ZIP 路径）
