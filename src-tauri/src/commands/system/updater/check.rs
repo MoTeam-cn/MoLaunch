@@ -7,16 +7,11 @@ use super::UpdateInfo;
 use crate::api_paths::UPDATES_MANIFEST_RAW;
 use crate::state::AppState;
 
-/// 获取当前平台标识（用于 updater endpoint 的 target 参数）
+/// 当前平台标识（用于 updater endpoint 的 target 参数）
 ///
 /// 服务端仅接受 `windows` / `macos` / `linux`，架构信息由 `arch` 查询参数单独传递。
 fn platform_target() -> &'static str {
-    match std::env::consts::OS {
-        "windows" => "windows",
-        "macos" => "macos",
-        "linux" => "linux",
-        other => other,
-    }
+    std::env::consts::OS
 }
 
 /// 语义化版本比较：manifest_version 高于 current_version 返回 true

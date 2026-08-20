@@ -8,6 +8,8 @@
 
 - **修复搭桥联机加入方端口反复跳变、进服地址不稳定**（[guest.rs](src-tauri/src/commands/online/manager/easytier_actions/guest.rs) / [RoomGuestPanel.vue](src/components/online/RoomGuestPanel.vue)）：① 房客 port-forward 目标变化时**仅移除目标不再匹配的规则**并保留联机中心转发（此前删光全部重建导致本地端口随机化，表现为每次轮询本地端口跳变），移除失败记录 WARN 不再静默忽略；② 加入方端口轮询新增**变更去抖**（连续 3 次轮询返回同一新端口才更新并提示，首次获取立即生效），轮询连续失败不再停止（仅提示，关房退出由 `room_get` 状态轮询负责）；③ **删除加入方手动指定端口功能**（端口由房主 MC 端口自动决定，加入方手动覆盖无意义）；④ 首次探测失败后仍自动启动端口轮询，组网收敛 / 房主开局域网后自动补上进服地址，无需手动重新探测。
 
+- **修复 clippy `needless_match` 告警**（[check.rs](src-tauri/src/commands/system/updater/check.rs)）：`platform_target` 的恒等 match 改为直接返回 `std::env::consts::OS`，消除 `-D warnings` 下的 CI 编译失败。
+
 ## [0.3.7-rc4] - 2026-08-21
 
 ### Added
