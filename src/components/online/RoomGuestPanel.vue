@@ -65,16 +65,22 @@ const connStateClass = computed(() => {
   }
 })
 
-/** 房主 MC 端口轮询周期（5s）与连续失败上限（3 次 = 15s） */
+/** 房主 MC 端口轮询周期（5s） */
 const POLL_INTERVAL_MS = 5000
-const POLL_MAX_FAILS = 3
+/** 端口变更去抖：连续 N 次轮询返回同一新端口才生效（房主短暂重建时不误报） */
+const PORT_STABLE_REQUIRED = 3
+/** 轮询连续失败提示阈值（仅提示不停止轮询；关房退出由 room_get 状态轮询负责） */
+const POLL_FAIL_HINT_LIMIT = 3
 
 /** 房主关房状态轮询周期（10s）：轮询服务端 room_get，检测 status=closed 或房间不存在 */
 const ROOM_STATUS_POLL_INTERVAL_MS = 10_000
 
-/** 房主 MC 端口轮询定时器与失败计数 */
+/** 房主 MC 端口轮询定时器、失败计数与端口变更去抖状态 */
 let portPollTimer: ReturnType<typeof setInterval> | null = null
 let pollFailCount = 0
+/** 端口变更去抖：pendingPort 为待确认新端口，连续一致达到阈值才提交 */
+let pendingPort: number | null = null
+let pendingPortCount = 0
 
 /** 房主关房状态轮询定时器 */
 let roomStatusTimer: ReturnType<typeof setInterval> | null = null
@@ -93,34 +99,53 @@ function startRoomStatusPolling(): void {
   }, ROOM_STATUS_POLL_INTERVAL_MS)
 }
 
-/** 手动指定端口（最高权重：自动轮询不再覆盖；null 为自动模式） */
-const manualPort = ref<number | null>(null)
-const manualInput = ref('')
-
 function stopPortPolling(): void {
   if (portPollTimer) {
     clearInterval(portPollTimer)
     portPollTimer = null
   }
   pollFailCount = 0
+  pendingPort = null
+  pendingPortCount = 0
 }
 
 async function pollTick(): Promise<void> {
   const res = await session.scaffolding.poll(room.value.roomCode)
   if (!res.ok) {
+    // 房主短暂重建 easytier 期间会瞬时失败：仅提示不停止轮询，关房退出由 room_get 状态轮询负责
     pollFailCount += 1
-    if (pollFailCount >= POLL_MAX_FAILS) {
-      stopPortPolling()
-      toastError('房主可能已关闭房间，已停止端口自动更新')
+    if (pollFailCount === POLL_FAIL_HINT_LIMIT) {
+      pollFailCount = 0
+      toastError('暂时无法连接房主，正在自动重试…')
     }
     return
   }
   pollFailCount = 0
   if (res.mcIp) store.setEasyTierRuntime({ mcIp: res.mcIp })
-  if (res.mcPort == null || manualPort.value != null) return
-  if (res.mcPort !== store.easytierRuntime.mcPort) {
+  if (res.mcPort == null) return
+  const current = store.easytierRuntime.mcPort
+  if (res.mcPort === current) {
+    pendingPort = null
+    pendingPortCount = 0
+    return
+  }
+  // 首次获取到端口立即生效；端口变更需连续一致达到阈值（去抖，避免瞬时端口误报）
+  if (current === 0) {
     store.setEasyTierRuntime({ mcPort: res.mcPort })
-    toastSuccess(`房主 MC 端口已变更（新端口 ${res.mcPort}），请刷新服务器列表或重新连接`)
+    toastSuccess('已获取进服地址，可以开始游玩')
+    return
+  }
+  if (pendingPort === res.mcPort) {
+    pendingPortCount += 1
+    if (pendingPortCount >= PORT_STABLE_REQUIRED) {
+      pendingPort = null
+      pendingPortCount = 0
+      store.setEasyTierRuntime({ mcPort: res.mcPort })
+      toastSuccess(`房主 MC 端口已变更（新端口 ${res.mcPort}），请刷新服务器列表或重新连接`)
+    }
+  } else {
+    pendingPort = res.mcPort
+    pendingPortCount = 1
   }
 }
 
@@ -131,27 +156,10 @@ function startPortPolling(): void {
   }, POLL_INTERVAL_MS)
 }
 
-function applyManualPort(): void {
-  const port = Number(manualInput.value)
-  if (!Number.isInteger(port) || port <= 0 || port > 65535) {
-    toastError('请输入有效的端口号（1-65535）')
-    return
-  }
-  manualPort.value = port
-  toastSuccess(`已手动设置端口 ${port}（自动更新不再覆盖）`)
-}
-
-function clearManualPort(): void {
-  manualPort.value = null
-  manualInput.value = ''
-  toastSuccess('已恢复端口自动更新')
-}
-
-/** 进服地址（mcIp:有效端口，手动覆盖优先） */
-const effectivePort = computed(() => manualPort.value ?? entry.value.mcPort)
+/** 进服地址（mcIp:房主 MC 端口对应的本地转发端口） */
 const entryAddress = computed(() => {
-  if (!entry.value.mcIp || !effectivePort.value) return ''
-  return `${entry.value.mcIp}:${effectivePort.value}`
+  if (!entry.value.mcIp || !entry.value.mcPort) return ''
+  return `${entry.value.mcIp}:${entry.value.mcPort}`
 })
 
 /** 重新探测进服地址（scaffolding_client_probe） */
@@ -184,15 +192,16 @@ async function pollRoomStatusTick(): Promise<void> {
   }
 }
 
-/** 首次进入房间：组网 + 探测成功后提示可开始游玩并启动端口轮询 */
+/** 首次进入房间：组网 + 探测进服地址，并始终启动端口轮询（探测失败也由 poll 自动补上） */
 async function initialProbe() {
   const res = await session.reconnect.reconnect()
   if (res.ok) {
     toastSuccess('当前成功与主网络组网，可以开始游玩')
-    startPortPolling()
   } else {
-    toastError(`探测失败：${res.error ?? '未知错误'}`)
+    toastError(`探测失败：${res.error ?? '未知错误'}，将自动重试`)
   }
+  // 组网收敛 / 房主开局域网后由 poll 自动获取进服地址，无需手动重新探测
+  startPortPolling()
 }
 
 /** 退出房间：停 easytier + 清空本地状态 */
@@ -316,25 +325,6 @@ onUnmounted(() => {
           <template #icon><ArrowPathIcon class="w-3.5 h-3.5" /></template>
           重新探测进服地址
         </Button>
-      </div>
-      <!-- 手动端口（最高权重：自动轮询不再覆盖） -->
-      <div class="mt-2 pt-3 border-t border-gray-100 space-y-2">
-        <div v-if="manualPort" class="flex items-center justify-between text-xs">
-          <span class="text-gray-500">已手动设置端口 {{ manualPort }}，自动更新暂停</span>
-          <Button type="ghost" size="small" @click="clearManualPort">恢复自动</Button>
-        </div>
-        <div class="flex items-center gap-2">
-          <input
-            v-model="manualInput"
-            type="number"
-            min="1"
-            max="65535"
-            placeholder="手动指定端口（最高权重）"
-            class="flex-1 min-w-0 rounded-md border border-gray-300 px-2 py-1 text-sm"
-            @keyup.enter="applyManualPort"
-          />
-          <Button type="outline" size="small" @click="applyManualPort">手动设置</Button>
-        </div>
       </div>
     </Card>
 

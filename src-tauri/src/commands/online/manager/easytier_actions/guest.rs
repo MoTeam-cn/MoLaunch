@@ -5,6 +5,7 @@ use serde::{Deserialize, Serialize};
 use crate::handler;
 use crate::log_debug;
 use crate::log_info;
+use crate::log_warn;
 use crate::minecraft::online::scaffolding::client as scaffolding_client;
 use crate::minecraft::online::scaffolding::code as room_code;
 use crate::minecraft::online::scaffolding::easytier::{pick_free_port, EasyTier, PortForwardRule};
@@ -50,13 +51,15 @@ async fn pick_local_port(mc_port: u16) -> Result<u16, String> {
     pick_free_port().await
 }
 
-/// 确保房客 port-forward 规则指向 `mc_ip:mc_port`；目标变化时移除旧规则并重建。
+/// 确保房客 port-forward 规则指向 `mc_ip:mc_port`；目标变化时移除不再匹配的旧规则并重建。
 ///
-/// 返回本地转发端口（尽力与 mc_port 相同，供进服地址 `127.0.0.1:{local_port}` 使用）。
+/// `preserve_dst` 为需保留的既有转发目标（如联机中心），其规则目标未变时原样保留，
+/// 避免无谓重建导致本地端口跳变。返回本地转发端口（尽力与 mc_port 相同）。
 async fn ensure_guest_port_forwards(
     state: &AppState,
     mc_ip: &str,
     mc_port: u16,
+    preserve_dst: &[String],
 ) -> Result<u16, String> {
     let desired_dst = format!("{mc_ip}:{mc_port}");
     {
@@ -71,18 +74,30 @@ async fn ensure_guest_port_forwards(
             return Ok(local_port);
         }
     }
-    // 目标变化：先移除旧规则（进程存活期间经 RPC 清理）
-    let old_rules = {
+    // 目标变化：仅移除目标既不一致又不需保留的旧规则；移除失败记 WARN 不中止
+    let stale_rules = {
         let mut rules = state.client_port_forwards.lock().await;
-        std::mem::take(&mut *rules)
+        let (stale, kept): (Vec<_>, Vec<_>) = rules
+            .drain(..)
+            .partition(|r| r.dst_addr != desired_dst && !preserve_dst.contains(&r.dst_addr));
+        *rules = kept;
+        stale
     };
-    {
+    if !stale_rules.is_empty() {
         let guard = state.easytier.lock().await;
         if let Some(easytier) = guard.as_ref() {
-            for rule in &old_rules {
-                let _ = easytier
+            for rule in &stale_rules {
+                if let Err(e) = easytier
                     .remove_port_forward(&rule.proto, &rule.bind_addr)
-                    .await;
+                    .await
+                {
+                    log_warn!(
+                        "[Online] 移除房客旧转发失败（{} {} → {}）: {e}",
+                        rule.proto,
+                        rule.bind_addr,
+                        rule.dst_addr
+                    );
+                }
             }
         }
     }
@@ -174,13 +189,15 @@ pub(super) fn register_guest(d: &mut Dispatcher) {
                 .await?
             };
             // no-tun 下系统栈无法直连虚拟 IP：先建联机中心本地转发，再经本地端口探测
-            let center_local = ensure_guest_port_forwards(&state, &center_ip, center_port).await?;
+            let center_dst = format!("{center_ip}:{center_port}");
+            let center_local =
+                ensure_guest_port_forwards(&state, &center_ip, center_port, &[]).await?;
             let mc_port = scaffolding_client::discover_mc_at("127.0.0.1", center_local).await?;
-            // 进服转发：MC 端口与联机中心相同则复用本地端口，否则单独建立
+            // 进服转发：MC 端口与联机中心相同则复用本地端口，否则单独建立（保留联机中心转发）
             let local_port = if mc_port == center_port {
                 center_local
             } else {
-                ensure_guest_port_forwards(&state, &center_ip, mc_port).await?
+                ensure_guest_port_forwards(&state, &center_ip, mc_port, &[center_dst]).await?
             };
             log_info!(
                 "[Online] 房客发现房主 MC 服务: {}:{}（本地转发 127.0.0.1:{}）",
@@ -211,13 +228,15 @@ pub(super) fn register_guest(d: &mut Dispatcher) {
                 scaffolding_client::resolve_center_addr(None, None, easytier).await?
             };
             // no-tun 下先建联机中心本地转发，再经本地端口探测
-            let center_local = ensure_guest_port_forwards(&state, &center_ip, center_port).await?;
+            let center_dst = format!("{center_ip}:{center_port}");
+            let center_local =
+                ensure_guest_port_forwards(&state, &center_ip, center_port, &[]).await?;
             let mc_port = scaffolding_client::discover_mc_at("127.0.0.1", center_local).await?;
-            // 端口变化时经 ensure_guest_port_forwards 重建本地转发规则
+            // 端口变化时经 ensure_guest_port_forwards 重建本地转发规则（保留联机中心转发）
             let local_port = if mc_port == center_port {
                 center_local
             } else {
-                ensure_guest_port_forwards(&state, &center_ip, mc_port).await?
+                ensure_guest_port_forwards(&state, &center_ip, mc_port, &[center_dst]).await?
             };
             serde_json::to_value(ScaffoldingClientProbeResponse {
                 success: true,

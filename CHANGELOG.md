@@ -2,6 +2,12 @@
 
 本项目所有重要变更均会记录在此文件中。格式参考 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/)。
 
+## [Unreleased]
+
+### Fixed
+
+- **修复搭桥联机加入方端口反复跳变、进服地址不稳定**（[watch.rs](src-tauri/src/commands/online/manager/easytier_actions/watch.rs) / [guest.rs](src-tauri/src/commands/online/manager/easytier_actions/guest.rs) / [RoomGuestPanel.vue](src/components/online/RoomGuestPanel.vue)）：① 房主监视循环端口重选改为**最接近 MC 局域网默认端口 25565** 且**连续两轮一致才生效**（防抖），避免游戏进程其他监听端口（JVM 服务等）抖动导致每 5s 重建 easytier、房客端端口随之跳变；② 房客 port-forward 目标变化时**仅移除目标不再匹配的规则**并保留联机中心转发（此前删光全部重建导致本地端口随机化），移除失败记录 WARN 不再静默忽略；③ 加入方端口轮询新增**变更去抖**（连续 3 次轮询返回同一新端口才更新并提示，首次获取立即生效），轮询连续失败不再停止（仅提示，关房退出由 `room_get` 状态轮询负责）；④ **删除加入方手动指定端口功能**（端口由房主 MC 端口自动决定，加入方手动覆盖无意义）；⑤ 首次探测失败后仍自动启动端口轮询，组网收敛 / 房主开局域网后自动补上进服地址，无需手动重新探测。
+
 ## [0.3.7-rc4] - 2026-08-21
 
 ### Added
