@@ -25,9 +25,6 @@ pub const UPDATES_MANIFEST_RAW: &str = "/v1/updates/manifest/raw?target={{target
 
 // ===== v1 FRP =====
 
-/// frpc/frps 版本清单（GET，组件/平台/架构/当前版本）
-pub const FRP_MANIFEST: &str =
-    "/v1/frp/manifest?component={component}&target={target}&arch={arch}&current_version={current_version}";
 /// 公共 frps 服务器列表（GET，直接返回完整连接信息）
 pub const FRP_SERVERS: &str = "/v1/frp/servers";
 

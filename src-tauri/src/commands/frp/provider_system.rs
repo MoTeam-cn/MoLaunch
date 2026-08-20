@@ -1,6 +1,6 @@
 //! 内置系统默认厂商数据与 frpc 路径辅助
-//! 系统默认厂商（`system-default`）的 frpc 首次使用时从 apiServer `/v1/frp/manifest`
-//! 获取最新版本下载 URL（见 `crate::commands::frp::binary`）。
+//! 系统默认厂商（`system-default`）的 frpc 首次使用时从 GitHub API（fatedier/frp releases）
+//! 获取最新版本下载（见 `crate::commands::frp::binary`）。
 
 use super::super::{providers_root, BinaryConfig};
 use std::path::PathBuf;
@@ -32,8 +32,8 @@ pub(crate) fn frpc_path() -> PathBuf {
 
 /// frpc 版本元数据文件路径（`<system_default_dir>/frpc_version.txt`）
 ///
-/// 由 `ensure_system_default_frpc` 下载成功后写入 `manifest.version`，
-/// 供 `list_providers` 展示真实版本与 `ensure_system_default_frpc` 下次 manifest 查询使用。
+/// 由 `ensure_system_default_frpc` 下载成功后写入 GitHub 最新版本号，
+/// 供 `list_providers` 展示真实版本。
 pub(super) fn frpc_version_path() -> PathBuf {
     system_default_dir().join("frpc_version.txt")
 }
