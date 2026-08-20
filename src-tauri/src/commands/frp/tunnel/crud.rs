@@ -41,6 +41,13 @@ pub async fn create_tunnel(params: CreateTunnelParams) -> Result<Tunnel, String>
 }
 
 pub async fn delete_tunnel(id: String) -> Result<(), String> {
+    // 校验 id 仅含安全字符，防止路径穿越删除目录外文件
+    if !id
+        .chars()
+        .all(|c| c.is_ascii_alphanumeric() || c == '-' || c == '_')
+    {
+        return Err(format!("非法隧道 id: {}", id));
+    }
     let mut tunnels = read_tunnels()?;
     let before = tunnels.len();
     tunnels.retain(|t| t.id != id);
