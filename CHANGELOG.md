@@ -16,6 +16,7 @@
 
 ### Fixed
 
+- **实例日志读取失败（stream did not contain valid UTF-8）**（[logs.rs](src-tauri/src/commands/version/logs.rs)）：日志含非 UTF-8 字节（如乱码/异常字符）时 `read_to_string` 直接失败；改为按字节读取（.gz 先解压）后 `from_utf8_lossy` 容错转换，任何日志文件都能正常加载。    
 - **联机加入房间不再弹「探测失败」错误**（[RoomGuestPanel.vue](src/components/online/RoomGuestPanel.vue)）：首次进入房间的探测失败静默处理——组网收敛需要时间，探测失败属正常过程，由端口轮询自动补上（连续失败 3 次才去抖提示一次"暂时无法连接房主"），避免每次加入必弹错误。
 
 - **修复 Slider 滑块垂直贴底**（[Slider.vue](src/components/common/Slider.vue)）：轨道容器原仅 4px 高，14px thumb 溢出导致在 flex 布局中视觉贴底/偏移；改为轨道容器 18px 高并 flex 垂直居中轨道线，meteor 流光层同步改为 4px 轨道线高度并居中（不遮挡 thumb）。

@@ -64,14 +64,19 @@ fn list_instance_logs_inner(dir: &str) -> Vec<InstanceLogFile> {
     files
 }
 
-/// 解压读取 .log.gz（MC 滚动日志为 gzip 格式）
-fn read_gzip_log(path: &std::path::Path) -> Result<String, std::io::Error> {
-    use std::io::Read;
-    let file = std::fs::File::open(path)?;
-    let mut gz = flate2::read::GzDecoder::new(file);
-    let mut content = String::new();
-    gz.read_to_string(&mut content)?;
-    Ok(content)
+/// 读取日志文件内容（非 UTF-8 字节用 lossy 替换，避免整文件读取失败）
+fn read_log_bytes(path: &std::path::Path) -> Result<String, std::io::Error> {
+    let bytes = if path.as_os_str().to_string_lossy().ends_with(".gz") {
+        use std::io::Read;
+        let file = std::fs::File::open(path)?;
+        let mut gz = flate2::read::GzDecoder::new(file);
+        let mut buf = Vec::new();
+        gz.read_to_end(&mut buf)?;
+        buf
+    } else {
+        std::fs::read(path)?
+    };
+    Ok(String::from_utf8_lossy(&bytes).into_owned())
 }
 
 /// 读取实例日志内容：校验文件名（防路径穿越）→ 读取/解压 → 脱敏
@@ -85,11 +90,7 @@ fn read_instance_log_inner(dir: &str, name: &str) -> Result<String, String> {
         return Err(format!("非法日志文件名: {}", name));
     }
     let path = std::path::Path::new(dir).join("logs").join(name);
-    let content = if name.ends_with(".gz") {
-        read_gzip_log(&path).map_err(|e| format!("读取日志文件失败: {}", e))?
-    } else {
-        std::fs::read_to_string(&path).map_err(|e| format!("读取日志文件失败: {}", e))?
-    };
+    let content = read_log_bytes(&path).map_err(|e| format!("读取日志文件失败: {}", e))?;
     Ok(crate::logger::sanitize_sensitive_info(&content))
 }
 
