@@ -22,7 +22,7 @@
 
 ### Changed
 
-- **版本选择页左侧列表布局优化**（[FolderSidebar.vue](src/views/version-select/FolderSidebar.vue)）：「添加已有文件夹」/「导入整合包」按钮改为 sticky 吸附：列表内容短时按钮跟随列表末尾（原位），列表过长滚出视野时吸附底部始终可见；文件夹名称与路径溢出省略时 hover 显示完整内容（复用 Tooltip 组件 `overflowOnly` + `block` 模式，仅省略时才弹提示）。
+- **版本选择页左侧列表布局优化**（[FolderSidebar.vue](src/views/version-select/FolderSidebar.vue)）：文件夹列表容器 `min-h-0 + overflow-y-auto` 纯 flex 方案——内容少时只占内容高度、按钮紧跟其后原位，列表超长时列表区收缩到剩余空间内滚动、按钮区 `flex-none` 停留在底部，滚动条仅作用于文件夹区域；文件夹名称与路径溢出省略时 hover 显示完整内容（复用 Tooltip 组件 `overflowOnly` + `block` 模式，仅省略时才弹提示）。
 
 - **dev-api 新增 `mockFolders` 测试命令**（[dev-api.ts](src/utils/dev-api.ts) / [FolderSidebar.vue](src/views/version-select/FolderSidebar.vue)）：`molaunch.mockFolders(count?)` 向版本选择页左侧注入默认 10 个模拟文件夹（名称/路径构造为不同长度，覆盖 truncate 与铺满样式），用于调试列表样式；通过 `molaunch:mock-folders` 自定义事件注入，刷新页面或切换文件夹后恢复真实列表，生产构建无事件来源不受影响。
 

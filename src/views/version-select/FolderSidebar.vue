@@ -146,8 +146,8 @@ defineExpose({ loadFolders })
 
 <template>
   <aside class="flex w-[23%] flex-none flex-col border-r border-gray-200 bg-white">
-    <!-- 滚动区（对齐 Settings 侧边栏：py-4，按钮自带 px-4） -->
-    <div data-inner-scroll class="flex-1 overflow-y-auto pt-4">
+    <!-- 文件夹列表：内容少时占内容高度（按钮紧随其后），超长时收缩到剩余空间内滚动（min-h-0 允许收缩） -->
+    <div data-inner-scroll class="min-h-0 overflow-y-auto pt-4">
       <!-- 文件夹项（对齐 Settings 选中态：右侧 border 高亮 + bg-primary-50 满色 + Heroicons 图标 w-5 h-5 mr-3） -->
       <!-- 保留原生 button：文件夹列表项（w-full + active 状态 + 图标），
            Button.vue 的 scoped size 类无法承载列表项布局 -->
@@ -181,9 +181,10 @@ defineExpose({ loadFolders })
           @click="removeFolder(folder, $event)"
         />
       </button>
+    </div>
 
-      <!-- 按钮区：内容短时跟随列表末尾，列表过长滚出视野时吸附底部 -->
-      <div class="sticky bottom-0 space-y-2 border-t border-gray-100 bg-white px-4 pb-4 pt-3">
+    <!-- 按钮区：flex-none 不参与收缩，始终位于列表下方；列表超长时停留在底部 -->
+    <div class="flex-none space-y-2 border-t border-gray-100 px-4 py-4">
         <Button
           type="ghost"
           long
@@ -207,6 +208,5 @@ defineExpose({ loadFolders })
           导入整合包
         </Button>
       </div>
-    </div>
   </aside>
 </template>
