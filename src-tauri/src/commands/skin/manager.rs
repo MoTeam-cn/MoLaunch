@@ -1,7 +1,7 @@
 //! 皮肤模块统一分发逻辑（skin 域 manager 模块）
 //!
 //! 使用 `utils::dispatcher::Dispatcher` 注册式分发，7 个 action 覆盖皮肤/披风查询、
-//! 上传、装备、下载。`download_url_to_file` 需要 state（路径校验用下载目录）；
+//! 上传、装备、下载。`download_url_to_file` 按用户所选路径保存（canonicalize 防逃逸）；
 //! `get_skin_cape_info` / `get_skin_url` / `get_cape_url` 需要 `&app` 用于图片缓存。
 
 use once_cell::sync::Lazy;

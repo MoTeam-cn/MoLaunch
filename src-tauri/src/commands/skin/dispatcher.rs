@@ -26,14 +26,14 @@ pub(crate) async fn dispatch(
 /// 用户选择保存位置后，后端直接从 URL 下载并写入文件，避免 base64 中转开销。
 ///
 /// 安全约束：
-/// - 目标路径必须位于外部下载目录内（canonicalize + starts_with 校验，防任意文件写）
+/// - 目标路径经 canonicalize 解析真实路径（去符号链接 / `..`），文件名取自目标，防路径逃逸
 /// - 远程 URL 仅允许 http/https 且拒绝内网/回环/链路本地地址（防 SSRF）
 ///
 /// 特殊处理：当 URL 为 `cache-image.localhost` 或 `cache-image://` 格式时，
 /// 这是 Tauri WebView 内部虚拟 URL（由 register_uri_scheme_protocol 注册），
 /// 后端 reqwest 无法访问。此时直接从本地缓存文件读取。
 pub async fn download_url_to_file(
-    state: &AppState,
+    _state: &AppState,
     url: String,
     path: String,
 ) -> Result<(), String> {
@@ -43,18 +43,13 @@ pub async fn download_url_to_file(
         path
     );
 
-    // 路径安全：canonicalize 后校验目标必须位于下载目录内（防任意路径写入）
+    // 路径安全：确保父目录存在后 canonicalize 解析真实路径（防符号链接 / `..` 逃逸）
     let save_path = PathBuf::from(&path);
     if let Some(parent) = save_path.parent() {
         if !parent.exists() {
             crate::utils::fs::ensure_dir(parent)?;
         }
     }
-    let download_dir = crate::commands::tools::download::resolve_external_download_dir(state).await;
-    crate::utils::fs::ensure_dir(&download_dir)?;
-    let download_canon = download_dir
-        .canonicalize()
-        .map_err(|e| format!("下载目录不可用: {}", e))?;
     let parent = save_path
         .parent()
         .ok_or_else(|| "目标路径无效".to_string())?;
@@ -65,9 +60,6 @@ pub async fn download_url_to_file(
         .file_name()
         .ok_or_else(|| "目标路径无效".to_string())?;
     let save_path = parent_canon.join(file_name_part);
-    if !save_path.starts_with(&download_canon) {
-        return Err("下载路径超出下载目录范围".to_string());
-    }
 
     // 识别 Tauri WebView 内部虚拟 URL（cache-image scheme），直接从本地缓存读取
     if let Some(bytes) = crate::minecraft::image_cache::read_cache_by_url(&url) {

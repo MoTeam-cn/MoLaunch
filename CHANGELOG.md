@@ -6,6 +6,8 @@
 
 ### Fixed
 
+- **修复皮肤保存被限制在下载目录内**（[dispatcher.rs](src-tauri/src/commands/skin/dispatcher.rs) / [manager.rs](src-tauri/src/commands/skin/manager.rs)）：`download_url_to_file` 原要求目标路径必须位于外部下载目录内（canonicalize + starts_with 白名单），导致「下载当前皮肤到本地」在保存对话框选择任意位置（如桌面）时被拒。改为仅 canonicalize 父目录解析真实路径 + 文件名取自目标（防符号链接 / `..` 逃逸），支持保存到用户所选任意路径，URL 的 SSRF 校验（`validate_public_http_url`）保持不变。
+
 - **修复 NBT 解析/保存被限制在启动器存档目录内**（[api.rs](src-tauri/src/commands/tools/nbt/api.rs)）：`resolve_saves_file` 原强制校验 NBT 文件必须位于启动器 `<game_dir>/saves` 目录内，导致解析外部 .minecraft 存档（如手动选择或输入路径）时报「存档目录不存在」误导性错误。改为 `resolve_nbt_file`：绝对路径直通任意 NBT 文件，相对路径基于游戏目录解析，仅保留 canonicalize 规范化与文件存在校验（防 `..` 路径逃逸）；`nbt_parse` / `nbt_save` 均支持查看与编辑外部存档。
 
 ## [0.3.7] - 2026-08-21
