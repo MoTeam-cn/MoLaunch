@@ -147,7 +147,7 @@ defineExpose({ loadFolders })
 <template>
   <aside class="flex w-[23%] flex-none flex-col border-r border-gray-200 bg-white">
     <!-- 滚动区（对齐 Settings 侧边栏：py-4，按钮自带 px-4） -->
-    <div data-inner-scroll class="flex-1 overflow-y-auto py-4">
+    <div data-inner-scroll class="flex-1 overflow-y-auto pt-4">
       <!-- 文件夹项（对齐 Settings 选中态：右侧 border 高亮 + bg-primary-50 满色 + Heroicons 图标 w-5 h-5 mr-3） -->
       <!-- 保留原生 button：文件夹列表项（w-full + active 状态 + 图标），
            Button.vue 的 scoped size 类无法承载列表项布局 -->
@@ -181,32 +181,32 @@ defineExpose({ loadFolders })
           @click="removeFolder(folder, $event)"
         />
       </button>
-    </div>
 
-    <!-- 底部固定操作区（列表过长时始终可见） -->
-    <div class="flex-none space-y-2 border-t border-gray-100 p-4">
-      <Button
-        type="ghost"
-        long
-        class="!justify-start !px-4"
-        @click="addFolder"
-      >
-        <template #icon>
-          <PlusIcon class="h-4 w-4 flex-none text-gray-400" />
-        </template>
-        添加已有文件夹
-      </Button>
-      <Button
-        type="ghost"
-        long
-        class="!justify-start !px-4"
-        @click="importModpack"
-      >
-        <template #icon>
-          <ArrowDownTrayIcon class="h-4 w-4 flex-none text-gray-400" />
-        </template>
-        导入整合包
-      </Button>
+      <!-- 按钮区：内容短时跟随列表末尾，列表过长滚出视野时吸附底部 -->
+      <div class="sticky bottom-0 space-y-2 border-t border-gray-100 bg-white px-4 pb-4 pt-3">
+        <Button
+          type="ghost"
+          long
+          class="!justify-start !px-4"
+          @click="addFolder"
+        >
+          <template #icon>
+            <PlusIcon class="h-4 w-4 flex-none text-gray-400" />
+          </template>
+          添加已有文件夹
+        </Button>
+        <Button
+          type="ghost"
+          long
+          class="!justify-start !px-4"
+          @click="importModpack"
+        >
+          <template #icon>
+            <ArrowDownTrayIcon class="h-4 w-4 flex-none text-gray-400" />
+          </template>
+          导入整合包
+        </Button>
+      </div>
     </div>
   </aside>
 </template>
