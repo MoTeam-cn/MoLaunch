@@ -2,7 +2,7 @@
 
 本项目所有重要变更均会记录在此文件中。格式参考 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/)。
 
-## [Unreleased]
+## [0.3.8-rc1] - 2026-08-22
 
 ### Added
 
@@ -12,25 +12,12 @@
 
 - **结束游戏按钮残留原生 title 提示**（[StopGameButton.vue](src/components/common/StopGameButton.vue)）：移除按钮上的 `title` 属性，避免系统原生 tooltip 与自定义 Tooltip 组件同时弹出。
 
-### Changed
-
-- **前端引入 axios 统一请求客户端**（[request.ts](src/utils/request.ts)）：新增 `getJson` / `postForm` / `getText` 三个封装（默认 15s 超时），JSON / 文本请求统一走 axios，替代散落的原生 `fetch`；wasm 二进制加载与 PNG blob 解码等需要 Response 流的场景保留 fetch。改造范围：[logShare.ts](src/utils/logShare.ts)（mclo.gs / logshare.cn 上传与分析）、[githubProxy.ts](src/utils/githubProxy.ts)（镜像源清单）、[resources.ts](src/utils/recipe-generator/resources.ts)（合成配方资源）、[previewResources.ts](src/utils/resourcepack/previewResources.ts)（资源包预览原版内置资源，atlas PNG 保留 fetch）。注：WebView 内 axios 走 XMLHttpRequest，浏览器强制忽略自定义 User-Agent 头，需要自定义 UA 的请求必须走后端 reqwest 转发。
-- **mclo.gs 云端分析改用新版接口流程**（[logShare.ts](src/utils/logShare.ts) / [CrashDialog.vue](src/components/common/CrashDialog.vue)）：不再直调旧版 `/1/analyse`，改为先 `POST /1/log` 上传获取日志 id，再 `GET /1/log/{id}?insights=1` 拉取 Insights（problems 位于 `content.insights.analysis`）；识别出问题即展示云端分析卡片，失败静默不影响崩溃弹窗。
-- **崩溃弹窗新增 mclo.gs 云端自动分析**（[CrashDialog.vue](src/components/common/CrashDialog.vue) / [logShare.ts](src/utils/logShare.ts)）：崩溃后自动调 mclo.gs（Insights），识别出问题（problems 非空）即在弹窗展示云端分析卡片（标题 / 描述 / 解决方案）；失败静默不影响崩溃弹窗。分享与脱敏为纯前端实现（脱敏镜像后端 logger/sanitize.rs 正则模式，后端日志读取路径已复用）。
-- **版本设置页新增「实例日志」页签**（[VersionSettings.vue](src/views/VersionSettings.vue) / [LogsTab.vue](src/views/version-settings/LogsTab.vue)）：侧栏新增实例日志入口，内容区下拉框选择实例 `logs/` 下日志文件（.log / .log.gz 自动解压），顶部工具栏支持刷新与「分享日志」（复用 mclo.gs / logshare.cn 浮层，上传前脱敏，成功打开分享页）；分享服务选项提取到 [logShare.ts](src/utils/logShare.ts) 的 `LOG_SHARE_PROVIDERS` 供崩溃弹窗与日志页复用。
-- **设置页新增「默认日志分享服务」选项**（[SettingsAdvanced.vue](src/views/settings/SettingsAdvanced.vue) / [config.ts](src/utils/api/config.ts)）：进阶设置 → 系统卡片可切换 mclo.gs / logshare.cn，配置经 `logShareProvider` 写入后端（对应 config.ini `[Log] share_provider`）。
-- **新增实例日志读取命令**（[logs.rs](src-tauri/src/commands/version/logs.rs)）：`version_logs_manager` 提供 `list_instance_logs`（列出实例 `logs/` 下 .log / .log.gz 文件，按修改时间倒序）与 `read_instance_log`（读取内容，.log.gz 自动解压，读取前校验文件名防路径穿越，返回前复用后端脱敏）。
-- **新增「默认日志分享服务」配置项**（后端 [models.rs](src-tauri/src/state/config/models.rs) / [defaults.rs](src-tauri/src/state/config/defaults.rs) / [load.rs](src-tauri/src/config/load.rs) / [save.rs](src-tauri/src/config/save.rs)）：写入 config.ini `[Log] share_provider`，默认 `mclogs`（mclo.gs），可切换 `logshare`（logshare.cn）；配置快照/补丁全链路（ConfigSnapshot / ConfigPatch / build_snapshot / apply_config）已支持。
-- **崩溃弹窗新增「分享日志」**（[logShare.ts](src/utils/logShare.ts) + [CrashDialog.vue](src/components/common/CrashDialog.vue)）：一键把崩溃日志分享到 mclo.gs 或 logshare.cn，上传前自动脱敏（JWT / token / Bearer / URL 敏感参数 / 本机用户名路径），成功后打开分享页面；CSP 已放行两个域名（[tauri.conf.json](src-tauri/tauri.conf.json)）。
-- **重写「使用基础」教程为完整玩家指南**（[tutorial-basics.html](src-tauri/resources/templates/tutorial-basics.html)）：基于对全部功能的代码排查，从玩家视角覆盖 12 章内容——快速开始、账号登录（离线/微软/外置）、主页与启动、版本安装与版本设置（6 标签页）、下载与社区资源（含拖拽安装、下载源配置）、Java 环境管理、联机功能（设备/大厅/搭桥创建加入/红石/FRP/局域网发现）、工具页 7 大分类、设置页全部分类（含 AI 设置）、实验性功能、常见排障。
-- **实例日志按级别着色渲染**（[LogsTab.vue](src/views/version-settings/LogsTab.vue)）：按 `[线程/级别]` 前缀识别日志级别并着色（ERROR/FATAL=红、WARN=黄、INFO=绿、DEBUG=青、TRACE=灰，无级别行默认灰白）；超长日志仅渲染尾部 20000 行并提示，避免拖垮渲染。
-- **日志交互细节优化**（[LogsTab.vue](src/views/version-settings/LogsTab.vue) / [CrashDialog.vue](src/components/common/CrashDialog.vue)）：日志滚动容器标记 `data-inner-scroll`，翻阅长日志不再误触发右下角「返回顶部」按钮；实例日志页「分享日志」浮层改为向下展开（避免被顶栏外部容器遮挡）；切换日志文件 / 加载崩溃日志时 toast 提示加载行数。
-
-### Fixed
-
 - **崩溃弹窗 mclo.gs 云端分析结果永不展示**（[logShare.ts](src/utils/logShare.ts) / [CrashDialog.vue](src/components/common/CrashDialog.vue)）：新版 Insights 响应中 problems 位于 `content.insights.analysis.problems`，此前接口类型与读取路径少了一层 `analysis`，导致 `problems` 恒为空、分析卡片永不出现；已同步修正 `MclogsAnalysis` 类型定义与 CrashDialog 的读取/判断逻辑。
+
 - **崩溃弹窗补充展示 mclo.gs 云端识别信息**（[CrashDialog.vue](src/components/common/CrashDialog.vue)）：此前仅展示 `problems`（问题条目），`information`（如游戏/加载器版本识别）被丢弃，导致无匹配问题模式时云端分析区整块隐藏；现 `problems` 或 `information` 任一非空即展示「云端分析（mclo.gs）」卡片，版本识别信息以列表形式呈现。
+
 - **实例日志读取失败（stream did not contain valid UTF-8）**（[logs.rs](src-tauri/src/commands/version/logs.rs)）：日志含非 UTF-8 字节（如乱码/异常字符）时 `read_to_string` 直接失败；改为按字节读取（.gz 先解压），UTF-8 优先、失败回退 GBK/GB18030（老版本 MC / 中文 Windows 日志常见编码），中文日志不再乱码。    
+
 - **联机加入房间不再弹「探测失败」错误**（[RoomGuestPanel.vue](src/components/online/RoomGuestPanel.vue)）：首次进入房间的探测失败静默处理——组网收敛需要时间，探测失败属正常过程，由端口轮询自动补上（连续失败 3 次才去抖提示一次"暂时无法连接房主"），避免每次加入必弹错误。
 
 - **修复 Slider 滑块垂直贴底**（[Slider.vue](src/components/common/Slider.vue)）：轨道容器原仅 4px 高，14px thumb 溢出导致在 flex 布局中视觉贴底/偏移；改为轨道容器 18px 高并 flex 垂直居中轨道线，meteor 流光层同步改为 4px 轨道线高度并居中（不遮挡 thumb）。
@@ -48,6 +35,28 @@
 - **修复 NBT 解析/保存被限制在启动器存档目录内**（[api.rs](src-tauri/src/commands/tools/nbt/api.rs)）：`resolve_saves_file` 原强制校验 NBT 文件必须位于启动器 `<game_dir>/saves` 目录内，导致解析外部 .minecraft 存档（如手动选择或输入路径）时报「存档目录不存在」误导性错误。改为 `resolve_nbt_file`：绝对路径直通任意 NBT 文件，相对路径基于游戏目录解析，仅保留 canonicalize 规范化与文件存在校验（防 `..` 路径逃逸）；`nbt_parse` / `nbt_save` 均支持查看与编辑外部存档。
 
 ### Changed
+
+- **前端引入 axios 统一请求客户端**（[request.ts](src/utils/request.ts)）：新增 `getJson` / `postForm` / `getText` 三个封装（默认 15s 超时），JSON / 文本请求统一走 axios，替代散落的原生 `fetch`；wasm 二进制加载与 PNG blob 解码等需要 Response 流的场景保留 fetch。改造范围：[logShare.ts](src/utils/logShare.ts)（mclo.gs / logshare.cn 上传与分析）、[githubProxy.ts](src/utils/githubProxy.ts)（镜像源清单）、[resources.ts](src/utils/recipe-generator/resources.ts)（合成配方资源）、[previewResources.ts](src/utils/resourcepack/previewResources.ts)（资源包预览原版内置资源，atlas PNG 保留 fetch）。注：WebView 内 axios 走 XMLHttpRequest，浏览器强制忽略自定义 User-Agent 头，需要自定义 UA 的请求必须走后端 reqwest 转发。
+
+- **mclo.gs 云端分析改用新版接口流程**（[logShare.ts](src/utils/logShare.ts) / [CrashDialog.vue](src/components/common/CrashDialog.vue)）：不再直调旧版 `/1/analyse`，改为先 `POST /1/log` 上传获取日志 id，再 `GET /1/log/{id}?insights=1` 拉取 Insights（problems 位于 `content.insights.analysis`）；识别出问题即展示云端分析卡片，失败静默不影响崩溃弹窗。
+
+- **崩溃弹窗新增 mclo.gs 云端自动分析**（[CrashDialog.vue](src/components/common/CrashDialog.vue) / [logShare.ts](src/utils/logShare.ts)）：崩溃后自动调 mclo.gs（Insights），识别出问题（problems 非空）即在弹窗展示云端分析卡片（标题 / 描述 / 解决方案）；失败静默不影响崩溃弹窗。分享与脱敏为纯前端实现（脱敏镜像后端 logger/sanitize.rs 正则模式，后端日志读取路径已复用）。
+
+- **版本设置页新增「实例日志」页签**（[VersionSettings.vue](src/views/VersionSettings.vue) / [LogsTab.vue](src/views/version-settings/LogsTab.vue)）：侧栏新增实例日志入口，内容区下拉框选择实例 `logs/` 下日志文件（.log / .log.gz 自动解压），顶部工具栏支持刷新与「分享日志」（复用 mclo.gs / logshare.cn 浮层，上传前脱敏，成功打开分享页）；分享服务选项提取到 [logShare.ts](src/utils/logShare.ts) 的 `LOG_SHARE_PROVIDERS` 供崩溃弹窗与日志页复用。
+
+- **设置页新增「默认日志分享服务」选项**（[SettingsAdvanced.vue](src/views/settings/SettingsAdvanced.vue) / [config.ts](src/utils/api/config.ts)）：进阶设置 → 系统卡片可切换 mclo.gs / logshare.cn，配置经 `logShareProvider` 写入后端（对应 config.ini `[Log] share_provider`）。
+
+- **新增实例日志读取命令**（[logs.rs](src-tauri/src/commands/version/logs.rs)）：`version_logs_manager` 提供 `list_instance_logs`（列出实例 `logs/` 下 .log / .log.gz 文件，按修改时间倒序）与 `read_instance_log`（读取内容，.log.gz 自动解压，读取前校验文件名防路径穿越，返回前复用后端脱敏）。
+
+- **新增「默认日志分享服务」配置项**（后端 [models.rs](src-tauri/src/state/config/models.rs) / [defaults.rs](src-tauri/src/state/config/defaults.rs) / [load.rs](src-tauri/src/config/load.rs) / [save.rs](src-tauri/src/config/save.rs)）：写入 config.ini `[Log] share_provider`，默认 `mclogs`（mclo.gs），可切换 `logshare`（logshare.cn）；配置快照/补丁全链路（ConfigSnapshot / ConfigPatch / build_snapshot / apply_config）已支持。
+
+- **崩溃弹窗新增「分享日志」**（[logShare.ts](src/utils/logShare.ts) + [CrashDialog.vue](src/components/common/CrashDialog.vue)）：一键把崩溃日志分享到 mclo.gs 或 logshare.cn，上传前自动脱敏（JWT / token / Bearer / URL 敏感参数 / 本机用户名路径），成功后打开分享页面；CSP 已放行两个域名（[tauri.conf.json](src-tauri/tauri.conf.json)）。
+
+- **重写「使用基础」教程为完整玩家指南**（[tutorial-basics.html](src-tauri/resources/templates/tutorial-basics.html)）：基于对全部功能的代码排查，从玩家视角覆盖 12 章内容——快速开始、账号登录（离线/微软/外置）、主页与启动、版本安装与版本设置（6 标签页）、下载与社区资源（含拖拽安装、下载源配置）、Java 环境管理、联机功能（设备/大厅/搭桥创建加入/红石/FRP/局域网发现）、工具页 7 大分类、设置页全部分类（含 AI 设置）、实验性功能、常见排障。
+
+- **实例日志按级别着色渲染**（[LogsTab.vue](src/views/version-settings/LogsTab.vue)）：按 `[线程/级别]` 前缀识别日志级别并着色（ERROR/FATAL=红、WARN=黄、INFO=绿、DEBUG=青、TRACE=灰，无级别行默认灰白）；超长日志仅渲染尾部 20000 行并提示，避免拖垮渲染。
+
+- **日志交互细节优化**（[LogsTab.vue](src/views/version-settings/LogsTab.vue) / [CrashDialog.vue](src/components/common/CrashDialog.vue)）：日志滚动容器标记 `data-inner-scroll`，翻阅长日志不再误触发右下角「返回顶部」按钮；实例日志页「分享日志」浮层改为向下展开（避免被顶栏外部容器遮挡）；切换日志文件 / 加载崩溃日志时 toast 提示加载行数。
 
 - **性能设置开关切换增加操作提示**（[SettingsPerformance.vue](src/views/settings/SettingsPerformance.vue)）：「关闭到托盘时释放内存」开关切换时弹出成功提示（开启提示"下次关闭到托盘时释放内存"，关闭提示"已关闭"），与 GPU 加速开关的提示行为保持一致。
 
@@ -11360,4 +11369,4 @@ oom_heartbeat\ 心跳上报时房主侧查询在线人数随请求体携带 \pla
 
 ---
 
-*本文档最后更新于 2026-08-21*
+*本文档最后更新于 2026-08-22*
