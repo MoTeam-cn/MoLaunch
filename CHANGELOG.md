@@ -8,6 +8,10 @@
 
 - **结束游戏悬浮按钮**（[StopGameButton.vue](src/components/common/StopGameButton.vue) / [App.vue](src/App.vue) / [useFloatingButtonState.ts](src/composables/useFloatingButtonState.ts)）：游戏启动后任意页面右下角常驻「结束游戏」圆钮（视觉与 BackToTop 统一：主题色底 + 停止方块图标，显示条件为 `runningPid` 非空，复用 Tooltip 组件提供悬浮提示），点击直接停止游戏，无需回到主页；右下角浮动按钮新增避让顺序（自底向上：结束游戏 → 返回顶部 → 下载面板），[BackToTop.vue](src/components/common/BackToTop.vue) 与 [DownloadPanel.vue](src/components/common/DownloadPanel.vue) 按此递进上移，避免重叠。
 
+### Fixed
+
+- **结束游戏按钮残留原生 title 提示**（[StopGameButton.vue](src/components/common/StopGameButton.vue)）：移除按钮上的 `title` 属性，避免系统原生 tooltip 与自定义 Tooltip 组件同时弹出。
+
 ### Changed
 
 - **前端引入 axios 统一请求客户端**（[request.ts](src/utils/request.ts)）：新增 `getJson` / `postForm` / `getText` 三个封装（默认 15s 超时），JSON / 文本请求统一走 axios，替代散落的原生 `fetch`；wasm 二进制加载与 PNG blob 解码等需要 Response 流的场景保留 fetch。改造范围：[logShare.ts](src/utils/logShare.ts)（mclo.gs / logshare.cn 上传与分析）、[githubProxy.ts](src/utils/githubProxy.ts)（镜像源清单）、[resources.ts](src/utils/recipe-generator/resources.ts)（合成配方资源）、[previewResources.ts](src/utils/resourcepack/previewResources.ts)（资源包预览原版内置资源，atlas PNG 保留 fetch）。注：WebView 内 axios 走 XMLHttpRequest，浏览器强制忽略自定义 User-Agent 头，需要自定义 UA 的请求必须走后端 reqwest 转发。
