@@ -18,6 +18,15 @@ pub fn save_config(config: &AppConfig) -> Result<(), String> {
     ini.set("General", "game_language", &config.game_language);
     ini.set("General", "primary_color", &config.primary_color);
     ini.set("General", "close_behavior", &config.close_behavior);
+    ini.set(
+        "General",
+        "use_gpu_acceleration",
+        if config.use_gpu_acceleration {
+            "true"
+        } else {
+            "false"
+        },
+    );
     // Experimental（实验性功能开关）
     ini.set(
         "Experimental",

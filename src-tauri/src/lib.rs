@@ -59,6 +59,12 @@ pub fn run() {
     let app_state = AppState::new();
     {
         let config = app_state.config.blocking_lock();
+        // GPU 硬件加速开关：关闭时注入 WebView2 额外参数（浏览器进程启动时读取该
+        // 环境变量，必须在 webview 创建前设置，且需重启应用才能切换生效）
+        if !config.use_gpu_acceleration {
+            std::env::set_var("WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS", "--disable-gpu");
+            log_info!("[GPU] 硬件加速已关闭，注入 --disable-gpu");
+        }
         let ignore_tls = commands::system::developer::is_ignore_tls();
         http::init_client(
             &config.proxy.mode,

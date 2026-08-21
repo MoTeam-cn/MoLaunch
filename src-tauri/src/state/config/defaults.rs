@@ -18,6 +18,10 @@ pub(crate) fn default_easytier_core_path() -> String {
     String::new()
 }
 
+pub(crate) fn default_use_gpu_acceleration() -> bool {
+    true
+}
+
 impl Default for AppConfig {
     fn default() -> Self {
         let game_dir = super::paths::get_default_game_dir();
@@ -37,6 +41,7 @@ impl Default for AppConfig {
             external_download_dir: None,
             close_behavior: default_close_behavior(),
             experimental_enabled: false,
+            use_gpu_acceleration: default_use_gpu_acceleration(),
             proxy: ProxyConfig {
                 mode: "none".to_string(),
                 kind: "http".to_string(),

@@ -32,6 +32,9 @@ pub fn load_config() -> Result<Option<AppConfig>, String> {
     app_config.primary_color = config.get_or("General", "primary_color", &app_config.primary_color);
     app_config.close_behavior =
         config.get_or("General", "close_behavior", &app_config.close_behavior);
+    if let Some(v) = config.get("General", "use_gpu_acceleration") {
+        app_config.use_gpu_acceleration = v == "true" || v == "1";
+    }
     // 实验性功能开关（[Experimental] enabled；未配置时保持默认 false）
     app_config.experimental_enabled =
         config.get("Experimental", "enabled").as_deref() == Some("true");

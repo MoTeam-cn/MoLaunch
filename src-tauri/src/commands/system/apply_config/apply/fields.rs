@@ -157,6 +157,10 @@ pub(super) fn apply_launcher(
         log_info!("[Config] close_behavior = {}", behavior);
         config.close_behavior = behavior.clone();
     }
+    if let Some(use_gpu) = patch.use_gpu_acceleration {
+        log_info!("[Config] use_gpu_acceleration = {}", use_gpu);
+        config.use_gpu_acceleration = use_gpu;
+    }
 }
 
 /// 实验性功能域：experimental_enabled

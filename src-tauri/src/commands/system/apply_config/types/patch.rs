@@ -114,6 +114,8 @@ pub struct ConfigPatch {
     pub close_behavior: Option<String>,
     /// 实验性功能开关（开启后显示「实验性」入口，并惰性初始化 SQLite 聊天存储）
     pub experimental_enabled: Option<bool>,
+    /// 启动器界面 GPU 硬件加速（关闭后 WebView2 走软件渲染，需重启生效）
+    pub use_gpu_acceleration: Option<bool>,
     /// 双层 Option：外层 Some 表示"要更新此字段"，内层 None 表示"清空"
     pub selected_version: Option<Option<String>>,
     /// 双层 Option：外层 Some 表示"要更新此字段"，内层 None 表示"清空（回退默认目录）"

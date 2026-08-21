@@ -48,6 +48,7 @@ pub fn build_snapshot(
         primary_color: config.primary_color.clone(),
         close_behavior: config.close_behavior.clone(),
         experimental_enabled: config.experimental_enabled,
+        use_gpu_acceleration: config.use_gpu_acceleration,
         selected_version: config.selected_version.clone(),
         external_download_dir: config.external_download_dir.clone(),
         java_path,

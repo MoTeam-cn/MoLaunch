@@ -108,6 +108,11 @@ fn default_close_behavior_str() -> String {
     "ask".to_string()
 }
 
+/// GPU 硬件加速默认开启
+fn default_use_gpu_acceleration() -> bool {
+    true
+}
+
 /// 配置快照：返回所有配置字段的当前值
 ///
 /// 用于前端一次性读取全部配置，取代此前分散的 14 个 get_* 命令。
@@ -134,6 +139,9 @@ pub struct ConfigSnapshot {
     pub close_behavior: String,
     /// 实验性功能开关（开启后显示「实验性」入口并初始化 SQLite 聊天存储，默认 false）
     pub experimental_enabled: bool,
+    /// 启动器界面 GPU 硬件加速（默认开启；关闭后 WebView2 走软件渲染）
+    #[serde(default = "default_use_gpu_acceleration")]
+    pub use_gpu_acceleration: bool,
     pub selected_version: Option<String>,
     // 外部下载工具
     pub external_download_dir: Option<String>,
