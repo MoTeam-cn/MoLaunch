@@ -167,10 +167,10 @@ defineExpose({ loadFolders })
         />
         <!-- 名称 + 路径（溢出省略，hover 显示完整内容） -->
         <div class="min-w-0 flex-1">
-          <Tooltip :text="folder.name" position="right" block overflow-only>
+          <Tooltip :text="folder.name" position="right" block overflow-only single-line>
             <div class="min-w-0 truncate">{{ folder.name }}</div>
           </Tooltip>
-          <Tooltip :text="folder.path" position="right" block overflow-only>
+          <Tooltip :text="folder.path" position="right" block overflow-only single-line>
             <div class="min-w-0 truncate text-xs font-normal text-gray-400">{{ folder.path }}</div>
           </Tooltip>
         </div>

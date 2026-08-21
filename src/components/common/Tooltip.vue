@@ -19,6 +19,8 @@ interface Props {
   block?: boolean
   /** 仅当内容被省略（文本溢出）时才显示 tooltip，默认 false（始终显示） */
   overflowOnly?: boolean
+  /** 单行显示（nowrap + 不设最大宽度），用于路径/名称需完整一行展示的场景，默认 false */
+  singleLine?: boolean
 }
 
 const props = withDefaults(defineProps<Props>(), {
@@ -26,6 +28,7 @@ const props = withDefaults(defineProps<Props>(), {
   delay: 300,
   block: false,
   overflowOnly: false,
+  singleLine: false,
 })
 
 const visible = ref(false)
@@ -222,7 +225,7 @@ onUnmounted(() => {
         ref="tipRef"
         :style="tipStyle"
         class="tooltip-body"
-        :class="{ 'tooltip-body--preline': text.includes('\n') }"
+        :class="{ 'tooltip-body--preline': text.includes('\n'), 'tooltip-body--single': singleLine }"
         @mouseenter="cancelHide"
         @mouseleave="hide"
       >
@@ -266,6 +269,12 @@ onUnmounted(() => {
 /* 含 \n 的多行提示（如设置项说明）启用 pre-line 保留换行 */
 .tooltip-body--preline {
   white-space: pre-line;
+}
+
+/* 单行显示：路径/名称需完整一行展示（避免在连字符等处自然断行） */
+.tooltip-body--single {
+  white-space: nowrap;
+  max-width: none;
 }
 
 .tooltip-arrow {
