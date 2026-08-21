@@ -179,8 +179,8 @@ function selectAndUpdate(field: 'source' | 'modLoader' | 'category', value: numb
         :model-value="gameVersion"
         placeholder="游戏版本"
         list="common-versions"
-        @update:model-value="emit('update:gameVersion', $event)"
-        @input="emit('update:gameVersion', $event)"
+        @update:model-value="emit('update:gameVersion', String($event))"
+        @input="emit('update:gameVersion', String($event))"
         @keydown.enter="emit('search')"
       />
       <datalist id="common-versions">

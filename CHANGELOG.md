@@ -6,6 +6,8 @@
 
 ### Fixed
 
+- **修复 Input 组件 `v-model.number` / `v-model.trim` 修饰符不生效**（[Input.vue](src/components/common/Input.vue)）：组件新增 `modelModifiers` 支持（与原生 input 行为一致，空输入保持 `''` 避免误变 0，如「0=不限」语义）；同步放宽 AuthCenter / AiEndpointSettings / SearchBar / ServerPinger / CustomLayoutSection 等手动绑定处参数类型（运行时值不变），避免数字输入以字符串泄漏给后端。影响既有 11 处 `v-model.number` 用法（CreateRoomForm / ExternalDownload / SummonEntity / ItemEditor / RecipeSettingsForm / SeedMapControls 等）。
+
 - **修复插件示例导出被限制在插件目录内**（[export.rs](src-tauri/src/commands/plugins/export.rs)）：`export_plugin_sample` 原要求目标路径必须位于插件目录内（canonicalize + starts_with 白名单），前端「导出示例」保存对话框选择任意位置即被拒。改为仅 canonicalize 父目录解析真实路径 + 文件名取自目标（防逃逸），支持导出到用户所选任意路径。
 
 - **修复社区资源「下载到任意路径」被限制在下载目录内**（[resource.rs](src-tauri/src/commands/community/install/resource.rs)）：`download_resource_to_path` 语义即为下载到用户选择路径，原却被限制在外部下载目录内（canonicalize + starts_with 白名单），前端「下载到任意路径」流程保存对话框选外部位置即被拒。改为仅 canonicalize 父目录解析真实路径 + 文件名取自目标（防逃逸），支持下载到任意路径，URL 的 SSRF 校验保持不变。

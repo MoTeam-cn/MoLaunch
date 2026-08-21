@@ -49,6 +49,8 @@ interface Props {
   hint?: string
   /** 提示类型：default=灰色、error=红色、success=绿色 */
   hintType?: 'default' | 'error' | 'success'
+  /** v-model 修饰符（v-model.number / v-model.trim 需组件自行处理） */
+  modelModifiers?: { number?: boolean; trim?: boolean }
 }
 
 const props = withDefaults(defineProps<Props>(), {
@@ -66,11 +68,12 @@ const props = withDefaults(defineProps<Props>(), {
   width: undefined,
   hint: undefined,
   hintType: 'default',
+  modelModifiers: () => ({}),
 })
 
 const emit = defineEmits<{
-  'update:modelValue': [value: string]
-  input: [value: string]
+  'update:modelValue': [value: string | number]
+  input: [value: string | number]
   change: [value: string]
   focus: [e: FocusEvent]
   blur: [e: FocusEvent]
@@ -81,9 +84,16 @@ const emit = defineEmits<{
 const inputValue = computed({
   get: () => props.modelValue,
   set: (val) => {
-    const str = String(val ?? '')
-    emit('update:modelValue', str)
-    emit('input', str)
+    let v = val ?? ''
+    // v-model.trim / v-model.number 修饰符：组件须自行处理（原生 input 由编译器转换）
+    if (props.modelModifiers?.trim) v = String(v).trim()
+    if (props.modelModifiers?.number) {
+      // 与原生 v-model.number 一致：空输入保持 ''，避免清空误变 0（如「0=不限」语义）
+      const s = String(v)
+      v = s === '' ? '' : Number(v)
+    }
+    emit('update:modelValue', v)
+    emit('input', v)
   },
 })
 

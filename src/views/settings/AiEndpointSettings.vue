@@ -33,7 +33,7 @@ const iconModeOptions = [
         :model-value="baseUrl"
         placeholder="http://127.0.0.1:11434/v1"
         hint="OpenAI 兼容 API 地址，例如 Ollama 默认 http://127.0.0.1:11434/v1"
-        @update:model-value="emit('update:baseUrl', $event)"
+        @update:model-value="emit('update:baseUrl', String($event))"
       />
     </div>
 
@@ -44,7 +44,7 @@ const iconModeOptions = [
         type="password"
         placeholder="留空表示无需认证"
         hint="写入时经 SDK 加密存储（config.ini），本地 Ollama 通常无需填写"
-        @update:model-value="emit('update:apiKey', $event)"
+        @update:model-value="emit('update:apiKey', String($event))"
       />
     </div>
 

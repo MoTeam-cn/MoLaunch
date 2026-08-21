@@ -131,7 +131,7 @@ const {
 
             <!-- API Key 输入 -->
             <div v-else-if="provider.authType === 'api_key' && !store.authStatuses[provider.id]?.authenticated" class="flex items-center gap-1.5 w-48">
-              <Input :model-value="store.apiKeyInputs[provider.id] || ''" placeholder="输入 API Key" size="small" @update:model-value="(v: string) => store.apiKeyInputs[provider.id] = v" />
+              <Input :model-value="store.apiKeyInputs[provider.id] || ''" placeholder="输入 API Key" size="small" @update:model-value="(v) => store.apiKeyInputs[provider.id] = String(v)" />
               <Button type="primary" size="small" :loading="!!store.authActionLoading[provider.id]" @click="handleSaveApiKey(provider.id)">保存</Button>
             </div>
 

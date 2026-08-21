@@ -103,10 +103,10 @@ export function useCustomLayout() {
 
   /** URL 输入防抖同步 */
   let urlSyncTimer: ReturnType<typeof setTimeout> | null = null
-  function onUrlInput(value: string) {
+  function onUrlInput(value: string | number) {
     if (urlSyncTimer) clearTimeout(urlSyncTimer)
     urlSyncTimer = setTimeout(async () => {
-      await pluginStore.setCustomLayoutConfig({ url: value })
+      await pluginStore.setCustomLayoutConfig({ url: String(value) })
     }, 500)
   }
 

@@ -110,7 +110,7 @@ function latencyColor(ms: number): string {
             :model-value="String(port)"
             type="number"
             placeholder="25565"
-            @update:model-value="(v: string) => port = parseInt(v) || 25565"
+            @update:model-value="(v: string | number) => port = parseInt(String(v)) || 25565"
           />
         </div>
         <Button type="primary" :loading="pinging" :disabled="!host.trim()" @click="doPing">
