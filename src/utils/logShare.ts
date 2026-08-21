@@ -1,7 +1,8 @@
 /**
  * 日志云端分享
  *
- * 纯前端实现（与 Axolotl 一致），上传前脱敏（镜像后端 logger/sanitize.rs 正则模式）。
+ * 分享为纯前端实现，上传前脱敏（镜像后端 logger/sanitize.rs 正则模式，
+ * 后端日志读取路径已复用 sanitize.rs，此处为分享路径兜底）。
  * 支持两个服务：
  * - mclo.gs：国际主流，POST https://api.mclo.gs/1/log（form: content=）
  * - logshare.cn：国内访问快，POST https://api.logshare.cn/v1/log（同构接口）
@@ -77,27 +78,33 @@ export async function uploadLogShare(
   return url
 }
 
-/** mclo.gs Insights 分析结果（POST /1/analyse 响应） */
+/** mclo.gs Insights 分析结果（先 POST /1/log 上传，再 GET /1/log/{id}?insights 拉取） */
 export interface MclogsAnalysis {
   success?: boolean
-  analysis?: {
-    problems?: Array<{ title?: string; description?: string; solution?: string; type?: string }>
-    information?: unknown[]
-    total_lines?: number
-    unique_lines?: number
+  content?: {
+    insights?: {
+      problems?: Array<{ title?: string; description?: string; solution?: string; type?: string }>
+      information?: unknown[]
+    }
   }
 }
 
 /**
- * 云端日志分析（mclo.gs Insights）：崩溃后自动调用，有 problems 才展示
+ * 云端日志分析（mclo.gs Insights）：崩溃后自动调用，有 problems 才展示。
+ * 新版接口流程：先上传获取 id，再按 id 拉取 insights。
  */
 export async function analyseLogShare(content: string): Promise<MclogsAnalysis | null> {
-  const body = new URLSearchParams({ content })
-  const res = await fetch('https://api.mclo.gs/1/analyse', {
+  // 1) 先上传，拿到日志 id
+  const upRes = await fetch('https://api.mclo.gs/1/log', {
     method: 'POST',
     headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-    body,
+    body: new URLSearchParams({ content }),
   })
+  if (!upRes.ok) throw new Error(`HTTP ${upRes.status}`)
+  const upData: { id?: string } | null = await upRes.json().catch(() => null)
+  if (!upData?.id) throw new Error('上传响应缺少日志 id')
+  // 2) 再按 id 拉取 Insights 分析
+  const res = await fetch(`https://api.mclo.gs/1/log/${upData.id}?insights=1`)
   if (!res.ok) throw new Error(`HTTP ${res.status}`)
   const data: MclogsAnalysis | null = await res.json().catch(() => null)
   return data

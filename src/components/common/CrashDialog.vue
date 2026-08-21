@@ -206,7 +206,7 @@ const hasLogDetails = computed(() => logLineCount.value > 0)
 const reason = computed(() => lastCrash.value.reason || '未知原因')
 const suggestion = computed(() => lastCrash.value.suggestion?.trim() ?? '')
 /** 云端分析识别出的问题列表（非空才展示卡片） */
-const cloudProblems = computed(() => cloudAnalysis.value?.analysis?.problems ?? [])
+const cloudProblems = computed(() => cloudAnalysis.value?.content?.insights?.problems ?? [])
 
 /**
  * 建议文本拆分为多行展示：
@@ -257,13 +257,13 @@ function buildShareContent(): string {
   return lines.filter(Boolean).join('\n')
 }
 
-/** 崩溃后自动调 mclo.gs /analyse 云端分析，有 problems 才展示 */
+/** 崩溃后自动调 mclo.gs Insights 云端分析（先上传再拉取），有 problems 才展示 */
 async function runCloudAnalysis() {
   const content = buildShareContent()
   if (!content) return
   try {
     const data = await analyseLogShare(sanitizeShareLog(content))
-    if (data?.analysis?.problems?.length) {
+    if (data?.content?.insights?.problems?.length) {
       cloudAnalysis.value = data
     }
   } catch {
