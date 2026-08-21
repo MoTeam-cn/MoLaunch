@@ -20,6 +20,7 @@ import { isJavaCompatible } from '@/utils/api/java'
 import { toastSuccess, toastError } from '@/utils/toast'
 const Select = defineAsyncComponent(() => import('@/components/common/Select.vue'))
 const Tooltip = defineAsyncComponent(() => import('@/components/common/Tooltip.vue'))
+const Input = defineAsyncComponent(() => import('@/components/common/Input.vue'))
 import { useVersionSettings } from '@/composables/useVersionSettings'
 import type { JavaRequirements } from '@/types/java'
 const JavaCustomMode = defineAsyncComponent(() => import('./JavaCustomMode.vue'))
@@ -190,23 +191,9 @@ watch(personalization, async (p) => {
     <div v-else-if="javaMode === 'auto_version'" class="space-y-2">
       <div class="flex items-center gap-2">
         <span class="text-xs text-gray-500">Java 主版本范围：</span>
-        <input
-          v-model.number="javaVersionMin"
-          type="number"
-          min="0"
-          placeholder="最低"
-          class="w-20 rounded-md border border-gray-300 px-2 py-1 text-sm focus:border-primary-500 focus:outline-none focus:ring-1 focus:ring-primary-500"
-          @blur="handleSaveJavaVersionRange"
-        >
+        <Input v-model.number="javaVersionMin" type="number" placeholder="最低" width="80px" size="small" @blur="handleSaveJavaVersionRange" />
         <span class="text-xs text-gray-400">~</span>
-        <input
-          v-model.number="javaVersionMax"
-          type="number"
-          min="0"
-          placeholder="最高"
-          class="w-20 rounded-md border border-gray-300 px-2 py-1 text-sm focus:border-primary-500 focus:outline-none focus:ring-1 focus:ring-primary-500"
-          @blur="handleSaveJavaVersionRange"
-        >
+        <Input v-model.number="javaVersionMax" type="number" placeholder="最高" width="80px" size="small" @blur="handleSaveJavaVersionRange" />
         <span class="text-xs text-gray-400">（0 = 不限）</span>
       </div>
       <div v-if="javaVersionRangeTip" class="rounded-md bg-red-50 px-3 py-1.5 text-xs text-red-600">

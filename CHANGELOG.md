@@ -18,6 +18,8 @@
 
 ### Changed
 
+- **版本设置-Java 版本范围输入改用自定义 Input 组件**（[JavaModeSelector.vue](src/views/version-settings/setup-tab/JavaModeSelector.vue)）：auto_version 模式下最低/最高版本 2 处原生 `<input type="number">` 替换为项目自定义 `Input.vue`（数字模式，80px 宽度）。
+
 - **资源包编辑器-文件内容编辑器改用自定义 Input 组件**（[RpTextEditor.vue](src/views/tools/data/RpTextEditor.vue)）：包内 JSON / 文本文件编辑区的原生 `<textarea>` 替换为项目自定义 `Input.vue` textarea 模式（保留等宽字体、12 行高度与 spellcheck 关闭）。
 
 - **资源包编辑器-pack.mcmeta 表单改用自定义 Input 组件**（[RpMcmetaForm.vue](src/views/tools/data/RpMcmetaForm.vue)）：pack_format 数字输入与描述 2 处原生 `<input>`/`<textarea>` 替换为项目自定义 `Input.vue`（数字模式 + textarea 模式）。
