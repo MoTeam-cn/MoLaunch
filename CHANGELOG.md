@@ -6,6 +6,8 @@
 
 ### Fixed
 
+- **联机加入房间不再弹「探测失败」错误**（[RoomGuestPanel.vue](src/components/online/RoomGuestPanel.vue)）：首次进入房间的探测失败静默处理——组网收敛需要时间，探测失败属正常过程，由端口轮询自动补上（连续失败 3 次才去抖提示一次"暂时无法连接房主"），避免每次加入必弹错误。
+
 - **修复 Slider 滑块垂直贴底**（[Slider.vue](src/components/common/Slider.vue)）：轨道容器原仅 4px 高，14px thumb 溢出导致在 flex 布局中视觉贴底/偏移；改为轨道容器 18px 高并 flex 垂直居中轨道线，meteor 流光层同步改为 4px 轨道线高度并居中（不遮挡 thumb）。
 
 - **修复 Input 组件 `v-model.number` / `v-model.trim` 修饰符不生效**（[Input.vue](src/components/common/Input.vue)）：组件新增 `modelModifiers` 支持（与原生 input 行为一致，空输入保持 `''` 避免误变 0，如「0=不限」语义）；同步放宽 AuthCenter / AiEndpointSettings / SearchBar / ServerPinger / CustomLayoutSection 等手动绑定处参数类型（运行时值不变），避免数字输入以字符串泄漏给后端。影响既有 11 处 `v-model.number` 用法（CreateRoomForm / ExternalDownload / SummonEntity / ItemEditor / RecipeSettingsForm / SeedMapControls 等）。

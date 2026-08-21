@@ -192,15 +192,13 @@ async function pollRoomStatusTick(): Promise<void> {
   }
 }
 
-/** 首次进入房间：组网 + 探测进服地址，并始终启动端口轮询（探测失败也由 poll 自动补上） */
+/** 首次进入房间：组网 + 探测进服地址，并始终启动端口轮询（探测失败由 poll 自动补上） */
 async function initialProbe() {
   const res = await session.reconnect.reconnect()
   if (res.ok) {
     toastSuccess('当前成功与主网络组网，可以开始游玩')
-  } else {
-    toastError(`探测失败：${res.error ?? '未知错误'}，将自动重试`)
   }
-  // 组网收敛 / 房主开局域网后由 poll 自动获取进服地址，无需手动重新探测
+  // 失败静默：组网收敛需要时间，探测失败属正常过程，由下方端口轮询自动补上（连续失败才去抖提示）
   startPortPolling()
 }
 
