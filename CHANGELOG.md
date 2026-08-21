@@ -6,7 +6,7 @@
 
 ### Changed
 
-- **mclo.gs 云端分析改用新版接口流程**（[logShare.ts](src/utils/logShare.ts) / [CrashDialog.vue](src/components/common/CrashDialog.vue)）：不再直调旧版 `/1/analyse`，改为先 `POST /1/log` 上传获取日志 id，再 `GET /1/log/{id}?insights=1` 拉取 Insights（problems 位于 `content.insights`）；识别出问题即展示云端分析卡片，失败静默不影响崩溃弹窗。
+- **mclo.gs 云端分析改用新版接口流程**（[logShare.ts](src/utils/logShare.ts) / [CrashDialog.vue](src/components/common/CrashDialog.vue)）：不再直调旧版 `/1/analyse`，改为先 `POST /1/log` 上传获取日志 id，再 `GET /1/log/{id}?insights=1` 拉取 Insights（problems 位于 `content.insights.analysis`）；识别出问题即展示云端分析卡片，失败静默不影响崩溃弹窗。
 - **崩溃弹窗新增 mclo.gs 云端自动分析**（[CrashDialog.vue](src/components/common/CrashDialog.vue) / [logShare.ts](src/utils/logShare.ts)）：崩溃后自动调 mclo.gs（Insights），识别出问题（problems 非空）即在弹窗展示云端分析卡片（标题 / 描述 / 解决方案）；失败静默不影响崩溃弹窗。分享与脱敏为纯前端实现（脱敏镜像后端 logger/sanitize.rs 正则模式，后端日志读取路径已复用）。
 - **版本设置页新增「实例日志」页签**（[VersionSettings.vue](src/views/VersionSettings.vue) / [LogsTab.vue](src/views/version-settings/LogsTab.vue)）：侧栏新增实例日志入口，内容区下拉框选择实例 `logs/` 下日志文件（.log / .log.gz 自动解压），顶部工具栏支持刷新与「分享日志」（复用 mclo.gs / logshare.cn 浮层，上传前脱敏，成功打开分享页）；分享服务选项提取到 [logShare.ts](src/utils/logShare.ts) 的 `LOG_SHARE_PROVIDERS` 供崩溃弹窗与日志页复用。
 - **设置页新增「默认日志分享服务」选项**（[SettingsAdvanced.vue](src/views/settings/SettingsAdvanced.vue) / [config.ts](src/utils/api/config.ts)）：进阶设置 → 系统卡片可切换 mclo.gs / logshare.cn，配置经 `logShareProvider` 写入后端（对应 config.ini `[Log] share_provider`）。
@@ -19,6 +19,7 @@
 
 ### Fixed
 
+- **崩溃弹窗 mclo.gs 云端分析结果永不展示**（[logShare.ts](src/utils/logShare.ts) / [CrashDialog.vue](src/components/common/CrashDialog.vue)）：新版 Insights 响应中 problems 位于 `content.insights.analysis.problems`，此前接口类型与读取路径少了一层 `analysis`，导致 `problems` 恒为空、分析卡片永不出现；已同步修正 `MclogsAnalysis` 类型定义与 CrashDialog 的读取/判断逻辑。
 - **实例日志读取失败（stream did not contain valid UTF-8）**（[logs.rs](src-tauri/src/commands/version/logs.rs)）：日志含非 UTF-8 字节（如乱码/异常字符）时 `read_to_string` 直接失败；改为按字节读取（.gz 先解压），UTF-8 优先、失败回退 GBK/GB18030（老版本 MC / 中文 Windows 日志常见编码），中文日志不再乱码。    
 - **联机加入房间不再弹「探测失败」错误**（[RoomGuestPanel.vue](src/components/online/RoomGuestPanel.vue)）：首次进入房间的探测失败静默处理——组网收敛需要时间，探测失败属正常过程，由端口轮询自动补上（连续失败 3 次才去抖提示一次"暂时无法连接房主"），避免每次加入必弹错误。
 

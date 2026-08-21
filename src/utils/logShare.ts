@@ -83,8 +83,12 @@ export interface MclogsAnalysis {
   success?: boolean
   content?: {
     insights?: {
-      problems?: Array<{ title?: string; description?: string; solution?: string; type?: string }>
-      information?: unknown[]
+      /** 日志类型识别信息（type 为 "Unknown Log" 时无具体分析） */
+      type?: string
+      analysis?: {
+        problems?: Array<{ title?: string; description?: string; solution?: string; type?: string }>
+        information?: unknown[]
+      }
     }
   }
 }

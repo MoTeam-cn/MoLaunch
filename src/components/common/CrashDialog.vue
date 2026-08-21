@@ -206,7 +206,7 @@ const hasLogDetails = computed(() => logLineCount.value > 0)
 const reason = computed(() => lastCrash.value.reason || '未知原因')
 const suggestion = computed(() => lastCrash.value.suggestion?.trim() ?? '')
 /** 云端分析识别出的问题列表（非空才展示卡片） */
-const cloudProblems = computed(() => cloudAnalysis.value?.content?.insights?.problems ?? [])
+const cloudProblems = computed(() => cloudAnalysis.value?.content?.insights?.analysis?.problems ?? [])
 
 /**
  * 建议文本拆分为多行展示：
@@ -263,7 +263,7 @@ async function runCloudAnalysis() {
   if (!content) return
   try {
     const data = await analyseLogShare(sanitizeShareLog(content))
-    if (data?.content?.insights?.problems?.length) {
+    if (data?.content?.insights?.analysis?.problems?.length) {
       cloudAnalysis.value = data
     }
   } catch {
