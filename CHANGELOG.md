@@ -6,6 +6,7 @@
 
 ### Changed
 
+- **崩溃弹窗新增 mclo.gs 云端自动分析**（[CrashDialog.vue](src/components/common/CrashDialog.vue) / [logShare.ts](src/utils/logShare.ts)）：崩溃后自动调 mclo.gs `/1/analyse`（Insights），识别出问题（problems 非空）即在弹窗展示云端分析卡片（标题 / 描述 / 解决方案）；与 Axolotl 做法一致，失败静默不影响崩溃弹窗。
 - **版本设置页新增「实例日志」页签**（[VersionSettings.vue](src/views/VersionSettings.vue) / [LogsTab.vue](src/views/version-settings/LogsTab.vue)）：侧栏新增实例日志入口，内容区下拉框选择实例 `logs/` 下日志文件（.log / .log.gz 自动解压），顶部工具栏支持刷新与「分享日志」（复用 mclo.gs / logshare.cn 浮层，上传前脱敏，成功打开分享页）；分享服务选项提取到 [logShare.ts](src/utils/logShare.ts) 的 `LOG_SHARE_PROVIDERS` 供崩溃弹窗与日志页复用。
 - **设置页新增「默认日志分享服务」选项**（[SettingsAdvanced.vue](src/views/settings/SettingsAdvanced.vue) / [config.ts](src/utils/api/config.ts)）：进阶设置 → 系统卡片可切换 mclo.gs / logshare.cn，配置经 `logShareProvider` 写入后端（对应 config.ini `[Log] share_provider`）。
 - **新增实例日志读取命令**（[logs.rs](src-tauri/src/commands/version/logs.rs)）：`version_logs_manager` 提供 `list_instance_logs`（列出实例 `logs/` 下 .log / .log.gz 文件，按修改时间倒序）与 `read_instance_log`（读取内容，.log.gz 自动解压，读取前校验文件名防路径穿越，返回前复用后端脱敏）。

@@ -45,6 +45,24 @@
       </div>
     </div>
 
+    <!-- 云端分析（mclo.gs Insights，崩溃后自动发起） -->
+    <div v-if="cloudProblems.length > 0" class="mt-5">
+      <p class="mb-1.5 text-xs font-medium text-gray-500">云端分析（mclo.gs）</p>
+      <div
+        v-for="(p, index) in cloudProblems"
+        :key="index"
+        class="mb-2 rounded-md border border-red-100 bg-red-50 px-3 py-2.5"
+      >
+        <p class="text-sm font-medium text-red-700">{{ p.title || '未知问题' }}</p>
+        <p v-if="p.description" class="mt-1 text-xs leading-relaxed break-all text-gray-600">
+          {{ p.description }}
+        </p>
+        <p v-if="p.solution" class="mt-1 text-xs leading-relaxed break-all text-red-600">
+          解决方案：{{ p.solution }}
+        </p>
+      </div>
+    </div>
+
     <!-- 崩溃报告文件 -->
     <div v-if="crashReportPath" class="mt-5">
       <p class="mb-1.5 text-xs font-medium text-gray-500">崩溃报告</p>
@@ -136,8 +154,8 @@ import { pickSavePath } from '@/utils/fileDialog'
 import { openPath, writeTextFile } from '@/utils/api/system'
 import { toastError, toastSuccess } from '@/utils/toast'
 import { open } from '@tauri-apps/plugin-shell'
-import { sanitizeShareLog, uploadLogShare, LOG_SHARE_PROVIDERS } from '@/utils/logShare'
-import type { LogShareProvider } from '@/utils/logShare'
+import { sanitizeShareLog, uploadLogShare, LOG_SHARE_PROVIDERS, analyseLogShare } from '@/utils/logShare'
+import type { LogShareProvider, MclogsAnalysis } from '@/utils/logShare'
 import type { CrashCategory, CrashInfo } from '@/types/version'
 
 /** 崩溃类别展示元数据：标签文案、Tag 颜色、原因横幅的左侧色条与底色 */
@@ -165,6 +183,8 @@ const showDetails = ref(false)
 const crashInfo = ref<CrashInfo | null>(null)
 const shareMenuOpen = ref(false)
 const sharing = ref<LogShareProvider | null>(null)
+/** mclo.gs Insights 云端分析结果（崩溃后自动发起） */
+const cloudAnalysis = ref<MclogsAnalysis | null>(null)
 
 /** 未展示崩溃数据时的兜底值 */
 const EMPTY_CRASH: CrashInfo = {
@@ -185,6 +205,8 @@ const logLineCount = computed(() => errorLines.value.length + logTail.value.leng
 const hasLogDetails = computed(() => logLineCount.value > 0)
 const reason = computed(() => lastCrash.value.reason || '未知原因')
 const suggestion = computed(() => lastCrash.value.suggestion?.trim() ?? '')
+/** 云端分析识别出的问题列表（非空才展示卡片） */
+const cloudProblems = computed(() => cloudAnalysis.value?.analysis?.problems ?? [])
 
 /**
  * 建议文本拆分为多行展示：
@@ -215,6 +237,34 @@ function show(info: CrashInfo) {
   crashInfo.value = info
   showDetails.value = false
   visible.value = true
+  // 崩溃后自动发起 mclo.gs 云端分析（不阻塞弹窗，失败静默）
+  cloudAnalysis.value = null
+  void runCloudAnalysis()
+}
+
+/** 组装分享用日志（以日志主体为主，便于第三方平台分析） */
+function buildShareContent(): string {
+  const c = lastCrash.value
+  const lines = [
+    `==== MoLaunch 崩溃日志（${category.value}） ====`,
+    ...(c.log_lines ?? []),
+    ...(c.log_tail ?? []),
+  ]
+  return lines.filter(Boolean).join('\n')
+}
+
+/** 崩溃后自动调 mclo.gs /analyse 云端分析，有 problems 才展示 */
+async function runCloudAnalysis() {
+  const content = buildShareContent()
+  if (!content) return
+  try {
+    const data = await analyseLogShare(sanitizeShareLog(content))
+    if (data?.analysis?.problems?.length) {
+      cloudAnalysis.value = data
+    }
+  } catch {
+    // 云端分析失败不影响崩溃弹窗（静默）
+  }
 }
 
 /** 打开崩溃报告文件（复用系统 shell 模块） */
@@ -251,17 +301,6 @@ function buildReportContent(): string {
     '\n== 错误日志 ==',
     ...(c.log_lines ?? []),
     '\n== 游戏日志尾部 ==',
-    ...(c.log_tail ?? []),
-  ]
-  return lines.filter(Boolean).join('\n')
-}
-
-/** 组装分享用日志（以日志主体为主，便于第三方平台分析） */
-function buildShareContent(): string {
-  const c = lastCrash.value
-  const lines = [
-    `==== MoLaunch 崩溃日志（${category.value}） ====`,
-    ...(c.log_lines ?? []),
     ...(c.log_tail ?? []),
   ]
   return lines.filter(Boolean).join('\n')

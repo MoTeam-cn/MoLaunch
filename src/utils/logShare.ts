@@ -76,3 +76,29 @@ export async function uploadLogShare(
   if (!url) throw new Error('服务响应缺少分享链接')
   return url
 }
+
+/** mclo.gs Insights 分析结果（POST /1/analyse 响应） */
+export interface MclogsAnalysis {
+  success?: boolean
+  analysis?: {
+    problems?: Array<{ title?: string; description?: string; solution?: string; type?: string }>
+    information?: unknown[]
+    total_lines?: number
+    unique_lines?: number
+  }
+}
+
+/**
+ * 云端日志分析（mclo.gs Insights）：崩溃后自动调用，有 problems 才展示
+ */
+export async function analyseLogShare(content: string): Promise<MclogsAnalysis | null> {
+  const body = new URLSearchParams({ content })
+  const res = await fetch('https://api.mclo.gs/1/analyse', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    body,
+  })
+  if (!res.ok) throw new Error(`HTTP ${res.status}`)
+  const data: MclogsAnalysis | null = await res.json().catch(() => null)
+  return data
+}
