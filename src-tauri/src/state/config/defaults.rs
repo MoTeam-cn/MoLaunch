@@ -27,6 +27,11 @@ pub(crate) fn default_release_memory_on_tray() -> bool {
     false
 }
 
+/// 默认日志分享服务：mclo.gs（国际主流，自带分析）
+pub(crate) fn default_log_share_provider() -> String {
+    "mclogs".to_string()
+}
+
 impl Default for AppConfig {
     fn default() -> Self {
         let game_dir = super::paths::get_default_game_dir();
@@ -82,6 +87,7 @@ impl Default for AppConfig {
                 disable_lua: false,
                 use_dedicated_gpu: false,
             },
+            log_share_provider: default_log_share_provider(),
             online: super::models::OnlineConfig::default(),
             tls: TlsConfig::default(),
         }

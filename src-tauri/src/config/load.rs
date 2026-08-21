@@ -167,6 +167,10 @@ pub fn load_config() -> Result<Option<AppConfig>, String> {
         app_config.launch_advanced.use_dedicated_gpu = v == "true" || v == "1";
     }
 
+    // Log（默认日志分享服务，未配置时保留默认 mclogs）
+    app_config.log_share_provider =
+        config.get_or("Log", "share_provider", &app_config.log_share_provider);
+
     // ExternalDownload
     app_config.external_download_dir = config
         .get("ExternalDownload", "dir")

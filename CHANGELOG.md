@@ -6,6 +6,7 @@
 
 ### Changed
 
+- **新增「默认日志分享服务」配置项**（后端 [models.rs](src-tauri/src/state/config/models.rs) / [defaults.rs](src-tauri/src/state/config/defaults.rs) / [load.rs](src-tauri/src/config/load.rs) / [save.rs](src-tauri/src/config/save.rs)）：写入 config.ini `[Log] share_provider`，默认 `mclogs`（mclo.gs），可切换 `logshare`（logshare.cn）；配置快照/补丁全链路（ConfigSnapshot / ConfigPatch / build_snapshot / apply_config）已支持。
 - **崩溃弹窗新增「分享日志」**（[logShare.ts](src/utils/logShare.ts) + [CrashDialog.vue](src/components/common/CrashDialog.vue)）：一键把崩溃日志分享到 mclo.gs 或 logshare.cn，上传前自动脱敏（JWT / token / Bearer / URL 敏感参数 / 本机用户名路径），成功后打开分享页面；CSP 已放行两个域名（[tauri.conf.json](src-tauri/tauri.conf.json)）。
 - **重写「使用基础」教程为完整玩家指南**（[tutorial-basics.html](src-tauri/resources/templates/tutorial-basics.html)）：基于对全部功能的代码排查，从玩家视角覆盖 12 章内容——快速开始、账号登录（离线/微软/外置）、主页与启动、版本安装与版本设置（6 标签页）、下载与社区资源（含拖拽安装、下载源配置）、Java 环境管理、联机功能（设备/大厅/搭桥创建加入/红石/FRP/局域网发现）、工具页 7 大分类、设置页全部分类（含 AI 设置）、实验性功能、常见排障。
 

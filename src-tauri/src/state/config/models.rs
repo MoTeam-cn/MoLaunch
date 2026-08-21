@@ -130,6 +130,9 @@ pub struct AppConfig {
     pub memory: MemoryConfig,
     pub community: CommunityConfig,
     pub launch_advanced: LaunchAdvancedConfig,
+    /// 默认日志分享服务："mclogs"（mclo.gs）/ "logshare"（logshare.cn）
+    #[serde(default = "crate::state::config::defaults::default_log_share_provider")]
+    pub log_share_provider: String,
     pub online: OnlineConfig,
     pub tls: TlsConfig,
 }

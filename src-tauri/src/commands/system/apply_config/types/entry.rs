@@ -50,6 +50,7 @@ pub fn build_snapshot(
         experimental_enabled: config.experimental_enabled,
         use_gpu_acceleration: config.use_gpu_acceleration,
         release_memory_on_tray: config.release_memory_on_tray,
+        log_share_provider: config.log_share_provider.clone(),
         selected_version: config.selected_version.clone(),
         external_download_dir: config.external_download_dir.clone(),
         java_path,

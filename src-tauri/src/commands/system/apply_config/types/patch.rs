@@ -118,6 +118,8 @@ pub struct ConfigPatch {
     pub use_gpu_acceleration: Option<bool>,
     /// 关闭到托盘时挂起 WebView2 释放渲染资源
     pub release_memory_on_tray: Option<bool>,
+    /// 默认日志分享服务："mclogs"（mclo.gs）/ "logshare"（logshare.cn）
+    pub log_share_provider: Option<String>,
     /// 双层 Option：外层 Some 表示"要更新此字段"，内层 None 表示"清空"
     pub selected_version: Option<Option<String>>,
     /// 双层 Option：外层 Some 表示"要更新此字段"，内层 None 表示"清空（回退默认目录）"

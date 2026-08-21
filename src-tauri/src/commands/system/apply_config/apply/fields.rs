@@ -165,6 +165,10 @@ pub(super) fn apply_launcher(
         log_info!("[Config] release_memory_on_tray = {}", release_mem);
         config.release_memory_on_tray = release_mem;
     }
+    if let Some(ref provider) = patch.log_share_provider {
+        log_info!("[Config] log_share_provider = {}", provider);
+        config.log_share_provider = provider.clone();
+    }
 }
 
 /// 实验性功能域：experimental_enabled
