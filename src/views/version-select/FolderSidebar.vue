@@ -7,14 +7,16 @@
  */
 import { ref, onMounted, defineAsyncComponent } from 'vue'
 import * as tauri from '@/utils/tauri'
-import { pickDirectory } from '@/utils/fileDialog'
+import { pickDirectory, pickFile } from '@/utils/fileDialog'
 import { toastSuccess, toastWarning, toastError, toastInfo } from '@/utils/toast'
 import { showConfirm, showPrompt } from '@/utils/modal'
+import { handleModpackDrop } from '@/composables/useDragDrop/handlers'
 const Button = defineAsyncComponent(() => import('@/components/common/Button.vue'))
 import {
   FolderIcon,
   PlusIcon,
   XMarkIcon,
+  ArrowDownTrayIcon,
 } from '@heroicons/vue/24/outline'
 import { safeCall } from '@/utils/async'
 
@@ -88,6 +90,21 @@ async function addFolder() {
   }
 }
 
+/** 导入本地整合包（复用全局拖拽的安装流程：预览 → 实例名 → 可选 Mod → 安装） */
+async function importModpack() {
+  try {
+    // 文件选择器仅开放后端支持导入的整合包格式
+    const selected = await pickFile({
+      title: '选择整合包',
+      filters: [{ name: '整合包', extensions: ['zip', 'mrpack'] }],
+    })
+    if (!selected) { toastInfo('已取消选择'); return }
+    await handleModpackDrop(selected)
+  } catch (e) {
+    toastError(String(e))
+  }
+}
+
 /** 移除文件夹 */
 async function removeFolder(folder: McFolder, event: Event) {
   event.stopPropagation()
@@ -117,7 +134,7 @@ defineExpose({ loadFolders })
 </script>
 
 <template>
-  <aside class="flex w-[20%] flex-none flex-col border-r border-gray-200 bg-white">
+  <aside class="flex w-[23%] flex-none flex-col border-r border-gray-200 bg-white">
     <!-- 滚动区（对齐 Settings 侧边栏：py-4，按钮自带 px-4） -->
     <div data-inner-scroll class="flex-1 overflow-y-auto py-4">
       <!-- 文件夹项（对齐 Settings 选中态：右侧 border 高亮 + bg-primary-50 满色 + Heroicons 图标 w-5 h-5 mr-3） -->
@@ -162,6 +179,17 @@ defineExpose({ loadFolders })
           <PlusIcon class="h-4 w-4 flex-none text-gray-400" />
         </template>
         添加已有文件夹
+      </Button>
+      <Button
+        type="ghost"
+        long
+        class="!justify-start !px-4"
+        @click="importModpack"
+      >
+        <template #icon>
+          <ArrowDownTrayIcon class="h-4 w-4 flex-none text-gray-400" />
+        </template>
+        导入整合包
       </Button>
     </div>
   </aside>

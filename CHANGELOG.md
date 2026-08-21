@@ -22,6 +22,8 @@
 
 ### Changed
 
+- **版本选择页新增「导入整合包」入口 + 左侧占比调为 23%**（[FolderSidebar.vue](src/views/version-select/FolderSidebar.vue)）：「添加已有文件夹」下方新增「导入整合包」按钮，文件选择器仅开放后端支持导入的 `.zip` / `.mrpack` 格式，选择后完全复用全局拖拽安装流程（`previewLocalModpack` 预览 → 输入实例名 → 可选 Mod 询问 → `install_local_modpack` + `install_merged`）；左侧文件夹列表宽度由 20% 调整为 23%。
+
 - **版本选择页左侧菜单占比调整为 20%**（[FolderSidebar.vue](src/views/version-select/FolderSidebar.vue)）：左侧文件夹列表由固定 `w-48`（192px）改为 `w-[20%]` 占比宽度，右侧版本列表占 80%，宽屏下文件夹名称/路径与版本卡片比例更协调。
 
 - **内存信息改后端 emit 推送（订阅/退订机制）**（[memory_push.rs](src-tauri/src/commands/system/memory_push.rs) / [useMemoryVisualizer.ts](src/composables/useMemoryVisualizer.ts)）：内存可视化由前端 1s IPC 轮询改为后端 1s `memory-info` 事件推送；前端页面挂载时 `memory_subscribe`、卸载时 `memory_unsubscribe`，后端维护订阅计数，有订阅才采样推送、归零即停（零空闲开销）。调用方接口 `startMemoryPolling` / `stopMemoryPolling` 签名不变，组件卸载自动退订。涉及设置页 MemoryAllocation 与版本设置 MemorySection。
