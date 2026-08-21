@@ -2,6 +2,7 @@
 import { defineAsyncComponent } from 'vue'
 const Input = defineAsyncComponent(() => import('@/components/common/Input.vue'))
 const Select = defineAsyncComponent(() => import('@/components/common/Select.vue'))
+const Slider = defineAsyncComponent(() => import('@/components/common/Slider.vue'))
 
 interface Props {
   baseUrl: string
@@ -54,14 +55,13 @@ const iconModeOptions = [
       </div>
       <div class="flex items-center gap-3">
         <span class="text-xs text-gray-400">10</span>
-        <input
-          :value="timeoutSecs"
-          type="range"
-          class="flex-1 h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer"
-          min="10"
-          max="300"
-          step="10"
-          @input="emit('update:timeoutSecs', Number(($event.target as HTMLInputElement).value))"
+        <Slider
+          :model-value="timeoutSecs"
+          :min="10"
+          :max="300"
+          :step="10"
+          class="flex-1"
+          @update:model-value="emit('update:timeoutSecs', $event)"
         />
         <span class="text-xs text-gray-400">300</span>
       </div>
