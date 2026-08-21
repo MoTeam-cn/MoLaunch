@@ -17,6 +17,7 @@ import {
 } from '@heroicons/vue/24/outline'
 const Drawer = defineAsyncComponent(() => import('@/components/common/Drawer.vue'))
 const Button = defineAsyncComponent(() => import('@/components/common/Button.vue'))
+const Input = defineAsyncComponent(() => import('@/components/common/Input.vue'))
 import { copyToClipboard } from '@/utils/clipboard'
 
 export type ModalType = 'error' | 'warning' | 'info' | 'success'
@@ -50,7 +51,8 @@ const options = ref<ModalOptions>({
   message: '',
 })
 const inputValue = ref('')
-const inputRef = ref<HTMLInputElement | null>(null)
+/** Input 组件实例（暴露 focus / select 供输入框模式自动聚焦） */
+const inputRef = ref<{ focus: () => void; select: () => void } | null>(null)
 
 const icon = computed(() => {
   switch (options.value.type) {
@@ -212,14 +214,12 @@ defineExpose({
 
     <!-- 输入框 -->
     <div v-if="options.showInput" class="mt-4">
-      <input
+      <Input
         ref="inputRef"
         v-model="inputValue"
-        type="text"
-        class="w-full rounded-lg border border-gray-300 px-3.5 py-2.5 text-sm text-gray-900 outline-none transition-colors focus:border-primary-500 focus:ring-1 focus:ring-primary-500"
         :placeholder="options.inputPlaceholder"
-        @keyup.enter="handleConfirm"
-      >
+        @keydown.enter="handleConfirm"
+      />
     </div>
 
     <!-- 详情 -->

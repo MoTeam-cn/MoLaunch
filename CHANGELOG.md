@@ -18,6 +18,8 @@
 
 ### Changed
 
+- **全局消息抽屉输入框改用自定义 Input 组件**（[MessageDrawer.vue](src/components/common/MessageDrawer.vue) / [Input.vue](src/components/common/Input.vue)）：抽屉输入框模式的原生 `<input>` 替换为项目自定义 `Input.vue`；`Input.vue` 新增 `defineExpose({ focus, select })` 支持外部聚焦/全选（输入框模式自动聚焦场景），回车确认由 `keyup` 改为 `keydown` 透传事件。
+
 - **自定义布局 URL 输入改用自定义 Input 组件**（[CustomLayoutSection.vue](src/views/settings/personal/CustomLayoutSection.vue) / [useCustomLayout.ts](src/composables/useCustomLayout.ts)）：布局 URL 的原生 `<input>` 替换为项目自定义 `Input.vue`；`onUrlInput` 签名由 `Event` 改为 `string`（配合 Input 组件的 `update:model-value` 事件）。
 
 - **版本设置-Java 版本范围输入改用自定义 Input 组件**（[JavaModeSelector.vue](src/views/version-settings/setup-tab/JavaModeSelector.vue)）：auto_version 模式下最低/最高版本 2 处原生 `<input type="number">` 替换为项目自定义 `Input.vue`（数字模式，80px 宽度）。

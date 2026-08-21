@@ -24,7 +24,7 @@
  * </Input>
  * <Input v-model="value" clearable @clear="onClear" />
  */
-import { computed } from 'vue'
+import { computed, ref } from 'vue'
 
 interface Props {
   modelValue: string | number
@@ -103,6 +103,13 @@ function onClear() {
 }
 
 const sizeClass = computed(() => `input-size-${props.size}`)
+
+/** 内部输入元素 ref：供需要聚焦/全选的场景（如弹窗输入框）通过 expose 调用 */
+const innerRef = ref<HTMLInputElement | null>(null)
+defineExpose({
+  focus: () => innerRef.value?.focus(),
+  select: () => innerRef.value?.select(),
+})
 </script>
 
 <template>
@@ -152,6 +159,7 @@ const sizeClass = computed(() => `input-size-${props.size}`)
 
       <!-- 输入框 -->
       <input
+        ref="innerRef"
         v-model="inputValue"
         :type="type"
         :placeholder="placeholder"
