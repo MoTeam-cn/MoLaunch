@@ -27,6 +27,9 @@ const loadingList = ref(false)
 const loadingContent = ref(false)
 const shareMenuOpen = ref(false)
 const sharing = ref<LogShareProvider | null>(null)
+/** 最近一次成功加载的文件名（用于区分「切换日志」与首屏自动加载，避免多余 toast） */
+let lastLoadedName = ''
+let firstLoadDone = false
 
 const options = computed(() =>
   logFiles.value.map((f) => ({ label: f.name, value: f.name })),
@@ -35,6 +38,42 @@ const options = computed(() =>
 const selectedFile = computed(() => logFiles.value.find((f) => f.name === selectedName.value))
 
 const lineCount = computed(() => (content.value ? content.value.split('\n').length : 0))
+
+/** 日志级别 → 行颜色（业界标准色：ERROR=红 / WARN=黄 / INFO=绿 / DEBUG=青 / TRACE=灰） */
+const LEVEL_COLORS: Record<string, string> = {
+  ERROR: 'text-red-400',
+  FATAL: 'text-red-400',
+  WARN: 'text-yellow-400',
+  INFO: 'text-green-400',
+  DEBUG: 'text-cyan-400',
+  TRACE: 'text-slate-500',
+}
+/** 无级别行的默认颜色 */
+const DEFAULT_LINE_COLOR = 'text-gray-300'
+/** 渲染行数上限（超长日志仅显示尾部，避免拖垮渲染） */
+const MAX_RENDER_LINES = 20000
+
+/** 匹配 MC 日志行前缀中的级别：`[HH:mm:ss] [线程/级别]: ...` */
+const LEVEL_RE = /^\[[^\]]*\] \[[^/\]\[]*\/(\w+)\]/
+
+interface LogLine {
+  text: string
+  color: string
+}
+
+/** 按行拆分并按级别着色（超长时仅取尾部 MAX_RENDER_LINES 行） */
+const renderedLines = computed<LogLine[]>(() => {
+  if (!content.value) return []
+  const all = content.value.split('\n')
+  const lines = all.length > MAX_RENDER_LINES ? all.slice(all.length - MAX_RENDER_LINES) : all
+  return lines.map((text) => {
+    const m = LEVEL_RE.exec(text)
+    return { text, color: (m && LEVEL_COLORS[m[1]]) || DEFAULT_LINE_COLOR }
+  })
+})
+
+/** 是否因过长被截断显示 */
+const truncated = computed(() => lineCount.value > MAX_RENDER_LINES)
 
 /** 加载日志文件列表，默认选中 latest.log */
 async function loadList() {
@@ -55,8 +94,8 @@ async function loadList() {
   }
 }
 
-/** 加载选中的日志文件内容 */
-async function loadContent() {
+/** 加载选中的日志文件内容；notify 为 true 表示用户主动切换文件，成功后 toast 提示 */
+async function loadContent(notify = false) {
   if (!effectiveDir.value || !selectedName.value) {
     content.value = ''
     return
@@ -64,6 +103,13 @@ async function loadContent() {
   loadingContent.value = true
   try {
     content.value = await readInstanceLog(effectiveDir.value, selectedName.value)
+    const name = selectedName.value
+    const isSwitch = firstLoadDone && name !== lastLoadedName
+    lastLoadedName = name
+    firstLoadDone = true
+    if (notify && isSwitch) {
+      toastSuccess(`已加载 ${name}（${lineCount.value} 行）`)
+    }
   } catch (e) {
     content.value = ''
     toastError('读取日志失败：' + String(e))
@@ -73,7 +119,7 @@ async function loadContent() {
 }
 
 watch(selectedName, (v) => {
-  if (v) loadContent()
+  if (v) loadContent(true)
 })
 
 onMounted(loadList)
@@ -151,7 +197,7 @@ function formatTime(ts: number): string {
           </Button>
           <div
             v-if="shareMenuOpen"
-            class="absolute bottom-full right-0 z-20 mb-1 w-60 rounded-md border border-gray-200 bg-white p-1 shadow-lg"
+            class="absolute top-full right-0 z-20 mt-1 w-60 rounded-md border border-gray-200 bg-white p-1 shadow-lg"
             @mouseleave="shareMenuOpen = false"
           >
             <button
@@ -183,10 +229,26 @@ function formatTime(ts: number): string {
         <p class="text-sm">暂无日志内容</p>
         <p class="text-xs">请先启动游戏产生日志，或从上方下拉框选择日志文件</p>
       </div>
-      <pre
-        v-else
-        class="h-full overflow-y-auto p-4 font-mono text-xs leading-5 whitespace-pre-wrap break-all text-gray-300"
-      >{{ content }}</pre>
+        <!-- 行级渲染：按日志级别着色（超长时仅显示尾部并提示） -->
+        <!-- data-inner-scroll：内部滚动容器，不触发全局返回顶部按钮 -->
+        <div v-else class="flex h-full flex-col overflow-hidden">
+          <div
+            v-if="truncated"
+            class="flex-none border-b border-gray-800 bg-gray-800 px-4 py-1.5 text-xs text-gray-400"
+          >
+            日志过长，仅显示最后 {{ MAX_RENDER_LINES }} 行（共 {{ lineCount }} 行）
+          </div>
+          <div data-inner-scroll class="min-h-0 flex-1 overflow-y-auto">
+            <div class="p-4 font-mono text-xs leading-5">
+            <div
+              v-for="(line, i) in renderedLines"
+              :key="i"
+              class="whitespace-pre-wrap break-all"
+              :class="line.color"
+            >{{ line.text }}</div>
+          </div>
+        </div>
+      </div>
     </div>
   </div>
 </template>

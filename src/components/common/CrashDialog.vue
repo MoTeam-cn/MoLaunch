@@ -152,7 +152,7 @@ const Tag = defineAsyncComponent(() => import('@/components/common/Tag.vue'))
 const Collapse = defineAsyncComponent(() => import('@/components/common/Collapse.vue'))
 import { pickSavePath } from '@/utils/fileDialog'
 import { openPath, writeTextFile } from '@/utils/api/system'
-import { toastError, toastSuccess } from '@/utils/toast'
+import { toastError, toastSuccess, toastInfo } from '@/utils/toast'
 import { open } from '@tauri-apps/plugin-shell'
 import { sanitizeShareLog, uploadLogShare, LOG_SHARE_PROVIDERS, analyseLogShare } from '@/utils/logShare'
 import type { LogShareProvider, MclogsAnalysis } from '@/utils/logShare'
@@ -237,6 +237,10 @@ function show(info: CrashInfo) {
   crashInfo.value = info
   showDetails.value = false
   visible.value = true
+  // 切换崩溃日志时给出反馈（避免页面单调），无日志内容则不提示
+  if (logLineCount.value > 0) {
+    toastInfo(`已加载崩溃日志（${logLineCount.value} 行）`)
+  }
   // 崩溃后自动发起 mclo.gs 云端分析（不阻塞弹窗，失败静默）
   cloudAnalysis.value = null
   void runCloudAnalysis()

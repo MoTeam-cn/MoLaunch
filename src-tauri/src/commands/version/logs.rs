@@ -64,7 +64,16 @@ fn list_instance_logs_inner(dir: &str) -> Vec<InstanceLogFile> {
     files
 }
 
-/// 读取日志文件内容（非 UTF-8 字节用 lossy 替换，避免整文件读取失败）
+/// 日志解码：UTF-8 优先，失败回退 GBK（老版本 MC / 中文 Windows 日志常为 GBK/GB18030）
+fn decode_log_bytes(bytes: &[u8]) -> String {
+    if let Ok(s) = std::str::from_utf8(bytes) {
+        return s.to_string();
+    }
+    let (decoded, _, _) = encoding_rs::GBK.decode(bytes);
+    decoded.into_owned()
+}
+
+/// 读取日志文件内容（.gz 解压；编码自适应 UTF-8/GBK，仍失败用 lossy 替换）
 fn read_log_bytes(path: &std::path::Path) -> Result<String, std::io::Error> {
     let bytes = if path.as_os_str().to_string_lossy().ends_with(".gz") {
         use std::io::Read;
@@ -76,7 +85,7 @@ fn read_log_bytes(path: &std::path::Path) -> Result<String, std::io::Error> {
     } else {
         std::fs::read(path)?
     };
-    Ok(String::from_utf8_lossy(&bytes).into_owned())
+    Ok(decode_log_bytes(&bytes))
 }
 
 /// 读取实例日志内容：校验文件名（防路径穿越）→ 读取/解压 → 脱敏
