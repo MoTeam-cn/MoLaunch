@@ -16,6 +16,7 @@ mod dispatcher;
 mod game;
 pub mod game_dir;
 pub(crate) mod manager;
+pub mod memory_push;
 mod proxy;
 pub mod updater;
 

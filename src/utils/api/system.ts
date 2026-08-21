@@ -55,6 +55,16 @@ export async function getSystemMemory(): Promise<{ total: number; used: number; 
   return systemManager(SYSTEM_ACTIONS.GET_SYSTEM_MEMORY)
 }
 
+/** 订阅内存推送（内存可视化页面挂载时调用，后端开始 1s emit `memory-info` 事件） */
+export async function memorySubscribe(): Promise<void> {
+  return systemManager<void>(SYSTEM_ACTIONS.MEMORY_SUBSCRIBE)
+}
+
+/** 退订内存推送（内存可视化页面卸载时调用，后端停止 emit，零空闲开销） */
+export async function memoryUnsubscribe(): Promise<void> {
+  return systemManager<void>(SYSTEM_ACTIONS.MEMORY_UNSUBSCRIBE)
+}
+
 /** 获取配置文件路径 */
 export async function getConfigPath(): Promise<string> {
   return systemManager<string>(SYSTEM_ACTIONS.GET_CONFIG_PATH)

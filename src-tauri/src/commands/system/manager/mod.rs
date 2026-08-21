@@ -4,6 +4,7 @@ mod config;
 mod developer;
 mod dispatcher;
 mod game_dir;
+mod memory;
 mod updater;
 
 pub use dispatcher::dispatch;

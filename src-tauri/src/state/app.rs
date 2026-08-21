@@ -12,6 +12,7 @@ use super::config::AppConfig;
 use super::download::DownloadState;
 use super::launch::LaunchHistory;
 use crate::commands::auth::authlib::PendingAuthlibLogin;
+use crate::commands::system::memory_push::MemoryPushState;
 
 /// 应用全局状态
 ///
@@ -96,6 +97,10 @@ pub struct AppState {
     /// 非静默进行中的下载批次计数（多个 DownloadManager 实例共享，
     /// 用于协调下载面板显隐：首个批次开始显示、最后批次结束隐藏）
     pub panel_active_count: Arc<std::sync::atomic::AtomicUsize>,
+    /// 内存推送订阅状态（前端订阅/退订控制 1s 定时 emit，无订阅者零开销）
+    pub memory_push: Arc<MemoryPushState>,
+    /// 内存推送 task 句柄（订阅 0→1 启动，退订归零 abort 并置 None）
+    pub memory_push_task: Arc<TokioMutex<Option<tokio::task::AbortHandle>>>,
 }
 
 impl Default for AppState {
@@ -165,6 +170,8 @@ impl AppState {
             easytier_cancel: Arc::new(std::sync::atomic::AtomicBool::new(false)),
             app_handle: Arc::new(std::sync::OnceLock::new()),
             panel_active_count: Arc::new(std::sync::atomic::AtomicUsize::new(0)),
+            memory_push: Arc::new(MemoryPushState::default()),
+            memory_push_task: Arc::new(TokioMutex::new(None)),
         }
     }
 }

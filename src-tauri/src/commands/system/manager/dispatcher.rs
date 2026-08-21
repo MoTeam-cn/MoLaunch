@@ -7,7 +7,7 @@ use once_cell::sync::Lazy;
 use serde::Deserialize;
 use tauri::AppHandle;
 
-use super::{config, developer, game_dir, updater};
+use super::{config, developer, game_dir, memory, updater};
 use crate::handler;
 use crate::logger::{get_log_path, list_log_files, read_log_file};
 use crate::state::AppState;
@@ -48,6 +48,7 @@ static DISPATCHER: Lazy<Dispatcher> = Lazy::new(|| {
     let mut d = Dispatcher::new();
     config::register(&mut d);
     game_dir::register(&mut d);
+    memory::register(&mut d);
     developer::register(&mut d);
     updater::register(&mut d);
 

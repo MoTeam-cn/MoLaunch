@@ -132,7 +132,7 @@ onMounted(async () => {
 })
 
 // 内存配置的防抖保存由 useDebouncedSave 在组件卸载时自动 flush；
-// 轮询由 usePolling 在 onUnmounted 自动 stop。
+// 内存推送订阅由 useMemoryVisualizer 在组件卸载时自动退订。
 </script>
 
 <template>

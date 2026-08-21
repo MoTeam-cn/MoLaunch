@@ -36,6 +36,9 @@ export const SYSTEM_ACTIONS = {
   WRITE_BINARY_FILE: 'write_binary_file',
   GET_SYSTEM_MEMORY: 'get_system_memory',
   SET_GAME_DIR: 'set_game_dir',
+  // 内存推送（2 个）—— 前端订阅/退订控制后端 1s emit，无页面打开时零开销
+  MEMORY_SUBSCRIBE: 'memory_subscribe',
+  MEMORY_UNSUBSCRIBE: 'memory_unsubscribe',
   // config（2 个）
   GET_CONFIG_PATH: 'get_config_path',
   SAVE_CONFIG_TO_FILE: 'save_config_to_file',
