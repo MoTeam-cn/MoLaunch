@@ -87,6 +87,33 @@
           查看报告
         </Button>
         <Button type="ghost" size="small" @click="exportReport">导出报告</Button>
+        <div class="relative">
+          <Button
+            type="ghost"
+            size="small"
+            :loading="sharing !== null"
+            @click="shareMenuOpen = !shareMenuOpen"
+          >
+            分享日志
+          </Button>
+          <div
+            v-if="shareMenuOpen"
+            class="absolute bottom-full right-0 z-20 mb-1 w-60 rounded-md border border-gray-200 bg-white p-1 shadow-lg"
+            @mouseleave="shareMenuOpen = false"
+          >
+            <button
+              v-for="item in SHARE_PROVIDERS"
+              :key="item.value"
+              class="flex w-full items-start gap-2 rounded px-2 py-1.5 text-left text-xs hover:bg-gray-50"
+              @click="shareTo(item.value)"
+            >
+              <div class="min-w-0">
+                <p class="font-medium text-gray-700">{{ item.label }}</p>
+                <p class="text-gray-400">{{ item.desc }}</p>
+              </div>
+            </button>
+          </div>
+        </div>
         <Button type="primary" size="small" @click="visible = false">关闭</Button>
       </div>
     </template>
@@ -108,6 +135,9 @@ const Collapse = defineAsyncComponent(() => import('@/components/common/Collapse
 import { pickSavePath } from '@/utils/fileDialog'
 import { openPath, writeTextFile } from '@/utils/api/system'
 import { toastError, toastSuccess } from '@/utils/toast'
+import { open } from '@tauri-apps/plugin-shell'
+import { sanitizeShareLog, uploadLogShare } from '@/utils/logShare'
+import type { LogShareProvider } from '@/utils/logShare'
 import type { CrashCategory, CrashInfo } from '@/types/version'
 
 /** 崩溃类别展示元数据：标签文案、Tag 颜色、原因横幅的左侧色条与底色 */
@@ -133,6 +163,14 @@ const CATEGORY_META: Record<CrashCategory, CategoryMeta> = {
 const visible = ref(false)
 const showDetails = ref(false)
 const crashInfo = ref<CrashInfo | null>(null)
+const shareMenuOpen = ref(false)
+const sharing = ref<LogShareProvider | null>(null)
+
+/** 日志分享服务选项 */
+const SHARE_PROVIDERS: { value: LogShareProvider; label: string; desc: string }[] = [
+  { value: 'mclogs', label: 'mclo.gs', desc: '国际主流日志分享，自带分析' },
+  { value: 'logshare', label: 'logshare.cn', desc: '国内访问快，支持 AI 分析' },
+]
 
 /** 未展示崩溃数据时的兜底值 */
 const EMPTY_CRASH: CrashInfo = {
@@ -222,6 +260,32 @@ function buildReportContent(): string {
     ...(c.log_tail ?? []),
   ]
   return lines.filter(Boolean).join('\n')
+}
+
+/** 组装分享用日志（以日志主体为主，便于第三方平台分析） */
+function buildShareContent(): string {
+  const c = lastCrash.value
+  const lines = [
+    `==== MoLaunch 崩溃日志（${category.value}） ====`,
+    ...(c.log_lines ?? []),
+    ...(c.log_tail ?? []),
+  ]
+  return lines.filter(Boolean).join('\n')
+}
+
+/** 分享日志到云端服务：脱敏 → 上传 → 打开分享页 */
+async function shareTo(provider: LogShareProvider) {
+  shareMenuOpen.value = false
+  sharing.value = provider
+  try {
+    const url = await uploadLogShare(sanitizeShareLog(buildShareContent()), provider)
+    await open(url)
+    toastSuccess('日志已分享，已打开分享页面')
+  } catch (e) {
+    toastError('分享失败：' + String(e))
+  } finally {
+    sharing.value = null
+  }
 }
 
 defineExpose({ show })
