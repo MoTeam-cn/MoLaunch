@@ -12,6 +12,7 @@ import { toastSuccess, toastWarning, toastError, toastInfo } from '@/utils/toast
 import { showConfirm, showPrompt } from '@/utils/modal'
 import { handleModpackDrop } from '@/composables/useDragDrop/handlers'
 const Button = defineAsyncComponent(() => import('@/components/common/Button.vue'))
+const Tooltip = defineAsyncComponent(() => import('@/components/common/Tooltip.vue'))
 import {
   FolderIcon,
   PlusIcon,
@@ -164,10 +165,14 @@ defineExpose({ loadFolders })
           class="w-5 h-5 mr-3 flex-none"
           :class="folder.path === currentPath ? 'text-primary-500' : 'text-gray-400'"
         />
-        <!-- 名称 + 路径 -->
+        <!-- 名称 + 路径（溢出省略，hover 显示完整内容） -->
         <div class="min-w-0 flex-1">
-          <div class="truncate">{{ folder.name }}</div>
-          <div class="truncate text-xs font-normal text-gray-400">{{ folder.path }}</div>
+          <Tooltip :text="folder.name" position="right" block overflow-only>
+            <div class="min-w-0 truncate">{{ folder.name }}</div>
+          </Tooltip>
+          <Tooltip :text="folder.path" position="right" block overflow-only>
+            <div class="min-w-0 truncate text-xs font-normal text-gray-400">{{ folder.path }}</div>
+          </Tooltip>
         </div>
         <!-- hover 时显示的移除按钮 -->
         <XMarkIcon
@@ -176,9 +181,10 @@ defineExpose({ loadFolders })
           @click="removeFolder(folder, $event)"
         />
       </button>
+    </div>
 
-      <!-- 分隔线 + 添加按钮 -->
-      <div class="mx-4 my-3 border-t border-gray-100" />
+    <!-- 底部固定操作区（列表过长时始终可见） -->
+    <div class="flex-none space-y-2 border-t border-gray-100 p-4">
       <Button
         type="ghost"
         long
