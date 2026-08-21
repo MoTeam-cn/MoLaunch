@@ -18,6 +18,8 @@
 
 ### Changed
 
+- **资源包编辑器-pack.mcmeta 表单改用自定义 Input 组件**（[RpMcmetaForm.vue](src/views/tools/data/RpMcmetaForm.vue)）：pack_format 数字输入与描述 2 处原生 `<input>`/`<textarea>` 替换为项目自定义 `Input.vue`（数字模式 + textarea 模式）。
+
 - **资源包编辑器-语言文件键值输入改用自定义 Input 组件**（[RpLangTable.vue](src/views/tools/data/RpLangTable.vue)）：lang 键值表格中的键名/值 2 处原生 `<input>` 替换为项目自定义 `Input.vue`（mini 紧凑尺寸，键名列保留等宽字体）。
 
 - **资源包编辑器-文件树搜索框改用自定义 Input 组件**（[RpFileTreePanel.vue](src/views/tools/data/RpFileTreePanel.vue)）：搜索文件的原生 `<input>` 替换为项目自定义 `Input.vue`，搜索图标改用 prefix 插槽、清除按钮改用内建 clearable（移除手写绝对定位图标与清除按钮）。

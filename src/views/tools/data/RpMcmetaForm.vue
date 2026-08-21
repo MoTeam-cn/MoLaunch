@@ -9,6 +9,7 @@ import { computed, ref, watch, defineAsyncComponent, onMounted } from 'vue'
 import { CheckIcon, CubeIcon, ExclamationTriangleIcon } from '@heroicons/vue/24/outline'
 const Button = defineAsyncComponent(() => import('@/components/common/Button.vue'))
 const Select = defineAsyncComponent(() => import('@/components/common/Select.vue'))
+const Input = defineAsyncComponent(() => import('@/components/common/Input.vue'))
 import { toastError, toastSuccess } from '@/utils/toast'
 import { rpPackFormatInfo, rpVersionPackFormat, rpWrite } from '@/utils/api/tools'
 import { listInstalledVersionsWithType, type InstalledVersionInfo } from '@/utils/api/version'
@@ -173,14 +174,7 @@ async function doSave() {
       <div class="flex border-b border-gray-200">
         <div class="w-32 shrink-0 bg-gray-50 px-3 py-2 text-xs text-gray-500">pack_format</div>
         <div class="flex-1 px-3 py-1.5">
-          <input
-            v-model="packFormat"
-            type="number"
-            min="0"
-            step="1"
-            class="w-full rounded border border-gray-300 px-2 py-1 text-sm text-gray-700 focus:border-blue-400 focus:outline-none"
-            placeholder="如 15"
-          />
+          <Input v-model="packFormat" type="number" placeholder="如 15" size="small" />
         </div>
       </div>
       <div v-if="versionOptions.length" class="flex border-b border-gray-200">
@@ -205,12 +199,7 @@ async function doSave() {
       <div class="flex">
         <div class="w-32 shrink-0 bg-gray-50 px-3 py-2 text-xs text-gray-500">描述</div>
         <div class="flex-1 px-3 py-1.5">
-          <textarea
-            v-model="description"
-            rows="2"
-            class="w-full rounded border border-gray-300 px-2 py-1 text-sm text-gray-700 focus:border-blue-400 focus:outline-none"
-            placeholder="资源包描述"
-          ></textarea>
+          <Input v-model="description" textarea :rows="2" placeholder="资源包描述" />
         </div>
       </div>
     </div>
