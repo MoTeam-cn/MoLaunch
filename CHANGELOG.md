@@ -18,6 +18,8 @@
 
 ### Changed
 
+- **清理垃圾分组/单项复选框改用自定义 Checkbox 组件**（[CleanupGroupList.vue](src/views/quick-tools/CleanupGroupList.vue)）：分组标题全选与单项勾选 2 处自写 span 复选框替换为项目自定义 `Checkbox.vue`（分组半选态用内建 indeterminate，右侧保留 已选/总数 徽章），移除手写边框/对勾样式与多余图标导入。
+
 - **合成配方-标签搜索框改用自定义 Input 组件**（[TagPalette.vue](src/views/tools/creation/recipe-generator/TagPalette.vue)）：原版标签调色板搜索的原生 `<input>` 替换为项目自定义 `Input.vue`，启用内建 clearable 清除按钮。
 
 - **合成配方-物品搜索框改用自定义 Input 组件**（[ItemPalette.vue](src/views/tools/creation/recipe-generator/ItemPalette.vue)）：物品调色板搜索的原生 `<input>` 替换为项目自定义 `Input.vue`，启用内建 clearable 清除按钮。

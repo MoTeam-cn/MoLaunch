@@ -9,13 +9,10 @@
  * 无 " - " 后缀的归入 "全局" 分组。分组计算内聚于此组件，父级只传原始 items。
  */
 import { computed, defineAsyncComponent } from 'vue'
-import {
-  CheckIcon,
-  CheckCircleIcon,
-  ChevronDownIcon,
-} from '@heroicons/vue/24/outline'
+import { ChevronDownIcon } from '@heroicons/vue/24/outline'
 const Tooltip = defineAsyncComponent(() => import('@/components/common/Tooltip.vue'))
 const Tag = defineAsyncComponent(() => import('@/components/common/Tag.vue'))
+const Checkbox = defineAsyncComponent(() => import('@/components/common/Checkbox.vue'))
 import type { CleanupItem } from '@/utils/api/tools'
 import { formatBytes } from '@/utils/format'
 import { groupIcon } from '@/utils/cleanup-group'
@@ -119,21 +116,13 @@ const { contentClassOf, iconClassOf } = useCollapseAnimation({
             </span>
           </div>
         </div>
-        <!-- 组内全选切换按钮：已选/总数直接显示在右侧徽章，避免 Tooltip 文案歧义 -->
-        <div class="flex flex-none items-center gap-1.5" @click.stop="emit('toggleGroupSelect', group.key)">
-          <span
-            class="flex h-5 w-5 items-center justify-center rounded border transition-colors"
-            :class="
-              group.selectedCount === group.items.length && group.items.length > 0
-                ? 'border-primary-500 bg-primary-500 text-white'
-                : group.selectedCount > 0
-                  ? 'border-primary-400 bg-primary-100 text-primary-600'
-                  : 'border-gray-300 bg-white text-gray-400 hover:border-primary-300'
-            "
-          >
-            <CheckIcon v-if="group.selectedCount === group.items.length && group.items.length > 0" class="h-3 w-3" />
-            <span v-else-if="group.selectedCount > 0" class="text-[10px] font-bold leading-none">{{ group.selectedCount }}</span>
-          </span>
+        <!-- 组内全选切换：Checkbox 半选表示部分选中，右侧徽章显示已选/总数 -->
+        <div class="flex flex-none items-center gap-1.5" @click.stop>
+          <Checkbox
+            :checked="group.items.length > 0 && group.selectedCount === group.items.length"
+            :indeterminate="group.selectedCount > 0 && group.selectedCount < group.items.length"
+            @change="emit('toggleGroupSelect', group.key)"
+          />
           <span class="text-xs text-gray-500">{{ group.selectedCount }}/{{ group.items.length }}</span>
         </div>
       </div>
@@ -156,16 +145,12 @@ const { contentClassOf, iconClassOf } = useCollapseAnimation({
               @click="emit('toggleSelect', item.path)"
             >
               <!-- 复选框 -->
-              <span
-                class="flex h-4 w-4 flex-none items-center justify-center rounded border transition-colors"
-                :class="
-                  selectedPaths.has(item.path)
-                    ? 'border-primary-500 bg-primary-500 text-white'
-                    : 'border-gray-300 bg-white'
-                "
-              >
-                <CheckCircleIcon v-if="selectedPaths.has(item.path)" class="h-3 w-3" />
-              </span>
+              <div class="flex-none" @click.stop>
+                <Checkbox
+                  :checked="selectedPaths.has(item.path)"
+                  @change="emit('toggleSelect', item.path)"
+                />
+              </div>
               <!-- 名称 + 类别 -->
               <div class="min-w-0 flex-1">
                 <div class="flex items-center gap-2">
