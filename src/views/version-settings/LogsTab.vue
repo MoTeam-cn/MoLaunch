@@ -54,7 +54,7 @@ const DEFAULT_LINE_COLOR = 'text-gray-300'
 const MAX_RENDER_LINES = 20000
 
 /** 匹配 MC 日志行前缀中的级别：`[HH:mm:ss] [线程/级别]: ...` */
-const LEVEL_RE = /^\[[^\]]*\] \[[^/\]\[]*\/(\w+)\]/
+const LEVEL_RE = /^\[[^\]]*\] \[[^/[\]]*\/(\w+)\]/
 
 interface LogLine {
   text: string
