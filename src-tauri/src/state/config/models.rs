@@ -122,6 +122,9 @@ pub struct AppConfig {
     /// 启动器界面 GPU 硬件加速（默认开启；关闭后 WebView2 走软件渲染，降低内存占用，需重启生效）
     #[serde(default = "crate::state::config::defaults::default_use_gpu_acceleration")]
     pub use_gpu_acceleration: bool,
+    /// 关闭到托盘时挂起 WebView2 释放渲染资源（默认关闭；恢复托盘窗口时自动恢复并保留界面状态）
+    #[serde(default = "crate::state::config::defaults::default_release_memory_on_tray")]
+    pub release_memory_on_tray: bool,
     pub proxy: ProxyConfig,
     pub download: DownloadConfig,
     pub memory: MemoryConfig,

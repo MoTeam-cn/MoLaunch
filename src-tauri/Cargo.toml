@@ -105,6 +105,13 @@ pem = "3"
 
 [target.'cfg(windows)'.dependencies]
 winreg = "0.52"
+# WebView2 挂起/恢复（关闭到托盘时释放渲染资源）：controller() 返回的 COM 接口类型来自
+# tauri 传递依赖的 webview2-com，此处显式声明以便调用 ICoreWebView2_4::TrySuspend/Resume
+# （版本需与 tauri 使用的 webview2-com 一致，Cargo 统一解析到同一实例）
+webview2-com = "0.38"
+# windows 0.61（与 webview2-com 0.38 配套）：别名引入，仅用于 webview2-com 接口的
+# cast 需要（Interface trait 来自该版本 windows-core），不影响现有 windows 0.58 用法
+windows_0_61 = { package = "windows", version = "0.61", features = ["Win32_Foundation"] }
 # Windows 目录联接（junction）：创建目录链接无需管理员权限/开发者模式，
 # 用于启动器导入的符号链接模式（junction 优先，失败回退 symlink）
 junction = "1"

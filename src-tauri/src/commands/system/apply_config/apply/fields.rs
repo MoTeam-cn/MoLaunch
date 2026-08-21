@@ -161,6 +161,10 @@ pub(super) fn apply_launcher(
         log_info!("[Config] use_gpu_acceleration = {}", use_gpu);
         config.use_gpu_acceleration = use_gpu;
     }
+    if let Some(release_mem) = patch.release_memory_on_tray {
+        log_info!("[Config] release_memory_on_tray = {}", release_mem);
+        config.release_memory_on_tray = release_mem;
+    }
 }
 
 /// 实验性功能域：experimental_enabled

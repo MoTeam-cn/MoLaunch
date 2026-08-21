@@ -27,6 +27,15 @@ pub fn save_config(config: &AppConfig) -> Result<(), String> {
             "false"
         },
     );
+    ini.set(
+        "General",
+        "release_memory_on_tray",
+        if config.release_memory_on_tray {
+            "true"
+        } else {
+            "false"
+        },
+    );
     // Experimental（实验性功能开关）
     ini.set(
         "Experimental",

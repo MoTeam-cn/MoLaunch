@@ -24,6 +24,8 @@
 
 ### Changed
 
+- **关闭到托盘时可挂起 WebView2 释放渲染资源**（[webview_suspend.rs](src-tauri/src/webview_suspend.rs) / [lib.rs](src-tauri/src/lib.rs) / [tray.rs](src-tauri/src/tray.rs) / [SettingsPerformance.vue](src/views/settings/SettingsPerformance.vue)）：新增「性能 → 关闭到托盘时释放内存」开关（默认关闭，配置项 `release_memory_on_tray` 已预设进默认 config.ini）。开启后关闭到托盘时不再仅 `hide()`，额外调用 WebView2 `ICoreWebView2_4::TrySuspend` 挂起——渲染/GPU 资源释放、内存换出（降约 50~70%），DOM/JS 状态完整保留；托盘点击 / 单实例唤起恢复时 `Resume()` 同步解挂、秒回且界面状态（含启动中的游戏进程状态）原样保留，无需重建窗口或重载前端。配置链路（models/defaults/snapshot/patch/entry/fields/load/save）同步扩展，开关变更即时生效无需重启。
+
 - **Tooltip 新增 `singleLine` 单行模式**（[Tooltip.vue](src/components/common/Tooltip.vue) / [FolderSidebar.vue](src/views/version-select/FolderSidebar.vue)）：`nowrap` + 取消最大宽度，用于路径/名称完整一行展示，避免长路径在连字符等自然断点处提前换行（如 `src-tauri` 在 `-` 后断行）；版本选择页文件夹名称与路径 tooltip 已启用。
 
 - **版本选择页左侧列表布局优化**（[FolderSidebar.vue](src/views/version-select/FolderSidebar.vue)）：文件夹列表容器 `min-h-0 + overflow-y-auto` 纯 flex 方案——内容少时只占内容高度、按钮紧跟其后原位，列表超长时列表区收缩到剩余空间内滚动、按钮区 `flex-none` 停留在底部，滚动条仅作用于文件夹区域；文件夹名称与路径溢出省略时 hover 显示完整内容（复用 Tooltip 组件 `overflowOnly` + `block` 模式，仅省略时才弹提示）。

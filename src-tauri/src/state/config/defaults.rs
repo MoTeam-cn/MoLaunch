@@ -22,6 +22,11 @@ pub(crate) fn default_use_gpu_acceleration() -> bool {
     true
 }
 
+/// 关闭到托盘时挂起 WebView2 释放渲染资源（默认关闭，与历史行为一致）
+pub(crate) fn default_release_memory_on_tray() -> bool {
+    false
+}
+
 impl Default for AppConfig {
     fn default() -> Self {
         let game_dir = super::paths::get_default_game_dir();
@@ -42,6 +47,7 @@ impl Default for AppConfig {
             close_behavior: default_close_behavior(),
             experimental_enabled: false,
             use_gpu_acceleration: default_use_gpu_acceleration(),
+            release_memory_on_tray: default_release_memory_on_tray(),
             proxy: ProxyConfig {
                 mode: "none".to_string(),
                 kind: "http".to_string(),

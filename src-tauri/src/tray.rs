@@ -64,6 +64,9 @@ pub fn setup_tray(app: &AppHandle) -> tauri::Result<()> {
 /// 打开主界面：显示窗口并聚焦（窗口可能被最小化或隐藏到托盘）
 fn open_main_window(app: &AppHandle) {
     if let Some(window) = app.get_webview_window("main") {
+        // 托盘挂起态恢复（若已挂起，Resume 同步恢复渲染，界面状态原样保留）
+        #[cfg(target_os = "windows")]
+        crate::webview_suspend::resume(&window);
         let _ = window.unminimize();
         let _ = window.show();
         let _ = window.set_focus();

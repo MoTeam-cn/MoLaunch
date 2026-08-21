@@ -35,6 +35,9 @@ pub fn load_config() -> Result<Option<AppConfig>, String> {
     if let Some(v) = config.get("General", "use_gpu_acceleration") {
         app_config.use_gpu_acceleration = v == "true" || v == "1";
     }
+    // 关闭到托盘时挂起 WebView2 释放渲染资源（未配置时保持默认 false）
+    app_config.release_memory_on_tray =
+        config.get("General", "release_memory_on_tray").as_deref() == Some("true");
     // 实验性功能开关（[Experimental] enabled；未配置时保持默认 false）
     app_config.experimental_enabled =
         config.get("Experimental", "enabled").as_deref() == Some("true");

@@ -19,6 +19,8 @@ pub mod state;
 pub mod storage;
 pub mod tray;
 pub mod utils;
+#[cfg(target_os = "windows")]
+pub mod webview_suspend;
 
 use state::AppState;
 use tauri::Emitter;
@@ -158,6 +160,9 @@ pub fn run() {
         builder.plugin(tauri_plugin_single_instance::init(|app, argv, _cwd| {
             // 新实例启动时，主实例在这里收到 argv（含 deeplink URL）。
             if let Some(window) = app.get_webview_window("main") {
+                // 托盘挂起态恢复（若已挂起，Resume 同步恢复渲染）
+                #[cfg(target_os = "windows")]
+                webview_suspend::resume(&window);
                 let _ = window.unminimize();
                 let _ = window.show();
                 let _ = window.set_focus();
@@ -266,12 +271,20 @@ pub fn run() {
                 let behavior = {
                     let state = app.state::<AppState>();
                     let config = state.config.blocking_lock();
-                    config.close_behavior.clone()
+                    (config.close_behavior.clone(), config.release_memory_on_tray)
                 };
+                let (behavior, release_mem) = behavior;
                 match behavior.as_str() {
                     "tray" => {
                         // 保留托盘：隐藏主界面，进程 / 全局 keepalive 定时器继续运行
                         let _ = window.hide();
+                        // 设置开启时挂起 WebView2 释放渲染资源（保留界面状态，恢复秒回）
+                        if release_mem {
+                            #[cfg(target_os = "windows")]
+                            if let Some(w) = app.get_webview_window("main") {
+                                webview_suspend::suspend(&w);
+                            }
+                        }
                         log_info!("[Window] 关闭请求：关闭到托盘");
                     }
                     "exit" => {
