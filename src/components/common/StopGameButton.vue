@@ -40,7 +40,6 @@ onUnmounted(() => { stopGameVisible.value = false })
     >
       <button
         class="stop-game-btn"
-        title="结束游戏"
         @click="handleStopGame"
       >
         <StopIcon class="w-5 h-5 text-white" />
