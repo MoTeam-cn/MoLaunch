@@ -2,6 +2,14 @@
 
 本项目所有重要变更均会记录在此文件中。格式参考 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/)。
 
+## [Unreleased]
+
+### Added
+
+- **组网设备列表展示设备码**（[easytier.rs](src-tauri/src/minecraft/online/scaffolding/easytier.rs) / [easytier.ts](src/types/online/easytier.ts) / [EasyTierPeerList.vue](src/components/online/EasyTierPeerList.vue)）：后端 `easytier_peers` 返回的节点新增 `node_id`（easytier `peer list` 的 `id` 字段，全局唯一），前端组网设备列表改为**双行显示**——设备码为主标识、设备名（hostname）为副标识，不再仅显示 `scaffolding-mc-server-{端口}` / `mo-launch-guest` 等 hostname，便于区分不同设备。
+
+- **支持自定义加入方设备名**（[NetworkIdentityEditor.vue](src/components/settings/NetworkIdentityEditor.vue)（新增）/ [config.ts](src/utils/api/config.ts) / [SettingsOnline.vue](src/views/settings/SettingsOnline.vue)）：设置-联机 新增「设备名」编辑器，写入 `online.network_identity`（后端 `configured_network_identity` 已支持），作为加入方 easytier hostname，重新加入房间后生效；留空回退默认 `mo-launch-guest`。房主 hostname 由联机中心协议决定（`discover_center` 按 `scaffolding-mc-server-{端口}` 前缀识别），不可自定义，编辑器中已注明。
+
 ## [0.3.7-rc5] - 2026-08-21
 
 ### Fixed

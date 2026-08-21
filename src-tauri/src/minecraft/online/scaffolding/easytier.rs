@@ -29,6 +29,8 @@ pub struct PortForwardRule {
 #[derive(Debug, Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct PeerInfo {
+    /// 节点设备码（easytier `peer list` 的 `id` 字段，全局唯一）
+    pub node_id: String,
     /// 节点 hostname（房主为 `scaffolding-mc-server-{center_port}`，房客为自定义/默认）
     pub hostname: String,
     /// 虚拟 IP（如 `10.144.144.1`）
@@ -246,6 +248,11 @@ impl EasyTier {
                 continue; // 中继节点无虚拟 IP，过滤
             }
             peers.push(PeerInfo {
+                node_id: node
+                    .get("id")
+                    .and_then(|v| v.as_str())
+                    .unwrap_or("")
+                    .to_string(),
                 hostname: node
                     .get("hostname")
                     .and_then(|v| v.as_str())

@@ -3,7 +3,7 @@
  * easytier 虚拟网络在线设备列表（Scaffolding 收敛版）
  *
  * 每 5 秒经 `easytier_peers` IPC 查询虚拟网络节点（过滤中继，含本机），展示组网
- * 人数与各节点 hostname / 虚拟 IP / 延迟，房主与房客均可据此判断对方是否已组网。
+ * 人数与各节点设备码 / 设备名 / 虚拟 IP / 延迟，房主与房客均可据此判断对方是否已组网。
  * 同时监听后端 `easytier-status` 事件（新成员加入触发），收到后立即刷新。
  */
 import { onMounted, onUnmounted, ref, defineAsyncComponent } from 'vue'
@@ -55,10 +55,13 @@ onUnmounted(() => {
       <span class="text-xs">虚拟网络中暂无其他设备</span>
     </div>
     <ul v-else class="mt-2 space-y-1.5">
-      <li v-for="p in peers" :key="p.virtualIp" class="flex items-center justify-between gap-2 text-xs">
-        <div class="flex items-center gap-1.5 min-w-0">
-          <span class="text-gray-800 truncate">{{ p.hostname }}</span>
-          <Tag v-if="p.isSelf" size="small" color="arcoblue" class="shrink-0">本机</Tag>
+      <li v-for="p in peers" :key="p.nodeId || p.virtualIp" class="flex items-center justify-between gap-2 text-xs">
+        <div class="flex flex-col gap-0.5 min-w-0">
+          <div class="flex items-center gap-1.5 min-w-0">
+            <code class="font-mono text-gray-800 truncate">{{ p.nodeId }}</code>
+            <Tag v-if="p.isSelf" size="small" color="arcoblue" class="shrink-0">本机</Tag>
+          </div>
+          <span class="text-gray-400 truncate">{{ p.hostname }}</span>
         </div>
         <div class="flex items-center gap-2 shrink-0">
           <code class="font-mono text-gray-600">{{ p.virtualIp }}</code>

@@ -58,6 +58,8 @@ export interface EasyTierStatusResult {
 
 /** `easytier_peers` 返回的虚拟网络节点（过滤中继后，含本机） */
 export interface EasyTierPeer {
+  /** 节点设备码（easytier `peer list` 的 `id` 字段，全局唯一） */
+  nodeId: string
   /** 节点 hostname（房主为 `scaffolding-mc-server-{center_port}`） */
   hostname: string
   /** 虚拟 IP（如 `10.144.144.1`） */
