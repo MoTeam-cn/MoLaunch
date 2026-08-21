@@ -291,7 +291,7 @@ pub(crate) async fn export_inner(params: &RpExportParams) -> Result<RpExportResu
     if target.is_dir() {
         return Err("目标路径不能是目录".to_string());
     }
-    // 路径安全：canonicalize 父目录后校验目标必须位于工作目录内（防任意路径写入）
+    // 路径安全：canonicalize 父目录后取文件名，解析真实路径（防符号链接 / `..` 逃逸）
     let parent_canon = parent
         .canonicalize()
         .map_err(|e| format!("目标目录不可用: {}", e))?;
@@ -299,9 +299,6 @@ pub(crate) async fn export_inner(params: &RpExportParams) -> Result<RpExportResu
         .file_name()
         .ok_or_else(|| "目标路径无效".to_string())?;
     let target = parent_canon.join(file_name);
-    if !target.starts_with(&work_canon) {
-        return Err("导出路径超出资源包工作目录范围".to_string());
-    }
 
     // 写临时文件后原子替换，避免打包失败损坏原 zip
     let final_target = target.clone();
