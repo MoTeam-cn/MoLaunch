@@ -18,6 +18,8 @@
 
 ### Changed
 
+- **设置-下载 滑块改用自定义 Slider 组件**（[SettingsDownload.vue](src/views/settings/SettingsDownload.vue)）：并行下载数、下载线程数、下载限速 3 处原生 `<input type="range">` 替换为项目自定义 `Slider.vue`，沿用 primary 配色与 32px 紧凑风格。
+
 - **NBT 编辑器类型选择改用自定义 Select 组件**（[NbtTreeNode.vue](src/views/tools/data/NbtTreeNode.vue)）：新增子节点时的 NBT 类型下拉由原生 `<select>` 替换为项目自定义 `Select.vue`（符合组件复用规范，消除审查清单 Q12 遗留的最后一处原生控件）。
 
 ## [0.3.7] - 2026-08-21

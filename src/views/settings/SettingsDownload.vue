@@ -2,6 +2,7 @@
 import { ref, watch, defineAsyncComponent } from 'vue'
 import { useConfigPage } from '@/composables/useConfigPage'
 const Select = defineAsyncComponent(() => import('@/components/common/Select.vue'))
+const Slider = defineAsyncComponent(() => import('@/components/common/Slider.vue'))
 
 const maxThreads = ref(8)
 const chunkCount = ref(4)
@@ -135,14 +136,7 @@ watch(chunkCount, (v) => markDirty('chunkCount', v))
             <p class="text-xs text-gray-500 mt-0.5">控制同时下载文件的数量，一般情况下推荐设置为 8</p>
           </div>
           <div class="flex items-center gap-3">
-            <input
-              v-model.number="maxThreads"
-              type="range"
-              class="w-32 h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer"
-              min="1"
-              max="16"
-              step="1"
-            />
+            <Slider v-model="maxThreads" :min="1" :max="16" :step="1" class="w-32" />
             <span class="text-sm font-medium text-primary-600 w-6 text-right">{{ maxThreads }}</span>
           </div>
         </div>
@@ -153,14 +147,7 @@ watch(chunkCount, (v) => markDirty('chunkCount', v))
             <p class="text-xs text-gray-500 mt-0.5">跟 IDM等多线程下载器一样，将文件分片下载，提升单文件下载速度，推荐设置为 4</p>
           </div>
           <div class="flex items-center gap-3">
-            <input
-              v-model.number="chunkCount"
-              type="range"
-              class="w-32 h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer"
-              min="1"
-              max="8"
-              step="1"
-            />
+            <Slider v-model="chunkCount" :min="1" :max="8" :step="1" class="w-32" />
             <span class="text-sm font-medium text-primary-600 w-6 text-right">{{ chunkCount }}</span>
           </div>
         </div>
@@ -177,14 +164,7 @@ watch(chunkCount, (v) => markDirty('chunkCount', v))
           </div>
           <div class="flex items-center gap-3">
             <span class="text-xs text-gray-400">1</span>
-            <input
-              v-model.number="speedSlider"
-              type="range"
-              class="flex-1 h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer"
-              min="0"
-              max="21"
-              step="1"
-            />
+            <Slider v-model="speedSlider" :min="0" :max="21" :step="1" class="flex-1" />
             <span class="text-xs text-gray-400">不限</span>
           </div>
         </div>
