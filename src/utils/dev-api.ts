@@ -408,10 +408,10 @@ export function setupDevApi(router: Router): void {
       )
     },
     mockFolders(count = 10) {
-      // 名称/路径构造为不同长度，覆盖 truncate 与铺满样式
+      // 名称构造较长（测 truncate / tooltip 完整显示），路径为常见 .minecraft 目录长度
       const folders = Array.from({ length: count }, (_, i) => ({
-        name: `模拟目录 ${String(i + 1).padStart(2, '0')} 一个较长的名称`,
-        path: `C:\\Users\\Test\\.minecraft\\模拟文件夹${i + 1}\\very\\long\\path\\for\\truncate\\test`,
+        name: `模拟目录 ${String(i + 1).padStart(2, '0')} - 一个较长的整合包文件夹名称`,
+        path: `C:\\Users\\Test\\.minecraft\\模拟文件夹${i + 1}`,
       }))
       window.dispatchEvent(new CustomEvent('molaunch:mock-folders', { detail: folders }))
       console.log(

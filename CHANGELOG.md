@@ -22,7 +22,7 @@
 
 ### Changed
 
-- **修复 Tooltip 中文文本提前换行**（[Tooltip.vue](src/components/common/Tooltip.vue)）：移除 `word-break: break-word`——Chromium 中该属性使 `max-content` 宽度退化为按 `min-content` 计算，中文文本会在空格处提前换行（"第一行右侧还有一半空间就换行"）；移除后名称单行完整显示，路径以 `\`/`/` 为天然断点、360px 内自然换行完整显示。
+- **修复 Tooltip 中文文本提前换行**（[Tooltip.vue](src/components/common/Tooltip.vue)）：`white-space` 由 `pre-line` 改为默认 `normal`——Chromium 中 `pre-line` 会使 `max-content` 宽度退化（中文/短文本在空格处提前换行，"第一行右侧还有一半空间"）；仅含 `\n` 的多行提示（如设置项说明）通过 `tooltip-body--preline` 单独启用 `pre-line`。`mockFolders` 测试数据同步缩短路径为常见 `.minecraft` 目录长度。
 
 - **版本选择页左侧列表布局优化**（[FolderSidebar.vue](src/views/version-select/FolderSidebar.vue)）：文件夹列表容器 `min-h-0 + overflow-y-auto` 纯 flex 方案——内容少时只占内容高度、按钮紧跟其后原位，列表超长时列表区收缩到剩余空间内滚动、按钮区 `flex-none` 停留在底部，滚动条仅作用于文件夹区域；文件夹名称与路径溢出省略时 hover 显示完整内容（复用 Tooltip 组件 `overflowOnly` + `block` 模式，仅省略时才弹提示）。
 

@@ -217,7 +217,15 @@ onUnmounted(() => {
   <div ref="triggerRef" class="tooltip-trigger" :class="{ 'tooltip-trigger--block': block }" @mouseenter="show" @mouseleave="hide" @focus="show" @blur="hide">
     <slot />
     <teleport to="body">
-      <div v-if="visible && text && canShow" ref="tipRef" :style="tipStyle" class="tooltip-body" @mouseenter="cancelHide" @mouseleave="hide">
+      <div
+        v-if="visible && text && canShow"
+        ref="tipRef"
+        :style="tipStyle"
+        class="tooltip-body"
+        :class="{ 'tooltip-body--preline': text.includes('\n') }"
+        @mouseenter="cancelHide"
+        @mouseleave="hide"
+      >
         {{ text }}
         <div class="tooltip-arrow" :style="arrowStyle"></div>
       </div>
@@ -247,12 +255,17 @@ onUnmounted(() => {
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
   width: max-content;
   max-width: 360px;
-  /* 注意：不能加 word-break/overflow-wrap，否则 Chromium 将 max-content 退化按 min-content 计算，
-     中文文本会在空格处提前换行 */
-  white-space: pre-line;
+  /* 默认 normal：避免 pre-line 触发 Chromium max-content 退化（中文/短文本提前换行）；
+     含 \n 的多行文本由 .tooltip-body--preline 单独启用 pre-line */
+  white-space: normal;
   /* 支持鼠标移入复制文字 */
   cursor: text;
   user-select: text;
+}
+
+/* 含 \n 的多行提示（如设置项说明）启用 pre-line 保留换行 */
+.tooltip-body--preline {
+  white-space: pre-line;
 }
 
 .tooltip-arrow {
