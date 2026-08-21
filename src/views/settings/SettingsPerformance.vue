@@ -5,7 +5,7 @@
  */
 import { ref, defineAsyncComponent } from 'vue'
 import { useConfigPage } from '@/composables/useConfigPage'
-import { toastWarning } from '@/utils/toast'
+import { toastSuccess, toastWarning } from '@/utils/toast'
 const ToggleRow = defineAsyncComponent(() => import('@/components/settings/ToggleRow.vue'))
 const Alert = defineAsyncComponent(() => import('@/components/common/Alert.vue'))
 
@@ -30,6 +30,7 @@ function saveGpuAcceleration(v: boolean) {
 function saveReleaseMemoryOnTray(v: boolean) {
   if (!loaded.value) return
   markDirty('releaseMemoryOnTray', v)
+  toastSuccess(v ? '已开启，下次关闭到托盘时释放内存' : '已关闭')
 }
 </script>
 
