@@ -2,6 +2,12 @@
 
 本项目所有重要变更均会记录在此文件中。格式参考 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/)。
 
+## [Unreleased]
+
+### Fixed
+
+- **修复 NBT 解析/保存被限制在启动器存档目录内**（[api.rs](src-tauri/src/commands/tools/nbt/api.rs)）：`resolve_saves_file` 原强制校验 NBT 文件必须位于启动器 `<game_dir>/saves` 目录内，导致解析外部 .minecraft 存档（如手动选择或输入路径）时报「存档目录不存在」误导性错误。改为 `resolve_nbt_file`：绝对路径直通任意 NBT 文件，相对路径基于游戏目录解析，仅保留 canonicalize 规范化与文件存在校验（防 `..` 路径逃逸）；`nbt_parse` / `nbt_save` 均支持查看与编辑外部存档。
+
 ## [0.3.7] - 2026-08-21
 
 ### Added

@@ -6,7 +6,7 @@ use fastnbt::{SerOpts, Value as NbtValue};
 
 use crate::error_util::log_err;
 use crate::log_info;
-use crate::state::AppState;
+use crate::state::{resolve_game_dir, AppState};
 
 use super::super::types::{
     NbtChunkInfo, NbtListSaveFilesParams, NbtListSaveFilesResult, NbtNode, NbtParseParams,
@@ -17,21 +17,19 @@ use super::convert::{convert_nbt, node_to_value};
 use super::mca::{parse_mca, save_mca_chunk};
 use super::scan::collect_save_files;
 
-/// 校验 file_path 位于存档目录（saves）内，返回规范化后的绝对路径
+/// 解析并规范化 NBT 文件路径，校验文件存在
 ///
-/// canonicalize 解析符号链接与 `..` 后，再校验前缀，防止任意文件读写。
-async fn resolve_saves_file(state: &AppState, file_path: &str) -> Result<PathBuf, String> {
-    let saves_dir = super::super::archive::resolve_saves_dir(state, None).await;
-    let saves_canon = saves_dir
-        .canonicalize()
-        .map_err(log_err("存档目录不存在"))?;
-    let file_canon = Path::new(file_path)
-        .canonicalize()
-        .map_err(log_err("NBT 文件不存在"))?;
-    if !file_canon.starts_with(&saves_canon) {
-        return Err("NBT 文件必须在存档目录内".to_string());
-    }
-    Ok(file_canon)
+/// 绝对路径直通（支持外部存档 / 任意 NBT 文件）；相对路径基于游戏目录解析；
+/// canonicalize 解析符号链接与 `..`，防止路径逃逸。
+async fn resolve_nbt_file(state: &AppState, file_path: &str) -> Result<PathBuf, String> {
+    let raw = Path::new(file_path);
+    let path = if raw.is_absolute() {
+        raw.to_path_buf()
+    } else {
+        let game_dir = { state.config.lock().await.game_dir.clone() };
+        resolve_game_dir(&game_dir).join(raw)
+    };
+    path.canonicalize().map_err(log_err("NBT 文件不存在"))
 }
 
 /// 解析 NBT / mca 文件，返回 NbtNode 树（或 mca 的区块列表）
@@ -39,7 +37,7 @@ async fn resolve_saves_file(state: &AppState, file_path: &str) -> Result<PathBuf
 /// 读取 `params.file_path` 指定的文件：普通 NBT（gzip 或原始）解析为树；
 /// .mca 按 Anvil 容器解析，返回全部有效区块的 NBT 树。
 pub async fn parse(state: &AppState, params: NbtParseParams) -> Result<serde_json::Value, String> {
-    let file_path = resolve_saves_file(state, &params.file_path).await?;
+    let file_path = resolve_nbt_file(state, &params.file_path).await?;
     log_info!("[NBT] 解析文件: {}", file_path.display());
 
     let (root_name, root_value, file_type, chunks) = tokio::task::spawn_blocking(
@@ -97,7 +95,7 @@ pub async fn parse(state: &AppState, params: NbtParseParams) -> Result<serde_jso
 /// 普通 NBT 文件：NbtNode 树序列化后写回（原 gzip 则保持 gzip）。
 /// mca 文件：整体重打包（保留其他区块原字节与时间戳表），写回指定区块。
 pub async fn save(state: &AppState, params: NbtSaveParams) -> Result<serde_json::Value, String> {
-    let file_path = resolve_saves_file(state, &params.file_path).await?;
+    let file_path = resolve_nbt_file(state, &params.file_path).await?;
     let fp = file_path.clone();
     let root = params.root;
     let chunk_index = params.chunk_index;
