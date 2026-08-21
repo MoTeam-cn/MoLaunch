@@ -49,6 +49,8 @@ export interface ConfigSnapshot {
   closeBehavior: string
   /** 实验性功能开关（开启后顶部导航显示「实验性」入口并初始化 SQLite 聊天存储） */
   experimentalEnabled: boolean
+  /** 启动器界面 GPU 硬件加速（默认开启；关闭后 WebView2 走软件渲染，需重启生效） */
+  useGpuAcceleration: boolean
   // 社区资源
   communitySource: number
   communityFilenameFormat: number
@@ -134,6 +136,8 @@ export interface ConfigPatch {
   closeBehavior?: string
   /** 实验性功能开关（开启后显示「实验性」入口并惰性初始化 SQLite 聊天存储） */
   experimentalEnabled?: boolean
+  /** 启动器界面 GPU 硬件加速（关闭后 WebView2 走软件渲染，需重启生效） */
+  useGpuAcceleration?: boolean
   // 社区资源（INI 明文）
   communitySource?: number                                 // 0/1/2
   communityFilenameFormat?: number                         // 0-4
