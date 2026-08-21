@@ -17,6 +17,7 @@ import {
 const Tag = defineAsyncComponent(() => import('@/components/common/Tag.vue'))
 const Input = defineAsyncComponent(() => import('@/components/common/Input.vue'))
 const Tooltip = defineAsyncComponent(() => import('@/components/common/Tooltip.vue'))
+const Select = defineAsyncComponent(() => import('@/components/common/Select.vue'))
 import type { NbtNode } from '@/utils/api/tools'
 
 const props = withDefaults(
@@ -42,6 +43,9 @@ const NBT_TYPES = [
   'byte', 'short', 'int', 'long', 'float', 'double',
   'string', 'compound', 'list', 'byte_array', 'int_array', 'long_array',
 ]
+
+/** 新增子节点的类型选项（NBT_TYPES 转 Select 选项） */
+const typeOptions = computed(() => NBT_TYPES.map((t) => ({ label: t, value: t })))
 
 const key = computed(() => props.path + '/' + node.name + ':' + node.tag_type)
 const isExpanded = computed(() => props.expandedSet.has(key.value))
@@ -258,12 +262,7 @@ function removeNode() {
     <!-- 新增子节点表单（compound） -->
     <div v-if="addMode" class="ml-6 flex items-center gap-1.5 py-1">
       <Input v-model="addName" size="small" class="w-32" placeholder="字段名" @keydown.enter="confirmAdd" />
-      <select
-        v-model="addType"
-        class="h-7 rounded-md border border-gray-200 bg-white px-1.5 text-xs text-gray-700 outline-none focus:border-primary-400"
-      >
-        <option v-for="t in NBT_TYPES" :key="t" :value="t">{{ t }}</option>
-      </select>
+      <Select v-model="addType" :options="typeOptions" class="w-28" />
       <Tooltip text="确认">
         <button class="rounded p-1 text-gray-500 hover:text-primary-600" @click="confirmAdd">
           <CheckIcon class="h-3.5 w-3.5" />
