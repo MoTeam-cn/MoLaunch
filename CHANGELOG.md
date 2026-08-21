@@ -18,6 +18,8 @@
 
 ### Changed
 
+- **调色板工具 RGB 滑块改用自定义 Slider 组件**（[ColorPalette.vue](src/views/tools/calc/ColorPalette.vue)）：R/G/B 3 处原生 `<input type="range">` 替换为项目自定义 `Slider.vue`（连同数字输入的自研 `Input`，RGB 编辑区全部组件化），并移除过时的「无自研组件」注释。
+
 - **版本设置-内存滑块改用自定义 Slider 组件**（[MemorySection.vue](src/views/version-settings/MemorySection.vue)）：版本独立自定义分配模式下最大/最小内存 2 处原生 `<input type="range">` 替换为项目自定义 `Slider.vue`，沿用 primary 配色与紧凑风格。
 
 - **设置-AI 超时滑块改用自定义 Slider 组件**（[AiEndpointSettings.vue](src/views/settings/AiEndpointSettings.vue)）：模型分析请求超时设置的原生 `<input type="range">` 替换为项目自定义 `Slider.vue`，沿用 primary 配色与紧凑风格。

@@ -14,6 +14,7 @@ import { SwatchIcon, ClipboardIcon } from '@heroicons/vue/24/outline'
 const Input = defineAsyncComponent(() => import('@/components/common/Input.vue'))
 const Button = defineAsyncComponent(() => import('@/components/common/Button.vue'))
 const Tooltip = defineAsyncComponent(() => import('@/components/common/Tooltip.vue'))
+const Slider = defineAsyncComponent(() => import('@/components/common/Slider.vue'))
 import { toastSuccess, toastError } from '@/utils/toast'
 import { copyToClipboard } from '@/utils/seedmap/format'
 
@@ -162,21 +163,21 @@ const formatCodes = [
         </div>
       </div>
 
-      <!-- RGB 滑块（range 类型无自研组件，保留原生 input range；数字输入用自研 Input） -->
+      <!-- RGB 滑块 + 数字输入，均使用自研组件（Slider / Input） -->
       <div class="space-y-2">
         <div class="flex items-center gap-2">
           <span class="w-4 text-xs font-medium text-gray-600">R</span>
-          <input v-model.number="r" type="range" min="0" max="255" class="flex-1 h-1.5 cursor-pointer" />
+          <Slider v-model="r" :min="0" :max="255" class="flex-1" />
           <Input v-model.number="r" type="number" size="small" width="64px" />
         </div>
         <div class="flex items-center gap-2">
           <span class="w-4 text-xs font-medium text-gray-600">G</span>
-          <input v-model.number="g" type="range" min="0" max="255" class="flex-1 h-1.5 cursor-pointer" />
+          <Slider v-model="g" :min="0" :max="255" class="flex-1" />
           <Input v-model.number="g" type="number" size="small" width="64px" />
         </div>
         <div class="flex items-center gap-2">
           <span class="w-4 text-xs font-medium text-gray-600">B</span>
-          <input v-model.number="b" type="range" min="0" max="255" class="flex-1 h-1.5 cursor-pointer" />
+          <Slider v-model="b" :min="0" :max="255" class="flex-1" />
           <Input v-model.number="b" type="number" size="small" width="64px" />
         </div>
       </div>
