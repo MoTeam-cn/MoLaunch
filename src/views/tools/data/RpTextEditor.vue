@@ -8,6 +8,7 @@ import { computed, ref, watch, defineAsyncComponent } from 'vue'
 import { CheckIcon, DocumentTextIcon, ExclamationTriangleIcon } from '@heroicons/vue/24/outline'
 import Tooltip from '@/components/common/Tooltip.vue'
 const Button = defineAsyncComponent(() => import('@/components/common/Button.vue'))
+const Input = defineAsyncComponent(() => import('@/components/common/Input.vue'))
 import { toastError, toastSuccess } from '@/utils/toast'
 import { rpWrite } from '@/utils/api/tools'
 
@@ -104,13 +105,14 @@ async function doSave() {
     <div v-if="dirty && jsonError" class="rounded border border-red-200 bg-red-50 px-2 py-1 text-xs text-red-600">
       {{ jsonError }}
     </div>
-    <textarea
+    <Input
       v-model="text"
-      rows="12"
+      textarea
+      :rows="12"
       spellcheck="false"
-      class="h-[272px] w-full resize-y rounded border border-gray-200 bg-gray-50 p-3 font-mono text-xs text-gray-700 focus:border-blue-400 focus:outline-none"
       placeholder="文件内容..."
-    ></textarea>
+      class="font-mono"
+    />
     <div class="flex items-center gap-2">
       <slot name="actions" />
       <Button
