@@ -9,6 +9,7 @@
  * items/tags 按版本懒加载；图集为全量加载。
  */
 import type { CustomItem, CustomTag, JavaVersionId, RecipeSlotContext } from './types'
+import { getJson } from '@/utils/request'
 
 export type AssetItem = {
   id: string
@@ -42,9 +43,7 @@ const atlasLayoutUrl = new URL('./assets/texture-atlas.json', import.meta.url).h
 const atlasPngUrl = new URL('./assets/texture-atlas.png', import.meta.url).href
 
 async function fetchJson<T>(url: string): Promise<T> {
-  const res = await fetch(url)
-  if (!res.ok) throw new Error(`加载资源失败：${url}（HTTP ${res.status}）`)
-  return res.json() as Promise<T>
+  return getJson<T>(url)
 }
 
 const atlasLayoutPromise = fetchJson<AtlasLayout>(atlasLayoutUrl)

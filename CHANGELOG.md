@@ -6,6 +6,7 @@
 
 ### Changed
 
+- **前端引入 axios 统一请求客户端**（[request.ts](src/utils/request.ts)）：新增 `getJson` / `postForm` / `getText` 三个封装（默认 15s 超时），JSON / 文本请求统一走 axios，替代散落的原生 `fetch`；wasm 二进制加载与 PNG blob 解码等需要 Response 流的场景保留 fetch。改造范围：[logShare.ts](src/utils/logShare.ts)（mclo.gs / logshare.cn 上传与分析）、[githubProxy.ts](src/utils/githubProxy.ts)（镜像源清单）、[resources.ts](src/utils/recipe-generator/resources.ts)（合成配方资源）、[previewResources.ts](src/utils/resourcepack/previewResources.ts)（资源包预览原版内置资源，atlas PNG 保留 fetch）。注：WebView 内 axios 走 XMLHttpRequest，浏览器强制忽略自定义 User-Agent 头，需要自定义 UA 的请求必须走后端 reqwest 转发。
 - **mclo.gs 云端分析改用新版接口流程**（[logShare.ts](src/utils/logShare.ts) / [CrashDialog.vue](src/components/common/CrashDialog.vue)）：不再直调旧版 `/1/analyse`，改为先 `POST /1/log` 上传获取日志 id，再 `GET /1/log/{id}?insights=1` 拉取 Insights（problems 位于 `content.insights.analysis`）；识别出问题即展示云端分析卡片，失败静默不影响崩溃弹窗。
 - **崩溃弹窗新增 mclo.gs 云端自动分析**（[CrashDialog.vue](src/components/common/CrashDialog.vue) / [logShare.ts](src/utils/logShare.ts)）：崩溃后自动调 mclo.gs（Insights），识别出问题（problems 非空）即在弹窗展示云端分析卡片（标题 / 描述 / 解决方案）；失败静默不影响崩溃弹窗。分享与脱敏为纯前端实现（脱敏镜像后端 logger/sanitize.rs 正则模式，后端日志读取路径已复用）。
 - **版本设置页新增「实例日志」页签**（[VersionSettings.vue](src/views/VersionSettings.vue) / [LogsTab.vue](src/views/version-settings/LogsTab.vue)）：侧栏新增实例日志入口，内容区下拉框选择实例 `logs/` 下日志文件（.log / .log.gz 自动解压），顶部工具栏支持刷新与「分享日志」（复用 mclo.gs / logshare.cn 浮层，上传前脱敏，成功打开分享页）；分享服务选项提取到 [logShare.ts](src/utils/logShare.ts) 的 `LOG_SHARE_PROVIDERS` 供崩溃弹窗与日志页复用。

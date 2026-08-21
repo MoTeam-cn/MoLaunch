@@ -3,10 +3,12 @@
  *
  * 分享为纯前端实现，上传前脱敏（镜像后端 logger/sanitize.rs 正则模式，
  * 后端日志读取路径已复用 sanitize.rs，此处为分享路径兜底）。
+ * 请求统一走 axios 客户端（src/utils/request.ts）。
  * 支持两个服务：
  * - mclo.gs：国际主流，POST https://api.mclo.gs/1/log（form: content=）
  * - logshare.cn：国内访问快，POST https://api.logshare.cn/v1/log（同构接口）
  */
+import { postForm, getJson } from '@/utils/request'
 
 export type LogShareProvider = 'mclogs' | 'logshare'
 
@@ -64,14 +66,7 @@ export async function uploadLogShare(
   provider: LogShareProvider,
 ): Promise<string> {
   const conf = PROVIDERS[provider]
-  const body = new URLSearchParams({ content })
-  const res = await fetch(conf.endpoint, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-    body,
-  })
-  if (!res.ok) throw new Error(`HTTP ${res.status}`)
-  const data: { id?: string; url?: string } | null = await res.json().catch(() => null)
+  const data = await postForm<{ id?: string; url?: string }>(conf.endpoint, { content })
   const id = data?.id
   const url = data?.url || (id ? conf.fallbackUrl(id) : '')
   if (!url) throw new Error('服务响应缺少分享链接')
@@ -100,17 +95,8 @@ export interface MclogsAnalysis {
  */
 export async function analyseLogShare(content: string): Promise<MclogsAnalysis | null> {
   // 1) 先上传，拿到日志 id
-  const upRes = await fetch('https://api.mclo.gs/1/log', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-    body: new URLSearchParams({ content }),
-  })
-  if (!upRes.ok) throw new Error(`HTTP ${upRes.status}`)
-  const upData: { id?: string } | null = await upRes.json().catch(() => null)
+  const upData = await postForm<{ id?: string }>('https://api.mclo.gs/1/log', { content })
   if (!upData?.id) throw new Error('上传响应缺少日志 id')
   // 2) 再按 id 拉取 Insights 分析
-  const res = await fetch(`https://api.mclo.gs/1/log/${upData.id}?insights=1`)
-  if (!res.ok) throw new Error(`HTTP ${res.status}`)
-  const data: MclogsAnalysis | null = await res.json().catch(() => null)
-  return data
+  return getJson<MclogsAnalysis>(`https://api.mclo.gs/1/log/${upData.id}?insights=1`)
 }

@@ -28,6 +28,7 @@ import nonSelfCullingTxtUrl from '@mattzh72/lodestone/assets/default-pack/block-
 import opaqueTxtUrl from '@mattzh72/lodestone/assets/default-pack/block-flags/opaque.txt?url'
 import transparentTxtUrl from '@mattzh72/lodestone/assets/default-pack/block-flags/transparent.txt?url'
 import emissiveJsonUrl from '@mattzh72/lodestone/assets/default-pack/block-flags/emissive.json?url'
+import { getJson, getText } from '@/utils/request'
 
 /** rp_read_many 返回的单文件条目 */
 export interface RpPreviewFile {
@@ -63,36 +64,32 @@ export function getVanillaBase(): Promise<VanillaPackBase> {
 }
 
 async function loadVanillaBase(): Promise<VanillaPackBase> {
-  const [assetsRes, atlasRes, opaqueRes, transparentRes, nonSelfCullingRes, emissiveRes] =
-    await Promise.all([
-      fetch(assetsJsonUrl),
-      fetch(atlasPngUrl),
-      fetch(opaqueTxtUrl),
-      fetch(transparentTxtUrl),
-      fetch(nonSelfCullingTxtUrl),
-      fetch(emissiveJsonUrl),
-    ])
-  const resList = [
-    assetsRes,
-    atlasRes,
-    opaqueRes,
-    transparentRes,
-    nonSelfCullingRes,
-    emissiveRes,
-  ]
-  const failed = resList.find((r) => !r.ok)
-  if (failed) throw new Error(`原版内置资源加载失败: ${failed.status} ${failed.statusText}`)
-  const assets = await assetsRes.json()
+  const [assets, atlasBlob, opaque, transparent, nonSelfCulling, emissive] = await Promise.all([
+    getJson<{
+      blockstates: Record<string, unknown>
+      models: Record<string, unknown>
+      textures: Record<string, [number, number, number, number]>
+    }>(assetsJsonUrl),
+    // PNG 二进制需要 blob 解码，保留 fetch
+    fetch(atlasPngUrl).then(async (res) => {
+      if (!res.ok) throw new Error(`原版内置资源加载失败: ${res.status} ${res.statusText}`)
+      return res.blob()
+    }),
+    getText(opaqueTxtUrl),
+    getText(transparentTxtUrl),
+    getText(nonSelfCullingTxtUrl),
+    getJson<Record<string, { intensity?: number; conditional?: string }>>(emissiveJsonUrl),
+  ])
   // lodestone 只特判 builtin/generated；内置 item 模板（如 item/milk_bucket）的 parent 是 builtin/entity，
   // 缺失会导致其 flatten 时被静默清空、引用它们的模型渲染黑屏。注入等价定义使其生成 layer0 平面。
   assets.models ??= {}
   assets.models['builtin/entity'] = { parent: 'builtin/generated' }
-  const atlas = await decodeAtlasToImageData(await atlasRes.blob())
+  const atlas = await decodeAtlasToImageData(atlasBlob)
   const flags = {
-    opaque: parseBlockList(await opaqueRes.text()),
-    transparent: parseBlockList(await transparentRes.text()),
-    nonSelfCulling: parseBlockList(await nonSelfCullingRes.text()),
-    emissive: (await emissiveRes.json()) as Record<string, { intensity?: number; conditional?: string }>,
+    opaque: parseBlockList(opaque),
+    transparent: parseBlockList(transparent),
+    nonSelfCulling: parseBlockList(nonSelfCulling),
+    emissive,
   }
   return { assets, atlas, flags, resources: createResourcesFromPack({ assets, atlas, flags }) }
 }

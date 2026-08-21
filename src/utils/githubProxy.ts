@@ -13,13 +13,14 @@ import proxyJsonUrl from '@/assets/Common/githubProxy.json?url'
 import type { GithubProxy } from '@/types/online'
 import { getConfigMap } from '@/utils/api/config'
 import { probeGithubProxies, setGithubProxies } from '@/utils/api/online-manager/easytier'
+import { getJson } from '@/utils/request'
 
 /** 启动时筛选出的默认源缓存（设置页"恢复默认"复用） */
 let defaultProxies: GithubProxy[] = []
 
 /** 读取镜像源清单，交给后端测速筛选（随机抽 30 个，返回最快 10 个） */
 async function probeDefaults(): Promise<GithubProxy[]> {
-  const proxyData = (await (await fetch(proxyJsonUrl)).json()) as { sources: GithubProxy[] }
+  const proxyData = await getJson<{ sources: GithubProxy[] }>(proxyJsonUrl)
   const sources = (proxyData.sources ?? []) as GithubProxy[]
   if (sources.length === 0) return []
   return probeGithubProxies(sources)
