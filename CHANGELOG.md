@@ -26,7 +26,7 @@
 
 - **性能设置开关切换增加操作提示**（[SettingsPerformance.vue](src/views/settings/SettingsPerformance.vue)）：「关闭到托盘时释放内存」开关切换时弹出成功提示（开启提示"下次关闭到托盘时释放内存"，关闭提示"已关闭"），与 GPU 加速开关的提示行为保持一致。
 
-- **关闭到托盘时可挂起 WebView2 释放渲染资源**（[webview_suspend.rs](src-tauri/src/webview_suspend.rs) / [lib.rs](src-tauri/src/lib.rs) / [tray.rs](src-tauri/src/tray.rs) / [SettingsPerformance.vue](src/views/settings/SettingsPerformance.vue)）：新增「性能 → 关闭到托盘时释放内存」开关（默认关闭，配置项 `release_memory_on_tray` 已预设进默认 config.ini）。开启后关闭到托盘时不再仅 `hide()`，额外调用 WebView2 `ICoreWebView2_4::TrySuspend` 挂起——渲染/GPU 资源释放、内存换出（降约 50~70%），DOM/JS 状态完整保留；托盘点击 / 单实例唤起恢复时 `Resume()` 同步解挂、秒回且界面状态（含启动中的游戏进程状态）原样保留，无需重建窗口或重载前端。配置链路（models/defaults/snapshot/patch/entry/fields/load/save）同步扩展，开关变更即时生效无需重启。
+- **关闭到托盘时可释放内存降低占用（约 50~70%）**：关闭到托盘时挂起 WebView2 释放渲染资源（渲染/GPU 资源释放、内存换出），从托盘恢复时界面秒回、内容不变（含进行中的游戏启动状态）；新增「性能 → 关闭到托盘时释放内存」开关（默认关闭，配置项 `release_memory_on_tray` 已预设进默认 config.ini，变更即时生效无需重启）。实现：[webview_suspend.rs](src-tauri/src/webview_suspend.rs) / [lib.rs](src-tauri/src/lib.rs) / [tray.rs](src-tauri/src/tray.rs) / [SettingsPerformance.vue](src/views/settings/SettingsPerformance.vue)。
 
 - **Tooltip 新增 `singleLine` 单行模式**（[Tooltip.vue](src/components/common/Tooltip.vue) / [FolderSidebar.vue](src/views/version-select/FolderSidebar.vue)）：`nowrap` + 取消最大宽度，用于路径/名称完整一行展示，避免长路径在连字符等自然断点处提前换行（如 `src-tauri` 在 `-` 后断行）；版本选择页文件夹名称与路径 tooltip 已启用。
 
