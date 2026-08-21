@@ -117,7 +117,7 @@ defineExpose({ loadFolders })
 </script>
 
 <template>
-  <aside class="flex w-[37.5%] flex-none flex-col border-r border-gray-200 bg-white">
+  <aside class="flex w-[28.57%] flex-none flex-col border-r border-gray-200 bg-white">
     <!-- 滚动区（对齐 Settings 侧边栏：py-4，按钮自带 px-4） -->
     <div data-inner-scroll class="flex-1 overflow-y-auto py-4">
       <!-- 文件夹项（对齐 Settings 选中态：右侧 border 高亮 + bg-primary-50 满色 + Heroicons 图标 w-5 h-5 mr-3） -->
