@@ -46,7 +46,7 @@
     </div>
 
     <!-- 云端分析（mclo.gs Insights，崩溃后自动发起） -->
-    <div v-if="cloudProblems.length > 0" class="mt-5">
+    <div v-if="cloudProblems.length > 0 || cloudInformation.length > 0" class="mt-5">
       <p class="mb-1.5 text-xs font-medium text-gray-500">云端分析（mclo.gs）</p>
       <div
         v-for="(p, index) in cloudProblems"
@@ -60,6 +60,16 @@
         <p v-if="p.solution" class="mt-1 text-xs leading-relaxed break-all text-red-600">
           解决方案：{{ p.solution }}
         </p>
+      </div>
+      <div v-if="cloudInformation.length > 0" class="rounded-md border border-gray-200 bg-gray-50 px-3 py-2.5">
+        <div
+          v-for="(info, index) in cloudInformation"
+          :key="index"
+          class="flex items-start gap-2 py-0.5 text-xs leading-relaxed text-gray-600"
+        >
+          <span v-if="info.label" class="shrink-0 font-medium text-gray-700">{{ info.label }}：</span>
+          <span class="min-w-0 break-all">{{ info.value ?? info.message }}</span>
+        </div>
       </div>
     </div>
 
@@ -207,6 +217,8 @@ const reason = computed(() => lastCrash.value.reason || '未知原因')
 const suggestion = computed(() => lastCrash.value.suggestion?.trim() ?? '')
 /** 云端分析识别出的问题列表（非空才展示卡片） */
 const cloudProblems = computed(() => cloudAnalysis.value?.content?.insights?.analysis?.problems ?? [])
+/** 云端分析识别的信息条目（如游戏/加载器版本，无 problems 时也能展示） */
+const cloudInformation = computed(() => cloudAnalysis.value?.content?.insights?.analysis?.information ?? [])
 
 /**
  * 建议文本拆分为多行展示：
@@ -257,13 +269,14 @@ function buildShareContent(): string {
   return lines.filter(Boolean).join('\n')
 }
 
-/** 崩溃后自动调 mclo.gs Insights 云端分析（先上传再拉取），有 problems 才展示 */
+/** 崩溃后自动调 mclo.gs Insights 云端分析（先上传再拉取），有 problems 或 information 才展示 */
 async function runCloudAnalysis() {
   const content = buildShareContent()
   if (!content) return
   try {
     const data = await analyseLogShare(sanitizeShareLog(content))
-    if (data?.content?.insights?.analysis?.problems?.length) {
+    const analysis = data?.content?.insights?.analysis
+    if (analysis && (analysis.problems?.length || analysis.information?.length)) {
       cloudAnalysis.value = data
     }
   } catch {

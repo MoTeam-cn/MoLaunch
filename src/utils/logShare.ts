@@ -87,7 +87,8 @@ export interface MclogsAnalysis {
       type?: string
       analysis?: {
         problems?: Array<{ title?: string; description?: string; solution?: string; type?: string }>
-        information?: unknown[]
+        /** 版本识别等信息条目（label/value/message） */
+        information?: Array<{ label?: string; value?: string; message?: string }>
       }
     }
   }

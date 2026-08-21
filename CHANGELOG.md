@@ -20,6 +20,7 @@
 ### Fixed
 
 - **崩溃弹窗 mclo.gs 云端分析结果永不展示**（[logShare.ts](src/utils/logShare.ts) / [CrashDialog.vue](src/components/common/CrashDialog.vue)）：新版 Insights 响应中 problems 位于 `content.insights.analysis.problems`，此前接口类型与读取路径少了一层 `analysis`，导致 `problems` 恒为空、分析卡片永不出现；已同步修正 `MclogsAnalysis` 类型定义与 CrashDialog 的读取/判断逻辑。
+- **崩溃弹窗补充展示 mclo.gs 云端识别信息**（[CrashDialog.vue](src/components/common/CrashDialog.vue)）：此前仅展示 `problems`（问题条目），`information`（如游戏/加载器版本识别）被丢弃，导致无匹配问题模式时云端分析区整块隐藏；现 `problems` 或 `information` 任一非空即展示「云端分析（mclo.gs）」卡片，版本识别信息以列表形式呈现。
 - **实例日志读取失败（stream did not contain valid UTF-8）**（[logs.rs](src-tauri/src/commands/version/logs.rs)）：日志含非 UTF-8 字节（如乱码/异常字符）时 `read_to_string` 直接失败；改为按字节读取（.gz 先解压），UTF-8 优先、失败回退 GBK/GB18030（老版本 MC / 中文 Windows 日志常见编码），中文日志不再乱码。    
 - **联机加入房间不再弹「探测失败」错误**（[RoomGuestPanel.vue](src/components/online/RoomGuestPanel.vue)）：首次进入房间的探测失败静默处理——组网收敛需要时间，探测失败属正常过程，由端口轮询自动补上（连续失败 3 次才去抖提示一次"暂时无法连接房主"），避免每次加入必弹错误。
 
