@@ -29,6 +29,8 @@ pub fn setup_tray(app: &AppHandle) -> tauri::Result<()> {
             "open" => open_main_window(app),
             "check-update" => {
                 log_info!("[Tray] 检查更新");
+                // 先置顶主窗口再通知前端：窗口隐藏到托盘/最小化时，弹窗对用户可见
+                open_main_window(app);
                 // 通知前端复用现有检查更新流程（弹窗/提示由前端掌控）
                 let _ = app.emit("tray-check-update", ());
             }
