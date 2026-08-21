@@ -1,15 +1,16 @@
 <script setup lang="ts">
 /**
  * 结束游戏悬浮按钮
- * 右下角圆钮，视觉与 BackToTop 完全统一：主题色底 + 关闭图标。
+ * 右下角圆钮，视觉与 BackToTop 完全统一：主题色底 + 停止方块图标。
  * 显示前提：游戏已启动（runningPid 非空），点击调用 store 的 stopGame 停止游戏。
  * 位置协调：贴底（bottom 24px），BackToTop 在其可见时上移避让。
  */
 
 import { watch, onUnmounted } from 'vue'
-import { XMarkIcon } from '@heroicons/vue/24/solid'
+import { StopIcon } from '@heroicons/vue/24/solid'
 import { useVersionStore } from '@/stores/version'
 import { stopGameVisible } from '@/composables/useFloatingButtonState'
+import Tooltip from '@/components/common/Tooltip.vue'
 
 const versionStore = useVersionStore()
 
@@ -30,25 +31,38 @@ onUnmounted(() => { stopGameVisible.value = false })
 
 <template>
   <Transition name="stop-game">
-    <button
+    <!-- fixed 定位落在 Tooltip 根元素（trigger）上，按钮撑满；悬浮提示"结束游戏" -->
+    <Tooltip
       v-if="versionStore.runningPid"
-      class="stop-game-btn"
-      title="结束游戏"
-      @click="handleStopGame"
+      class="stop-game-trigger"
+      text="结束游戏"
+      position="top"
     >
-      <XMarkIcon class="w-5 h-5 text-white" />
-    </button>
+      <button
+        class="stop-game-btn"
+        title="结束游戏"
+        @click="handleStopGame"
+      >
+        <StopIcon class="w-5 h-5 text-white" />
+      </button>
+    </Tooltip>
   </Transition>
 </template>
 
 <style scoped>
-.stop-game-btn {
+/* fixed 定位在 Tooltip 根元素（trigger），确保 tooltip 位置基准正确 */
+.stop-game-trigger {
   position: fixed;
   bottom: 24px;
   right: 24px;
   z-index: 50;
   width: 44px;
   height: 44px;
+}
+
+.stop-game-btn {
+  width: 100%;
+  height: 100%;
   border-radius: 50%;
   background: var(--color-primary-600);
   border: none;
@@ -67,7 +81,7 @@ onUnmounted(() => { stopGameVisible.value = false })
 }
 
 .stop-game-btn:active {
-  transform: translateY(0) scale(0.95);
+  transform: scale(0.95);
 }
 
 /* 进入/离开动画（简洁淡入滑入） */
