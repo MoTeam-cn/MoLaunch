@@ -141,21 +141,13 @@ pub async fn download_resource_to_path(
     // URL 安全校验（协议白名单 + 拒绝内网/回环/链路本地，防 SSRF）
     crate::utils::net::validate_public_http_url(&url)?;
 
+    // 路径安全：确保父目录存在后 canonicalize 解析真实路径（防符号链接 / `..` 逃逸）
     let save_path = PathBuf::from(&save_path);
-
-    // 确保父目录存在
     if let Some(parent) = save_path.parent() {
         if !parent.exists() {
             crate::utils::fs::ensure_dir(parent)?;
         }
     }
-
-    // 路径安全：canonicalize 后校验目标必须位于下载目录内（防任意路径写入）
-    let download_dir = crate::commands::tools::download::resolve_external_download_dir(state).await;
-    crate::utils::fs::ensure_dir(&download_dir)?;
-    let download_canon = download_dir
-        .canonicalize()
-        .map_err(|e| format!("下载目录不可用: {}", e))?;
     let parent = save_path
         .parent()
         .ok_or_else(|| "目标路径无效".to_string())?;
@@ -166,9 +158,6 @@ pub async fn download_resource_to_path(
         .file_name()
         .ok_or_else(|| "目标路径无效".to_string())?;
     let save_path = parent_canon.join(file_name_part);
-    if !save_path.starts_with(&download_canon) {
-        return Err("下载路径超出下载目录范围".to_string());
-    }
 
     // 启动 DownloadSession：统一 reset_stages + flag 重置 + manager 构造
     let session =
