@@ -18,6 +18,8 @@
 
 ### Changed
 
+- **资源包编辑器-语言文件键值输入改用自定义 Input 组件**（[RpLangTable.vue](src/views/tools/data/RpLangTable.vue)）：lang 键值表格中的键名/值 2 处原生 `<input>` 替换为项目自定义 `Input.vue`（mini 紧凑尺寸，键名列保留等宽字体）。
+
 - **资源包编辑器-文件树搜索框改用自定义 Input 组件**（[RpFileTreePanel.vue](src/views/tools/data/RpFileTreePanel.vue)）：搜索文件的原生 `<input>` 替换为项目自定义 `Input.vue`，搜索图标改用 prefix 插槽、清除按钮改用内建 clearable（移除手写绝对定位图标与清除按钮）。
 
 - **调色板工具 RGB 滑块改用自定义 Slider 组件**（[ColorPalette.vue](src/views/tools/calc/ColorPalette.vue)）：R/G/B 3 处原生 `<input type="range">` 替换为项目自定义 `Slider.vue`（连同数字输入的自研 `Input`，RGB 编辑区全部组件化），并移除过时的「无自研组件」注释。

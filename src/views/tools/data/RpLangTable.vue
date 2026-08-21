@@ -6,6 +6,7 @@ import { computed, ref, watch, defineAsyncComponent } from 'vue'
 import { CheckIcon, LanguageIcon, PlusIcon, TrashIcon, ExclamationTriangleIcon } from '@heroicons/vue/24/outline'
 const Button = defineAsyncComponent(() => import('@/components/common/Button.vue'))
 const Tooltip = defineAsyncComponent(() => import('@/components/common/Tooltip.vue'))
+const Input = defineAsyncComponent(() => import('@/components/common/Input.vue'))
 import { toastError, toastSuccess } from '@/utils/toast'
 import { rpWrite } from '@/utils/api/tools'
 
@@ -129,18 +130,10 @@ async function doSave() {
         <tbody class="divide-y divide-gray-100">
           <tr v-for="(e, i) in entries" :key="i" class="align-top">
             <td class="px-2 py-1">
-              <input
-                v-model="e.key"
-                class="w-full rounded border border-gray-300 px-2 py-1 font-mono text-xs text-gray-700 focus:border-blue-400 focus:outline-none"
-                placeholder="键名"
-              />
+              <Input v-model="e.key" placeholder="键名" size="mini" class="font-mono" />
             </td>
             <td class="px-2 py-1">
-              <input
-                v-model="e.value"
-                class="w-full rounded border border-gray-300 px-2 py-1 text-xs text-gray-700 focus:border-blue-400 focus:outline-none"
-                placeholder="值"
-              />
+              <Input v-model="e.value" placeholder="值" size="mini" />
             </td>
             <td class="px-2 py-1">
               <Tooltip text="删除">
