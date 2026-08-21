@@ -247,7 +247,8 @@ onUnmounted(() => {
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
   width: max-content;
   max-width: 360px;
-  word-break: break-word;
+  /* 注意：不能加 word-break/overflow-wrap，否则 Chromium 将 max-content 退化按 min-content 计算，
+     中文文本会在空格处提前换行 */
   white-space: pre-line;
   /* 支持鼠标移入复制文字 */
   cursor: text;
