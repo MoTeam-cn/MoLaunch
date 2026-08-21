@@ -11,15 +11,21 @@ import { computed } from 'vue'
 import { useRouter } from 'vue-router'
 import { useVersionStore } from '@/stores/version'
 import { ArrowDownTrayIcon } from '@heroicons/vue/24/solid'
-import { backToTopVisible } from '@/composables/useFloatingButtonState'
+import { backToTopVisible, stopGameVisible } from '@/composables/useFloatingButtonState'
 
 const router = useRouter()
 const versionStore = useVersionStore()
 
-/** BackToTop 可见时上移避让，不可见时贴底 */
-const positionClass = computed(() =>
-  backToTopVisible.value ? 'bottom-24' : 'bottom-6',
-)
+/**
+ * 位置协调：右下角浮动按钮自底向上为 结束游戏 → BackToTop → 本按钮，
+ * 下方按钮可见时依次上移避让：仅 BackToTop → bottom-24(96px)；结束游戏可见
+ * → bottom-40(160px)；均不可见贴底 bottom-6(24px)。
+ */
+const positionClass = computed(() => {
+  if (stopGameVisible.value) return 'bottom-40'
+  if (backToTopVisible.value) return 'bottom-24'
+  return 'bottom-6'
+})
 
 function goToDownloads() {
   router.push('/apps/downloads')

@@ -12,6 +12,7 @@ import HintDialog from '@/components/common/HintDialog.vue'
 import UserAgreementDialog from '@/components/common/UserAgreementDialog.vue'
 import Toast from '@/components/common/Toast.vue'
 const BackToTop = defineAsyncComponent(() => import('@/components/common/BackToTop.vue'))
+const StopGameButton = defineAsyncComponent(() => import('@/components/common/StopGameButton.vue'))
 const DownloadPanel = defineAsyncComponent(() => import('@/components/common/DownloadPanel.vue'))
 const DragOverlay = defineAsyncComponent(() => import('@/components/common/DragOverlay.vue'))
 const UpdateDialog = defineAsyncComponent(() => import('@/components/about/UpdateDialog.vue'))
@@ -229,6 +230,7 @@ async function restorePage(savedPath: string): Promise<void> {
   </TopNavLayout>
   <Teleport to="body">
     <BackToTop />
+    <StopGameButton />
     <DownloadPanel />
   </Teleport>
   <MessageDrawer ref="modalRef" />

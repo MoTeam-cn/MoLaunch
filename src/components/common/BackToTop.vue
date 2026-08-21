@@ -12,10 +12,10 @@
  * - 路由切换时重置状态，防止旧按钮残留到新页面
  */
 
-import { ref, watch, onMounted, onUnmounted } from 'vue'
+import { ref, watch, computed, onMounted, onUnmounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { ArrowUpIcon } from '@heroicons/vue/24/solid'
-import { backToTopVisible, backToTopEnabled } from '@/composables/useFloatingButtonState'
+import { backToTopVisible, backToTopEnabled, stopGameVisible } from '@/composables/useFloatingButtonState'
 
 const visible = ref(false)
 let activeEl: Element | null = null
@@ -26,6 +26,9 @@ const SHOW_THRESHOLD = 400
 
 // 同步可见状态到共享 ref，供 DownloadPanel 调整位置
 watch(visible, (v) => { backToTopVisible.value = v })
+
+/** 结束游戏按钮可见时上移避让（44px 按钮 + 24px 间距 + 24px 底边距 = 92px） */
+const offsetClass = computed(() => (stopGameVisible.value ? 'shift-up' : ''))
 
 // 页内视图白名单：展开操作页（如 LoaderSelect）时禁用，避免残留按钮遮挡右下角操作
 watch(backToTopEnabled, (enabled) => {
@@ -125,7 +128,7 @@ onUnmounted(() => {
          Button.vue 的 scoped size 类与布局不适合浮动定位按钮 -->
     <button
       v-if="visible"
-      class="back-to-top-btn"
+      :class="['back-to-top-btn', offsetClass]"
       @click="scrollToTop"
     >
       <ArrowUpIcon class="w-5 h-5 text-white" />
@@ -160,6 +163,11 @@ onUnmounted(() => {
 
 .back-to-top-btn:active {
   transform: translateY(0) scale(0.95);
+}
+
+/* 结束游戏按钮可见时上移避让（bottom 92px） */
+.back-to-top-btn.shift-up {
+  bottom: 92px;
 }
 
 /* 进入/离开动画（简洁淡入滑入） */
