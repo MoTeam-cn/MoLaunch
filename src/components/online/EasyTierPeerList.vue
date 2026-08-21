@@ -54,8 +54,8 @@ onUnmounted(() => {
       <UsersIcon class="w-6 h-6" />
       <span class="text-xs">虚拟网络中暂无其他设备</span>
     </div>
-    <ul v-else class="mt-2 space-y-1.5">
-      <li v-for="p in peers" :key="p.nodeId || p.virtualIp" class="flex items-center justify-between gap-2 text-xs">
+    <ul v-else class="mt-2 space-y-2">
+      <li v-for="p in peers" :key="p.nodeId || p.virtualIp" class="flex items-center justify-between gap-2 text-xs border border-dashed border-gray-300 rounded px-3 py-2">
         <div class="flex flex-col gap-0.5 min-w-0">
           <div class="flex items-center gap-1.5 min-w-0">
             <code class="font-mono text-gray-800 truncate">{{ p.nodeId }}</code>
