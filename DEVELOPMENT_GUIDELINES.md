@@ -416,7 +416,7 @@ toastInfo('提示信息')
 ```bash
 git commit --allow-empty -m "note: 感谢大家的支持"
 # ... 其他发版提交完成后 ...
-git tag v0.3.5-rc1
+git tag v0.3.8-rc.1
 git push origin main --tags
 ```
 

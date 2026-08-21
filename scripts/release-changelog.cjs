@@ -4,7 +4,7 @@
  * release-changelog.cjs — 发布前整理 CHANGELOG：[Unreleased] 合并重复二级标题并落版本号
  *
  * 用法：node release-changelog.cjs <version>
- * 示例：node release-changelog.cjs 0.3.7-rc1
+ * 示例：node release-changelog.cjs 0.3.8-rc.1
  * 效果：将 [Unreleased] 下重复的 ### Added / Fixed / Changed 分组合并到首次出现位置，
  *       标题替换为 `## [<version>] - <今天日期>`，并同步更新文档底部
  *       `*本文档最后更新于 YYYY-MM-DD*` 时间戳，其余版本块不动。

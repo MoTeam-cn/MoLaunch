@@ -24,7 +24,7 @@ labels: bug
 
 **环境信息**
  - 操作系统: （如 Windows 11 24H2 / macOS 15 / Ubuntu 24.04）
- - 启动器版本: （如 v0.3.5-rc1）
+ - 启动器版本: （如 v0.3.8-rc.1）
  - 安装方式: 安装版 / 便携版
  - 游戏版本: （如 1.20.1 / 1.21.4）
  - Java 版本: （如 Oracle JDK 21 / Microsoft OpenJDK 17）
