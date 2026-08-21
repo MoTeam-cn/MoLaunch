@@ -6,7 +6,8 @@
  * 用法：node release-changelog.cjs <version>
  * 示例：node release-changelog.cjs 0.3.7-rc1
  * 效果：将 [Unreleased] 下重复的 ### Added / Fixed / Changed 分组合并到首次出现位置，
- *       标题替换为 `## [<version>] - <今天日期>`，其余版本块不动。
+ *       标题替换为 `## [<version>] - <今天日期>`，并同步更新文档底部
+ *       `*本文档最后更新于 YYYY-MM-DD*` 时间戳，其余版本块不动。
  */
 'use strict';
 
@@ -59,6 +60,12 @@ for (const [title, items] of groups) {
 }
 out.push('');
 
-fs.writeFileSync(file, raw.slice(0, start) + out.join('\n') + raw.slice(end));
+// 同步文档底部「最后更新于」时间戳（UTC+8，与版本日期同源）
+const updated = raw.replace(
+  /\*本文档最后更新于 \d{4}-\d{2}-\d{2}\*/,
+  `*本文档最后更新于 ${date}*`
+);
+
+fs.writeFileSync(file, updated.slice(0, start) + out.join('\n') + updated.slice(end));
 console.log(`CHANGELOG [Unreleased] -> [${VERSION}] - ${date}`);
 console.log(`merged groups: ${[...groups.keys()].join(', ')}`);
