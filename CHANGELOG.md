@@ -18,6 +18,8 @@
 
 ### Changed
 
+- **合成配方-标签搜索框改用自定义 Input 组件**（[TagPalette.vue](src/views/tools/creation/recipe-generator/TagPalette.vue)）：原版标签调色板搜索的原生 `<input>` 替换为项目自定义 `Input.vue`，启用内建 clearable 清除按钮。
+
 - **合成配方-物品搜索框改用自定义 Input 组件**（[ItemPalette.vue](src/views/tools/creation/recipe-generator/ItemPalette.vue)）：物品调色板搜索的原生 `<input>` 替换为项目自定义 `Input.vue`，启用内建 clearable 清除按钮。
 
 - **全局消息抽屉输入框改用自定义 Input 组件**（[MessageDrawer.vue](src/components/common/MessageDrawer.vue) / [Input.vue](src/components/common/Input.vue)）：抽屉输入框模式的原生 `<input>` 替换为项目自定义 `Input.vue`；`Input.vue` 新增 `defineExpose({ focus, select })` 支持外部聚焦/全选（输入框模式自动聚焦场景），回车确认由 `keyup` 改为 `keydown` 透传事件。

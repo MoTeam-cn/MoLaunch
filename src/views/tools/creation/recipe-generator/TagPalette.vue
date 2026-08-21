@@ -8,6 +8,7 @@ import 'vue-virtual-scroller/index.css'
 import type { SlotValue } from '@/utils/recipe-generator/types'
 import { tagLabel } from '@/utils/recipe-generator/tag-zh'
 const Tooltip = defineAsyncComponent(() => import('@/components/common/Tooltip.vue'))
+const Input = defineAsyncComponent(() => import('@/components/common/Input.vue'))
 
 const props = defineProps<{
   tags: Record<string, string[]>
@@ -58,12 +59,7 @@ function pick(id: string) {
 <template>
   <div class="tag-palette">
     <div>
-      <input
-        v-model="query"
-        type="text"
-        class="w-full rounded border border-gray-300 px-3 py-1.5 text-sm outline-none transition focus:border-primary-500"
-        placeholder="搜索标签（中文 / ID）…"
-      />
+      <Input v-model="query" placeholder="搜索标签（中文 / ID）…" clearable />
     </div>
     <div class="tag-palette-summary">共 {{ filtered.length }} 个标签</div>
     <RecycleScroller
