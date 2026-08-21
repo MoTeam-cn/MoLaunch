@@ -18,6 +18,8 @@
 
 ### Changed
 
+- **自定义布局 URL 输入改用自定义 Input 组件**（[CustomLayoutSection.vue](src/views/settings/personal/CustomLayoutSection.vue) / [useCustomLayout.ts](src/composables/useCustomLayout.ts)）：布局 URL 的原生 `<input>` 替换为项目自定义 `Input.vue`；`onUrlInput` 签名由 `Event` 改为 `string`（配合 Input 组件的 `update:model-value` 事件）。
+
 - **版本设置-Java 版本范围输入改用自定义 Input 组件**（[JavaModeSelector.vue](src/views/version-settings/setup-tab/JavaModeSelector.vue)）：auto_version 模式下最低/最高版本 2 处原生 `<input type="number">` 替换为项目自定义 `Input.vue`（数字模式，80px 宽度）。
 
 - **资源包编辑器-文件内容编辑器改用自定义 Input 组件**（[RpTextEditor.vue](src/views/tools/data/RpTextEditor.vue)）：包内 JSON / 文本文件编辑区的原生 `<textarea>` 替换为项目自定义 `Input.vue` textarea 模式（保留等宽字体、12 行高度与 spellcheck 关闭）。

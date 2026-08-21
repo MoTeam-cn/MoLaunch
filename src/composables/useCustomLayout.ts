@@ -103,8 +103,7 @@ export function useCustomLayout() {
 
   /** URL 输入防抖同步 */
   let urlSyncTimer: ReturnType<typeof setTimeout> | null = null
-  function onUrlInput(event: Event) {
-    const value = (event.target as HTMLInputElement).value
+  function onUrlInput(value: string) {
     if (urlSyncTimer) clearTimeout(urlSyncTimer)
     urlSyncTimer = setTimeout(async () => {
       await pluginStore.setCustomLayoutConfig({ url: value })

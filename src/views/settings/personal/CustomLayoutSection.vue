@@ -120,12 +120,10 @@ const {
           <span class="text-[11px] text-gray-400">缓存时间：{{ cachedTimeText }}</span>
         </div>
         <div class="flex gap-2">
-          <input
-            :value="customConfig.url"
-            type="text"
+          <Input
+            :model-value="customConfig.url"
             placeholder="https://example.com/layout.json"
-            class="flex-1 rounded border border-gray-300 bg-white px-3 py-1.5 text-xs text-gray-900 focus:border-primary-500 focus:outline-none focus:ring-1 focus:ring-primary-500"
-            @input="onUrlInput"
+            @update:model-value="onUrlInput"
           />
           <Button
             type="outline"
