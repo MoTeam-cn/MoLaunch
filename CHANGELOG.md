@@ -22,6 +22,8 @@
 
 ### Changed
 
+- **版本选择页左右比例调整为 3:5**（[FolderSidebar.vue](src/views/version-select/FolderSidebar.vue)）：左侧文件夹列表由固定 `w-48`（192px）改为 `w-[37.5%]` 比例宽度（左 3 : 右 5），宽屏下文件夹名称/路径展示更完整。
+
 - **内存信息改后端 emit 推送（订阅/退订机制）**（[memory_push.rs](src-tauri/src/commands/system/memory_push.rs) / [useMemoryVisualizer.ts](src/composables/useMemoryVisualizer.ts)）：内存可视化由前端 1s IPC 轮询改为后端 1s `memory-info` 事件推送；前端页面挂载时 `memory_subscribe`、卸载时 `memory_unsubscribe`，后端维护订阅计数，有订阅才采样推送、归零即停（零空闲开销）。调用方接口 `startMemoryPolling` / `stopMemoryPolling` 签名不变，组件卸载自动退订。涉及设置页 MemoryAllocation 与版本设置 MemorySection。
 
 - **清理垃圾分组/单项复选框改用自定义 Checkbox 组件**（[CleanupGroupList.vue](src/views/quick-tools/CleanupGroupList.vue)）：分组标题全选与单项勾选 2 处自写 span 复选框替换为项目自定义 `Checkbox.vue`（分组半选态用内建 indeterminate，右侧保留 已选/总数 徽章），移除手写边框/对勾样式与多余图标导入。
