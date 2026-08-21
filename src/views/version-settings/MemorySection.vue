@@ -11,6 +11,7 @@ import { formatBytes, formatMemoryMB } from '@/utils/format'
 import { useDebouncedSave } from '@/composables/useDebouncedSave'
 const Tooltip = defineAsyncComponent(() => import('@/components/common/Tooltip.vue'))
 const Button = defineAsyncComponent(() => import('@/components/common/Button.vue'))
+const Slider = defineAsyncComponent(() => import('@/components/common/Slider.vue'))
 import { useVersionSettings } from '@/composables/useVersionSettings'
 import { useMemoryVisualizer } from '@/composables/useMemoryVisualizer'
 import { safeCall } from '@/utils/async'
@@ -222,7 +223,7 @@ onMounted(async () => {
           <p class="text-sm font-medium text-gray-900">最大内存</p>
           <span class="text-sm font-bold text-primary-600">{{ formatMemoryMB(maxMemory) }}</span>
         </div>
-        <input v-model.number="maxMemory" type="range" class="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer" min="512" :max="totalMemoryMB > 0 ? Math.min(totalMemoryMB, 16384) : 8192" step="256" />
+        <Slider v-model="maxMemory" :min="512" :max="totalMemoryMB > 0 ? Math.min(totalMemoryMB, 16384) : 8192" :step="256" class="w-full" />
         <div class="flex justify-between text-xs text-gray-400 mt-1">
           <span>512 MB</span>
           <span>{{ formatMemoryMB(totalMemoryMB > 0 ? Math.min(totalMemoryMB, 16384) : 8192) }}</span>
@@ -233,7 +234,7 @@ onMounted(async () => {
           <p class="text-sm font-medium text-gray-900">最小内存</p>
           <span class="text-sm font-bold text-gray-600">{{ formatMemoryMB(minMemory) }}</span>
         </div>
-        <input v-model.number="minMemory" type="range" class="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer" min="256" :max="maxMemory" step="256" />
+        <Slider v-model="minMemory" :min="256" :max="maxMemory" :step="256" class="w-full" />
         <div class="flex justify-between text-xs text-gray-400 mt-1">
           <span>256 MB</span>
           <span>{{ formatMemoryMB(maxMemory) }}</span>

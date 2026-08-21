@@ -18,6 +18,8 @@
 
 ### Changed
 
+- **版本设置-内存滑块改用自定义 Slider 组件**（[MemorySection.vue](src/views/version-settings/MemorySection.vue)）：版本独立自定义分配模式下最大/最小内存 2 处原生 `<input type="range">` 替换为项目自定义 `Slider.vue`，沿用 primary 配色与紧凑风格。
+
 - **设置-AI 超时滑块改用自定义 Slider 组件**（[AiEndpointSettings.vue](src/views/settings/AiEndpointSettings.vue)）：模型分析请求超时设置的原生 `<input type="range">` 替换为项目自定义 `Slider.vue`，沿用 primary 配色与紧凑风格。
 
 - **设置-启动 内存滑块改用自定义 Slider 组件**（[MemoryAllocation.vue](src/views/settings/settings-launch/MemoryAllocation.vue)）：自定义分配模式下最大/最小内存 2 处原生 `<input type="range">` 替换为项目自定义 `Slider.vue`，沿用 primary 配色与紧凑风格。
