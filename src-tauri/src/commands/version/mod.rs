@@ -10,6 +10,7 @@ pub mod launch;
 pub mod list;
 pub mod list_manager;
 pub mod loaders;
+pub mod logs;
 pub mod manage;
 pub mod mods;
 pub mod pack_common;
@@ -68,6 +69,20 @@ pub async fn version_install_manager(
 ) -> Result<serde_json::Value, String> {
     let state = state.inner().clone();
     install_manager::dispatch(state, app, req).await
+}
+
+/// 实例日志读取统一 IPC 入口（list_instance_logs / read_instance_log）
+///
+/// 注：该函数为 Tauri `generate_handler!` 所需的命令注册点，必须定义在本模块
+/// （`#[tauri::command]` 生成的 `__cmd__*` 宏仅在本模块作用域可见，无法经 `pub use` 重导出）。
+#[tauri::command]
+pub async fn version_logs_manager(
+    state: tauri::State<'_, crate::state::AppState>,
+    app: tauri::AppHandle,
+    req: crate::utils::dispatcher::ActionRequest,
+) -> Result<serde_json::Value, String> {
+    let state = state.inner().clone();
+    logs::dispatch(state, app, req).await
 }
 
 /// 统一版本导出管理 IPC 入口
