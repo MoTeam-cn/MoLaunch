@@ -29,6 +29,12 @@ const PROVIDERS: Record<LogShareProvider, ProviderConfig> = {
   },
 }
 
+/** 分享服务选项（供崩溃弹窗 / 实例日志页分享浮层复用） */
+export const LOG_SHARE_PROVIDERS: { value: LogShareProvider; label: string; desc: string }[] = [
+  { value: 'mclogs', label: 'mclo.gs', desc: '国际主流日志分享，自带分析' },
+  { value: 'logshare', label: 'logshare.cn', desc: '国内访问快，支持 AI 分析' },
+]
+
 /** 上传日志前脱敏：JWT / JSON 敏感字段 / Bearer 头 / URL query 参数 / 本机用户名路径 */
 export function sanitizeShareLog(content: string): string {
   let s = content

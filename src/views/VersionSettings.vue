@@ -15,6 +15,7 @@ import {
   PaintBrushIcon,
   SparklesIcon,
   ArrowUpTrayIcon,
+  DocumentTextIcon,
 } from '@heroicons/vue/24/outline'
 import { useVersionStore } from '@/stores/version'
 import { useVersionSettings } from '@/composables/useVersionSettings'
@@ -25,6 +26,7 @@ const SetupTab = defineAsyncComponent(() => import('./version-settings/SetupTab.
 const ModTab = defineAsyncComponent(() => import('./version-settings/ModTab.vue'))
 const PackTab = defineAsyncComponent(() => import('./version-settings/PackTab.vue'))
 const ExportTab = defineAsyncComponent(() => import('./version-settings/ExportTab.vue'))
+const LogsTab = defineAsyncComponent(() => import('./version-settings/LogsTab.vue'))
 
 const router = useRouter()
 const route = useRoute()
@@ -39,6 +41,7 @@ const categories = [
   { id: 'mod', label: 'Mod 管理', icon: PuzzlePieceIcon, desc: '管理当前版本的 Mod' },
   { id: 'resourcepack', label: '资源包', icon: PaintBrushIcon, desc: '管理当前版本的资源包' },
   { id: 'shader', label: '光影', icon: SparklesIcon, desc: '管理当前版本的光影' },
+  { id: 'logs', label: '实例日志', icon: DocumentTextIcon, desc: '查看当前实例的游戏日志文件' },
   { id: 'export', label: '导出', icon: ArrowUpTrayIcon, desc: '导出整合包或版本' },
 ]
 
@@ -136,13 +139,15 @@ onMounted(async () => {
         <div
           class="flex-1 overflow-hidden"
           :class="(activeCategory === 'mod' || activeCategory === 'resourcepack'
-            || activeCategory === 'shader' || activeCategory === 'export') ? 'flex flex-col' : 'overflow-y-auto p-6'"
+            || activeCategory === 'shader' || activeCategory === 'export' || activeCategory === 'logs')
+            ? 'flex flex-col' : 'overflow-y-auto p-6'"
         >
           <OverviewTab v-if="activeCategory === 'overview'" />
           <SetupTab v-else-if="activeCategory === 'setup'" />
           <ModTab v-else-if="activeCategory === 'mod'" />
           <PackTab v-else-if="activeCategory === 'resourcepack'" kind="resourcepack" />
           <PackTab v-else-if="activeCategory === 'shader'" kind="shader" />
+          <LogsTab v-else-if="activeCategory === 'logs'" />
           <ExportTab v-else-if="activeCategory === 'export'" />
         </div>
       </div>

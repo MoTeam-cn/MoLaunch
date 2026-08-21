@@ -9,6 +9,7 @@ import type { VersionList } from '@/types/version'
 import type { CheckLocalModpackResult, ModpackMetaFile } from '@/types/online'
 import { VERSION_INSTALL_ACTIONS, versionInstallManager } from './version-install-manager'
 import { VERSION_LIST_ACTIONS, versionListManager } from './version-list-manager'
+import { VERSION_LOGS_ACTIONS, versionLogsManager } from './version-logs-manager'
 
 /**
  * 获取版本列表
@@ -93,6 +94,30 @@ export async function uninstallVersion(versionId: string): Promise<void> {
  */
 export async function getVersionEffectiveDir(versionId: string): Promise<string> {
   return versionListManager<string>(VERSION_LIST_ACTIONS.GET_VERSION_EFFECTIVE_DIR, { versionId })
+}
+
+/** 实例日志文件条目 */
+export interface InstanceLogFile {
+  name: string
+  size: number
+  modified: number
+}
+
+/**
+ * 列出实例 logs 目录下的日志文件（.log / .log.gz，按修改时间倒序）
+ * @param dir 实例有效游戏目录（effectiveDir）
+ */
+export async function listInstanceLogs(dir: string): Promise<InstanceLogFile[]> {
+  return versionLogsManager<InstanceLogFile[]>(VERSION_LOGS_ACTIONS.LIST_INSTANCE_LOGS, { dir })
+}
+
+/**
+ * 读取实例日志文件内容（.log.gz 自动解压，返回前已脱敏）
+ * @param dir 实例有效游戏目录（effectiveDir）
+ * @param name 日志文件名（不含路径分隔符）
+ */
+export async function readInstanceLog(dir: string, name: string): Promise<string> {
+  return versionLogsManager<string>(VERSION_LOGS_ACTIONS.READ_INSTANCE_LOG, { dir, name })
 }
 
 /**

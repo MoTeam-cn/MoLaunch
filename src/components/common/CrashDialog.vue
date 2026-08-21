@@ -102,7 +102,7 @@
             @mouseleave="shareMenuOpen = false"
           >
             <button
-              v-for="item in SHARE_PROVIDERS"
+              v-for="item in LOG_SHARE_PROVIDERS"
               :key="item.value"
               class="flex w-full items-start gap-2 rounded px-2 py-1.5 text-left text-xs hover:bg-gray-50"
               @click="shareTo(item.value)"
@@ -136,7 +136,7 @@ import { pickSavePath } from '@/utils/fileDialog'
 import { openPath, writeTextFile } from '@/utils/api/system'
 import { toastError, toastSuccess } from '@/utils/toast'
 import { open } from '@tauri-apps/plugin-shell'
-import { sanitizeShareLog, uploadLogShare } from '@/utils/logShare'
+import { sanitizeShareLog, uploadLogShare, LOG_SHARE_PROVIDERS } from '@/utils/logShare'
 import type { LogShareProvider } from '@/utils/logShare'
 import type { CrashCategory, CrashInfo } from '@/types/version'
 
@@ -165,12 +165,6 @@ const showDetails = ref(false)
 const crashInfo = ref<CrashInfo | null>(null)
 const shareMenuOpen = ref(false)
 const sharing = ref<LogShareProvider | null>(null)
-
-/** 日志分享服务选项 */
-const SHARE_PROVIDERS: { value: LogShareProvider; label: string; desc: string }[] = [
-  { value: 'mclogs', label: 'mclo.gs', desc: '国际主流日志分享，自带分析' },
-  { value: 'logshare', label: 'logshare.cn', desc: '国内访问快，支持 AI 分析' },
-]
 
 /** 未展示崩溃数据时的兜底值 */
 const EMPTY_CRASH: CrashInfo = {

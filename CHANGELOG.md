@@ -6,6 +6,7 @@
 
 ### Changed
 
+- **版本设置页新增「实例日志」页签**（[VersionSettings.vue](src/views/VersionSettings.vue) / [LogsTab.vue](src/views/version-settings/LogsTab.vue)）：侧栏新增实例日志入口，内容区下拉框选择实例 `logs/` 下日志文件（.log / .log.gz 自动解压），顶部工具栏支持刷新与「分享日志」（复用 mclo.gs / logshare.cn 浮层，上传前脱敏，成功打开分享页）；分享服务选项提取到 [logShare.ts](src/utils/logShare.ts) 的 `LOG_SHARE_PROVIDERS` 供崩溃弹窗与日志页复用。
 - **设置页新增「默认日志分享服务」选项**（[SettingsAdvanced.vue](src/views/settings/SettingsAdvanced.vue) / [config.ts](src/utils/api/config.ts)）：进阶设置 → 系统卡片可切换 mclo.gs / logshare.cn，配置经 `logShareProvider` 写入后端（对应 config.ini `[Log] share_provider`）。
 - **新增实例日志读取命令**（[logs.rs](src-tauri/src/commands/version/logs.rs)）：`version_logs_manager` 提供 `list_instance_logs`（列出实例 `logs/` 下 .log / .log.gz 文件，按修改时间倒序）与 `read_instance_log`（读取内容，.log.gz 自动解压，读取前校验文件名防路径穿越，返回前复用后端脱敏）。
 - **新增「默认日志分享服务」配置项**（后端 [models.rs](src-tauri/src/state/config/models.rs) / [defaults.rs](src-tauri/src/state/config/defaults.rs) / [load.rs](src-tauri/src/config/load.rs) / [save.rs](src-tauri/src/config/save.rs)）：写入 config.ini `[Log] share_provider`，默认 `mclogs`（mclo.gs），可切换 `logshare`（logshare.cn）；配置快照/补丁全链路（ConfigSnapshot / ConfigPatch / build_snapshot / apply_config）已支持。
