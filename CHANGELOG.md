@@ -6,7 +6,7 @@
 
 ### Added
 
-- **结束游戏悬浮按钮**（[StopGameButton.vue](src/components/common/StopGameButton.vue) / [App.vue](src/App.vue) / [useFloatingButtonState.ts](src/composables/useFloatingButtonState.ts)）：游戏启动后任意页面右下角常驻红色圆形「结束游戏」按钮（与 BackToTop 同款简约风格，显示条件为 `runningPid` 非空），点击直接停止游戏，无需回到主页；右下角浮动按钮新增避让顺序（自底向上：结束游戏 → 返回顶部 → 下载面板），[BackToTop.vue](src/components/common/BackToTop.vue) 与 [DownloadPanel.vue](src/components/common/DownloadPanel.vue) 按此递进上移，避免重叠。
+- **结束游戏悬浮按钮**（[StopGameButton.vue](src/components/common/StopGameButton.vue) / [App.vue](src/App.vue) / [useFloatingButtonState.ts](src/composables/useFloatingButtonState.ts)）：游戏启动后任意页面右下角常驻「结束游戏」圆钮（视觉与 BackToTop 统一：主题色底 + 关闭图标，显示条件为 `runningPid` 非空），点击直接停止游戏，无需回到主页；右下角浮动按钮新增避让顺序（自底向上：结束游戏 → 返回顶部 → 下载面板），[BackToTop.vue](src/components/common/BackToTop.vue) 与 [DownloadPanel.vue](src/components/common/DownloadPanel.vue) 按此递进上移，避免重叠。
 
 ### Changed
 

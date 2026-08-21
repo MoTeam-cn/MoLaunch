@@ -8,10 +8,9 @@
  */
 import axios from 'axios'
 
-/** 统一请求实例：默认 15s 超时，携带启动器标识请求头 */
+/** 统一请求实例：默认 15s 超时 */
 const http = axios.create({
   timeout: 15_000,
-  headers: { 'X-Mc-Launch': 'MoLaunch' },
 })
 
 /** GET 请求并解析 JSON */

@@ -1,13 +1,13 @@
 <script setup lang="ts">
 /**
  * 结束游戏悬浮按钮
- * 右下角红色圆钮，与 BackToTop / DownloadPanel 同款简约风格。
+ * 右下角圆钮，视觉与 BackToTop 完全统一：主题色底 + 关闭图标。
  * 显示前提：游戏已启动（runningPid 非空），点击调用 store 的 stopGame 停止游戏。
  * 位置协调：贴底（bottom 24px），BackToTop 在其可见时上移避让。
  */
 
 import { watch, onUnmounted } from 'vue'
-import { StopIcon } from '@heroicons/vue/24/solid'
+import { XMarkIcon } from '@heroicons/vue/24/solid'
 import { useVersionStore } from '@/stores/version'
 import { stopGameVisible } from '@/composables/useFloatingButtonState'
 
@@ -23,7 +23,6 @@ watch(
 function handleStopGame() {
   if (!versionStore.runningPid) return
   versionStore.stopGame()
-  // 与主页启动按钮行为一致：停止游戏
 }
 
 onUnmounted(() => { stopGameVisible.value = false })
@@ -37,7 +36,7 @@ onUnmounted(() => { stopGameVisible.value = false })
       title="结束游戏"
       @click="handleStopGame"
     >
-      <StopIcon class="w-5 h-5 text-white" />
+      <XMarkIcon class="w-5 h-5 text-white" />
     </button>
   </Transition>
 </template>
@@ -51,20 +50,20 @@ onUnmounted(() => { stopGameVisible.value = false })
   width: 44px;
   height: 44px;
   border-radius: 50%;
-  background: var(--color-red-600, #dc2626);
+  background: var(--color-primary-600);
   border: none;
   cursor: pointer;
   display: flex;
   align-items: center;
   justify-content: center;
-  box-shadow: 0 2px 8px rgb(220 38 38 / 0.35);
+  box-shadow: 0 2px 8px rgb(var(--color-primary-rgb-600) / 0.35);
   transition: background-color 0.2s ease, transform 0.2s ease, box-shadow 0.2s ease;
 }
 
 .stop-game-btn:hover {
-  background: var(--color-red-700, #b91c1c);
+  background: var(--color-primary-700);
   transform: translateY(-2px);
-  box-shadow: 0 4px 12px rgb(220 38 38 / 0.4);
+  box-shadow: 0 4px 12px rgb(var(--color-primary-rgb-600) / 0.4);
 }
 
 .stop-game-btn:active {
