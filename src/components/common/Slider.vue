@@ -153,7 +153,10 @@ const showMeteor = computed(() => props.meteor && percent.value >= 66)
 
 .slider-track-wrap {
   position: relative;
-  height: 4px;
+  /* 高度容纳 14px thumb，轨道线垂直居中，避免 thumb 溢出导致贴底/偏移 */
+  height: 18px;
+  display: flex;
+  align-items: center;
 }
 
 .slider-input {
@@ -167,12 +170,13 @@ const showMeteor = computed(() => props.meteor && percent.value >= 66)
   margin: 0;
 }
 
-/* 流星流光层：覆盖已填充轨道，overflow 裁剪使扫光只在填充段内可见 */
+/* 流星流光层：覆盖已填充轨道（保持轨道线高度并垂直居中，不遮挡 thumb），overflow 裁剪使扫光只在填充段内可见 */
 .slider-meteor {
   position: absolute;
-  top: 0;
+  top: 50%;
+  transform: translateY(-50%);
+  height: 4px;
   left: 0;
-  bottom: 0;
   overflow: hidden;
   border-radius: 9999px;
   pointer-events: none;
