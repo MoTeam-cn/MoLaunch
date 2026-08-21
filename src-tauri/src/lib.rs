@@ -147,28 +147,23 @@ pub fn run() {
         )
         .manage(app_state);
 
-    // 单实例插件（带 deep-link feature）：保证只有一个主进程实例；
-    // Windows/Linux 上第二次点击 molaunch:// 链接时，新进程把 URL 作为
-    // CLI 参数交给本回调，再由 deep-link 插件转发为 deep-link://new-url 事件。
-    // 注意：必须注册在 deep-link 插件之前。
+    // 单实例插件：保证只有一个主进程实例；
     // 管理员提权重启时跳过：新进程（管理员）必须能独立接管成为主实例，
     // 否则会被单实例插件识别为"第二实例"强制退出，导致 UAC 确认后程序不重启。
+    // deeplink 已暂时禁用（后续启用时恢复 deep-link 插件注册）
     let builder = if is_admin_relaunch {
         log_info!("[SingleInstance] 管理员重启模式：跳过单实例插件，允许新实例接管");
-        builder.plugin(tauri_plugin_deep_link::init())
-    } else {
         builder
-            .plugin(tauri_plugin_single_instance::init(|app, argv, _cwd| {
-                // 新实例启动时，主实例在这里收到 argv（含 deeplink URL）。
-                // deeplink 插件已接管 deep-link://new-url 事件分发，此处仅需聚焦窗口。
-                if let Some(window) = app.get_webview_window("main") {
-                    let _ = window.unminimize();
-                    let _ = window.show();
-                    let _ = window.set_focus();
-                }
-                log_info!("[SingleInstance] 新实例 argv: {:?}", argv);
-            }))
-            .plugin(tauri_plugin_deep_link::init())
+    } else {
+        builder.plugin(tauri_plugin_single_instance::init(|app, argv, _cwd| {
+            // 新实例启动时，主实例在这里收到 argv（含 deeplink URL）。
+            if let Some(window) = app.get_webview_window("main") {
+                let _ = window.unminimize();
+                let _ = window.show();
+                let _ = window.set_focus();
+            }
+            log_info!("[SingleInstance] 新实例 argv: {:?}", argv);
+        }))
     };
 
     // 自动更新官方 plugin：仅 macOS/Linux 使用（Windows 便携版走自实现 updater，
@@ -181,14 +176,8 @@ pub fn run() {
             // setup 钩子在窗口/webview 创建后、前端加载前调用
             log_info!("[Startup] Tauri setup() hook entered — webview & window created");
 
-            // 初始化深度链接模块（molaunch:// 协议监听 + 内置 handler 注册）
-            // 返回 EventId（Copy 值），监听由插件内部持有，无需托管
-            match deeplink::init(app.handle()) {
-                Ok(_event_id) => {}
-                Err(e) => {
-                    log_error!("[Deeplink] 初始化失败: {}", e);
-                }
-            }
+            // deeplink 已暂时禁用：跳过 molaunch:// 协议监听与内置 handler 注册，
+            // 后续启用时恢复 `deeplink::init(app.handle())` 调用（含返回的 EventId）
 
             // 注入 AppHandle 到 AppState：下载进度等后台任务通过 emit 推送事件
             // （此前由 WS 服务器广播，改回 Tauri plugin event 后统一走 emit）

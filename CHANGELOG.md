@@ -8,6 +8,10 @@
 
 - **设置新增「性能」分类与 GPU 硬件加速开关**（[models.rs](src-tauri/src/state/config/models.rs) / [lib.rs](src-tauri/src/lib.rs) / [SettingsPerformance.vue](src/views/settings/SettingsPerformance.vue)（新增） / [Settings.vue](src/views/Settings.vue)）：新增 `use_gpu_acceleration` 配置项（默认开启），设置-性能 可关闭启动器界面的 GPU 硬件加速——后端启动时按配置注入 `--disable-gpu` 浏览器参数，WebView2 走软件渲染以降低内存占用（约 35 MB），需重启生效。
 
+### Changed
+
+- **暂时禁用 molaunch:// 深度链接（deep-link）注册**（[tauri.conf.json](src-tauri/tauri.conf.json) / [lib.rs](src-tauri/src/lib.rs)）：移除 deep-link 插件注册与 `deeplink::init` 调用，`molaunch://` 协议不再自动注册，后续启用时恢复配置与插件注册即可。
+
 - **组网设备列表展示设备码**（[easytier.rs](src-tauri/src/minecraft/online/scaffolding/easytier.rs) / [easytier.ts](src/types/online/easytier.ts) / [EasyTierPeerList.vue](src/components/online/EasyTierPeerList.vue)）：后端 `easytier_peers` 返回的节点新增 `node_id`（easytier `peer list` 的 `id` 字段，全局唯一），前端组网设备列表改为**双行显示**——设备码为主标识、设备名（hostname）为副标识，不再仅显示 `scaffolding-mc-server-{端口}` / `mo-launch-guest` 等 hostname，便于区分不同设备；每个设备以**虚线边框独立成条目**，避免内容混杂难以分辨设备数量。
 
 - **支持自定义加入方设备名**（[NetworkIdentityEditor.vue](src/components/settings/NetworkIdentityEditor.vue)（新增）/ [config.ts](src/utils/api/config.ts) / [SettingsOnline.vue](src/views/settings/SettingsOnline.vue)）：设置-联机 新增「设备名」编辑器，写入 `online.network_identity`（后端 `configured_network_identity` 已支持），作为加入方 easytier hostname，重新加入房间后生效；留空回退默认 `mo-launch-guest`。房主 hostname 由联机中心协议决定（`discover_center` 按 `scaffolding-mc-server-{端口}` 前缀识别），不可自定义，编辑器中已注明。
