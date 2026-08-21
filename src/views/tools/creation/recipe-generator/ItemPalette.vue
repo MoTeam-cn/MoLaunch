@@ -9,6 +9,7 @@ import type { AssetItem, AtlasLayout } from '@/utils/recipe-generator/resources'
 import type { SlotValue } from '@/utils/recipe-generator/types'
 const RecipeItemIcon = defineAsyncComponent(() => import('./RecipeItemIcon.vue'))
 const Tooltip = defineAsyncComponent(() => import('@/components/common/Tooltip.vue'))
+const Input = defineAsyncComponent(() => import('@/components/common/Input.vue'))
 import { matchItem } from '@/utils/recipe-generator/itemSearch'
 
 const props = defineProps<{
@@ -51,12 +52,7 @@ function pick(item: AssetItem) {
 <template>
   <div class="item-palette">
     <div class="item-palette-search">
-      <input
-        v-model="query"
-        type="text"
-        class="w-full rounded border border-gray-300 px-3 py-1.5 text-sm outline-none transition focus:border-primary-500"
-        placeholder="搜索物品（名称 / ID / 中文 / 拼音）…"
-      />
+      <Input v-model="query" placeholder="搜索物品（名称 / ID / 中文 / 拼音）…" clearable />
     </div>
     <div class="item-palette-count">
       共 {{ filtered.length }} 个物品
