@@ -6,6 +6,8 @@
 
 ### Fixed
 
+- **修复插件示例导出被限制在插件目录内**（[export.rs](src-tauri/src/commands/plugins/export.rs)）：`export_plugin_sample` 原要求目标路径必须位于插件目录内（canonicalize + starts_with 白名单），前端「导出示例」保存对话框选择任意位置即被拒。改为仅 canonicalize 父目录解析真实路径 + 文件名取自目标（防逃逸），支持导出到用户所选任意路径。
+
 - **修复社区资源「下载到任意路径」被限制在下载目录内**（[resource.rs](src-tauri/src/commands/community/install/resource.rs)）：`download_resource_to_path` 语义即为下载到用户选择路径，原却被限制在外部下载目录内（canonicalize + starts_with 白名单），前端「下载到任意路径」流程保存对话框选外部位置即被拒。改为仅 canonicalize 父目录解析真实路径 + 文件名取自目标（防逃逸），支持下载到任意路径，URL 的 SSRF 校验保持不变。
 
 - **修复资源包导出被限制在临时工作目录内**（[io.rs](src-tauri/src/commands/tools/resourcepack/explore/io.rs)）：`export_inner` 原要求目标路径必须位于资源包临时工作目录内（`starts_with(&work_canon)`），导致「保存回原 ZIP」（传原包路径）与「另存为」（保存对话框选择任意位置）均被拒绝。改为仅 canonicalize 父目录后取文件名（防逃逸），放行原包路径与用户所选路径，工作目录仅用于打包源。
