@@ -29,6 +29,8 @@ const cfShowKey = ref(false)
 
 // 日志级别（控制日志输出详细程度，0=关闭 ~ 5=跟踪）
 const logLevel = ref(3)
+// 默认日志分享服务（mclo.gs / logshare.cn，崩溃自动分析与手动分享默认使用）
+const logShareProvider = ref('mclogs')
 
 const { loaded, markDirty } = useConfigPage({
   delay: 1000,
@@ -41,6 +43,7 @@ const { loaded, markDirty } = useConfigPage({
     cfEnabled.value = cfg.curseforgeEnabled
     cfApiKey.value = cfg.curseforgeApiKey
     logLevel.value = cfg.logLevel
+    logShareProvider.value = (cfg.logShareProvider as string) || 'mclogs'
   },
 })
 
@@ -56,6 +59,8 @@ watch(cfApiKey, (v) => markDirty('curseforgeApiKey', v))
 
 // 日志级别：后端会同步调用 logger::set_level 立即生效
 watch(logLevel, (v) => markDirty('logLevel', v))
+// 默认日志分享服务
+watch(logShareProvider, (v) => markDirty('logShareProvider', v))
 </script>
 
 <template>
@@ -286,6 +291,21 @@ watch(logLevel, (v) => markDirty('logLevel', v))
             ]"
             style="min-width: 100px"
             @update:model-value="logLevel = Number($event)"
+          />
+        </div>
+        <div class="px-5 py-4 flex items-center justify-between">
+          <div>
+            <p class="text-sm font-medium text-gray-900">默认日志分享服务</p>
+            <p class="text-xs text-gray-500 mt-0.5">崩溃自动分析与手动分享默认使用的日志平台</p>
+          </div>
+          <Select
+            :model-value="logShareProvider"
+            :options="[
+              { label: 'mclo.gs（国际主流，自带分析）', value: 'mclogs' },
+              { label: 'logshare.cn（国内访问快，支持 AI 分析）', value: 'logshare' },
+            ]"
+            style="min-width: 180px"
+            @update:model-value="logShareProvider = String($event)"
           />
         </div>
       </div>

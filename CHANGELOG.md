@@ -6,6 +6,7 @@
 
 ### Changed
 
+- **设置页新增「默认日志分享服务」选项**（[SettingsAdvanced.vue](src/views/settings/SettingsAdvanced.vue) / [config.ts](src/utils/api/config.ts)）：进阶设置 → 系统卡片可切换 mclo.gs / logshare.cn，配置经 `logShareProvider` 写入后端（对应 config.ini `[Log] share_provider`）。
 - **新增实例日志读取命令**（[logs.rs](src-tauri/src/commands/version/logs.rs)）：`version_logs_manager` 提供 `list_instance_logs`（列出实例 `logs/` 下 .log / .log.gz 文件，按修改时间倒序）与 `read_instance_log`（读取内容，.log.gz 自动解压，读取前校验文件名防路径穿越，返回前复用后端脱敏）。
 - **新增「默认日志分享服务」配置项**（后端 [models.rs](src-tauri/src/state/config/models.rs) / [defaults.rs](src-tauri/src/state/config/defaults.rs) / [load.rs](src-tauri/src/config/load.rs) / [save.rs](src-tauri/src/config/save.rs)）：写入 config.ini `[Log] share_provider`，默认 `mclogs`（mclo.gs），可切换 `logshare`（logshare.cn）；配置快照/补丁全链路（ConfigSnapshot / ConfigPatch / build_snapshot / apply_config）已支持。
 - **崩溃弹窗新增「分享日志」**（[logShare.ts](src/utils/logShare.ts) + [CrashDialog.vue](src/components/common/CrashDialog.vue)）：一键把崩溃日志分享到 mclo.gs 或 logshare.cn，上传前自动脱敏（JWT / token / Bearer / URL 敏感参数 / 本机用户名路径），成功后打开分享页面；CSP 已放行两个域名（[tauri.conf.json](src-tauri/tauri.conf.json)）。

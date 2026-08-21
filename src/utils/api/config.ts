@@ -53,6 +53,8 @@ export interface ConfigSnapshot {
   useGpuAcceleration: boolean
   /** 关闭到托盘时挂起 WebView2 释放渲染资源（默认关闭；恢复托盘窗口时自动恢复并保留界面状态） */
   releaseMemoryOnTray: boolean
+  /** 默认日志分享服务："mclogs"（mclo.gs）/ "logshare"（logshare.cn） */
+  logShareProvider: string
   // 社区资源
   communitySource: number
   communityFilenameFormat: number
@@ -142,6 +144,8 @@ export interface ConfigPatch {
   useGpuAcceleration?: boolean
   /** 关闭到托盘时挂起 WebView2 释放渲染资源 */
   releaseMemoryOnTray?: boolean
+  /** 默认日志分享服务："mclogs"（mclo.gs）/ "logshare"（logshare.cn） */
+  logShareProvider?: string
   // 社区资源（INI 明文）
   communitySource?: number                                 // 0/1/2
   communityFilenameFormat?: number                         // 0-4
