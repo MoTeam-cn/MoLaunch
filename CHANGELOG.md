@@ -22,6 +22,8 @@
 
 ### Changed
 
+- **dev-api 新增 `mockFolders` 测试命令**（[dev-api.ts](src/utils/dev-api.ts) / [FolderSidebar.vue](src/views/version-select/FolderSidebar.vue)）：`molaunch.mockFolders(count?)` 向版本选择页左侧注入默认 10 个模拟文件夹（名称/路径构造为不同长度，覆盖 truncate 与铺满样式），用于调试列表样式；通过 `molaunch:mock-folders` 自定义事件注入，刷新页面或切换文件夹后恢复真实列表，生产构建无事件来源不受影响。
+
 - **版本选择页新增「导入整合包」入口 + 左侧占比调为 23%**（[FolderSidebar.vue](src/views/version-select/FolderSidebar.vue)）：「添加已有文件夹」下方新增「导入整合包」按钮，文件选择器仅开放后端支持导入的 `.zip` / `.mrpack` 格式，选择后完全复用全局拖拽安装流程（`previewLocalModpack` 预览 → 输入实例名 → 可选 Mod 询问 → `install_local_modpack` + `install_merged`）；左侧文件夹列表宽度由 20% 调整为 23%。
 
 - **版本选择页左侧菜单占比调整为 20%**（[FolderSidebar.vue](src/views/version-select/FolderSidebar.vue)）：左侧文件夹列表由固定 `w-48`（192px）改为 `w-[20%]` 占比宽度，右侧版本列表占 80%，宽屏下文件夹名称/路径与版本卡片比例更协调。

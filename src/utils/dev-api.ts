@@ -77,6 +77,8 @@ export interface MolaunchDevAPI {
   demoMessages(): void
   /** 模拟云端连接状态（测试封存/封禁 UI 用）；online=false 时联机分类封禁、设备信息卡片封存 */
   simulateCloud(online: boolean, reason?: string): Promise<void>
+  /** 向版本选择页左侧注入 count 个模拟文件夹（测试列表铺满/截断样式用）；通过 molaunch:mock-folders 事件生效 */
+  mockFolders(count?: number): void
 }
 
 /** 全局 Window 类型扩展，使 `window.molaunch` 在 TypeScript 中可识别 */
@@ -187,6 +189,11 @@ MoLaunch Dev API 可用命令：
       离线时侧边栏联机分类封禁（灰色置灰）、设备面板「设备信息」卡片封存遮罩；
       用 simulateCloud(true) 恢复在线（页面刷新后自动恢复真实状态）
 
+  molaunch.mockFolders(count?)
+      向版本选择页左侧注入 count 个模拟文件夹（默认 10），查看列表铺满 / 名称路径截断效果
+      - count: 模拟文件夹数量（默认 10）
+      刷新页面或切换文件夹后恢复真实列表
+
 示例：
   await molaunch.pickPort()
   await molaunch.picker('confirm', { message: '测试弹窗' })
@@ -208,6 +215,7 @@ MoLaunch Dev API 可用命令：
   molaunch.demoMessages()
   await molaunch.simulateCloud(false)  // 模拟云端离线，查看封存/封禁效果
   await molaunch.simulateCloud(true)   // 恢复云端在线
+  molaunch.mockFolders()               // 版本选择页左侧注入 10 个模拟文件夹
 `.trim()
 
 /** 动态加载所有 Pinia store 并返回 $state 映射 */
@@ -395,6 +403,19 @@ export function setupDevApi(router: Router): void {
         `%c[molaunch.simulateCloud]%c 云端已设为「${online ? '在线' : '离线'}」${
           offline ? '，可查看侧边栏分类封禁与设备信息卡片封存效果' : '，封存/封禁已解除'
         }`,
+        'color:#165dff;font-weight:bold',
+        'color:inherit',
+      )
+    },
+    mockFolders(count = 10) {
+      // 名称/路径构造为不同长度，覆盖 truncate 与铺满样式
+      const folders = Array.from({ length: count }, (_, i) => ({
+        name: `模拟目录 ${String(i + 1).padStart(2, '0')} 一个较长的名称`,
+        path: `C:\\Users\\Test\\.minecraft\\模拟文件夹${i + 1}\\very\\long\\path\\for\\truncate\\test`,
+      }))
+      window.dispatchEvent(new CustomEvent('molaunch:mock-folders', { detail: folders }))
+      console.log(
+        `%c[molaunch.mockFolders]%c 已向版本选择页左侧注入 ${count} 个模拟文件夹`,
         'color:#165dff;font-weight:bold',
         'color:inherit',
       )
