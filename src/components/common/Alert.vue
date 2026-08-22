@@ -18,7 +18,7 @@ import { toastInfo } from '@/utils/toast'
 interface Props {
   type?: 'info' | 'warning' | 'error' | 'success' | 'debug'
   message?: string
-  /** 是否单行截断（默认 true，仅 bar 风格生效）；传 false 允许换行完整显示 */
+  /** 是否单行截断（默认 false 允许换行完整显示，仅 bar 风格生效）；需要紧凑布局时传 true */
   truncate?: boolean
   /** 外部链接配置（soft 风格）：slot 内通过 openLink 触发，点击后 toast 提示并延迟 0.5s 跳转 */
   link?: { url: string; toast?: string }
@@ -29,7 +29,7 @@ interface Props {
 const props = withDefaults(defineProps<Props>(), {
   type: 'info',
   message: '',
-  truncate: true,
+  truncate: false,
   link: undefined,
   variant: 'bar',
 })

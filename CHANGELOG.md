@@ -12,6 +12,8 @@
 
 - **版本号示例统一为 SemVer 规范格式**：预发布版本号使用 `rc.1`（点分隔预发布标识），后续打 tag 统一 `v0.3.8-rc.1` 风格；同步更新 [release-changelog.cjs](scripts/release-changelog.cjs)、[DEVELOPMENT_GUIDELINES.md](DEVELOPMENT_GUIDELINES.md)、[bug_report.md](.github/ISSUE_TEMPLATE/bug_report.md)、[question.md](.github/ISSUE_TEMPLATE/question.md) 中的版本示例。
 
+- **Alert bar 风格默认允许换行**（[Alert.vue](src/components/common/Alert.vue)）：`truncate` 默认值由 `true` 改为 `false`，内容超宽不再单行省略号截断，改为换行完整展示；需紧凑单行布局的调用方可显式传 `:truncate="true"`。
+
 ## [0.3.8-rc1] - 2026-08-22
 
 ### Added
