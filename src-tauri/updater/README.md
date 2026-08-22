@@ -20,7 +20,7 @@ MoLaunch 采用双进程更新方案：主程序下载新版本 exe 后，由本
 
 ```mermaid
 graph TD
-    START["updater.exe 启动"] --> ARGS["解析参数<br/>--old-exe / --new-exe / --pid / --signature"]
+    START["updater.exe 启动"] --> ARGS["解析参数<br/>--old-exe / --new-exe / --pid / --signature<br/>[--no-relaunch]"]
     ARGS -->|失败| E1["退出码 1"]
     ARGS --> WAIT["等待主进程退出<br/>OpenProcess + WaitForSingleObject（30s）"]
     WAIT -->|超时| E2["退出码 2"]
@@ -28,7 +28,9 @@ graph TD
     VERIFY -->|失败| E5["退出码 5"]
     VERIFY --> REPLACE["替换旧 exe<br/>MoveFileExW 原子替换 + rename 备份回退"]
     REPLACE -->|失败| E3["退出码 3"]
-    REPLACE --> LAUNCH["启动新 exe"]
+    REPLACE --> CHECK_RELAUNCH{传了 --no-relaunch?}
+    CHECK_RELAUNCH -->|是| DONE["退出（退出码 0）"]
+    CHECK_RELAUNCH --> LAUNCH["启动新 exe"]
     LAUNCH -->|失败| E4["退出码 4"]
     LAUNCH --> DONE["退出（退出码 0）"]
 ```
@@ -53,7 +55,7 @@ graph TD
 
 ### 重启新版本
 
-替换成功后直接 `spawn` 启动新 exe，随后自身退出。
+替换成功后直接 `spawn` 启动新 exe，随后自身退出（默认）。传入 `--no-relaunch` 时（静默更新，用户已退出程序）仅替换文件不重启，下次用户主动启动即为新版本。
 
 ## 命令行参数
 
@@ -67,6 +69,7 @@ molaunch_updater.exe --old-exe <旧exe路径> --new-exe <新exe路径> --pid <�
 | `--new-exe` | 下载到临时目录的新版本 exe 路径 |
 | `--pid` | 主进程 PID，用于等待其退出释放文件锁 |
 | `--signature` | 新 exe 的 minisign `.sig` 文件完整内容（由主程序从 `last.sig` 读出传入） |
+| `--no-relaunch` | 可选。静默更新模式（用户已退出程序）：替换后不重启新版本，仅替换文件等待下次用户主动启动 |
 
 ## 退出码
 
@@ -123,7 +126,7 @@ cargo build --release
 1. 构建后复制 `molaunch_updater.exe` 到 `src-tauri/resources/updater/updater.exe`（随主程序打包内嵌）
 2. 主程序运行时经 `resources.rs` 的 `extract_updater()` 释放到 `%APPDATA%\.Molaunch\updater\updater.exe`
 3. 更新流程：主程序下载新版本 exe + 签名并缓存为 `last.exe` / `last.sig`；前端窗口 close 事件触发 `apply_pending_update`，主程序启动 updater.exe 子进程（传入新旧 exe 路径、主进程 PID、签名内容）后立即退出
-4. updater 等待主进程退出 → 验签 → 替换 → 启动新 exe，下次启动即为新版本
+4. updater 等待主进程退出 → 验签 → 替换 → 启动新 exe（静默更新传 `--no-relaunch` 时不启动），下次启动即为新版本
 
 ## 许可证
 

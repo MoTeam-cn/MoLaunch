@@ -49,6 +49,12 @@ fn main() {
     }
     log("exe 替换成功");
 
+    // 静默更新（用户已退出程序）不重启，仅替换文件，下次用户启动即为新版本
+    if !args.relaunch {
+        log("静默更新模式，不重启新版本，updater 退出");
+        return;
+    }
+
     if let Err(e) = launch_new_exe(&args.old_exe) {
         log(&format!("启动新 exe 失败: {e}"));
         std::process::exit(4);

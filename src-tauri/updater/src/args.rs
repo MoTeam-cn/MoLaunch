@@ -6,6 +6,8 @@ pub struct Args {
     pub new_exe: PathBuf,
     pub pid: u32,
     pub signature: String,
+    /// 替换完成后是否重启新版本（默认 true）；静默更新（用户已退出程序）传 --no-relaunch 关闭
+    pub relaunch: bool,
 }
 
 impl Args {
@@ -15,6 +17,7 @@ impl Args {
         let mut new_exe = None;
         let mut pid = None;
         let mut signature = None;
+        let mut relaunch = true;
 
         while let Some(arg) = args.next() {
             match arg.as_str() {
@@ -33,6 +36,7 @@ impl Args {
                     )
                 }
                 "--signature" => signature = Some(args.next().ok_or("缺少 --signature 值")?),
+                "--no-relaunch" => relaunch = false,
                 _ => return Err(format!("未知参数: {}", arg)),
             }
         }
@@ -42,6 +46,7 @@ impl Args {
             new_exe: new_exe.ok_or("缺少 --new-exe")?,
             pid: pid.ok_or("缺少 --pid")?,
             signature: signature.ok_or("缺少 --signature")?,
+            relaunch,
         })
     }
 }

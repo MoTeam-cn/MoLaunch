@@ -8,6 +8,8 @@
 
 - **日志页正则多余转义触发 eslint 报错**（[LogsTab.vue](src/views/version-settings/LogsTab.vue)）：`LEVEL_RE` 字符类内 `\[` 属无用转义（`[` 在字符类中无需转义），CI 的 no-useless-escape 报错导致构建失败；已改为字面 `[`，匹配行为不变。
 
+- **静默更新替换后错误重启程序**（[main.rs](src-tauri/updater/src/main.rs) / [args.rs](src-tauri/updater/src/args.rs) / [install_windows.rs](src-tauri/src/commands/system/updater/install_windows.rs)）：Windows 便携版退出时静默应用更新（`apply_pending_update`）后，updater.exe 无条件重启新版本，用户已退出却被重新拉起；updater 新增 `--no-relaunch` 参数（默认重启保持「立即更新」行为），静默路径传入该参数，替换后不重启，下次用户主动启动即为新版本。
+
 ### Changed
 
 - **版本号示例统一为 SemVer 规范格式**：预发布版本号使用 `rc.1`（点分隔预发布标识），后续打 tag 统一 `v0.3.8-rc.1` 风格；同步更新 [release-changelog.cjs](scripts/release-changelog.cjs)、[DEVELOPMENT_GUIDELINES.md](DEVELOPMENT_GUIDELINES.md)、[bug_report.md](.github/ISSUE_TEMPLATE/bug_report.md)、[question.md](.github/ISSUE_TEMPLATE/question.md) 中的版本示例。

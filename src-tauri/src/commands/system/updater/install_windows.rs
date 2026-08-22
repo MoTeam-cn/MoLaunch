@@ -89,6 +89,7 @@ pub(super) async fn download_and_install_windows(
 // 2. download_update_to_appdata 将新版本 exe 下载到 %APPDATA%/.Molaunch/last.exe
 // 3. 用户点击右上角退出时，前端调用 apply_pending_update
 // 4. apply_pending_update 检查 last.exe 是否存在，存在则启动 updater.exe 替换主 exe
+//    （传入 --no-relaunch：用户已退出程序，替换后不重启，下次用户启动即为新版本）
 // 5. 主程序退出，updater.exe 接管替换，下次启动即为新版本
 
 /// 获取 last.exe 路径（%APPDATA%/.Molaunch/last.exe）
@@ -216,6 +217,8 @@ pub(super) async fn apply_pending_update_impl(_app: &AppHandle) -> Result<bool, 
             pid.to_string(),
             "--signature".to_string(),
             signature.clone(),
+            // 静默更新：用户已退出程序，替换后不重启，下次用户启动即为新版本
+            "--no-relaunch".to_string(),
         ],
     )
     .map_err(|e| format!("启动 updater.exe 失败: {e}"))?;
