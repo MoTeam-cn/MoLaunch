@@ -83,3 +83,25 @@ fn test_fill_body_keeps_secret_when_present() {
     assert_eq!(obj["client_secret"], "secret-456");
     assert!(obj.contains_key("client_secret"));
 }
+
+#[test]
+fn test_ensure_https_accepts_https_url() {
+    assert!(ensure_https("https://api.example.com/oauth2/token").is_ok());
+}
+
+#[test]
+fn test_ensure_https_rejects_plain_http_url() {
+    let err = ensure_https("http://api.example.com/oauth2/token").unwrap_err();
+    assert!(
+        err.contains("HTTPS"),
+        "错误信息应说明必须使用 HTTPS: {}",
+        err
+    );
+}
+
+#[test]
+fn test_ensure_https_rejects_schemeless_and_other_schemes() {
+    assert!(ensure_https("api.example.com/token").is_err());
+    assert!(ensure_https("ftp://api.example.com/token").is_err());
+    assert!(ensure_https("").is_err());
+}

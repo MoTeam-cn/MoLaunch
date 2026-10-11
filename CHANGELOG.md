@@ -6,6 +6,10 @@
 
 ### Fixed
 
+- **厂商 API 重定向可被降级为明文传输**（[redirect.rs](src-tauri/src/commands/frp/api_spec/redirect.rs)）：重定向校验此前只比对主机白名单，不校验 scheme；当厂商 API 以 `Location: http://<同主机>/...` 响应时会被放行，而 [http.rs](src-tauri/src/commands/frp/api_spec/http.rs) 在重定向后会重新注入 `Authorization: Bearer`，导致 token 以明文发出（CodeQL rust/cleartext-transmission）。新增 `is_scheme_downgrade` 守卫：基准为 https 时拒绝任何非 https 重定向；补充 [redirect_tests.rs](src-tauri/src/commands/frp/api_spec/redirect_tests.rs) 回归用例。
+
+- **认证流程请求未强制 HTTPS**（[flows.rs](src-tauri/src/commands/frp/auth/flows.rs)）：`send_flow_request` 直接使用 endpoints.json 中 authFlows 配置的 URL 发起请求，未校验 scheme，携带 client_secret / apiKey / refresh_token 的请求可能走明文 http（CodeQL rust/cleartext-transmission）。新增 `ensure_https` 校验，非 https 地址直接拒绝；[flows_tests.rs](src-tauri/src/commands/frp/auth/flows_tests.rs) 补充用例。
+
 - **日志页正则多余转义触发 eslint 报错**（[LogsTab.vue](src/views/version-settings/LogsTab.vue)）：`LEVEL_RE` 字符类内 `\[` 属无用转义（`[` 在字符类中无需转义），CI 的 no-useless-escape 报错导致构建失败；已改为字面 `[`，匹配行为不变。
 
 - **静默更新替换后错误重启程序**（[main.rs](src-tauri/updater/src/main.rs) / [args.rs](src-tauri/updater/src/args.rs) / [install_windows.rs](src-tauri/src/commands/system/updater/install_windows.rs)）：Windows 便携版退出时静默应用更新（`apply_pending_update`）后，updater.exe 无条件重启新版本，用户已退出却被重新拉起；updater 新增 `--no-relaunch` 参数（默认重启保持「立即更新」行为），静默路径传入该参数，替换后不重启，下次用户主动启动即为新版本。

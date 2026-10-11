@@ -36,6 +36,15 @@ pub(super) fn next_url(
             )
         })?;
     let next_url = resolve_url(current_url, location)?;
+
+    // 安全：禁止 scheme 降级（https -> 非 https），否则认证 token 会随重定向以明文重发
+    if is_scheme_downgrade(current_url, &next_url) {
+        return Err(format!(
+            "厂商 API 重定向拒绝明文降级（https -> 非 https）: {}",
+            next_url
+        ));
+    }
+
     let next_host =
         extract_host(&next_url).ok_or_else(|| format!("无法解析重定向 URL 主机: {}", next_url))?;
 
@@ -83,3 +92,14 @@ fn resolve_url(base: &str, location: &str) -> Result<String, String> {
         Ok(format!("{}://{}/{}", scheme, host, location))
     }
 }
+
+/// 判断重定向是否发生 scheme 降级（https -> 非 https）。
+///
+/// 认证 token 在重定向后会重新注入，降级即等于明文重发，必须拒绝。
+fn is_scheme_downgrade(current_url: &str, next_url: &str) -> bool {
+    current_url.starts_with("https://") && !next_url.starts_with("https://")
+}
+
+#[cfg(test)]
+#[path = "redirect_tests.rs"]
+mod tests;

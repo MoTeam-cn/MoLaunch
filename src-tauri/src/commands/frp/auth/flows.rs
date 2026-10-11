@@ -54,6 +54,7 @@ pub async fn send_flow_request(
     ctx: &FlowContext,
 ) -> Result<FlowResponse, String> {
     let url = fill_template(&flow.url, ctx);
+    ensure_https(&url)?;
     let method = flow.method.to_uppercase();
     let content_type = if flow.content_type.is_empty() {
         "application/json"
@@ -189,6 +190,18 @@ impl FlowResponse {
             .iter()
             .filter_map(|(key, extractor)| self.extract_field(extractor).map(|v| (key.clone(), v)))
             .collect()
+    }
+}
+
+/// 校验认证流程请求 URL 为 HTTPS
+///
+/// 认证流程会携带 client_secret / apiKey / refresh_token 等敏感数据，
+/// 明文传输可被中间人截获，故拒绝任何非 https 的请求地址。
+fn ensure_https(url: &str) -> Result<(), String> {
+    if url.starts_with("https://") {
+        Ok(())
+    } else {
+        Err(format!("认证流程 URL 必须使用 HTTPS: {}", url))
     }
 }
 
