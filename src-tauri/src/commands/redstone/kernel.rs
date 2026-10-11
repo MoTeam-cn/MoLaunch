@@ -1,11 +1,14 @@
-//! 红石内核获取：运行时下载 + 本地缓存 + 编译期兜底。
+//! 红石内核获取：运行时下载 + 本地缓存 + 编译期兜底 + 平台支持探测。
 //!
 //! 服务端对内核做版本校验（旧内核会被直接拒绝），所以内核不能只靠编译期嵌入——
 //! 那样对方每发一版 MoLaunch 都得跟着发版。获取顺序：
 //! 1. AppData 缓存已有内核 → 直接用，不联网
 //! 2. 否则从官方 /api/download/client 下载，校验后原子写入缓存
 //! 3. 下载失败（服务不可用 / 该平台尚未发布）→ 回退编译期嵌入的兜底内核
+//!
+//! 平台支持不写死：见 probe_platform_support，官方停供或恢复都无需发版。
 
+use once_cell::sync::Lazy;
 use std::path::PathBuf;
 
 /// 官方内核下载端点（kind=client 即启动器要的 hongshic；server 是中继 hongshis，webui 是图形壳）
@@ -13,6 +16,18 @@ const KERNEL_DOWNLOAD_BASE: &str = "https://hongshi.site/api/download/client";
 
 /// 下载超时（内核不到 1MB，60s 足够）
 const DOWNLOAD_TIMEOUT_SECS: u64 = 60;
+
+/// 平台支持探测的超时（HEAD 探测，给短一点）
+const SUPPORT_PROBE_TIMEOUT_SECS: u64 = 10;
+
+/// 平台支持探测结果的进程内缓存时长（秒）
+///
+/// 避免每次进红石页面都打一次官方接口；「重新检测」按钮可强制绕过。
+const SUPPORT_CACHE_TTL_SECS: u64 = 600;
+
+/// 平台支持探测结果缓存
+static SUPPORT_CACHE: Lazy<std::sync::Mutex<Option<(std::time::Instant, PlatformSupport)>>> =
+    Lazy::new(|| std::sync::Mutex::new(None));
 
 /// 内核来源（用于日志与错误提示）
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -36,17 +51,109 @@ impl KernelSource {
     }
 }
 
-/// 官方是否仍为当前平台提供内核
+/// 平台内核支持状态
+#[derive(Debug, Clone)]
+pub struct PlatformSupport {
+    /// 当前平台是否有可用的官方内核
+    pub supported: bool,
+    /// 不支持时的可读原因（supported=true 时为 None）
+    pub reason: Option<String>,
+}
+
+/// 探测当前平台是否有可用内核（带进程内缓存）
 ///
-/// 官方已停止提供 macOS 构建（下载页仍挂链接但实际 404），该平台判为不支持。
-pub fn is_platform_supported() -> bool {
-    !cfg!(target_os = "macos")
+/// force=true 时绕过缓存重新探测（供前端「重新检测」使用）。
+pub async fn probe_platform_support(force: bool) -> PlatformSupport {
+    if !force {
+        if let Some(hit) = cached_support() {
+            return hit;
+        }
+    }
+    let result = resolve_platform_support().await;
+    store_support(&result);
+    result
+}
+
+/// 实际判定：本地缓存 → 内置兜底 → 官方端点探测
+///
+/// 不写死平台：官方恢复某个平台的构建后，无需发版即可自动生效。
+/// Windows/Linux 命中内置兜底即返回，因此正常平台不产生任何网络请求；
+/// 只有既无缓存又无内置兜底（如 macOS）才会真去探测官方端点。
+async fn resolve_platform_support() -> PlatformSupport {
+    if let Ok(path) = cached_kernel_path() {
+        if path.is_file() {
+            return PlatformSupport {
+                supported: true,
+                reason: None,
+            };
+        }
+    }
+    if crate::resources::get_embedded_resource("hongshi/hongshi").is_some() {
+        return PlatformSupport {
+            supported: true,
+            reason: None,
+        };
+    }
+    match probe_download_endpoint().await {
+        Ok(()) => PlatformSupport {
+            supported: true,
+            reason: None,
+        },
+        Err(reason) => PlatformSupport {
+            supported: false,
+            reason: Some(reason),
+        },
+    }
+}
+
+/// HEAD 探测官方下载端点是否提供当前平台构建
+async fn probe_download_endpoint() -> Result<(), String> {
+    let (platform, arch) =
+        platform_arch().ok_or_else(|| "当前平台没有对应的官方内核命名".to_string())?;
+    let url = format!("{KERNEL_DOWNLOAD_BASE}?platform={platform}&arch={arch}");
+    let resp = crate::http::get_client()
+        .head(&url)
+        .timeout(std::time::Duration::from_secs(SUPPORT_PROBE_TIMEOUT_SECS))
+        .send()
+        .await
+        .map_err(|e| format!("探测官方内核下载失败：{e}"))?;
+
+    let status = resp.status();
+    if status.is_success() {
+        Ok(())
+    } else if status.as_u16() == 404 {
+        Err(format!(
+            "官方尚未提供当前平台（{platform}-{arch}）的内核构建"
+        ))
+    } else {
+        Err(format!("官方内核下载返回 HTTP {}", status.as_u16()))
+    }
+}
+
+/// 读取未过期的探测缓存
+fn cached_support() -> Option<PlatformSupport> {
+    let guard = SUPPORT_CACHE.lock().ok()?;
+    let (at, support) = guard.as_ref()?;
+    if at.elapsed().as_secs() < SUPPORT_CACHE_TTL_SECS {
+        Some(support.clone())
+    } else {
+        None
+    }
+}
+
+/// 写入探测缓存
+fn store_support(support: &PlatformSupport) {
+    if let Ok(mut guard) = SUPPORT_CACHE.lock() {
+        *guard = Some((std::time::Instant::now(), support.clone()));
+    }
 }
 
 /// 当前平台对应的官方命名（platform, arch）
 ///
 /// 官方取值：platform ∈ windows|linux|macos，arch ∈ amd64|arm64。
-/// 未覆盖的组合返回 None（如 macOS 官方已停供、Windows arm64 未发布）。
+/// 未覆盖的组合返回 None（如 Windows arm64 官方未发布）。
+/// 注意：这里只做**命名映射**，不判断官方是否真的发布了该平台构建——
+/// 后者由 probe_platform_support 通过实际探测决定。
 pub fn platform_arch() -> Option<(&'static str, &'static str)> {
     #[cfg(all(target_os = "windows", target_arch = "x86_64"))]
     {
@@ -60,11 +167,19 @@ pub fn platform_arch() -> Option<(&'static str, &'static str)> {
     {
         return Some(("linux", "arm64"));
     }
+    #[cfg(all(target_os = "macos", target_arch = "x86_64"))]
+    {
+        return Some(("macos", "amd64"));
+    }
+    #[cfg(all(target_os = "macos", target_arch = "aarch64"))]
+    {
+        return Some(("macos", "arm64"));
+    }
     #[allow(unreachable_code)]
     None
 }
 
-/// 官方文件名：`{binary}-{platform}-{arch}`，仅 windows 追加 .exe
+/// 官方文件名：{binary}-{platform}-{arch}，仅 windows 追加 .exe
 pub fn kernel_file_name() -> Option<String> {
     let (platform, arch) = platform_arch()?;
     let suffix = if platform == "windows" { ".exe" } else { "" };
@@ -85,12 +200,8 @@ pub fn cached_kernel_path() -> Result<PathBuf, String> {
 /// 解析可用内核：缓存 → 下载 → 编译期兜底
 ///
 /// 返回（内核路径，来源）。三条路径都不可用时返回带原因的错误。
+/// 是否该走这里由 probe_platform_support 决定（前端在平台不支持时不进入创建流程）。
 pub async fn ensure_kernel() -> Result<(PathBuf, KernelSource), String> {
-    // 0. 平台闸门：官方已停供的平台直接给出明确原因，不再走下载与兜底
-    if !is_platform_supported() {
-        return Err("红石联机已不再支持 macOS：官方已停止提供 macOS 内核".to_string());
-    }
-
     // 1. 本地缓存
     if let Ok(path) = cached_kernel_path() {
         if path.is_file() {
@@ -112,8 +223,7 @@ pub async fn ensure_kernel() -> Result<(PathBuf, KernelSource), String> {
                     Ok((path, KernelSource::Embedded))
                 }
                 Err(embed_err) => Err(format!(
-                    "获取红石内核失败：下载失败（{}），内置兜底也不可用（{}）",
-                    download_err, embed_err
+                    "获取红石内核失败：官方下载不可用（{download_err}），本机也没有内置兜底内核（{embed_err}）"
                 )),
             }
         }

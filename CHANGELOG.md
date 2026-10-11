@@ -30,9 +30,11 @@
 
 ### Changed
 
-- **红石联机不再支持 macOS**（[kernel.rs](src-tauri/src/commands/redstone/kernel.rs) / [resources.rs](src-tauri/src/resources.rs) / [platform.ts](src/utils/platform.ts)（新增） / [useRedStonePanel.ts](src/composables/useRedStonePanel.ts) / [RedStoneCreatePanel.vue](src/components/online/RedStoneCreatePanel.vue) / [RedStoneKernelPanel.vue](src/components/online/RedStoneKernelPanel.vue)）：官方已停止提供 macOS 内核（下载页仍挂 `macos-amd64` / `macos-arm64` 链接但**实际 404**），同步移除该平台支持。
-  - 删除仓库内残留的 macOS 内核二进制；[resources.rs](src-tauri/src/resources.rs) 去掉 macOS 嵌入分支；[kernel.rs](src-tauri/src/commands/redstone/kernel.rs) 的 `platform_arch()` 不再映射 macOS，并新增 `is_platform_supported()` 平台闸门——`ensure_kernel()` 在 macOS 上直接返回「红石联机已不再支持 macOS：官方已停止提供 macOS 内核」，不再走下载与兜底。
-  - 前端新增 [platform.ts](src/utils/platform.ts) 的 `isMacOS()`（`navigator.platform` 优先、`userAgent` 兜底）：创建面板与内核面板在 macOS 上**整页替换为不支持说明**，并指向「搭桥联机」/「FRP」作为替代；composable 侧对加载服务器列表、创建/重启隧道、恢复状态全部短路，不再发起任何红石相关请求。
+- **红石联机的平台支持改为实际探测，macOS 给出明确说明**（[kernel.rs](src-tauri/src/commands/redstone/kernel.rs) / [manager.rs](src-tauri/src/commands/redstone/manager.rs) / [resources.rs](src-tauri/src/resources.rs) / [platform.ts](src/utils/platform.ts)（新增） / [useRedStonePanel.ts](src/composables/useRedStonePanel.ts) / [redstone.ts](src/utils/api/redstone.ts) / [types/redstone.ts](src/types/redstone.ts) / [RedStoneCreatePanel.vue](src/components/online/RedStoneCreatePanel.vue) / [RedStoneKernelPanel.vue](src/components/online/RedStoneKernelPanel.vue)）：官方已停止提供 macOS 内核（下载页仍挂 `macos-amd64` / `macos-arm64` 链接但**实际 404**），删除仓库内残留的 macOS 内核二进制并去掉 macOS 嵌入分支。
+  - **平台支持不写死**：新增 `kernel::probe_platform_support()`，判定顺序为「AppData 已有内核 → 编译期兜底存在 → HEAD 探测官方下载端点」。Windows/Linux 在前两步即返回，**不产生任何网络请求**；只有既无缓存又无内置兜底的平台（macOS）才真去探测官方端点。因此官方恢复 macOS 构建后**无需更新启动器即可自动恢复**——这也修正了此前「编译期写死 macOS 不支持」与「恢复后自动可用」文案自相矛盾的问题。
+  - 探测结果在进程内缓存 10 分钟，新增 IPC `redstone_platform_support`（`force=true` 绕过缓存）；`ensure_kernel()` 移除编译期平台闸门，改由探测结果决定是否进入创建流程。
+  - 前端新增 [platform.ts](src/utils/platform.ts) 的 `isMacOS()`（`navigator.platform` 优先、`userAgent` 兜底）；新增 `useRedStonePlatformSupport()` 供两个面板共用：初值对 macOS 取「不支持」避免探测返回前闪现正常 UI，随后由后端探测结果纠正。
+  - 创建面板与内核面板在不支持时**整页替换为说明卡**（含后端给出的具体原因与「重新检测」按钮），并指向「搭桥联机」/「FRP」作为替代；composable 侧对加载服务器列表、创建/重启隧道、恢复状态全部短路，不发起任何红石请求。
 
 - **红石联机切换到 Redstone Online2（hongshic）内核契约**（[tunnel.rs](src-tauri/src/commands/redstone/tunnel.rs) / [tunnel_test.rs](src-tauri/src/commands/redstone/tunnel_test.rs) / [manager.rs](src-tauri/src/commands/redstone/manager.rs) / [redstone.ts](src/utils/api/redstone.ts) / [types/redstone.ts](src/types/redstone.ts) / [RedStoneKernelPanel.vue](src/components/online/RedStoneKernelPanel.vue)）：官网已改版，旧契约**两处同时失效**（列表端点 404 + 旧内核被服务端以「客户端版本过时」拒绝），旧版红石联机已完全不可用，本次整体对齐新契约。
   - 服务器列表 `hongshi.site/newserver.json`（已 404）→ `hongshi.site/api/server/list`（响应仍是 `region → host` 映射，解析逻辑复用）。

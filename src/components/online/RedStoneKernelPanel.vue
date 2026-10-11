@@ -17,8 +17,7 @@ import {
   CheckCircleIcon,
 } from '@heroicons/vue/24/outline'
 import { redstoneLogFiles, redstoneReadLog, redstoneStatus } from '@/utils/api/redstone'
-import { MACOS_UNSUPPORTED_MESSAGE } from '@/composables/useRedStonePanel'
-import { isMacOS } from '@/utils/platform'
+import { useRedStonePlatformSupport } from '@/composables/useRedStonePanel'
 import { parseLogLines, logLineClass } from '@/utils/log-display'
 import { toastError } from '@/utils/toast'
 import { formatBytes } from '@/utils/format'
@@ -29,8 +28,13 @@ const Select = defineAsyncComponent(() => import('@/components/common/Select.vue
 const Tag = defineAsyncComponent(() => import('@/components/common/Tag.vue'))
 const Alert = defineAsyncComponent(() => import('@/components/common/Alert.vue'))
 
-/** 官方已停止提供 macOS 内核，该平台不提供红石联机 */
-const platformUnsupported = isMacOS()
+/** 平台支持探测（与创建面板共用；macOS 官方停供，探测失败即整页替换为说明） */
+const {
+  platformUnsupported,
+  platformUnsupportedMessage,
+  platformChecking,
+  checkPlatformSupport,
+} = useRedStonePlatformSupport()
 /** 内核状态（redstone_status 返回） */
 const status = ref<RedStoneStatusResult | null>(null)
 /** 日志文件列表（按修改时间倒序，最新在前） */
@@ -56,7 +60,7 @@ const fileOptions = computed(() =>
 
 /** 加载内核状态（进程存活 + 内核 stdout 解析出的隧道地址） */
 async function loadStatus() {
-  if (platformUnsupported) return
+  if (platformUnsupported.value) return
   statusLoading.value = true
   try {
     status.value = await redstoneStatus()
@@ -69,7 +73,7 @@ async function loadStatus() {
 
 /** 加载日志文件列表，选中最新的日志文件（没有选中项时） */
 async function loadLogFiles() {
-  if (platformUnsupported) return
+  if (platformUnsupported.value) return
   try {
     logFiles.value = (await redstoneLogFiles()).files
     if (!logFiles.value.some((f) => f.fileName === selectedFile.value)) {
@@ -104,8 +108,9 @@ watch(selectedFile, () => {
   void loadLog()
 })
 
-/** 手动刷新：状态 + 文件列表 + 当前日志 */
+/** 手动刷新：先重新探测平台支持，再拉状态 + 文件列表 + 当前日志 */
 async function handleRefresh() {
+  if (!(await checkPlatformSupport())) return
   await Promise.all([loadStatus(), loadLogFiles()])
   void loadLog()
 }
@@ -125,12 +130,21 @@ onActivated(() => {
 <template>
   <Card v-if="platformUnsupported" title="暂不支持 macOS">
     <div class="space-y-3">
-      <Alert variant="soft" type="error" :message="MACOS_UNSUPPORTED_MESSAGE" />
+      <Alert variant="soft" type="error" :message="platformUnsupportedMessage" />
       <Alert
         variant="soft"
         type="info"
-        message="如需在 macOS 上联机，可改用「搭桥联机」或「FRP」；若官方日后恢复 macOS 内核，无需更新启动器即可自动恢复"
+        message="如需在 macOS 上联机，可改用「搭桥联机」或「FRP」。官方一旦发布 macOS 内核，点击「重新检测」即可恢复，无需更新启动器"
       />
+      <div>
+        <Button
+          type="outline"
+          :loading="platformChecking || logsLoading || statusLoading"
+          @click="handleRefresh"
+        >
+          <template #icon><ArrowPathIcon class="w-4 h-4" /></template>重新检测
+        </Button>
+      </div>
     </div>
   </Card>
   <div v-else class="space-y-4">

@@ -22,14 +22,13 @@ const Input = defineAsyncComponent(() => import('@/components/common/Input.vue')
 const Select = defineAsyncComponent(() => import('@/components/common/Select.vue'))
 const Tag = defineAsyncComponent(() => import('@/components/common/Tag.vue'))
 const Alert = defineAsyncComponent(() => import('@/components/common/Alert.vue'))
-import {
-  MACOS_UNSUPPORTED_MESSAGE,
-  latencyTagColor,
-  useRedStonePanel,
-} from '@/composables/useRedStonePanel'
+import { latencyTagColor, useRedStonePanel } from '@/composables/useRedStonePanel'
 
 const {
   platformUnsupported,
+  platformUnsupportedMessage,
+  platformChecking,
+  recheckPlatformSupport,
   serverLoading, serverError, useManualServer, server, mcPort, portSelecting,
   phase, errorMessage, creating, stopping, restarting,
   serverOptions, address, latencyTesting,
@@ -43,12 +42,17 @@ const selectedOption = computed(() => serverOptions.value.find((o) => o.value ==
 <template>
   <Card v-if="platformUnsupported" title="暂不支持 macOS">
     <div class="space-y-3">
-      <Alert variant="soft" type="error" :message="MACOS_UNSUPPORTED_MESSAGE" />
+      <Alert variant="soft" type="error" :message="platformUnsupportedMessage" />
       <Alert
         variant="soft"
         type="info"
-        message="如需在 macOS 上联机，可改用「搭桥联机」或「FRP」；若官方日后恢复 macOS 内核，无需更新启动器即可自动恢复"
+        message="如需在 macOS 上联机，可改用「搭桥联机」或「FRP」。官方一旦发布 macOS 内核，点击「重新检测」即可恢复，无需更新启动器"
       />
+      <div>
+        <Button type="outline" :loading="platformChecking" @click="recheckPlatformSupport">
+          <template #icon><ArrowPathIcon class="w-4 h-4" /></template>重新检测
+        </Button>
+      </div>
     </div>
   </Card>
   <div v-else class="space-y-4">

@@ -6,7 +6,13 @@
  * 监听后端 `scaffolding-mc-port-change` / `mc-port-detected` 自动回填端口并 toast。
  */
 import { ref, computed, onMounted, onUnmounted, onActivated, onDeactivated } from 'vue'
-import { redstoneGetServers, redstoneStart, redstoneStatus, redstoneStop } from '@/utils/api/redstone'
+import {
+  redstoneGetServers,
+  redstonePlatformSupport,
+  redstoneStart,
+  redstoneStatus,
+  redstoneStop,
+} from '@/utils/api/redstone'
 import { getRunningMcPort } from '@/utils/api/online-manager'
 import { addressLatencyTest } from '@/utils/api/tools'
 import { copyToClipboard } from '@/utils/clipboard'
@@ -19,8 +25,8 @@ import type { RedStoneServer, RedStoneStatusResult } from '@/types/redstone'
 const POLL_INTERVAL = 2000
 const POLL_TIMEOUT = 15000
 const CLOSED_MESSAGE = '房间已关闭（长时间无人或服务器维护）'
-/** macOS 不支持提示（官方已停止提供 macOS 内核） */
-export const MACOS_UNSUPPORTED_MESSAGE = '红石联机已不再支持 macOS：官方已停止提供 macOS 内核'
+/** 平台不支持时的兜底提示（后端探测到具体原因时会覆盖它） */
+export const MACOS_UNSUPPORTED_MESSAGE = '官方尚未提供 macOS 内核，红石联机在当前平台暂不可用'
 export type RedStoneCreatePhase = 'idle' | 'creating' | 'open' | 'closed' | 'error'
 
 /**
@@ -35,10 +41,84 @@ export function latencyTagColor(ms: number | null): string {
   return 'red'
 }
 
+/**
+ * 平台支持状态（创建面板与内核面板共用）
+ *
+ * 初值对 macOS 取「不支持」的乐观判定，避免探测返回前闪现正常 UI；
+ * 真正的判定来自后端 redstone_platform_support —— 它会**实际探测官方下载端点**
+ * （而非写死平台），因此官方恢复 macOS 构建后无需更新启动器即可自动恢复。
+ */
+export function useRedStonePlatformSupport() {
+  const platformSupported = ref(!isMacOS())
+  /** 后端给出的不支持原因（探测失败或支持时为空串） */
+  const platformReason = ref('')
+  const platformChecking = ref(false)
+  const platformUnsupported = computed(() => !platformSupported.value)
+  /** 面板展示的不支持原因（后端原因优先，回退默认文案） */
+  const platformUnsupportedMessage = computed(
+    () => platformReason.value || MACOS_UNSUPPORTED_MESSAGE,
+  )
+
+  /** 探测平台支持；force=true 绕过后端的进程内缓存（「重新检测」用） */
+  async function checkPlatformSupport(force = false): Promise<boolean> {
+    if (platformChecking.value) return !platformUnsupported.value
+    platformChecking.value = true
+    try {
+      const res = await redstonePlatformSupport(force)
+      platformSupported.value = res.supported
+      platformReason.value = res.reason ?? ''
+    } catch {
+      // 探测本身失败不阻断：按支持处理，让创建时暴露真实错误
+      platformSupported.value = true
+      platformReason.value = ''
+    } finally {
+      platformChecking.value = false
+    }
+    return !platformUnsupported.value
+  }
+
+  return {
+    platformUnsupported,
+    platformUnsupportedMessage,
+    platformChecking,
+    checkPlatformSupport,
+  }
+}
+
 /** 红石联机创建面板逻辑（含端口选择与 MC 端口事件自动回填） */
 export function useRedStonePanel() {
-  /** 官方已停止提供 macOS 内核，该平台不提供红石联机（由面板显示错误卡） */
-  const platformUnsupported = isMacOS()
+  const {
+    platformUnsupported,
+    platformUnsupportedMessage,
+    platformChecking,
+    checkPlatformSupport,
+  } = useRedStonePlatformSupport()
+  /** 事件监听是否已启动（探测翻转为支持后补启，避免重复注册） */
+  let listenersStarted = false
+
+  /** 启动红石相关加载与事件监听（平台支持时才调用） */
+  function startRedstone() {
+    mountedOnce = true
+    void restoreStatus()
+    void loadServers()
+    void autoFillPort()
+    if (!listenersStarted) {
+      listenersStarted = true
+      void portChangeListener.start()
+      void mcPortDetectedListener.start()
+    }
+  }
+
+  /** 「重新检测」：强制重新探测官方端点，恢复可用时直接进入正常流程 */
+  async function recheckPlatformSupport() {
+    const supported = await checkPlatformSupport(true)
+    if (!supported) {
+      toastError(platformUnsupportedMessage.value)
+      return
+    }
+    toastSuccess('已检测到官方内核，红石联机可用')
+    startRedstone()
+  }
   const servers = ref<RedStoneServer[]>([])
   const serverLoading = ref(false)
   const serverError = ref('')
@@ -76,7 +156,7 @@ export function useRedStonePanel() {
     return e instanceof Error ? e.message : String(e)
   }
   async function loadServers() {
-    if (platformUnsupported) return
+    if (platformUnsupported.value) return
     serverLoading.value = true
     serverError.value = ''
     try {
@@ -249,7 +329,7 @@ export function useRedStonePanel() {
   }
 
   function handleCreate() {
-    if (platformUnsupported) {
+    if (platformUnsupported.value) {
       toastError(MACOS_UNSUPPORTED_MESSAGE)
       return
     }
@@ -265,7 +345,7 @@ export function useRedStonePanel() {
 
   /** 重启 = 先 stop 再 start（沿用当前服务器与端口） */
   async function handleRestart() {
-    if (platformUnsupported) {
+    if (platformUnsupported.value) {
       toastError(MACOS_UNSUPPORTED_MESSAGE)
       return
     }
@@ -308,7 +388,7 @@ export function useRedStonePanel() {
   }
 
   async function restoreStatus() {
-    if (platformUnsupported) return
+    if (platformUnsupported.value) return
     try {
       const res = await redstoneStatus()
       status.value = res
@@ -343,14 +423,10 @@ export function useRedStonePanel() {
   })
 
   onMounted(() => {
-    // 不支持平台：不发起任何红石相关请求，交由面板显示错误卡
-    if (platformUnsupported) return
-    mountedOnce = true
-    void restoreStatus()
-    void loadServers()
-    void autoFillPort()
-    void portChangeListener.start()
-    void mcPortDetectedListener.start()
+    // 先探测平台支持（会实际打官方端点）；不支持则不发起任何红石请求，由面板显示错误卡
+    void (async () => {
+      if (await checkPlatformSupport()) startRedstone()
+    })()
   })
   onActivated(() => { // keep-alive 初次激活紧跟 mounted，去重避免重复拉取
     if (mountedOnce) {
@@ -364,6 +440,9 @@ export function useRedStonePanel() {
 
   return {
     platformUnsupported,
+    platformUnsupportedMessage,
+    platformChecking,
+    recheckPlatformSupport,
     servers,
     serverLoading,
     serverError,

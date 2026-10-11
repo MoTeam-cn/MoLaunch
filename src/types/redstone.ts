@@ -16,6 +16,12 @@ export interface RedStoneGetServersResult {
   servers: RedStoneServer[]
 }
 
+/** `redstone_platform_support` 返回（supported=false 时 reason 为可读原因） */
+export interface RedStonePlatformSupportResult {
+  supported: boolean
+  reason: string | null
+}
+
 /** `redstone_start` 参数 */
 export interface RedStoneStartParams {
   server: string

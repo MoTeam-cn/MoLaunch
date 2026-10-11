@@ -1,6 +1,6 @@
 //! 红石联机动作分发（redstone_manager 的命令层实现）
-//! 统一注册 redstone_get_servers / redstone_start / redstone_status / redstone_stop
-//! / redstone_log_files / redstone_read_log。
+//! 统一注册 redstone_platform_support / redstone_get_servers / redstone_start
+//! / redstone_status / redstone_stop / redstone_log_files / redstone_read_log。
 //! 内核由 kernel::ensure_kernel 解析（缓存 → 运行时下载 → 编译期兜底），
 //! 再由 HongshiTunnel 子进程封装拉起；隧道地址取自内核 stdout 的 endpoint=。
 
@@ -13,6 +13,7 @@ use crate::log_info;
 use crate::state::AppState;
 use crate::utils::dispatcher::{ActionRequest, Dispatcher};
 
+use super::kernel;
 use super::tunnel::{split_endpoint, HongshiTunnel};
 
 static DISPATCHER: Lazy<Dispatcher> = Lazy::new(|| {
@@ -70,6 +71,25 @@ fn parse_new_server(value: serde_json::Value) -> Vec<serde_json::Value> {
 }
 
 fn register(d: &mut Dispatcher) {
+    // 探测当前平台是否有可用内核
+    // 官方停供 macOS，但**不写死平台**：无内置兜底的平台会真去探测官方下载端点，
+    // 官方恢复构建后无需发版即可自动生效；正常平台命中内置兜底，不产生网络请求。
+    d.register(
+        "redstone_platform_support",
+        handler!(_state, _app, params, {
+            // force=true 绕过进程内缓存（前端「重新检测」按钮）
+            let force = params
+                .get("force")
+                .and_then(|v| v.as_bool())
+                .unwrap_or(false);
+            let support = kernel::probe_platform_support(force).await;
+            Ok(serde_json::json!({
+                "supported": support.supported,
+                "reason": support.reason,
+            }))
+        }),
+    );
+
     // 拉取红石中转服务器列表（官方 /api/server/list，仅几 KB 轻量 JSON）
     // 失败时前端降级为手动填写，不阻塞创建流程
     d.register(

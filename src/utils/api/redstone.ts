@@ -7,6 +7,7 @@
 import { invoke } from '@tauri-apps/api/core'
 import type {
   RedStoneGetServersResult,
+  RedStonePlatformSupportResult,
   RedStoneLogFilesResult,
   RedStoneReadLogResult,
   RedStoneStartParams,
@@ -17,6 +18,7 @@ import type {
 
 /** 红石联机 action 名称常量 */
 export const REDSTONE_ACTIONS = {
+  PLATFORM_SUPPORT: 'redstone_platform_support',
   GET_SERVERS: 'redstone_get_servers',
   START: 'redstone_start',
   STATUS: 'redstone_status',
@@ -28,6 +30,13 @@ export const REDSTONE_ACTIONS = {
 /** 红石联机统一调用入口（action/params 放在 req 中，与后端 `req: ActionRequest` 契约一致） */
 export function redstoneManager<T = unknown>(action: string, params?: unknown): Promise<T> {
   return invoke<T>('redstone_manager', { req: { action, params: params ?? null } })
+}
+
+/** 探测当前平台是否有可用内核（force=true 绕过后端进程内缓存） */
+export function redstonePlatformSupport(force = false): Promise<RedStonePlatformSupportResult> {
+  return redstoneManager<RedStonePlatformSupportResult>(REDSTONE_ACTIONS.PLATFORM_SUPPORT, {
+    force,
+  })
 }
 
 /** 获取中转服务器列表 */
