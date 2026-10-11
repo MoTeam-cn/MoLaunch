@@ -315,9 +315,9 @@ pub(crate) async fn export_inner(params: &RpExportParams) -> Result<RpExportResu
         let _ = std::fs::remove_file(&tmp_target);
         return Err(e);
     }
-    if final_target.exists() {
-        std::fs::remove_file(&final_target).map_err(|e| format!("替换目标文件失败: {}", e))?;
-    }
+    // 不先 remove_file 目标：实测 std::fs::rename 在 Windows 上会覆盖已存在目标
+    // （MoveFileExW + MOVEFILE_REPLACE_EXISTING），先删会引入「目标不存在」的窗口，
+    // 使「先写 tmp 再 rename」失去原子性意义
     std::fs::rename(&tmp_target, &final_target).map_err(|e| format!("写入目标文件失败: {}", e))?;
 
     Ok(RpExportResult {

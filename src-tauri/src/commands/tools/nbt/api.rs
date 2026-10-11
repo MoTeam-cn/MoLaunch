@@ -198,13 +198,11 @@ fn read_root_name(data: &[u8]) -> String {
 }
 
 /// 原子写文件：先写同目录临时文件再替换目标（避免写一半损坏原文件）
+///
+/// 实现统一在 utils/fs.rs（临时名带自增序号，防并发同名）。
+/// 原先在 rename 前先 remove_file 目标——那不是原子替换，中间存在目标文件不存在的
+/// 窗口。已实测 std::fs::rename 在 Windows 上会覆盖已存在目标
+/// （MoveFileExW + MOVEFILE_REPLACE_EXISTING），故删除该步骤。
 fn atomic_write(path: &Path, data: &[u8]) -> Result<(), String> {
-    let ext = path.extension().and_then(|e| e.to_str()).unwrap_or("bin");
-    let tmp = path.with_extension(format!("{}.tmp", ext));
-    std::fs::write(&tmp, data).map_err(log_err("NBT 写入临时文件失败"))?;
-    if path.exists() {
-        std::fs::remove_file(path).map_err(log_err("NBT 删除原文件失败"))?;
-    }
-    std::fs::rename(&tmp, path).map_err(log_err("NBT 替换文件失败"))?;
-    Ok(())
+    crate::utils::fs::write_atomic(path, data)
 }

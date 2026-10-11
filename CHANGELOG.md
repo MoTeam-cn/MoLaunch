@@ -49,6 +49,8 @@
 
 ### Fixed
 
+- **修复两处「先删再改名」破坏原子性的缺陷**（[nbt/api.rs](src-tauri/src/commands/tools/nbt/api.rs) / [resourcepack/explore/io.rs](src-tauri/src/commands/tools/resourcepack/explore/io.rs)）：两处都在 `rename` **之前**先 `remove_file` 目标文件，使「先写 tmp 再 rename」失去原子性——删除成功而 rename 失败时原文件已丢失。**实测证据**：独立 rustc 程序验证 `std::fs::rename` 在 Windows 上会覆盖已存在目标（输出 `rename=OK content=NEW_CONTENT overwrote=true`，底层为 `MoveFileExW` + `MOVEFILE_REPLACE_EXISTING`），故 `remove_file` 属多余且有害，已删除。nbt 侧的 `atomic_write` 同时改为复用 `utils::fs::write_atomic`（临时名由固定 `{ext}.tmp` 改为带自增序号）。
+
 - **继续迁移原子写到共享实现**（[fs.rs](src-tauri/src/utils/fs.rs)）：[version/modpack_meta.rs](src-tauri/src/minecraft/version/modpack_meta.rs)、[version/setup/save.rs](src-tauri/src/minecraft/version/setup/save.rs)（2 处）原用 `with_extension("json.tmp")` / `with_extension("ini.tmp")` 的固定临时名，已改为 `utils::fs::write_atomic`。
 
 - **记录两处非原子替换缺陷（本轮未改，待验证 Windows rename 覆盖语义）**：[tools/nbt/api.rs](src-tauri/src/commands/tools/nbt/api.rs) 与 [tools/resourcepack/explore/io.rs](src-tauri/src/commands/tools/resourcepack/explore/io.rs) 在 `rename` **之前**先 `remove_file` 目标文件——这不是原子替换，中间存在目标文件不存在的窗口，恰好破坏了「先写 tmp 再 rename」的全部意义。Rust 的 `std::fs::rename` 在 Windows 上走 `MoveFileExW(MOVEFILE_REPLACE_EXISTING)`，理论上会覆盖，故 `remove_file` 疑似多余；但两处都这么写说明可能有人踩过错误，**在拿到确定性证据前不改**，避免把能用的代码改坏。
