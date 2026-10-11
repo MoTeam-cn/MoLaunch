@@ -16,6 +16,8 @@
 
 ### Changed
 
+- **升级存在安全公告的前端依赖并锁定传递依赖下限**（[package.json](package.json) / [package-lock.json](package-lock.json)）：直接依赖 axios `^1.19.0` → `^1.20.0`（对应 9 条 Dependabot 公告）、dompurify `^3.4.12` → `^3.4.16`、vitest `^3.2.7` → `^4.1.11`；新增 `overrides` 固定 decode-uri-component `^0.5.0`、colord `^2.9.4`、js-yaml `^4.3.2`、browserslist `^4.28.7`、baseline-browser-mapping `^2.11.0`，并以范围键 `fflate@<0.6.11` 仅覆盖 0.6.x 分支（不影响 numcodecs 使用的 0.8.x）。
+
 - **版本号示例统一为 SemVer 规范格式**：预发布版本号使用 `rc.1`（点分隔预发布标识），后续打 tag 统一 `v0.3.8-rc.1` 风格；同步更新 [release-changelog.cjs](scripts/release-changelog.cjs)、[DEVELOPMENT_GUIDELINES.md](DEVELOPMENT_GUIDELINES.md)、[bug_report.md](.github/ISSUE_TEMPLATE/bug_report.md)、[question.md](.github/ISSUE_TEMPLATE/question.md) 中的版本示例。
 
 - **Alert bar 风格默认允许换行**（[Alert.vue](src/components/common/Alert.vue)）：`truncate` 默认值由 `true` 改为 `false`，内容超宽不再单行省略号截断，改为换行完整展示；需紧凑单行布局的调用方可显式传 `:truncate="true"`。
