@@ -26,60 +26,19 @@ use super::easytier_install::{
 fn extract_zip_safely(zip_path: &Path, dst: &Path, keep_files: &[&str]) -> Result<(), String> {
     let file = std::fs::File::open(zip_path).map_err(|e| format!("打开 ZIP 失败: {e}"))?;
     let mut archive = zip::ZipArchive::new(file).map_err(|e| format!("解析 ZIP 失败: {e}"))?;
-    // 确定共享顶层前缀（所有条目同一根目录时剥离，扁平包不剥离）
-    let mut roots = std::collections::HashSet::new();
-    let mut flat = false;
-    for name in archive.file_names() {
-        if name.contains('/') {
-            if let Some(root) = name.split('/').next().filter(|v| !v.is_empty()) {
-                roots.insert(root.to_string());
-            }
-        } else if !name.is_empty() {
-            flat = true;
-        }
-    }
-    let prefix = if flat || roots.len() != 1 {
-        String::new()
-    } else {
-        format!("{}/", roots.into_iter().next().unwrap())
-    };
-    let canonical_dst = dst.canonicalize().unwrap_or_else(|_| dst.to_path_buf());
-    for i in 0..archive.len() {
-        let mut entry = archive
-            .by_index(i)
-            .map_err(|e| format!("读取 ZIP 条目失败: {e}"))?;
-        let name = entry.name().to_string();
-        let rel = name.strip_prefix(&prefix).unwrap_or(&name);
-        if rel.is_empty() {
-            continue;
-        }
-        // 白名单过滤：只解压需要的文件（core/cli 二进制 + Windows 的 WinDivert 驱动）
-        let file_name = Path::new(&rel)
+    // 确定共享顶层前缀（实现统一在 utils/archive.rs）
+    let names: Vec<String> = archive.file_names().map(str::to_string).collect();
+    let prefix = crate::utils::archive::determine_zip_prefix(&names);
+    // 白名单过滤：只解压需要的文件（core/cli 二进制 + Windows 的 WinDivert 驱动）；
+    // 段级 Zip Slip 校验与 canonicalize 兜底统一在 utils/archive.rs（此处原先只有
+    // 文件分支做 canonicalize，目录分支无校验）
+    crate::utils::archive::extract_zip_safely(&mut archive, &prefix, dst, |rel| {
+        Path::new(rel)
             .file_name()
             .and_then(|n| n.to_str())
-            .unwrap_or("");
-        if !keep_files.contains(&file_name) {
-            continue;
-        }
-        let path = dst.join(rel);
-        if rel.ends_with('/') {
-            std::fs::create_dir_all(&path).map_err(|e| format!("创建目录失败: {e}"))?;
-            continue;
-        }
-        if let Some(parent) = path.parent() {
-            std::fs::create_dir_all(parent).map_err(|e| format!("创建父目录失败: {e}"))?;
-            if !parent
-                .canonicalize()
-                .map_err(|e| format!("canonicalize 失败: {e}"))?
-                .starts_with(&canonical_dst)
-            {
-                return Err(format!("Zip Slip 检测: {rel}"));
-            }
-        }
-        let mut out = std::fs::File::create(&path).map_err(|e| format!("创建文件失败: {e}"))?;
-        std::io::copy(&mut entry, &mut out).map_err(|e| format!("写入文件失败: {e}"))?;
-    }
-    Ok(())
+            .map(|n| keep_files.contains(&n))
+            .unwrap_or(false)
+    })
 }
 
 /// 递归移动目录内容（临时目录 → 安装目录）

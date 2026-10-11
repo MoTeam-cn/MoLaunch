@@ -49,6 +49,10 @@
 
 ### Fixed
 
+- **修复第四处 ZIP 解压目录条目路径穿越**（[easytier_download.rs](src-tauri/src/commands/online/manager/easytier_download.rs)）：该处同样只有文件分支做 canonicalize 校验，目录分支直接 `create_dir_all`。**此处在安全审计的 Zip Slip 清单之外**，是在做去重迁移时才发现的（查重审计列出了 5 处解压实现，安全审计只报了 3 处）。已迁移到 `utils::archive::extract_zip_safely`，段级校验随之生效。
+
+- **迁移 easytier 内核解压到共享实现**（[easytier_download.rs](src-tauri/src/commands/online/manager/easytier_download.rs)）：原内联的顶层前缀探测改用 `determine_zip_prefix`，`keep_files` 白名单改用 `extract_zip_safely` 的 `should_keep` 过滤器，保留原有语义。
+
 - **抽公共 ZIP 工具，消除解压与前缀探测的重复实现**（[archive.rs](src-tauri/src/utils/archive.rs)（新增） / [archive_test.rs](src-tauri/src/utils/archive_test.rs)（新增））：`determine_zip_prefix` 原有三份拷贝、安全解压有五份拷贝，改一处漏两处——本轮修 Zip Slip 目录分支时就正是因为三处拷贝只改了两处而漏掉一处。新增 `utils::archive::{determine_zip_prefix, extract_zip_safely}`：前者统一顶层结构判定；后者统一两道防线（段级 `ensure_safe_relative_path` 在创建任何目录之前 + canonicalize 父目录兜底），并接受 `prefix` 与 `should_keep` 过滤器以覆盖各调用点的差异。
 
 - **迁移以下调用点到共享实现**：[frp/install/zip.rs](src-tauri/src/commands/frp/install/zip.rs)、[plugins/install.rs](src-tauri/src/commands/plugins/install.rs)、[frp/binary/archive.rs](src-tauri/src/commands/frp/binary/archive.rs)。保留原私有函数的薄封装以稳定调用点。
