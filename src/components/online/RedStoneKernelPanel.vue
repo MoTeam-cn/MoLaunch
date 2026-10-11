@@ -2,9 +2,10 @@
 /**
  * 红石联机 - 内核状态
  *
- * 上半：内核运行状态卡（进程存活 + tunnel.ini 解析结果 + 释放目录说明）
+ * 上半：内核运行状态卡（进程存活 + 内核 stdout 解析出的隧道地址 + 目录说明）
  * 下半：内核日志阅读（logs/ 目录按日期文件，深色终端风格，复用 log-display 配色与解析）
- * 内核按需释放到系统临时目录 `<temp>/MoLaunch/hongshi/`，日志位于其下 logs/。
+ * 内核优先运行时从官网下载并缓存到应用数据目录，下载不可用时回退应用内置内核；
+ * 运行日志由内核写入 `<temp>/MoLaunch/hongshi/logs/`。
  */
 import { ref, computed, watch, onMounted, onActivated, defineAsyncComponent } from 'vue'
 import {
@@ -48,7 +49,7 @@ const fileOptions = computed(() =>
   })),
 )
 
-/** 加载内核状态（进程存活 + tunnel.ini 解析） */
+/** 加载内核状态（进程存活 + 内核 stdout 解析出的隧道地址） */
 async function loadStatus() {
   statusLoading.value = true
   try {
@@ -155,7 +156,7 @@ onActivated(() => {
             <div class="mt-0.5">{{ status.created ?? '—' }}</div>
           </div>
         </div>
-        <Alert variant="soft" type="info" message="红石内核按需释放到系统临时目录（&lt;temp&gt;/MoLaunch/hongshi/），退出即随系统清理；日志位于内核目录 logs/ 下，由内核与控制台同步输出" />
+        <Alert variant="soft" type="info" message="红石内核优先从官网下载并缓存，下载不可用时回退应用内置内核；运行日志写入系统临时目录（&lt;temp&gt;/MoLaunch/hongshi/logs/），退出即随系统清理，由内核与控制台同步输出" />
       </div>
       <div v-else-if="!statusLoading" class="flex flex-col items-center justify-center py-10 gap-2 text-gray-400">
         <ShieldCheckIcon class="w-8 h-8" />

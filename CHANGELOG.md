@@ -18,12 +18,23 @@
   - 新增 GitHub 下载域名白名单校验 `validate_github_download_url`；下载链路改为两源白名单取并集（`validate_update_download_url_any_source`），仍为严格 https + 域名白名单。
   - 设置 → 更多 → 关于 新增「更新源」切换项。GitHub 源不含强制更新与灰度信息，`forceUpdate` 恒为 false、无签名。
 
+- **红石内核运行时下载 + 本地缓存 + 兜底**（[kernel.rs](src-tauri/src/commands/redstone/kernel.rs)（新增） / [kernel_test.rs](src-tauri/src/commands/redstone/kernel_test.rs)（新增） / [resources.rs](src-tauri/src/resources.rs)）：
+  - 官方对内核做**版本校验**（旧内核会被服务端直接拒绝），所以「编译期嵌入内核」必然周期性失效——对方每发一版启动器都得跟着发版。改为三级获取：AppData 缓存命中 → 运行时从 `hongshi.site/api/download/client?platform=&arch=` 下载并**原子写入缓存** → 下载失败（服务不可用或该平台未发布）回退应用内置兜底内核。
+  - 下载内容按平台校验可执行文件魔数（PE / ELF / Mach-O），防止把 JSON/HTML 错误体当成内核写进缓存；先写 `.tmp` 再改名，避免下载中断留下半个文件被当作有效缓存；非 Windows 平台补可执行位。
+  - 实测 macOS 两个架构：官方下载页挂了链接但**实际未发布**（404），该平台目前只能走内置兜底；等官方发布后无需发版即可自动生效。
+
 - **联机大厅开关：未启用时不与云端交互**（[OnlineLobbyCard.vue](src/components/settings/OnlineLobbyCard.vue) / [SettingsOnline.vue](src/views/settings/SettingsOnline.vue) / [App.vue](src/App.vue) / [authSlice.ts](src/stores/online/authSlice.ts) / [auth_register_login.rs](src-tauri/src/commands/online/manager/auth_register_login.rs)）：
   - 新增配置项 `Online.lobby_enabled`（前端 `onlineLobbyEnabled`），默认**关闭**；设置页「联机」新增「联机大厅」开关，开启前必须先确认与云端交互说明。
   - 关闭时启动流程完全不与云端交互：不再静默注册设备、不再静默续期或重新登录 token。后端 `auth_init` 同步增加守卫，未启用时直接返回本地凭证快照（`disabled=true`），不发起任何网络请求。
   - FRP 使用独立的第三方凭证体系，不受该开关影响。
 
 ### Changed
+
+- **红石联机切换到 Redstone Online2（hongshic）内核契约**（[tunnel.rs](src-tauri/src/commands/redstone/tunnel.rs) / [tunnel_test.rs](src-tauri/src/commands/redstone/tunnel_test.rs) / [manager.rs](src-tauri/src/commands/redstone/manager.rs) / [redstone.ts](src/utils/api/redstone.ts) / [types/redstone.ts](src/types/redstone.ts) / [RedStoneKernelPanel.vue](src/components/online/RedStoneKernelPanel.vue)）：官网已改版，旧契约**两处同时失效**（列表端点 404 + 旧内核被服务端以「客户端版本过时」拒绝），旧版红石联机已完全不可用，本次整体对齐新契约。
+  - 服务器列表 `hongshi.site/newserver.json`（已 404）→ `hongshi.site/api/server/list`（响应仍是 `region → host` 映射，解析逻辑复用）。
+  - 启动参数 `-server <addr> -port <port> -status-file <tunnel.ini>` → `-t <relay> -p <game_port>`；新版内核**没有配置文件**，`tunnel.ini` 状态文件机制整体移除。
+  - 隧道地址改为解析内核 stdout 的 `endpoint=` 字段（形如 `nj.hongshi.site:41269`），`redstone_status` 的 `server`/`port` 由该字段派生：进程已退出 → `closed`，进程在但尚未拿到地址 → `unknown`（前端保持「连接中」），拿到地址 → `open`。新增 `parse_endpoint` / `split_endpoint` 与 7 条回归用例。
+  - 内核日志仍由内核写入工作目录 `logs/<YYYY-MM-DD>.log`，日志面板无需改动。
 
 - **更新检查不再依赖设备注册**（[check.rs](src-tauri/src/commands/system/updater/check.rs)）：移除 `load_creds_with_auto_refresh` 调用，检查更新与联机大厅开关彻底解耦；`force_update` / `min_version` / `rollout_pct` 等全量字段仍然保留（新端点返回完整清单，不再使用简化的插件端点）。
 （[Online.vue](src/views/Online.vue)）：未启用联机大厅时点击联机大厅/创建房间/加入房间，不再只弹「功能已封存」，而是就地询问是否启用（说明需与云端交互注册设备并续期令牌），确认后立即启用并继续进入该分类。红石联机与 FRP 不依赖云端，始终可用。

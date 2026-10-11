@@ -140,20 +140,21 @@ fn embedded_bytes(path: &str) -> Option<&'static [u8]> {
         // 作用：主程序退出后替换 exe 文件，绕过 Windows 文件锁
         #[cfg(target_os = "windows")]
         "updater/updater.exe" => Some(include_bytes!("../resources/updater/updater.exe")),
-        // hongshi（红石联机内核，按平台/架构嵌入对应版本；Windows 仅 amd64 官方产物）
-        // 来源：https://hongshi.site/docs-api.html（人工下载入库）
-        // 运行时由 `extract_hongshi_core` 释放到 `<temp>/MoLaunch/hongshi/`
+        // hongshic（红石联机内核，按平台/架构嵌入**兜底**版本）
+        // 来源：https://hongshi.site/api/download/client?platform=..&arch=..（人工下载入库）
+        // 首选路径是运行时下载并缓存（见 commands/redstone/kernel.rs），此处仅在
+        // 下载服务不可用或该平台未发布时兜底；由 extract_hongshi_core 释放到 temp。
         #[cfg(all(target_os = "windows", target_arch = "x86_64"))]
         "hongshi/hongshi" => Some(include_bytes!(
-            "../resources/hongshi/windows/x86_64/hongshi-windows-amd64.exe"
+            "../resources/hongshi/windows/x86_64/hongshic-windows-amd64.exe"
         )),
         #[cfg(all(target_os = "linux", target_arch = "x86_64"))]
         "hongshi/hongshi" => Some(include_bytes!(
-            "../resources/hongshi/linux/x86_64/hongshi-linux-amd64"
+            "../resources/hongshi/linux/x86_64/hongshic-linux-amd64"
         )),
         #[cfg(all(target_os = "linux", target_arch = "aarch64"))]
         "hongshi/hongshi" => Some(include_bytes!(
-            "../resources/hongshi/linux/aarch64/hongshi-linux-arm64"
+            "../resources/hongshi/linux/aarch64/hongshic-linux-arm64"
         )),
         #[cfg(all(target_os = "macos", target_arch = "x86_64"))]
         "hongshi/hongshi" => Some(include_bytes!(

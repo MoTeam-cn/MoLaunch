@@ -1,9 +1,11 @@
 /**
- * 红石联机（hongshi 内核隧道）类型定义
+ * 红石联机（hongshic 内核隧道）类型定义
  *
+ * 内核来自 hongshi.site（Redstone Online2）：优先运行时下载并缓存，
+ * 下载不可用时回退应用内置的兜底内核。
  */
 
-/** 中转服务器条目（来自 hongshi.site/newserver.json） */
+/** 中转服务器条目（来自 hongshi.site/api/server/list） */
 export interface RedStoneServer {
   host: string
   region: string
@@ -25,7 +27,7 @@ export interface RedStoneStartResult {
   pid: number
 }
 
-/** 隧道状态：open=已建立 / closed=已关闭 / unknown=未创建 */
+/** 隧道状态：open=已建立 / closed=已关闭 / unknown=未创建或仍在建链 */
 export type RedStoneChannelStatus = 'open' | 'closed' | 'unknown'
 
 /** `redstone_status` 返回（未创建隧道时 running=false, status='unknown'） */

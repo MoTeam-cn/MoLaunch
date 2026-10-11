@@ -1,62 +1,51 @@
-//! hongshi（红石联机）内核子进程封装。
+//! hongshic（红石联机）内核子进程封装。
 //!
-//! 以 `hongshi -server <addr> -port <mc_port> -status-file <tunnel.ini>` 拉起内核，
-//! tunnel.ini 由内核原子写 `[tunnel] status=open/closed` 等隧道状态。
+//! 以 `hongshic -t <relay> -p <game_port>` 拉起内核。新版内核**没有配置文件**：
+//! 隧道地址从 stdout 的 `endpoint=` 字段读取（形如 `endpoint=nj.hongshi.site:41269`），
+//! 旧版的 `-status-file` / `tunnel.ini` 机制已随 Redstone Online2 一并移除。
 
 use crate::log_debug;
-use std::path::{Path, PathBuf};
+use crate::log_info;
+use std::path::PathBuf;
+use std::sync::{Arc, Mutex};
 use tokio::io::{AsyncBufReadExt, BufReader};
 
-/// hongshi 隧道子进程句柄
+/// hongshic 隧道子进程句柄
 pub struct HongshiTunnel {
     pub child: tokio::process::Child,
-    pub server: String,
-    pub status_file: PathBuf,
-}
-
-/// 从 tunnel.ini 解析出的隧道状态
-pub struct TunnelStatus {
-    pub status: String,
-    pub server: Option<String>,
-    pub port: Option<i64>,
-    pub created: Option<String>,
-}
-
-/// 大小写不敏感读取 INI 段键值（INIFile 惯例：段名/键名不区分大小写）
-fn ini_get_ci(ini: &crate::storage::ini::IniFile, section: &str, key: &str) -> Option<String> {
-    ini.sections()
-        .into_iter()
-        .find(|s| s.eq_ignore_ascii_case(section))
-        .and_then(|s| {
-            ini.get_section(&s)
-                .into_iter()
-                .find(|(k, _)| k.eq_ignore_ascii_case(key))
-                .map(|(_, v)| v)
-        })
+    /// 中继地址（玩家侧看到的服务器）
+    pub relay: String,
+    /// 本地 MC 端口
+    pub mc_port: u16,
+    /// 内核 stdout 解析出的 endpoint（`host:port`），隧道建立后才有值
+    endpoint: Arc<Mutex<Option<String>>>,
+    /// 内核可执行文件路径（日志与排障用）
+    pub kernel_path: PathBuf,
+    /// 隧道启动时间（本地时间字符串，供前端展示）
+    pub created_at: String,
 }
 
 impl HongshiTunnel {
-    /// 启动 hongshi 内核建立隧道（内部确保内核已释放就位；status-file 由内核原子写）
+    /// 启动内核建立隧道
     ///
-    /// 工作目录固定为内核所在目录（`<temp>/MoLaunch/hongshi/`），
-    /// 内核按官方约定在 cwd 下写 `logs/<YYYY-MM-DD>.log` 日志。
-    pub async fn spawn(server: &str, mc_port: u16, status_file: &Path) -> Result<Self, String> {
-        let kernel_path = crate::resources::extract_hongshi_core()
-            .map_err(|e| format!("释放红石内核失败: {e}"))?;
+    /// 内核来源由 [`crate::commands::redstone::kernel::ensure_kernel`] 决定
+    /// （AppData 缓存 → 运行时下载 → 编译期兜底）。
+    /// 工作目录固定为内核日志目录，内核按官方约定在 cwd 下写 `logs/<YYYY-MM-DD>.log`。
+    pub async fn spawn(relay: &str, mc_port: u16) -> Result<Self, String> {
+        let (kernel_path, source) = crate::commands::redstone::kernel::ensure_kernel().await?;
         if !kernel_path.is_file() {
             return Err(format!("红石内核不存在: {}", kernel_path.display()));
         }
-        let kernel_dir = kernel_path
-            .parent()
-            .ok_or_else(|| "红石内核路径无效".to_string())?;
+
+        let work_dir = crate::resources::hongshi_kernel_dir();
+        std::fs::create_dir_all(&work_dir).map_err(|e| format!("创建内核工作目录失败: {e}"))?;
+
         let mut cmd = tokio::process::Command::new(&kernel_path);
-        cmd.arg("-server")
-            .arg(server)
-            .arg("-port")
+        cmd.arg("-t")
+            .arg(relay)
+            .arg("-p")
             .arg(mc_port.to_string())
-            .arg("-status-file")
-            .arg(status_file)
-            .current_dir(kernel_dir)
+            .current_dir(&work_dir)
             .kill_on_drop(true)
             .stdout(std::process::Stdio::piped())
             .stderr(std::process::Stdio::piped());
@@ -66,11 +55,19 @@ impl HongshiTunnel {
         }
         let mut child = cmd.spawn().map_err(|e| format!("启动红石内核失败: {e}"))?;
 
+        // stdout：边落日志边抓 endpoint（官方约定 endpoint= 之后到下一个空白即玩家地址）
+        let endpoint: Arc<Mutex<Option<String>>> = Arc::new(Mutex::new(None));
         if let Some(out) = child.stdout.take() {
+            let slot = Arc::clone(&endpoint);
             tokio::spawn(async move {
                 let mut reader = BufReader::new(out).lines();
                 while let Ok(Some(line)) = reader.next_line().await {
-                    log_debug!("[hongshi] {line}");
+                    if let Some(found) = parse_endpoint(&line) {
+                        if let Ok(mut guard) = slot.lock() {
+                            *guard = Some(found);
+                        }
+                    }
+                    log_debug!("[hongshic] {line}");
                 }
             });
         }
@@ -78,15 +75,26 @@ impl HongshiTunnel {
             tokio::spawn(async move {
                 let mut reader = BufReader::new(err).lines();
                 while let Ok(Some(line)) = reader.next_line().await {
-                    log_debug!("[hongshi] {line}");
+                    log_debug!("[hongshic] {line}");
                 }
             });
         }
 
+        log_info!(
+            "[Redstone] 内核已拉起: source={}, relay={}, mc_port={}, kernel={}",
+            source.as_str(),
+            relay,
+            mc_port,
+            kernel_path.display()
+        );
+
         Ok(Self {
             child,
-            server: server.to_string(),
-            status_file: status_file.to_path_buf(),
+            relay: relay.to_string(),
+            mc_port,
+            endpoint,
+            kernel_path,
+            created_at: chrono::Local::now().format("%Y-%m-%d %H:%M:%S").to_string(),
         })
     }
 
@@ -95,40 +103,47 @@ impl HongshiTunnel {
         !matches!(self.child.try_wait(), Ok(Some(_)))
     }
 
+    /// 读取已建立的隧道地址（未建立时为 None）
+    pub fn endpoint(&self) -> Option<String> {
+        self.endpoint.lock().ok().and_then(|g| g.clone())
+    }
+
     /// 停止子进程
     pub async fn stop(mut self) {
         let _ = self.child.kill().await;
     }
 }
 
-/// 解析 tunnel.ini 的 [tunnel] 段状态。
+/// 从内核一行输出中提取 endpoint 地址
 ///
-/// status 取 open/closed（大小写不敏感），否则 unknown；port 仅非 closed 状态
-/// 下解析，缺失或 -1 视为未知；server/created 缺失时返回 None。
-pub fn parse_tunnel_status(content: &str) -> TunnelStatus {
-    let ini = crate::storage::ini::IniFile::parse(content);
-    let status = match ini_get_ci(&ini, "tunnel", "status")
-        .map(|s| s.to_ascii_lowercase())
-        .as_deref()
-    {
-        Some("open") => "open".to_string(),
-        Some("closed") => "closed".to_string(),
-        _ => "unknown".to_string(),
-    };
-    let server = ini_get_ci(&ini, "tunnel", "server");
-    let created = ini_get_ci(&ini, "tunnel", "created");
-    let port = if status == "closed" {
+/// 官方约定：`endpoint=` 之前的内容都是装饰、可能变化；之后取到下一个空白为止，
+/// 即玩家要填进「直接连接」的地址（如 `nj.hongshi.site:41269`）。
+pub fn parse_endpoint(line: &str) -> Option<String> {
+    const MARKER: &str = "endpoint=";
+    let rest = &line[line.find(MARKER)? + MARKER.len()..];
+    // 值必须紧跟等号：紧跟空白说明没有取值，不能顺延到下一个 token
+    match rest.chars().next() {
+        Some(c) if !c.is_whitespace() => {}
+        _ => return None,
+    }
+    let addr = rest.split_whitespace().next().unwrap_or("");
+    if addr.is_empty() {
         None
     } else {
-        ini_get_ci(&ini, "tunnel", "port")
-            .and_then(|s| s.parse::<i64>().ok())
-            .filter(|&p| p != -1)
-    };
-    TunnelStatus {
-        status,
-        server,
-        port,
-        created,
+        Some(addr.to_string())
+    }
+}
+
+/// 把 `host:port` 拆成（host, port）
+///
+/// 端口缺失或非法时返回（原串, None）；无冒号时整体视为 host。
+pub fn split_endpoint(endpoint: &str) -> (String, Option<i64>) {
+    match endpoint.rsplit_once(':') {
+        Some((host, port)) => match port.parse::<i64>() {
+            Ok(p) => (host.to_string(), Some(p)),
+            Err(_) => (endpoint.to_string(), None),
+        },
+        None => (endpoint.to_string(), None),
     }
 }
 

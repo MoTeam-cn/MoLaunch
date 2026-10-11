@@ -1,5 +1,5 @@
 /**
- * 红石联机（hongshi 内核）IPC 封装：`redstone_manager` 经 action 分发
+ * 红石联机（hongshic 内核）IPC 封装：`redstone_manager` 经 action 分发
  *
  * params 字段名与后端契约一致（`redstone_start` 为 `mc_port`）。
  * 错误经 invoke reject 透出，message 为后端中文文案。
@@ -35,12 +35,12 @@ export function redstoneGetServers(): Promise<RedStoneGetServersResult> {
   return redstoneManager<RedStoneGetServersResult>(REDSTONE_ACTIONS.GET_SERVERS)
 }
 
-/** 创建隧道（内部释放内核并拉起 hongshi 进程） */
+/** 创建隧道（内部解析/下载内核并拉起 hongshic 进程） */
 export function redstoneStart(params: RedStoneStartParams): Promise<RedStoneStartResult> {
   return redstoneManager<RedStoneStartResult>(REDSTONE_ACTIONS.START, params)
 }
 
-/** 查询隧道状态（读 tunnel.ini） */
+/** 查询隧道状态（子进程存活 + 内核 stdout 解析出的隧道地址） */
 export function redstoneStatus(): Promise<RedStoneStatusResult> {
   return redstoneManager<RedStoneStatusResult>(REDSTONE_ACTIONS.STATUS)
 }

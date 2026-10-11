@@ -3,6 +3,7 @@
 //! （redstone_get_servers / redstone_start / redstone_status / redstone_stop
 //!  / redstone_log_files / redstone_read_log）。
 
+pub(crate) mod kernel;
 pub(crate) mod log;
 pub(crate) mod manager;
 pub(crate) mod tunnel;

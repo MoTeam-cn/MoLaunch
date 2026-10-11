@@ -1,7 +1,8 @@
 //! 红石联机动作分发（redstone_manager 的命令层实现）
 //! 统一注册 redstone_get_servers / redstone_start / redstone_status / redstone_stop
-//! / redstone_log_files / redstone_read_log，
-//! 内核经 extract_hongshi_core 释放后由 HongshiTunnel 子进程封装拉起。
+//! / redstone_log_files / redstone_read_log。
+//! 内核由 kernel::ensure_kernel 解析（缓存 → 运行时下载 → 编译期兜底），
+//! 再由 HongshiTunnel 子进程封装拉起；隧道地址取自内核 stdout 的 endpoint=。
 
 use once_cell::sync::Lazy;
 use serde::Deserialize;
@@ -12,7 +13,7 @@ use crate::log_info;
 use crate::state::AppState;
 use crate::utils::dispatcher::{ActionRequest, Dispatcher};
 
-use super::tunnel::{parse_tunnel_status, HongshiTunnel};
+use super::tunnel::{split_endpoint, HongshiTunnel};
 
 static DISPATCHER: Lazy<Dispatcher> = Lazy::new(|| {
     let mut d = Dispatcher::new();
@@ -32,15 +33,15 @@ pub(crate) async fn dispatch(
 /// `redstone_start` 参数
 #[derive(Debug, Deserialize)]
 struct RedstoneStartParams {
-    /// 中转服务器地址（newserver.json 的 host，可手动填写）
+    /// 中转服务器地址（/api/server/list 的 host，可手动填写）
     server: String,
     /// 本地 MC 端口（兼容前端 camelCase 的 mcPort）
     #[serde(alias = "mcPort")]
     mc_port: u16,
 }
 
-/// newserver.json 解析：线上实际为 map（region → host），官方文档示例为 array（[{host, region}]），
-/// 统一转换为 `{ host, region }` 列表。
+/// 中继列表解析：官方 /api/server/list 返回 map（region → host），
+/// 旧文档示例为 array（[{host, region}]），统一转换为 `{ host, region }` 列表。
 fn parse_new_server(value: serde_json::Value) -> Vec<serde_json::Value> {
     match value {
         // map 格式（线上实际）：{ "南京": "nanjing.hongshi.site", "成都": "chengdu.hongshi.site" }
@@ -69,14 +70,14 @@ fn parse_new_server(value: serde_json::Value) -> Vec<serde_json::Value> {
 }
 
 fn register(d: &mut Dispatcher) {
-    // 拉取红石中转服务器列表（newserver.json，仅几 KB 轻量 JSON）
+    // 拉取红石中转服务器列表（官方 /api/server/list，仅几 KB 轻量 JSON）
     // 失败时前端降级为手动填写，不阻塞创建流程
     d.register(
         "redstone_get_servers",
         handler!(_state, _app, _params, {
             // 复用全局主 client（重定向策略一致），单请求 10s 超时
             let resp = crate::http::get_client()
-                .get("https://hongshi.site/newserver.json")
+                .get("https://hongshi.site/api/server/list")
                 .timeout(Duration::from_secs(10))
                 .send()
                 .await
@@ -93,17 +94,12 @@ fn register(d: &mut Dispatcher) {
         }),
     );
 
-    // 创建隧道：释放内核 → 停止旧实例（单实例）→ 拉起 hongshi 子进程
+    // 创建隧道：解析内核 → 停止旧实例（单实例）→ 拉起 hongshic 子进程
     d.register(
         "redstone_start",
         handler!(state, _app, params, {
             let p: RedstoneStartParams =
                 serde_json::from_value(params).map_err(|e| format!("参数解析失败: {e}"))?;
-
-            // 释放内核并确定同目录状态文件（tunnel.ini 由内核原子写）
-            let kernel_path = crate::resources::extract_hongshi_core()
-                .map_err(|e| format!("释放红石内核失败: {e}"))?;
-            let status_file = kernel_path.with_file_name("tunnel.ini");
 
             // 单实例：先停止旧隧道，防止进程泄漏
             let old = state.redstone.lock().await.take();
@@ -111,7 +107,7 @@ fn register(d: &mut Dispatcher) {
                 old.stop().await;
             }
 
-            let tunnel = HongshiTunnel::spawn(&p.server, p.mc_port, &status_file).await?;
+            let tunnel = HongshiTunnel::spawn(&p.server, p.mc_port).await?;
             let pid = tunnel.child.id();
             *state.redstone.lock().await = Some(tunnel);
             log_info!(
@@ -123,21 +119,39 @@ fn register(d: &mut Dispatcher) {
         }),
     );
 
-    // 查询隧道状态：子进程存活 + tunnel.ini 解析结果
+    // 查询隧道状态：子进程存活 + 内核 stdout 解析出的 endpoint
+    //  - 进程已退出 → closed
+    //  - 进程在但还没拿到 endpoint → unknown（前端保持"连接中"）
+    //  - 拿到 endpoint → open，server/port 即该地址
     d.register(
         "redstone_status",
         handler!(state, _app, _params, {
             let mut guard = state.redstone.lock().await;
             if let Some(tunnel) = guard.as_mut() {
                 let running = tunnel.is_running();
-                let content = std::fs::read_to_string(&tunnel.status_file).unwrap_or_default();
-                let ts = parse_tunnel_status(&content);
+                let endpoint = tunnel.endpoint();
+                let (host, port) = match endpoint.as_deref() {
+                    Some(ep) => split_endpoint(ep),
+                    None => (String::new(), None),
+                };
+                let status = if !running {
+                    "closed"
+                } else if port.is_some() {
+                    "open"
+                } else {
+                    "unknown"
+                };
+                let server = if host.is_empty() {
+                    serde_json::Value::Null
+                } else {
+                    serde_json::Value::String(host)
+                };
                 Ok(serde_json::json!({
                     "running": running,
-                    "status": ts.status,
-                    "server": ts.server,
-                    "port": ts.port,
-                    "created": ts.created,
+                    "status": status,
+                    "server": server,
+                    "port": port,
+                    "created": tunnel.created_at,
                 }))
             } else {
                 Ok(serde_json::json!({
