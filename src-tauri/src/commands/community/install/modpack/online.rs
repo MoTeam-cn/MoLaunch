@@ -29,6 +29,10 @@ pub async fn install_modpack(
     // 0. 实例名校验 + 重复任务检查（入口拦截）
     super::super::helpers::validate_instance_name(&req.instance_name)?;
     super::super::helpers::validate_modpack_extension(&req.file_name)?;
+    // 扩展名校验对路径穿越无感知（"../../../evil.zip" 能通过），
+    // 而文件名会 join 进 instance_dir，这里必须再做一次文件名安全校验
+    crate::utils::path::sanitize_file_name(&req.file_name)
+        .map_err(|_| format!("整合包文件名非法: {}", req.file_name))?;
     let _guard = super::InstallGuard::acquire(&req.instance_name)?;
 
     // 1. CF 平台前置检查 API Key（在 reset_stages 之前，失败时不需要 mark_failed）

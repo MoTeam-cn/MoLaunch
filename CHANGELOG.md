@@ -49,6 +49,11 @@
 
 ### Fixed
 
+- **修复整合包实例名 / 压缩包文件名的路径穿越**（[helpers.rs](src-tauri/src/commands/community/install/helpers.rs) / [helpers_test.rs](src-tauri/src/commands/community/install/helpers_test.rs)（新增） / [online.rs](src-tauri/src/commands/community/install/modpack/online.rs)）：
+  - `validate_instance_name` 的文档（[helpers.rs:170](src-tauri/src/commands/community/install/helpers.rs)）一直声称拒绝 `< > : " / \ | ? *`，但实现的 `matches!` **漏掉了 `/` 与 `\`**。实例名会被 `game_dir.join("versions").join(name)` 拼进路径（[online.rs:41](src-tauri/src/commands/community/install/modpack/online.rs) / [local.rs:90](src-tauri/src/commands/community/install/modpack/local.rs)），漏掉分隔符即可用 `../` 逃出 `versions/`。已补齐字符类。
+  - `install_modpack` 的 `file_name` 此前只过 `validate_modpack_extension`（仅看最后一个 `.` 后的扩展名，`"../../../evil.zip"` 能通过），随后被 `instance_dir.join(&file_name)` 拼接（[online.rs:45](src-tauri/src/commands/community/install/modpack/online.rs)）。已补 `crate::utils::path::sanitize_file_name`。
+  - 新增 [helpers_test.rs](src-tauri/src/commands/community/install/helpers_test.rs) 3 条回归用例：拒绝穿越输入、接受中文/空格/点号的正常实例名、以及显式记录「扩展名校验不承担路径安全」。
+
 - **修复红石创建面板 keep-alive 去重标志失效**（[useRedStonePanel.ts](src/composables/useRedStonePanel.ts)）：平台支持探测改为异步后，`mountedOnce` 被挪到 `startRedstone()` 里置位，而该函数要等 `await checkPlatformSupport()` 才执行——于是 `onActivated` 先跑、守卫失效：首次进入会重复调用一次 `restoreStatus()`，且标志随后置 true 无人复位，导致第一次切走再切回时跳过状态恢复（若离开时隧道处于创建中，`startPolling()` 不会恢复，面板停在「创建中」）。改为在 `onMounted` 同步段置位。
 
 - **修复内核自动更新的 HEAD 大小比对恒判「已更新」**（[kernel.rs](src-tauri/src/commands/redstone/kernel.rs) / [net.rs](src-tauri/src/utils/net.rs)）：reqwest 对 **HEAD** 响应的 `Response::content_length()` 恒为 0（HEAD 无 body），直接用它比对会把「官方未更新」误判成「已更新」，导致**每次启动都重新下载内核**。改为从 `Content-Length` 响应头读取。

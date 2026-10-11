@@ -187,7 +187,9 @@ pub(super) fn validate_instance_name(name: &str) -> Result<(), String> {
                 "整合包实例名不能包含 \";\" 字符（路径分隔符，会导致启动失败）".to_string(),
             );
         }
-        if matches!(c, '<' | '>' | ':' | '"' | '|' | '?' | '*') {
+        // / 与 \ 必须显式拒绝：实例名会 join 进 <game_dir>/versions/，
+        // 漏掉分隔符即可用 ../ 逃出该目录（文档一直声称拒绝，实现曾漏掉）
+        if matches!(c, '<' | '>' | ':' | '"' | '/' | '\\' | '|' | '?' | '*') {
             return Err(format!("整合包实例名不能包含 Windows 非法字符 \"{}\"", c));
         }
         if (c as u32) < 32 {
@@ -267,3 +269,7 @@ pub(super) fn cleanup_version_dir_on_failure(instance_dir: &std::path::Path) {
         }
     }
 }
+
+#[cfg(test)]
+#[path = "helpers_test.rs"]
+mod helpers_test;
