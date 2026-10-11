@@ -49,6 +49,8 @@
 
 ### Fixed
 
+- **抽公共目录大小统计函数**（[fs.rs](src-tauri/src/utils/fs.rs)）：`dir_total_size` / `dir_size` 原有四份逐字相同的实现——[version/pack_common/entries.rs](src-tauri/src/commands/version/pack_common/entries.rs)、[tools/archive/helpers.rs](src-tauri/src/commands/tools/archive/helpers.rs)、[tools/resourcepack/list.rs](src-tauri/src/commands/tools/resourcepack/list.rs)、[tools/resourcepack/explore/tree.rs](src-tauri/src/commands/tools/resourcepack/explore/tree.rs)，签名与语义完全一致（读目录失败返回 0、目录递归、文件累加 metadata len）。已抽出 `utils::fs::dir_total_size` 并让四处委托。
+
 - **抽公共目录复制函数**（[fs.rs](src-tauri/src/utils/fs.rs)）：`copy_dir_recursive` 原有四份实现，其中三份（[migrations/common.rs](src-tauri/src/migrations/common.rs)、[version/pack_common/entries.rs](src-tauri/src/commands/version/pack_common/entries.rs)、[plugins/install.rs](src-tauri/src/commands/plugins/install.rs)）逻辑逐字相同、仅返回类型不同（`Result<(), String>` vs `std::io::Result<()>`）。已抽出 `utils::fs::copy_dir_recursive` 并让三处委托，返回类型差异在调用点用 `map_err(std::io::Error::other)` 消化。
 
 - **未合并第四处并加注释说明原因**（[frp/install/files.rs](src-tauri/src/commands/frp/install/files.rs)）：该处签名为 `(src, dst, skip, base) -> Result<u32, String>`，带跳过集合过滤、返回复制计数、并为文件补建父目录，与「整目录复制」语义不同。已在函数上注明不要与 `utils::fs::copy_dir_recursive` 合并，避免后人误合。

@@ -65,18 +65,7 @@ pub(crate) fn build_tree(dir: &Path, rel: &str) -> RpTreeNode {
 
 /// 递归统计目录总大小
 pub(crate) fn dir_size(dir: &Path) -> u64 {
-    let mut total = 0u64;
-    if let Ok(rd) = std::fs::read_dir(dir) {
-        for entry in rd.flatten() {
-            let path = entry.path();
-            if path.is_dir() {
-                total += dir_size(&path);
-            } else if let Ok(meta) = std::fs::metadata(&path) {
-                total += meta.len();
-            }
-        }
-    }
-    total
+    crate::utils::fs::dir_total_size(dir)
 }
 
 /// 打开失败时的空结构树

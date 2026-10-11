@@ -37,18 +37,7 @@ fn matches_suffixes(file_name: &str, suffixes: &[&str]) -> bool {
 }
 
 fn dir_total_size(dir: &Path) -> u64 {
-    let mut total = 0u64;
-    if let Ok(rd) = std::fs::read_dir(dir) {
-        for entry in rd.flatten() {
-            let path = entry.path();
-            if path.is_dir() {
-                total += dir_total_size(&path);
-            } else if let Ok(meta) = entry.metadata() {
-                total += meta.len();
-            }
-        }
-    }
-    total
+    crate::utils::fs::dir_total_size(dir)
 }
 
 /// 枚举目录条目（扩展名过滤 + 可选文件夹，按文件名排序）

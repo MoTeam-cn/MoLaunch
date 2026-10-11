@@ -30,22 +30,9 @@ pub(crate) async fn resolve_saves_dir(state: &AppState, version_id: Option<&str>
     }
 }
 
-/// 递归计算目录总字节数
+/// 递归计算目录总字节数（实现统一在 utils/fs.rs）
 pub(super) fn dir_total_size(dir: &Path) -> u64 {
-    let mut total: u64 = 0;
-    let read = match std::fs::read_dir(dir) {
-        Ok(r) => r,
-        Err(_) => return 0,
-    };
-    for entry in read.flatten() {
-        let path = entry.path();
-        if path.is_file() {
-            total += std::fs::metadata(&path).map(|m| m.len()).unwrap_or(0);
-        } else if path.is_dir() {
-            total += dir_total_size(&path);
-        }
-    }
-    total
+    crate::utils::fs::dir_total_size(dir)
 }
 
 /// 递归收集目录下所有文件路径

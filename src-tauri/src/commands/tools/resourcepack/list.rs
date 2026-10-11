@@ -73,20 +73,7 @@ pub async fn list(
     serde_json::to_value(&result).map_err(|e| e.to_string())
 }
 
-/// 递归计算目录总字节数
+/// 递归计算目录总字节数（实现统一在 utils/fs.rs）
 fn dir_total_size(dir: &std::path::Path) -> u64 {
-    let mut total: u64 = 0;
-    let read = match std::fs::read_dir(dir) {
-        Ok(r) => r,
-        Err(_) => return 0,
-    };
-    for entry in read.flatten() {
-        let path = entry.path();
-        if path.is_file() {
-            total += std::fs::metadata(&path).map(|m| m.len()).unwrap_or(0);
-        } else if path.is_dir() {
-            total += dir_total_size(&path);
-        }
-    }
-    total
+    crate::utils::fs::dir_total_size(dir)
 }

@@ -72,3 +72,24 @@ pub fn copy_dir_recursive(src: &std::path::Path, dst: &std::path::Path) -> Resul
     }
     Ok(())
 }
+
+/// 递归统计目录总字节数（读不到的子项按 0 计，不返回错误）
+///
+/// 统一替代 version/pack_common/entries.rs、tools/archive/helpers.rs、
+/// tools/resourcepack/list.rs、tools/resourcepack/explore/tree.rs 中
+/// 逐字相同的四份实现。
+pub fn dir_total_size(dir: &std::path::Path) -> u64 {
+    let mut total: u64 = 0;
+    let Ok(read) = std::fs::read_dir(dir) else {
+        return 0;
+    };
+    for entry in read.flatten() {
+        let path = entry.path();
+        if path.is_dir() {
+            total += dir_total_size(&path);
+        } else {
+            total += entry.metadata().map(|m| m.len()).unwrap_or(0);
+        }
+    }
+    total
+}
