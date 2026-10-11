@@ -7,6 +7,9 @@ use super::UpdateInfo;
 use crate::api_paths::UPDATES_MANIFEST_RAW;
 use crate::state::AppState;
 
+/// GitHub Releases 仓库（备用更新源）
+const GITHUB_REPO: &str = "MoTeam-cn/MoLaunch";
+
 /// 当前平台标识（用于 updater endpoint 的 target 参数）
 ///
 /// 服务端仅接受 `windows` / `macos` / `linux`，架构信息由 `arch` 查询参数单独传递。
@@ -93,12 +96,27 @@ fn is_version_newer(manifest: &str, current: &str) -> bool {
 /// 使用 `crate::http::get_client()` 发起请求（走用户配置的代理），
 /// 手动解析 manifest JSON 并比较版本，不依赖 tauri-plugin-updater 的内部 HTTP 客户端。
 ///
-/// **base_url**：从 `AppConfig.online.api_server_url` 读取（继承联机设置），不再硬编码。
-/// **鉴权**：v1 raw 端点需要 JWT，尝试加载设备 JWT 携带 `Authorization: Bearer` 头；
-/// 未注册设备时无 auth 请求（服务端 raw 端点对未鉴权请求返回空 manifest）。
-/// macOS/Linux 下载安装仍转发到官方 plugin（`download_and_install_unix`，走 v3 端点）。
+/// **更新源**：由 `AppConfig.update_source` 决定
+/// - `api`（默认）：MoLaunch 云端 `/v1/updates/manifest/raw`（需要设备 JWT）。
+/// - `github`：GitHub Releases `releases/latest`，无需任何鉴权。
+///
+/// 注意：`/v3/updates/manifest` 是 Tauri updater 插件专用端点
+/// （见 tauri.conf.json 的 plugins.updater.endpoints），启动器不得复用。
+///
+/// **base_url**：云端源从 `AppConfig.online.api_server_url` 读取（继承联机设置），不再硬编码。
+/// macOS/Linux 下载安装仍转发到官方 plugin（`download_and_install_unix`）。
 pub async fn check_update(state: &AppState, _app: &AppHandle) -> Result<UpdateInfo, String> {
     let current_version = env!("CARGO_PKG_VERSION");
+
+    // 更新源分流：github 走 Releases，其余一律走云端业务端点
+    let update_source = {
+        let config = state.config.lock().await;
+        config.update_source.clone()
+    };
+    if update_source == "github" {
+        return check_update_github(current_version).await;
+    }
+
     let target = platform_target();
     let arch = std::env::consts::ARCH;
 
@@ -166,18 +184,21 @@ pub async fn check_update(state: &AppState, _app: &AppHandle) -> Result<UpdateIn
         .await
         .map_err(|e| format!("解析更新信息失败: {e}"))?;
 
-    // UnifiedResponse 包装：{ code, msg, data }（v1 raw/manifest 端点统一格式）
-    let code = json.get("code").and_then(|v| v.as_i64()).unwrap_or(0);
-    if code != 1 {
-        log::info!("[Updater] 服务器返回 code={}（无可用更新）", code);
-        return Ok(UpdateInfo::default());
-    }
-    let data = json.get("data");
+    // v3 公开端点返回裸对象 { version, url, signature, notes }；
+    // 兼容历史 v1 业务端点的 UnifiedResponse 包装 { code, msg, data }
+    let data = match json.get("data") {
+        Some(data) => {
+            let code = json.get("code").and_then(|v| v.as_i64()).unwrap_or(0);
+            if code != 1 {
+                log::info!("[Updater] 服务器返回 code={}（无可用更新）", code);
+                return Ok(UpdateInfo::default());
+            }
+            data
+        }
+        None => &json,
+    };
 
-    let version = data
-        .and_then(|d| d.get("version"))
-        .and_then(|v| v.as_str())
-        .unwrap_or("");
+    let version = data.get("version").and_then(|v| v.as_str()).unwrap_or("");
     if version.is_empty() {
         log::info!("[Updater] manifest 无 version 字段（无可用更新）");
         return Ok(UpdateInfo::default());
@@ -192,7 +213,7 @@ pub async fn check_update(state: &AppState, _app: &AppHandle) -> Result<UpdateIn
     log::info!("[Updater] 发现新版本: {} -> {}", current_version, version);
 
     let download_url = data
-        .and_then(|d| d.get("url"))
+        .get("url")
         .and_then(|v| v.as_str())
         .unwrap_or("")
         .to_string();
@@ -205,21 +226,123 @@ pub async fn check_update(state: &AppState, _app: &AppHandle) -> Result<UpdateIn
         available: true,
         version: version.to_string(),
         notes: data
-            .and_then(|d| d.get("notes"))
+            .get("notes")
             .and_then(|v| v.as_str())
             .unwrap_or("")
             .to_string(),
         force_update: data
-            .and_then(|d| d.get("force_update"))
+            .get("force_update")
             .and_then(|v| v.as_bool())
             .unwrap_or(false),
         download_url,
         signature: data
-            .and_then(|d| d.get("signature"))
+            .get("signature")
             .and_then(|v| v.as_str())
             .unwrap_or("")
             .to_string(),
     })
+}
+
+/// GitHub Releases 更新检查（备用更新源，无需任何鉴权）
+///
+/// 取 `releases/latest`：版本号取 tag（去掉前缀 v），更新日志取 release body，
+/// 下载地址按当前平台/架构从 release 资源中挑选。
+/// 注意：GitHub 不提供强制更新与灰度信息，`force_update` 恒为 false、无签名。
+async fn check_update_github(current_version: &str) -> Result<UpdateInfo, String> {
+    let url = format!(
+        "https://api.github.com/repos/{}/releases/latest",
+        GITHUB_REPO
+    );
+    let client = crate::http::get_client();
+    let response = client
+        .get(&url)
+        .header("Accept", "application/vnd.github+json")
+        .header("User-Agent", "MoLaunch-Updater")
+        .send()
+        .await
+        .map_err(|e| format!("检查更新失败: {e}"))?;
+
+    if !response.status().is_success() {
+        return Err(format!(
+            "检查更新失败: HTTP {}（GitHub）",
+            response.status()
+        ));
+    }
+
+    let json: Value = response
+        .json()
+        .await
+        .map_err(|e| format!("解析更新信息失败: {e}"))?;
+
+    let version = json
+        .get("tag_name")
+        .and_then(|v| v.as_str())
+        .unwrap_or("")
+        .trim_start_matches('v');
+    if version.is_empty() {
+        return Err("GitHub Release 缺少 tag_name".to_string());
+    }
+    if !is_version_newer(version, current_version) {
+        log::info!("[Updater] 当前版本 {} 已是最新（GitHub）", current_version);
+        return Ok(UpdateInfo::default());
+    }
+
+    let download_url = pick_github_asset(&json).ok_or_else(|| {
+        "GitHub Release 中未找到匹配当前平台的安装包，请前往 Releases 页手动下载".to_string()
+    })?;
+    crate::utils::net::validate_github_download_url(&download_url)?;
+
+    log::info!(
+        "[Updater] 发现新版本（GitHub）: {} -> {}",
+        current_version,
+        version
+    );
+
+    Ok(UpdateInfo {
+        available: true,
+        version: version.to_string(),
+        notes: json
+            .get("body")
+            .and_then(|v| v.as_str())
+            .unwrap_or("")
+            .to_string(),
+        force_update: false,
+        download_url,
+        signature: String::new(),
+    })
+}
+
+/// 从 GitHub Release 的 assets 中挑选当前平台/架构的安装包
+///
+/// - Windows：便携版 `MoLaunch_<ver>_x64.exe`（排除 `-setup.exe` 安装版，自更新需替换主程序本体）
+/// - macOS：`*.app.tar.gz`
+/// - Linux：`*.AppImage`
+///
+/// 未匹配到对应资源时返回 None（宁可报错让用户手动下载，也不下载错误文件）。
+fn pick_github_asset(release: &Value) -> Option<String> {
+    let assets = release.get("assets")?.as_array()?;
+    let suffixes: &[&str] = if cfg!(target_os = "windows") {
+        &["_x64.exe", "_x86_64.exe", "_arm64.exe", "_x86.exe"]
+    } else if cfg!(target_os = "macos") {
+        &[".app.tar.gz"]
+    } else {
+        &[".AppImage"]
+    };
+
+    for asset in assets {
+        let name = asset.get("name").and_then(|v| v.as_str()).unwrap_or("");
+        let url = asset
+            .get("browser_download_url")
+            .and_then(|v| v.as_str())
+            .unwrap_or("");
+        if name.is_empty() || url.is_empty() || name.ends_with("-setup.exe") {
+            continue;
+        }
+        if suffixes.iter().any(|s| name.ends_with(s)) {
+            return Some(url.to_string());
+        }
+    }
+    None
 }
 
 #[cfg(test)]

@@ -1,6 +1,7 @@
 //! check 单元测试
 
-use super::is_version_newer;
+use super::{is_version_newer, pick_github_asset};
+use serde_json::json;
 
 #[test]
 fn rc_版本递增可识别() {
@@ -39,4 +40,40 @@ fn beta_alpha_先后顺序() {
 fn v_前缀与多段pre() {
     assert!(is_version_newer("v0.3.5-rc7", "v0.3.5-rc6"));
     assert!(is_version_newer("0.3.5-rc7.1", "0.3.5-rc7"));
+}
+
+// ===== GitHub 备用更新源：资源挑选 =====
+
+#[test]
+fn github_资源优先匹配便携版而非安装版() {
+    let release = json!({
+        "assets": [
+            { "name": "MoLaunch_1.0.0_x64-setup.exe", "browser_download_url": "https://github.com/a/setup.exe" },
+            { "name": "MoLaunch_1.0.0_x64.exe", "browser_download_url": "https://github.com/a/portable.exe" }
+        ]
+    });
+    let picked = pick_github_asset(&release);
+    if cfg!(target_os = "windows") {
+        // Windows 必须挑便携版（自更新需替换主程序本体）
+        assert_eq!(picked.as_deref(), Some("https://github.com/a/portable.exe"));
+    } else {
+        // 非 Windows 平台不匹配 .exe 资源
+        assert_eq!(picked, None);
+    }
+}
+
+#[test]
+fn github_无匹配资源返回_none() {
+    let release = json!({
+        "assets": [
+            { "name": "notes.txt", "browser_download_url": "https://github.com/a/notes.txt" }
+        ]
+    });
+    assert_eq!(pick_github_asset(&release), None);
+}
+
+#[test]
+fn github_缺少_assets_字段返回_none() {
+    let release = json!({ "tag_name": "v1.0.0" });
+    assert_eq!(pick_github_asset(&release), None);
 }

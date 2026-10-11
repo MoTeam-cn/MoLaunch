@@ -140,6 +140,11 @@ pub struct AppConfig {
     /// 默认日志分享服务："mclogs"（mclo.gs）/ "logshare"（logshare.cn）
     #[serde(default = "crate::state::config::defaults::default_log_share_provider")]
     pub log_share_provider: String,
+    /// 更新源："api"（MoLaunch 云端公开端点，默认）/ "github"（GitHub Releases，备用）
+    ///
+    /// 两个源均无需设备注册与 JWT，检查更新不受联机大厅开关影响。
+    #[serde(default = "crate::state::config::defaults::default_update_source")]
+    pub update_source: String,
     pub online: OnlineConfig,
     pub tls: TlsConfig,
 }

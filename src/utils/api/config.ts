@@ -55,6 +55,8 @@ export interface ConfigSnapshot {
   releaseMemoryOnTray: boolean
   /** 默认日志分享服务："mclogs"（mclo.gs）/ "logshare"（logshare.cn） */
   logShareProvider: string
+  /** 更新源："api"（MoLaunch 云端公开端点）/ "github"（GitHub Releases） */
+  updateSource: string
   // 社区资源
   communitySource: number
   communityFilenameFormat: number
@@ -148,6 +150,8 @@ export interface ConfigPatch {
   releaseMemoryOnTray?: boolean
   /** 默认日志分享服务："mclogs"（mclo.gs）/ "logshare"（logshare.cn） */
   logShareProvider?: string
+  /** 更新源："api"（MoLaunch 云端公开端点）/ "github"（GitHub Releases） */
+  updateSource?: string
   // 社区资源（INI 明文）
   communitySource?: number                                 // 0/1/2
   communityFilenameFormat?: number                         // 0-4

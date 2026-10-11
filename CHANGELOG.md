@@ -6,6 +6,12 @@
 
 ### Added
 
+- **GitHub Releases 备用更新源**（[models.rs](src-tauri/src/state/config/models.rs) / [check.rs](src-tauri/src/commands/system/updater/check.rs) / [net.rs](src-tauri/src/utils/net.rs) / [AboutTab.vue](src/views/settings/more/AboutTab.vue)）：
+  - 新增配置项 `Update.source`（前端 `updateSource`，默认 `api`）：`api` = MoLaunch 云端，`github` = GitHub Releases。
+  - GitHub 源查询 `repos/MoTeam-cn/MoLaunch/releases/latest`：版本取 tag、更新日志取 release body、安装包按平台从 assets 中挑选（Windows 取便携版 `*_x64.exe` 并排除 `-setup.exe` 安装版；macOS 取 `*.app.tar.gz`；Linux 取 `*.AppImage`），未匹配到则报错引导手动下载。
+  - 新增 GitHub 下载域名白名单校验 `validate_github_download_url`；下载链路改为两源白名单取并集（`validate_update_download_url_any_source`），仍为严格 https + 域名白名单。
+  - 设置 → 更多 → 关于 新增「更新源」切换项。GitHub 源不含强制更新与灰度信息，`forceUpdate` 恒为 false、无签名。
+
 - **联机大厅开关：未启用时不与云端交互**（[OnlineLobbyCard.vue](src/components/settings/OnlineLobbyCard.vue) / [SettingsOnline.vue](src/views/settings/SettingsOnline.vue) / [App.vue](src/App.vue) / [authSlice.ts](src/stores/online/authSlice.ts) / [auth_register_login.rs](src-tauri/src/commands/online/manager/auth_register_login.rs)）：
   - 新增配置项 `Online.lobby_enabled`（前端 `onlineLobbyEnabled`），默认**关闭**；设置页「联机」新增「联机大厅」开关，开启前必须先确认与云端交互说明。
   - 关闭时启动流程完全不与云端交互：不再静默注册设备、不再静默续期或重新登录 token。后端 `auth_init` 同步增加守卫，未启用时直接返回本地凭证快照（`disabled=true`），不发起任何网络请求。
@@ -13,6 +19,7 @@
 
 ### Changed
 
+- **云端功能改为「用到时就地询问」**（[Online.vue](src/views/Online.vue)）：未启用联机大厅时点击联机大厅/创建房间/加入房间，不再只弹「功能已封存」，而是就地询问是否启用（说明需与云端交互注册设备并续期令牌），确认后立即启用并继续进入该分类。红石联机与 FRP 不依赖云端，始终可用。
 - **联机封禁提示区分「未启用」与「连接失败」**（[Online.vue](src/views/Online.vue) / [TopNavLayout.vue](src/components/layout/TopNavLayout.vue) / [ApiServerCard.vue](src/components/settings/ApiServerCard.vue)）：未启用联机大厅时提示改为「需先启用联机大厅」，不再误报为云端连接失败；设置页「重新连接」按钮在未启用时禁用，`reconnect()` 直接返回且不发起 refresh 请求。
 - 配置读写链路新增 `Online.lobby_enabled`（[models.rs](src-tauri/src/state/config/models.rs) / [load.rs](src-tauri/src/config/load.rs) / [save.rs](src-tauri/src/config/save.rs) / [patch.rs](src-tauri/src/commands/system/apply_config/types/patch.rs) / [snapshot.rs](src-tauri/src/commands/system/apply_config/types/snapshot.rs) / [fields.rs](src-tauri/src/commands/system/apply_config/apply/fields.rs) / [config.ts](src/utils/api/config.ts) / [auth.ts](src/types/online/auth.ts)）。
 

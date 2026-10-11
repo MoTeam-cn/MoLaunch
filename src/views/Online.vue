@@ -36,7 +36,7 @@ const DisclaimerDialog = defineAsyncComponent(() => import('@/components/common/
 import { useOnlineNav, type OnlineCategoryId } from '@/composables/useOnlineNav'
 import { useEasyTierInstall } from '@/composables/useEasyTierInstall'
 import { hasAgreedToday } from '@/utils/disclaimer'
-import { showWarning } from '@/utils/modal'
+import { showConfirmAsync, showWarning } from '@/utils/modal'
 
 const router = useRouter()
 const onlineStore = useOnlineStore()
@@ -112,7 +112,7 @@ function goTutorial() {
  * 封禁态分类（云端离线时的房间/大厅）点击后弹窗告知原因，不切换；
  * 其余分类直接赋值。
  */
-function handleCategoryChange(id: string): void {
+async function handleCategoryChange(id: string): Promise<void> {
   if (id === 'tutorial') {
     goTutorial()
     return
@@ -125,19 +125,24 @@ function handleCategoryChange(id: string): void {
       return
     }
     if (!onlineStore.lobbyEnabled) {
-      // 未启用联机大厅：不是连接失败，而是用户尚未开启与云端交互
+      // 未启用联机大厅：就地询问是否启用（启用后才与云端交互），确认后继续进入该分类
+      const agreed = await showConfirmAsync(
+        '需要启用联机大厅',
+        `「${sealed.label}」需要与云端交互（注册设备标识、签发并续期访问令牌）才能使用。\n是否现在启用？`,
+      )
+      if (!agreed) return
+      const enabled = await onlineStore.setLobbyEnabled(true)
+      if (!enabled) return
+    } else if (!onlineStore.cloudConnected) {
       showWarning(
         '功能已封存',
-        `「${sealed.label}」需要先在「设置 → 联机」页启用联机大厅（与云端交互）后才能使用。`,
+        `「${sealed.label}」需要连接云端服务，当前云端连接失败，暂不可用。`,
+        onlineStore.cloudError ?? undefined,
       )
       return
+    } else {
+      return
     }
-    showWarning(
-      '功能已封存',
-      `「${sealed.label}」需要连接云端服务，当前云端连接失败，暂不可用。`,
-      onlineStore.cloudError ?? undefined,
-    )
-    return
   }
   activeCategory.value = id as OnlineCategoryId
 }

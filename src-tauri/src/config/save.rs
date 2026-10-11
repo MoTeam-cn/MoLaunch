@@ -125,6 +125,9 @@ pub fn save_config(config: &AppConfig) -> Result<(), String> {
     // 默认日志分享服务（mclo.gs / logshare.cn）
     ini.set("Log", "share_provider", &config.log_share_provider);
 
+    // Update（更新源）
+    ini.set("Update", "source", &config.update_source);
+
     // Proxy
     ini.set("Proxy", "mode", &config.proxy.mode);
     ini.set("Proxy", "type", &config.proxy.kind);
