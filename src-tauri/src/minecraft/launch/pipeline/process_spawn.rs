@@ -151,7 +151,17 @@ impl LaunchPipeline {
 
             let logs_chronological: Vec<&LogEntry> = logs.iter().rev().collect();
 
-            // 先检查是否有 Java 异常
+            // 顺序很关键：**先**判正常启动标志，再判致命错误。
+            // 出现 LWJGL / Setting user 说明游戏已开始正常加载，此时即使同一批日志里
+            // 混有 "Exception in thread"（模组线程的非致命未捕获异常）也不应判启动失败。
+            let has_healthy = logs_chronological
+                .iter()
+                .any(|l| healthy_signs.iter().any(|s| l.message.contains(s)));
+            if has_healthy {
+                break;
+            }
+
+            // 再检查是否有 Java 异常
             for (idx, log) in logs_chronological.iter().enumerate() {
                 for error in &fatal_errors {
                     if log.message.contains(error) {
@@ -175,14 +185,6 @@ impl LaunchPipeline {
                     message: format!("Java启动失败:\n{}", tail.join("\n")),
                     is_user_facing: true,
                 });
-            }
-
-            // 检查是否有正常启动标志 → 立即返回
-            let has_healthy = logs_chronological
-                .iter()
-                .any(|l| healthy_signs.iter().any(|s| l.message.contains(s)));
-            if has_healthy {
-                break;
             }
         }
 

@@ -150,6 +150,10 @@ pub(super) fn extract_archive(archive_path: &Path, dst: &Path) -> Result<(), Str
             .by_index(i)
             .map_err(|e| format!("读取 ZIP 条目失败: {}", e))?;
         let name = entry.name().to_string();
+        // 段级校验必须放在创建任何目录**之前**：目录条目与文件条目都要过，
+        // 否则 "../x/" 这类目录条目会在 dst 之外建出目录（此处不剥 prefix，条目名即相对路径）
+        crate::utils::path::ensure_safe_relative_path(&name)
+            .map_err(|e| format!("Zip Slip 检测: {} ({})", name, e))?;
         if name.ends_with('/') {
             std::fs::create_dir_all(dst.join(&name)).map_err(|e| format!("创建目录失败: {}", e))?;
             continue;

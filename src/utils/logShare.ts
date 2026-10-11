@@ -68,7 +68,10 @@ export async function uploadLogShare(
   const conf = PROVIDERS[provider]
   const data = await postForm<{ id?: string; url?: string }>(conf.endpoint, { content })
   const id = data?.id
-  const url = data?.url || (id ? conf.fallbackUrl(id) : '')
+  // 第三方响应里的 url 不可信（会被交给系统 open 打开）：只接受 http/https，
+  // 否则退回本地按 id 拼的链接，避免 file:// 等 scheme 被系统处理
+  const rawUrl = typeof data?.url === 'string' ? data.url : ''
+  const url = /^https?:\/\//i.test(rawUrl) ? rawUrl : id ? conf.fallbackUrl(id) : ''
   if (!url) throw new Error('服务响应缺少分享链接')
   return url
 }

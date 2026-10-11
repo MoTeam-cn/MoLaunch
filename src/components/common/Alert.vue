@@ -12,8 +12,8 @@
 
 import { ExclamationTriangleIcon, InformationCircleIcon, CheckCircleIcon, ExclamationCircleIcon, BugAntIcon } from '@heroicons/vue/24/outline'
 import { elementIcons } from '@/utils/element-icons'
-import { open as openUrl } from '@tauri-apps/plugin-shell'
-import { toastInfo } from '@/utils/toast'
+import { openExternal as openUrl, isSafeExternalUrl } from '@/utils/openExternal'
+import { toastInfo, toastWarning } from '@/utils/toast'
 
 interface Props {
   type?: 'info' | 'warning' | 'error' | 'success' | 'debug'
@@ -53,6 +53,10 @@ const softConfig = {
 function handleLinkClick() {
   const link = props.link
   if (!link) return
+  if (!isSafeExternalUrl(link.url)) {
+    toastWarning('链接不是 http/https，已阻止打开')
+    return
+  }
   toastInfo(link.toast ?? '正在打开外部链接…')
   setTimeout(() => {
     openUrl(link.url)

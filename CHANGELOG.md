@@ -49,6 +49,18 @@
 
 ### Fixed
 
+- **修复第三处 ZIP 解压目录条目路径穿越**（[archive.rs](src-tauri/src/commands/frp/binary/archive.rs)）：与 [zip.rs](src-tauri/src/commands/frp/install/zip.rs) / [install.rs](src-tauri/src/commands/plugins/install.rs) 同源——目录条目分支直接 `create_dir_all` 后 `continue`，文件分支的 canonicalize 校验走不到；且此处不剥 prefix，条目名即相对路径。已把 `ensure_safe_relative_path` 提到创建目录之前。
+
+- **修复社区资源官网链接未校验 scheme 即交系统处理**（[ResourceDetailHeader.vue](src/components/community/resource-detail/ResourceDetailHeader.vue)）：`project.website` 来自社区平台元数据（资源作者可控），原样交给 `open` → `ShellExecuteW`。已改为经 `isSafeExternalUrl`（仅 http/https）校验后走 `openExternal`。
+
+- **修复日志分享链接直接采信第三方响应**（[logShare.ts](src/utils/logShare.ts)）：`data.url` 由 mclo.gs / logshare.cn 响应提供并被后续 `open()` 打开。已改为仅接受 http/https，否则回退本地按 id 拼的链接。
+
+- **补在线安装整合包下载地址的 SSRF 校验**（[online.rs](src-tauri/src/commands/community/install/modpack/online.rs)）：`req.download_url` 原样交给下载器，与 [resource.rs](src-tauri/src/commands/community/install/resource.rs) 的资源下载路径不一致（后者已校验）。已补 `validate_public_http_url`。
+
+- **修复启动早期崩溃检测的判定顺序**（[process_spawn.rs](src-tauri/src/minecraft/launch/pipeline/process_spawn.rs)）：原先先判 fatal 再判 healthy，导致日志里一旦出现 `Exception in thread`（模组线程的非致命未捕获异常很常见），即使同批日志已有 `LWJGL` / `Setting user` 等正常启动标志也会被判「Java启动失败」。已改为 **healthy 优先**，`fatal_errors` 内容未改动。
+
+- **统一外部链接打开路径**（[Alert.vue](src/components/common/Alert.vue) / [useModDetailQuery.ts](src/composables/useModDetailQuery.ts)）：两处原用裸 `@tauri-apps/plugin-shell` 的 `open`，绕过 [openExternal.ts](src/utils/openExternal.ts) 的 scheme 校验。已收口到 `openExternal`。
+
 - **修复 frpc 进程表无条件移除导致新进程失联**（[monitor.rs](src-tauri/src/commands/frp/process/monitor.rs)）：进程表按 `tunnel_id` 键控，monitor task 在子进程退出后**无条件** `RUNNING.remove(&tunnel_id)`。当「启动 → 进程退出 → 再启动」重叠时，上一个 monitor task 的收尾会晚于新进程注册，把**新进程的句柄**删掉，新 frpc 从此无法经 UI 停止（成为孤儿进程）。已改为按 `pid` 比对后再移除（compare-and-remove）。
 
 - **修复 easytier-cli 无超时调用导致状态锁被长期占用**（[easytier.rs](src-tauri/src/minecraft/online/scaffolding/easytier.rs)）：`easytier_cli_raw` 的 `cmd.output().await` 无超时，而 `emit_easytier_status`（[easytier_actions.rs:65-66](src-tauri/src/commands/online/manager/easytier_actions.rs)）与 `easytier_status` IPC（[easytier_actions.rs:288-289](src-tauri/src/commands/online/manager/easytier_actions.rs)）都**持有 `state.easytier` 锁跨这个 await**——easytier-cli 一旦卡住，join / stop / 状态查询 / peers 全部被连带阻塞。已加 10 秒超时，把持锁时间封顶。

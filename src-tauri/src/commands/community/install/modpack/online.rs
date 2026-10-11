@@ -33,6 +33,8 @@ pub async fn install_modpack(
     // 而文件名会 join 进 instance_dir，这里必须再做一次文件名安全校验
     crate::utils::path::sanitize_file_name(&req.file_name)
         .map_err(|_| format!("整合包文件名非法: {}", req.file_name))?;
+    // 下载地址必须过公网校验（与 community/install/resource.rs 的资源下载一致）
+    crate::utils::net::validate_public_http_url(&req.download_url)?;
     let _guard = super::InstallGuard::acquire(&req.instance_name)?;
 
     // 1. CF 平台前置检查 API Key（在 reset_stages 之前，失败时不需要 mark_failed）

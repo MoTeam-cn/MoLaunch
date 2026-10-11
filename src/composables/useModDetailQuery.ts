@@ -8,7 +8,7 @@ import { ref, type Ref } from 'vue'
 import { getProjectDetail, getMcmodUrl } from '@/utils/api/community'
 import { showInfo } from '@/utils/modal'
 import { formatBytes } from '@/utils/format'
-import { open as openUrl } from '@tauri-apps/plugin-shell'
+import { openExternal as openUrl, isSafeExternalUrl } from '@/utils/openExternal'
 import { toastError } from '@/utils/toast'
 import { modTitle, loaderVisual, stripModVersion } from '@/utils/mod-display'
 import type { ResourceProject } from '@/types/community'
@@ -141,7 +141,7 @@ export function useModDetailQuery() {
       try {
         let url = await getMcmodUrl('CurseForge', mod.slug)
         if (!url) url = await getMcmodUrl('Modrinth', mod.slug)
-        if (url) {
+        if (url && isSafeExternalUrl(url)) {
           await openUrl(url)
           return
         }

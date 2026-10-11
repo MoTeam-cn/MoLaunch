@@ -9,7 +9,7 @@
  * openMcmod 和 copyName 内部处理（只依赖 project prop）
  */
 import { ref, watch, defineAsyncComponent } from 'vue'
-import { open as openUrl } from '@tauri-apps/plugin-shell'
+import { openExternal as openUrl, isSafeExternalUrl } from '@/utils/openExternal'
 import type { ResourceProject } from '@/types/community'
 import { getMcmodUrl } from '@/utils/api/community'
 import { toastSuccess, toastInfo, toastWarning } from '@/utils/toast'
@@ -57,6 +57,11 @@ async function openMcmod() {
 /** 点击"转到平台官网"：直接打开 project.website */
 async function openWebsite() {
   if (!props.project.website) return
+  // website 来自社区平台元数据（资源作者可控），交系统处理前必须校验 scheme
+  if (!isSafeExternalUrl(props.project.website)) {
+    toastWarning('官网链接不是 http/https，已阻止打开')
+    return
+  }
   toastInfo('正在打开官网')
   await openUrl(props.project.website)
 }
