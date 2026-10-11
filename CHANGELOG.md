@@ -49,6 +49,10 @@
 
 ### Fixed
 
+- **继续迁移原子写到共享实现**（[fs.rs](src-tauri/src/utils/fs.rs)）：[version/modpack_meta.rs](src-tauri/src/minecraft/version/modpack_meta.rs)、[version/setup/save.rs](src-tauri/src/minecraft/version/setup/save.rs)（2 处）原用 `with_extension("json.tmp")` / `with_extension("ini.tmp")` 的固定临时名，已改为 `utils::fs::write_atomic`。
+
+- **记录两处非原子替换缺陷（本轮未改，待验证 Windows rename 覆盖语义）**：[tools/nbt/api.rs](src-tauri/src/commands/tools/nbt/api.rs) 与 [tools/resourcepack/explore/io.rs](src-tauri/src/commands/tools/resourcepack/explore/io.rs) 在 `rename` **之前**先 `remove_file` 目标文件——这不是原子替换，中间存在目标文件不存在的窗口，恰好破坏了「先写 tmp 再 rename」的全部意义。Rust 的 `std::fs::rename` 在 Windows 上走 `MoveFileExW(MOVEFILE_REPLACE_EXISTING)`，理论上会覆盖，故 `remove_file` 疑似多余；但两处都这么写说明可能有人踩过错误，**在拿到确定性证据前不改**，避免把能用的代码改坏。
+
 - **新增通用原子写函数并迁移 mod_translation 五处**（[fs.rs](src-tauri/src/utils/fs.rs)）：各调用点普遍手搓「写固定名 tmp → rename」，其中 [translate_lang.rs](src-tauri/src/mod_translation/translate_lang.rs)、[translate_class/apply.rs](src-tauri/src/mod_translation/translate_class/apply.rs)、[resume.rs](src-tauri/src/mod_translation/resume.rs)、[repair_apply.rs](src-tauri/src/mod_translation/repair_apply.rs)、[memory.rs](src-tauri/src/mod_translation/memory.rs) 五处都用 `with_extension("tmp")` 的**固定临时名**——这正是 [storage/fs.rs](src-tauri/src/storage/fs.rs) 注释里记录的并发缺陷（多个写入共用同一 tmp 导致 rename 找不到源文件，os error 2）。新增 `utils::fs::write_atomic(path, bytes)`：临时文件名带**自增序号**、自动建父目录，五处已迁移。
 
 - **抽公共 release 下载 URL 候选构造**（[github_download.rs](src-tauri/src/utils/github_download.rs)）：frp 厂商包（[system_default.rs](src-tauri/src/commands/frp/binary/system_default.rs)）与 easytier 内核（[easytier_download.rs](src-tauri/src/commands/online/manager/easytier_download.rs)）各手搓了一份「镜像竞速选最快 + 官方保底」的候选 URL 列表，逻辑同构、仅 easytier 多带取消判断。已抽出 `build_release_url_candidates(proxies, repo, version, asset, cancel)`，两处改为调用。

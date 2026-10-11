@@ -181,10 +181,8 @@ impl VersionSetup {
             content.push_str(&format!("MaxMemory={}\n", mm));
         }
 
-        // 原子写入：先写 .tmp 再 rename，避免崩溃导致 setup.ini 半写状态
-        let tmp = path.with_extension("ini.tmp");
-        std::fs::write(&tmp, content)?;
-        std::fs::rename(&tmp, &path)?;
+        // 原子写入实现统一在 utils/fs.rs，避免崩溃导致 setup.ini 半写状态
+        crate::utils::fs::write_atomic(&path, content.as_bytes()).map_err(std::io::Error::other)?;
         Ok(())
     }
 
@@ -210,10 +208,9 @@ impl VersionSetup {
         let modified = current.merge_missing_from(&template);
 
         if modified {
-            // 原子写入：先写 .tmp 再 rename
-            let tmp = path.with_extension("ini.tmp");
-            std::fs::write(&tmp, current.to_string())?;
-            std::fs::rename(&tmp, &path)?;
+            // 原子写入实现统一在 utils/fs.rs
+            crate::utils::fs::write_atomic(&path, current.to_string().as_bytes())
+                .map_err(std::io::Error::other)?;
         }
 
         Ok(modified)

@@ -75,12 +75,10 @@ impl ModpackMetaFile {
     /// 调用方需确保 `version_dir` 已存在。
     pub fn save(&self, version_dir: &Path) -> std::io::Result<()> {
         let path = Self::file_path(version_dir);
-        let tmp_path = path.with_extension("json.tmp");
         let content = serde_json::to_string_pretty(self)
             .map_err(|e| std::io::Error::new(std::io::ErrorKind::InvalidData, e))?;
-        std::fs::write(&tmp_path, content)?;
-        std::fs::rename(&tmp_path, &path)?;
-        Ok(())
+        // 原子写实现统一在 utils/fs.rs（tmp 名带自增序号，防并发同名）
+        crate::utils::fs::write_atomic(&path, content.as_bytes()).map_err(std::io::Error::other)
     }
 
     /// 转换为上报用 `ModpackMeta`（丢弃 `installed_at` 本地字段）
