@@ -219,19 +219,15 @@ async fn is_cache_outdated(path: &std::path::Path) -> bool {
         return false;
     };
     let url = format!("{KERNEL_DOWNLOAD_BASE}?platform={platform}&arch={arch}");
-    let resp = match crate::http::get_client()
-        .head(&url)
-        .timeout(std::time::Duration::from_secs(SUPPORT_PROBE_TIMEOUT_SECS))
-        .send()
-        .await
-    {
-        Ok(resp) => resp,
-        Err(_) => return false,
-    };
-    if !resp.status().is_success() {
-        return false;
-    }
-    let Some(remote_len) = resp.content_length() else {
+    // HEAD 的 Content-Length 必须从响应头读：content_length() 对 HEAD 恒为 0，
+    // 直接用它会把「未更新」误判成「已更新」而每次启动都重下
+    let Some(remote_len) = crate::utils::net::head_content_length(
+        &crate::http::get_client(),
+        &url,
+        std::time::Duration::from_secs(SUPPORT_PROBE_TIMEOUT_SECS),
+    )
+    .await
+    else {
         return false;
     };
     let Ok(local_len) = std::fs::metadata(path).map(|m| m.len()) else {
@@ -302,7 +298,7 @@ async fn download_and_cache() -> Result<PathBuf, String> {
     // 先写临时文件再改名：避免下载中断留下半个可执行文件被当成有效缓存
     let tmp = path.with_extension("tmp");
     std::fs::write(&tmp, &bytes).map_err(|e| format!("写入内核缓存失败: {e}"))?;
-    set_executable(&tmp)?;
+    crate::minecraft::system::shell::make_executable(&tmp);
     std::fs::rename(&tmp, &path).map_err(|e| format!("落盘内核缓存失败: {e}"))?;
 
     crate::log_info!(
@@ -360,21 +356,6 @@ fn is_expected_executable(bytes: &[u8], platform: &str) -> bool {
         }
         _ => false,
     }
-}
-
-/// 非 Windows 平台补可执行位
-fn set_executable(path: &std::path::Path) -> Result<(), String> {
-    #[cfg(unix)]
-    {
-        use std::os::unix::fs::PermissionsExt;
-        std::fs::set_permissions(path, std::fs::Permissions::from_mode(0o755))
-            .map_err(|e| format!("设置内核可执行权限失败: {e}"))?;
-    }
-    #[cfg(not(unix))]
-    {
-        let _ = path;
-    }
-    Ok(())
 }
 
 #[cfg(test)]

@@ -125,6 +125,18 @@ export function compareVersion(a: string, b: string): number {
   return 0
 }
 
+/**
+ * 判断是否存在可用的新版本
+ *
+ * 供「厂商 frpc / 联机内核」等更新提示复用，避免各处自行写不相等判断。
+ * 刻意用「字符串不相等」而非 `compareVersion` 逐段比较：版本号可能带 `v` 前缀或
+ * 分段格式不统一，逐段比较在格式异常时会漏报，而漏报会让用户看不到可用更新。
+ * 宁可多提示，不可漏提示。
+ */
+export function hasNewerVersion(current?: string | null, latest?: string | null): boolean {
+  return !!current && !!latest && current !== latest
+}
+
 /** Mod 版本变化类型（升级 / 降级 / 同版本 / 未知） */
 export type VersionChangeType = 'upgrade' | 'downgrade' | 'same' | 'unknown'
 

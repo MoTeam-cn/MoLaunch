@@ -49,6 +49,15 @@
 
 ### Fixed
 
+- **修复内核自动更新的 HEAD 大小比对恒判「已更新」**（[kernel.rs](src-tauri/src/commands/redstone/kernel.rs) / [net.rs](src-tauri/src/utils/net.rs)）：reqwest 对 **HEAD** 响应的 `Response::content_length()` 恒为 0（HEAD 无 body），直接用它比对会把「官方未更新」误判成「已更新」，导致**每次启动都重新下载内核**。改为从 `Content-Length` 响应头读取。
+
+### Refactored
+
+- **下载/更新相关重复实现收敛到共享工具**（[net.rs](src-tauri/src/utils/net.rs) / [kernel.rs](src-tauri/src/commands/redstone/kernel.rs) / [easytier_download.rs](src-tauri/src/commands/online/manager/easytier_download.rs) / [filename.rs](src-tauri/src/commands/tools/filename.rs) / [version.ts](src/utils/version.ts) / [EasyTierKernelCard.vue](src/components/settings/EasyTierKernelCard.vue) / [ProviderList.vue](src/components/frp/ProviderList.vue)）：
+  - `utils/net.rs` 新增 `content_length_of()` 与 `head_content_length()`：HEAD 取远端文件大小的实现此前在红石内核、easytier 下载、工具页 filename 三处各写一遍（且其中一处踩了 `content_length()` 的坑），现统一收敛。
+  - 红石内核不再自写 `set_executable()`，改用既有的 `minecraft::system::shell::make_executable`。
+  - 前端 `utils/version.ts` 新增 `hasNewerVersion()`：厂商 frpc 卡片与联机内核卡片的「有新版本」判定此前各写一遍，现统一。**刻意保留「字符串不相等」语义**——版本号可能带 `v` 前缀或分段格式不统一，逐段比较在格式异常时会漏报，漏报会让用户看不到可用更新。
+
 - **红石内核缓存永不刷新，官方发新版后用不上**（[kernel.rs](src-tauri/src/commands/redstone/kernel.rs) / [tunnel.rs](src-tauri/src/commands/redstone/tunnel.rs) / [tunnel_test.rs](src-tauri/src/commands/redstone/tunnel_test.rs)）：此前内核下载到 AppData 后**永不重新下载**，而官方对内核做版本校验，因此缓存迟早会被服务端拒绝、且再也刷不新。现在补上自动更新：
   - **启动前比对**：缓存命中时用一次 HEAD 取官方 `Content-Length` 与本地文件大小比对，不一致即认为官方已发新版并重新下载。只在**真正拉起内核时**执行，页面加载不做任何请求；探测失败（离线 / 服务不可用）一律视为未过期，先用旧的。
   - **被拒即失效**：扫描内核 stdout / stderr，命中 `version check failed` / `版本过时` / `outdated` 即置位过期标记，下次启动强制重新下载（用内存标记而非直接删文件，避免内核进程仍占用该文件）。

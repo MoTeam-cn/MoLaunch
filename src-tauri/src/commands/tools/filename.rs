@@ -6,7 +6,7 @@
 
 use std::time::Duration;
 
-use reqwest::header::{CONTENT_DISPOSITION, CONTENT_LENGTH, RANGE};
+use reqwest::header::{CONTENT_DISPOSITION, RANGE};
 
 use crate::commands::tools::types::{FetchFilenameParams, FetchFilenameResult};
 use crate::http::get_client;
@@ -44,7 +44,7 @@ pub async fn fetch_filename(params: FetchFilenameParams) -> Result<serde_json::V
                 .get(CONTENT_DISPOSITION)
                 .and_then(|v| v.to_str().ok())
                 .map(|s| s.to_string());
-            let len = parse_content_length(resp.headers().get(CONTENT_LENGTH));
+            let len = crate::utils::net::content_length_of(resp.headers());
             match cd.as_deref() {
                 Some(cd_str) => {
                     let parsed = parse_content_disposition(cd_str);
@@ -71,7 +71,7 @@ pub async fn fetch_filename(params: FetchFilenameParams) -> Result<serde_json::V
                 .get(CONTENT_DISPOSITION)
                 .and_then(|v| v.to_str().ok())
                 .map(|s| s.to_string());
-            let len = parse_content_length(resp.headers().get(CONTENT_LENGTH));
+            let len = crate::utils::net::content_length_of(resp.headers());
 
             match cd.as_deref() {
                 Some(cd_str) => match parse_content_disposition(cd_str) {
@@ -92,13 +92,6 @@ pub async fn fetch_filename(params: FetchFilenameParams) -> Result<serde_json::V
         file_size: file_size.unwrap_or(0),
     };
     serde_json::to_value(&result).map_err(|e| e.to_string())
-}
-
-/// 解析 `Content-Length` 响应头为 u64
-fn parse_content_length(header: Option<&reqwest::header::HeaderValue>) -> Option<u64> {
-    header
-        .and_then(|v| v.to_str().ok())
-        .and_then(|s| s.trim().parse::<u64>().ok())
 }
 
 /// 解析 Content-Disposition 头，提取文件名

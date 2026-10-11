@@ -146,6 +146,33 @@ pub fn sanitize_url_for_log(raw: &str) -> String {
     }
 }
 
+/// 从响应头读取 `Content-Length`（缺失或解析失败返回 None）
+///
+/// 注意：reqwest 对 **HEAD** 响应的 `Response::content_length()` 一律返回 0
+/// （HEAD 无 body），因此必须直接读响应头才能拿到真实大小。
+pub fn content_length_of(headers: &reqwest::header::HeaderMap) -> Option<u64> {
+    headers
+        .get(reqwest::header::CONTENT_LENGTH)
+        .and_then(|v| v.to_str().ok())
+        .and_then(|v| v.trim().parse::<u64>().ok())
+}
+
+/// HEAD 探测远端文件大小（非 2xx 或解析失败返回 None）
+///
+/// 供「远端是否已换新版本」这类判断复用。HEAD 的 Content-Length 只能从响应头取，
+/// 统一实现在此，避免各处重复踩 `content_length()` 对 HEAD 返回 0 的坑。
+pub async fn head_content_length(
+    client: &reqwest::Client,
+    url: &str,
+    timeout: std::time::Duration,
+) -> Option<u64> {
+    let resp = client.head(url).timeout(timeout).send().await.ok()?;
+    if !resp.status().is_success() {
+        return None;
+    }
+    content_length_of(resp.headers())
+}
+
 #[cfg(test)]
 mod tests {
     use super::{

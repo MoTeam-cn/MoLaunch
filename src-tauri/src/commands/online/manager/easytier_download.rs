@@ -105,20 +105,9 @@ fn move_dir_contents(src: &Path, dst: &Path) -> Result<(), String> {
 /// 注意：reqwest 对 HEAD 响应 `content_length()` 一律返回 0（HEAD 无 body），
 /// 需直接读 Content-Length 响应头才能拿到真实大小。
 async fn probe_zip_size(client: &reqwest::Client, url: &str) -> u64 {
-    match client
-        .head(url)
-        .timeout(Duration::from_secs(10))
-        .send()
+    crate::utils::net::head_content_length(client, url, Duration::from_secs(10))
         .await
-    {
-        Ok(r) if r.status().is_success() => r
-            .headers()
-            .get(reqwest::header::CONTENT_LENGTH)
-            .and_then(|v| v.to_str().ok())
-            .and_then(|v| v.parse::<u64>().ok())
-            .unwrap_or(0),
-        _ => 0,
-    }
+        .unwrap_or(0)
 }
 
 /// 校验 zip 魔数（PK\x03\x04 文件头 / PK\x05\x06 空归档 / PK\x07\x08 分卷）

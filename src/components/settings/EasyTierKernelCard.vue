@@ -15,6 +15,7 @@ import {
   cancelEasyTierInstall,
 } from '@/utils/api/online-manager/easytier'
 import type { EasyTierInstallProgress, EasyTierInstallStatus } from '@/types/online'
+import { hasNewerVersion } from '@/utils/version'
 import { ArrowDownTrayIcon, ArrowPathIcon } from '@heroicons/vue/24/outline'
 
 const installStatus = ref<EasyTierInstallStatus | null>(null)
@@ -23,7 +24,7 @@ const installBusy = ref(false)
 
 const hasUpdate = computed(() => {
   const s = installStatus.value
-  return !!s?.installed && !!s.latestVersion && s.version !== s.latestVersion
+  return !!s?.installed && hasNewerVersion(s.version, s.latestVersion)
 })
 /** 进度展示：download / extract 阶段事件驱动（done/error 清除），避免状态轮询 */
 const showProgress = computed(() => {

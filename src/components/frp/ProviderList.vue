@@ -18,6 +18,7 @@ import { useFrpStore } from '@/stores/frp'
 import { showConfirm, showPrompt } from '@/utils/modal'
 import { toastInfo } from '@/utils/toast'
 import { pickFile, pickDirectory } from '@/utils/fileDialog'
+import { hasNewerVersion } from '@/utils/version'
 const Button = defineAsyncComponent(() => import('@/components/common/Button.vue'))
 const Tooltip = defineAsyncComponent(() => import('@/components/common/Tooltip.vue'))
 const Select = defineAsyncComponent(() => import('@/components/common/Select.vue'))
@@ -90,7 +91,7 @@ async function handleUpdateFrpc() {
 
 /** 是否有新版本（云端最新版存在且与本地不同） */
 function hasUpdate(p: ProviderInfo): boolean {
-  return !!p.latestVersion && p.latestVersion !== p.version
+  return hasNewerVersion(p.version, p.latestVersion)
 }
 
 /** 从文件夹安装厂商（manifest.toml + frpc 二进制） */
