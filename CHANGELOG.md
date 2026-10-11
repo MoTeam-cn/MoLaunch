@@ -49,6 +49,8 @@
 
 ### Fixed
 
+- **设备 ID 打码统一并修正短 ID 行为**（[format.ts](src/utils/format.ts) / [SystemInfoTab.vue](src/views/settings/more/SystemInfoTab.vue)）：`maskDeviceId` 对长度 ≤8 的 ID 原先**返回原值**，等于放弃打码，与「打码展示」的语义矛盾；现改为返回 `'****'`。据此 [SystemInfoTab.vue](src/views/settings/more/SystemInfoTab.vue) 里那份等价的打码逻辑（短 ID 分支本就是 `'****'`）得以删除并改用共享函数。**注意**：`maskDeviceId` 的短 ID 分支是行为变更，会影响 [LuckyTool.vue](src/views/quick-tools/LuckyTool.vue) 的显示（短 ID 由明文变为掩码）。
+
 - **RGB→HEX 全面收敛到大写可选项**（[color.ts](src/utils/color.ts)）：给 `rgbToHex` 增加 `options.uppercase`，据此合并另外两处等价实现——[ColorPalette.vue](src/views/tools/calc/ColorPalette.vue) 与 [gradient-text/core.ts](src/utils/gradient-text/core.ts) 原先各自输出大写 `#RRGGBB`，现已统一调用共享函数。ColorPalette 自写的 `rgbToHsl` 与共享版**数值完全等价**（仅缩放不同：共享版返回 0~1），一并删除，改由调用方按度数/百分比取整。
 
 - **原子写补齐最后三处**（[fs.rs](src-tauri/src/utils/fs.rs)）：新增 `write_atomic_with(path, f)` 闭包式变体——把「写临时文件」交给调用方，适用于需在 rename 前对临时文件做额外处理或无法一次性拿到全部字节的场景。据此迁移剩余三处：① [redstone/kernel.rs](src-tauri/src/commands/redstone/kernel.rs) 需在 rename 前补可执行位（`make_executable`）；② [download/chunk/merge.rs](src-tauri/src/minecraft/download/chunk/merge.rs) 是流式多分片拼接，原用固定的 `{}.merging` 临时名，并发合并同一目标会互相覆盖；③ [mod_translation/jar.rs](src-tauri/src/mod_translation/jar.rs) 由 zip writer 直接写临时文件。至此原子写实现全部收敛到 `utils/fs.rs`，无残留手写实现。
