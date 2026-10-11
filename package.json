@@ -35,7 +35,7 @@
     "pinyin-pro": "^3.29.1",
     "skinview3d": "^3.4.2",
     "three": "^0.164.1",
-    "vue": "^3.4.15",
+    "vue": "^3.5.43",
     "vue-router": "^4.2.5",
     "vue-virtual-scroller": "^3.0.4"
   },
@@ -65,6 +65,10 @@
     "js-yaml": "^4.3.2",
     "browserslist": "^4.28.7",
     "baseline-browser-mapping": "^2.11.0",
-    "fflate@<0.6.11": "0.6.11"
+    "fflate@<0.6.11": "0.6.11",
+    "brace-expansion@1": "1.1.21",
+    "brace-expansion@2": "2.1.7",
+    "source-map-js": "^1.2.2",
+    "katex": "^0.18.2"
   }
 }
