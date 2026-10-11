@@ -62,6 +62,9 @@ impl HongshiTunnel {
             tokio::spawn(async move {
                 let mut reader = BufReader::new(out).lines();
                 while let Ok(Some(line)) = reader.next_line().await {
+                    if is_version_rejection(&line) {
+                        crate::commands::redstone::kernel::mark_kernel_rejected();
+                    }
                     if let Some(found) = parse_endpoint(&line) {
                         if let Ok(mut guard) = slot.lock() {
                             *guard = Some(found);
@@ -75,6 +78,9 @@ impl HongshiTunnel {
             tokio::spawn(async move {
                 let mut reader = BufReader::new(err).lines();
                 while let Ok(Some(line)) = reader.next_line().await {
+                    if is_version_rejection(&line) {
+                        crate::commands::redstone::kernel::mark_kernel_rejected();
+                    }
                     log_debug!("[hongshic] {line}");
                 }
             });
@@ -112,6 +118,18 @@ impl HongshiTunnel {
     pub async fn stop(mut self) {
         let _ = self.child.kill().await;
     }
+}
+
+/// 内核输出中表示「版本过期被服务端拒绝」的特征串
+const VERSION_REJECTED_MARKERS: [&str; 3] = ["version check failed", "版本过时", "outdated"];
+
+/// 判断一行内核输出是否表示版本过期被拒
+///
+/// 官方对内核做版本校验：旧内核会被服务端拒绝并在输出里给出原因。
+/// 命中后由 kernel::mark_kernel_rejected 置位，下次启动强制重新下载。
+pub fn is_version_rejection(line: &str) -> bool {
+    let lower = line.to_ascii_lowercase();
+    VERSION_REJECTED_MARKERS.iter().any(|m| lower.contains(m))
 }
 
 /// 从内核一行输出中提取 endpoint 地址

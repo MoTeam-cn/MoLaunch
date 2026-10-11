@@ -49,6 +49,11 @@
 
 ### Fixed
 
+- **红石内核缓存永不刷新，官方发新版后用不上**（[kernel.rs](src-tauri/src/commands/redstone/kernel.rs) / [tunnel.rs](src-tauri/src/commands/redstone/tunnel.rs) / [tunnel_test.rs](src-tauri/src/commands/redstone/tunnel_test.rs)）：此前内核下载到 AppData 后**永不重新下载**，而官方对内核做版本校验，因此缓存迟早会被服务端拒绝、且再也刷不新。现在补上自动更新：
+  - **启动前比对**：缓存命中时用一次 HEAD 取官方 `Content-Length` 与本地文件大小比对，不一致即认为官方已发新版并重新下载。只在**真正拉起内核时**执行，页面加载不做任何请求；探测失败（离线 / 服务不可用）一律视为未过期，先用旧的。
+  - **被拒即失效**：扫描内核 stdout / stderr，命中 `version check failed` / `版本过时` / `outdated` 即置位过期标记，下次启动强制重新下载（用内存标记而非直接删文件，避免内核进程仍占用该文件）。
+  - 新增 `is_version_rejection` 与 2 条回归用例。
+
 - **修正版本卡片展开动画的无效过渡延迟类名**（[VersionGroupCard.vue](src/components/community/resource-detail/VersionGroupCard.vue)）：`transition-delay-[50ms]` / `transition-delay-0` 并非 Tailwind 工具类（正确写法为 `delay-[50ms]` / `delay-0`），自 v3 起即未生成任何样式，展开动画的错峰延迟从未生效；已改为 `delay-*`。
 
 - **修复生产依赖安全公告**（[package.json](package.json) / [package-lock.json](package-lock.json)）：vue `3.5.39` → `3.5.43`（连带 @vue/server-renderer，GHSA-g2v6-rqmx-r4w6 XSS）、source-map-js `1.2.1` → `1.2.2`（GHSA-68fv-2mgg-jv7q 事件循环 DoS）、katex `0.16.47/0.18.1` → `0.18.11`（GHSA-238p-pmpm-9mq7）、brace-expansion `1.1.18/2.1.4` → `1.1.21/2.1.7`（GHSA-q2hr-2g5m-vwhr 等）。修复后生产依赖审计归零（`npm audit --omit=dev` 0 漏洞）。

@@ -197,15 +197,73 @@ pub fn cached_kernel_path() -> Result<PathBuf, String> {
     Ok(kernel_cache_dir()?.join(name))
 }
 
+/// 内核被服务端判定过期的标记
+///
+/// 内核进程报告版本过期时置位（见 tunnel.rs 对内核输出的扫描）；下一次 ensure_kernel
+/// 会跳过缓存强制重新下载。用内存标记而不是直接删文件：内核进程可能仍占用着该文件。
+static KERNEL_REJECTED: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);
+
+/// 标记当前缓存内核已被服务端拒绝（版本过期），下次解析将强制重新下载
+pub fn mark_kernel_rejected() {
+    KERNEL_REJECTED.store(true, std::sync::atomic::Ordering::Relaxed);
+    crate::log_warn!("[Redstone] 内核被服务端判定过期，下次启动将重新下载");
+}
+
+/// 用官方 Content-Length 与本地文件大小比对，判断缓存内核是否已过期
+///
+/// 官方发新版后产物大小几乎必然变化，因此一次 HEAD 即可判断是否需要更新。
+/// 只在**真正要拉起内核时**执行（不在页面加载时）；探测失败一律视为未过期——
+/// 宁可先用旧的，也不要因为网络抖动让用户用不了。
+async fn is_cache_outdated(path: &std::path::Path) -> bool {
+    let Some((platform, arch)) = platform_arch() else {
+        return false;
+    };
+    let url = format!("{KERNEL_DOWNLOAD_BASE}?platform={platform}&arch={arch}");
+    let resp = match crate::http::get_client()
+        .head(&url)
+        .timeout(std::time::Duration::from_secs(SUPPORT_PROBE_TIMEOUT_SECS))
+        .send()
+        .await
+    {
+        Ok(resp) => resp,
+        Err(_) => return false,
+    };
+    if !resp.status().is_success() {
+        return false;
+    }
+    let Some(remote_len) = resp.content_length() else {
+        return false;
+    };
+    let Ok(local_len) = std::fs::metadata(path).map(|m| m.len()) else {
+        return false;
+    };
+    if remote_len == local_len {
+        return false;
+    }
+    crate::log_info!(
+        "[Redstone] 官方内核已更新（本地 {} 字节 → 官方 {} 字节），将重新下载",
+        local_len,
+        remote_len
+    );
+    true
+}
+
 /// 解析可用内核：缓存 → 下载 → 编译期兜底
 ///
 /// 返回（内核路径，来源）。三条路径都不可用时返回带原因的错误。
 /// 是否该走这里由 probe_platform_support 决定（前端在平台不支持时不进入创建流程）。
 pub async fn ensure_kernel() -> Result<(PathBuf, KernelSource), String> {
-    // 1. 本地缓存
+    // 1. 本地缓存：命中即用、不联网；两种情况例外，需要重新下载——
+    //    a. 上次内核被服务端判定过期（版本校验失败）
+    //    b. 官方产物大小与本地不一致（官方已发新版）
     if let Ok(path) = cached_kernel_path() {
         if path.is_file() {
-            return Ok((path, KernelSource::Cache));
+            if KERNEL_REJECTED.swap(false, std::sync::atomic::Ordering::Relaxed) {
+                crate::log_info!("[Redstone] 上次内核被判过期，删除缓存并重新下载");
+                let _ = std::fs::remove_file(&path);
+            } else if !is_cache_outdated(&path).await {
+                return Ok((path, KernelSource::Cache));
+            }
         }
     }
 
