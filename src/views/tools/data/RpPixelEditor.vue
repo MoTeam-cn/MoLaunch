@@ -6,6 +6,7 @@
  * 撤销栈 + 放大网格显示；保存经 rpWrite(base64) 写回包内同名文件。
  */
 import { computed, defineAsyncComponent, nextTick, onBeforeUnmount, ref, watch } from 'vue'
+import { rgbToHex } from '@/utils/color'
 import {
   ArrowPathIcon,
   CheckIcon,
@@ -161,10 +162,6 @@ function onMouseMove(e: MouseEvent) {
 function onMouseUp() {
   painting = false
   lastPaint = { x: -1, y: -1 }
-}
-
-function rgbToHex(r: number, g: number, b: number): string {
-  return `#${[r, g, b].map((v) => v.toString(16).padStart(2, '0')).join('')}`
 }
 
 async function save() {

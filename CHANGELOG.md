@@ -49,6 +49,10 @@
 
 ### Fixed
 
+- **复用共享 RGB→HEX 工具**（[RpPixelEditor.vue](src/views/tools/data/RpPixelEditor.vue)）：该文件自写的 `rgbToHex` 与 [utils/color.ts](src/utils/color.ts) 的同名函数语义一致（均为小写 `#rrggbb`），已删除本地实现改用共享版（共享版额外做 0–255 clamp）。
+
+- **记录两处大小写不同的 RGB→HEX（不合并）**：[ColorPalette.vue](src/views/tools/calc/ColorPalette.vue) 与 [gradient-text/core.ts](src/utils/gradient-text/core.ts) 的同名函数输出**大写** `#RRGGBB`，而 `utils/color.ts::rgbToHex` 输出小写；ColorPalette 的大写 hex 是**展示给用户的颜色代码文本**，改成小写属可见变更，故不合并。
+
 - **抽出 now 定时刷新 composable**（[useNowTicker.ts](src/composables/useNowTicker.ts)（新增））：[Downloads.vue](src/views/Downloads.vue) 与 [TaskGroupCard.vue](src/components/downloads/TaskGroupCard.vue) 各写了一份逐字相同的 200ms `now` 定时器（`ref(Date.now())` + `setInterval` + `onUnmounted` 清理），用于下载「伪进度」补丁重算。已抽出 `useNowTicker(intervalMs = 200)`（内部用 `onUnmounted` 自动清理，调用方无需管理），两处改为调用；随之移除不再需要的 `onUnmounted`（Downloads）与 `onMounted/onUnmounted`、`ref`（TaskGroupCard）导入。
 
 - **统一下载速度格式化**（[external-task.ts](src/composables/external-task.ts)）：`formatBytes(x) + '/s'` 与 `utils/format.ts::formatSpeed` 逐字相同，已改用后者。
