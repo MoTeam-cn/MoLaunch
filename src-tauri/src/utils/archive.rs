@@ -57,6 +57,11 @@ where
         let mut file = archive
             .by_index(i)
             .map_err(|e| format!("读取 ZIP 条目失败: {}", e))?;
+        // 跳过 symlink 条目：本实现只创建普通文件，symlink 条目会把链接目标当文件
+        // 内容写出来（纯垃圾文件）；解压出真实链接反而有指向 dst 之外的风险
+        if file.is_symlink() {
+            continue;
+        }
         let name = file.name().to_string();
         if !name.starts_with(prefix) {
             continue;
@@ -68,7 +73,8 @@ where
         crate::utils::path::ensure_safe_relative_path(rel)
             .map_err(|e| format!("Zip Slip 检测: {} ({})", rel, e))?;
         let path = dst.join(rel);
-        if rel.ends_with('/') {
+        // 用 is_dir() 而非仅看结尾 '/'：目录条目可以不以 '/' 结尾
+        if file.is_dir() || rel.ends_with('/') {
             std::fs::create_dir_all(&path).map_err(|e| format!("创建目录失败: {}", e))?;
             continue;
         }
