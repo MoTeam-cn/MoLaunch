@@ -7,7 +7,7 @@ import { computed } from 'vue'
 import { useVersionStore } from '@/stores/version'
 import { toastError, toastInfo } from '@/utils/toast'
 import { showConfirm } from '@/utils/modal'
-import { formatBytes } from '@/utils/format'
+import { formatBytes, formatSpeed } from '@/utils/format'
 import { pauseDownload, resumeDownload, cancelDownload } from '@/utils/api/system'
 
 export function useExternalTask() {
@@ -19,7 +19,7 @@ export function useExternalTask() {
   const isPaused = computed(() => downloadProgress.value?.isPaused ?? false)
 
   const percentage = computed(() => downloadProgress.value?.percentage ?? 0)
-  const speedFormatted = computed(() => formatBytes(downloadProgress.value?.global_speed ?? 0) + '/s')
+  const speedFormatted = computed(() => formatSpeed(downloadProgress.value?.global_speed ?? 0))
   const downloadedFormatted = computed(() => {
     const d = downloadProgress.value?.global_bytes_downloaded ?? 0
     const t = downloadProgress.value?.global_bytes_total ?? 0

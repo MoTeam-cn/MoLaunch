@@ -49,6 +49,10 @@
 
 ### Fixed
 
+- **统一下载速度格式化**（[external-task.ts](src/composables/external-task.ts)）：`formatBytes(x) + '/s'` 与 `utils/format.ts::formatSpeed` 逐字相同，已改用后者。
+
+- **记录一处不可合并的打码差异**（[SystemInfoTab.vue](src/views/settings/more/SystemInfoTab.vue)）：该处打码逻辑与 `utils::format::maskDeviceId` 的「前 4 后 4」部分相同，但**短 ID 兜底不同**——`maskDeviceId` 对长度 ≤8 的 ID 返回**原值**，而 SystemInfoTab 返回 `'****'`。若合并到 `maskDeviceId`，短设备 ID 会明文显示，属隐私倒退，故**不合并**。[Watermark.vue](src/components/common/Watermark.vue) 用的是「前 8 后 4」，规则亦不同。
+
 - **统一 LogsTab 的格式化与外部链接调用**（[LogsTab.vue](src/views/version-settings/LogsTab.vue)）：① 自写的 `formatSize` 与 `utils/format.ts::formatBytes` 重复，且**缺少 GB 分支**（超过 1 GB 会显示成 `2048.00 MB`），已删除并改用 `formatBytes`；② 自写的 `formatTime` 与 `formatTimestamp(ts, { withSeconds: false })` 输出完全一致，已删除并改用后者（无效值兜底由空串变为 `-`）；③ 该文件仍裸引 `@tauri-apps/plugin-shell` 的 `open` 打开分享链接——这是日志分享链路的**前端**一半（上一批只改了 [logShare.ts](src/utils/logShare.ts) 的 URL 校验），已收口到 `openExternal`。
 
 - **修复两处「先删再改名」破坏原子性的缺陷**（[nbt/api.rs](src-tauri/src/commands/tools/nbt/api.rs) / [resourcepack/explore/io.rs](src-tauri/src/commands/tools/resourcepack/explore/io.rs)）：两处都在 `rename` **之前**先 `remove_file` 目标文件，使「先写 tmp 再 rename」失去原子性——删除成功而 rename 失败时原文件已丢失。**实测证据**：独立 rustc 程序验证 `std::fs::rename` 在 Windows 上会覆盖已存在目标（输出 `rename=OK content=NEW_CONTENT overwrote=true`，底层为 `MoveFileExW` + `MOVEFILE_REPLACE_EXISTING`），故 `remove_file` 属多余且有害，已删除。nbt 侧的 `atomic_write` 同时改为复用 `utils::fs::write_atomic`（临时名由固定 `{ext}.tmp` 改为带自增序号）。
