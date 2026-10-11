@@ -10,6 +10,7 @@
  */
 import { ref, computed, onMounted, defineAsyncComponent } from 'vue'
 import { pluginSdk } from '@/plugins/sdk'
+import { compareVersion } from '@/utils/version'
 import { ArrowPathIcon, ChartBarIcon } from '@heroicons/vue/24/outline'
 const Button = defineAsyncComponent(() => import('@/components/common/Button.vue'))
 
@@ -73,12 +74,9 @@ const statsByMajor = computed(() => {
   }
   // 转为数组并按版本号倒序
   const arr = Array.from(counts.entries()).map(([major, count]) => ({ major, count }))
-  arr.sort((a, b) => {
-    const [a1, a2] = a.major.split('.').map(Number)
-    const [b1, b2] = b.major.split('.').map(Number)
-    if (a1 !== b1) return b1 - a1
-    return b2 - a2
-  })
+  // 倒序：版本号大的在前。用共享 compareVersion——原实现直接 Number() 后相减，
+  // '其他' 桶会产生 NaN 比较器，而 sort 的比较器返回 NaN 属未定义行为
+  arr.sort((a, b) => compareVersion(b.major, a.major))
   return arr
 })
 

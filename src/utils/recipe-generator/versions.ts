@@ -1,6 +1,7 @@
 /**
  * 合成配方生成器 - 版本元数据与能力判定
  */
+import { compareVersion } from '@/utils/version'
 import type { JavaVersionId, PackFormatVersion, RecipeSlot, RecipeType } from './types'
 
 export type JavaVersionMeta = {
@@ -98,14 +99,16 @@ export function isJavaVersionId(value: unknown): value is JavaVersionId {
   return typeof value === 'string' && versionById.has(value as JavaVersionId)
 }
 
+/**
+ * 比较两个 Minecraft 版本号
+ *
+ * 实现统一在 utils/version.ts::compareVersion（同为逐段数字比较）。
+ * 原实现用 Number() 后以 ?? 0 兜底，拦不住 NaN——带后缀的版本号（如
+ * 1.20.1-forge）会产生 NaN 段，NaN !== 0 成立且 NaN > 0 为假，于是被误判为更小。
+ * compareVersion 用 parseInt + filter 剔除 NaN 段，行为更正确。
+ */
 export function compareMinecraftVersions(a: string, b: string): number {
-  const aParts = a.split('.').map(Number)
-  const bParts = b.split('.').map(Number)
-  for (let index = 0; index < Math.max(aParts.length, bParts.length); index += 1) {
-    const diff = (aParts[index] ?? 0) - (bParts[index] ?? 0)
-    if (diff !== 0) return diff > 0 ? 1 : -1
-  }
-  return 0
+  return compareVersion(a, b)
 }
 
 export function isVersionAtLeast(version: JavaVersionId, minimum: string): boolean {
