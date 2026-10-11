@@ -6,6 +6,8 @@
 
 ### Fixed
 
+- **修正版本卡片展开动画的无效过渡延迟类名**（[VersionGroupCard.vue](src/components/community/resource-detail/VersionGroupCard.vue)）：`transition-delay-[50ms]` / `transition-delay-0` 并非 Tailwind 工具类（正确写法为 `delay-[50ms]` / `delay-0`），自 v3 起即未生成任何样式，展开动画的错峰延迟从未生效；已改为 `delay-*`。
+
 - **修复生产依赖安全公告**（[package.json](package.json) / [package-lock.json](package-lock.json)）：vue `3.5.39` → `3.5.43`（连带 @vue/server-renderer，GHSA-g2v6-rqmx-r4w6 XSS）、source-map-js `1.2.1` → `1.2.2`（GHSA-68fv-2mgg-jv7q 事件循环 DoS）、katex `0.16.47/0.18.1` → `0.18.11`（GHSA-238p-pmpm-9mq7）、brace-expansion `1.1.18/2.1.4` → `1.1.21/2.1.7`（GHSA-q2hr-2g5m-vwhr 等）。修复后生产依赖审计归零（`npm audit --omit=dev` 0 漏洞）。
 
 - **厂商 API 重定向可被降级为明文传输**（[redirect.rs](src-tauri/src/commands/frp/api_spec/redirect.rs)）：重定向校验此前只比对主机白名单，不校验 scheme；当厂商 API 以 `Location: http://<同主机>/...` 响应时会被放行，而 [http.rs](src-tauri/src/commands/frp/api_spec/http.rs) 在重定向后会重新注入 `Authorization: Bearer`，导致 token 以明文发出（CodeQL rust/cleartext-transmission）。新增 `is_scheme_downgrade` 守卫：基准为 https 时拒绝任何非 https 重定向；补充 [redirect_tests.rs](src-tauri/src/commands/frp/api_spec/redirect_tests.rs) 回归用例。

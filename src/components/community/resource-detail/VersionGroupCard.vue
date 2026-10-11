@@ -133,8 +133,8 @@ const { contentClassOf, iconClassOf } = useCollapseAnimation({
         <div
           class="p-1.5 space-y-0.5 transition-all duration-350 ease-in-out"
           :class="expanded
-            ? 'opacity-100 translate-y-0 transition-delay-[50ms]'
-            : 'opacity-0 -translate-y-2 transition-delay-0'"
+            ? 'opacity-100 translate-y-0 delay-[50ms]'
+            : 'opacity-0 -translate-y-2 delay-0'"
         >
           <div
             v-for="v in versions"
