@@ -49,6 +49,8 @@
 
 ### Fixed
 
+- **原子写补齐最后三处**（[fs.rs](src-tauri/src/utils/fs.rs)）：新增 `write_atomic_with(path, f)` 闭包式变体——把「写临时文件」交给调用方，适用于需在 rename 前对临时文件做额外处理或无法一次性拿到全部字节的场景。据此迁移剩余三处：① [redstone/kernel.rs](src-tauri/src/commands/redstone/kernel.rs) 需在 rename 前补可执行位（`make_executable`）；② [download/chunk/merge.rs](src-tauri/src/minecraft/download/chunk/merge.rs) 是流式多分片拼接，原用固定的 `{}.merging` 临时名，并发合并同一目标会互相覆盖；③ [mod_translation/jar.rs](src-tauri/src/mod_translation/jar.rs) 由 zip writer 直接写临时文件。至此原子写实现全部收敛到 `utils/fs.rs`，无残留手写实现。
+
 - **抽出系统内存可视化条组件**（[MemoryUsageBar.vue](src/components/settings/MemoryUsageBar.vue)（新增））：[MemorySection.vue](src/views/version-settings/MemorySection.vue) 与 [MemoryAllocation.vue](src/views/settings/settings-launch/MemoryAllocation.vue) 各自维护一份逐字相同的三段内存比例条模板（总览 + 已用/游戏/剩余三段 + 图例，共约 26 行）。已抽出共享组件，数据经 props 传入（本组件不持有数据源）；[useMemoryVisualizer.ts](src/composables/useMemoryVisualizer.ts) 的 `SystemMemory` 接口随之导出供组件复用。两处父组件不再需要 `Tooltip` 与 `formatBytes`，已清理。
 
 - **统一版本号比较**（[versions.ts](src/utils/recipe-generator/versions.ts) / [VersionStatsPanel.vue](src/plugins/version-stats/VersionStatsPanel.vue)）：两处各自实现逐段数字比较，已改为复用 [utils/version.ts](src/utils/version.ts) 的 `compareVersion`。顺带修掉两个真实缺陷：① `compareMinecraftVersions` 用 `Number()` 后以 `?? 0` 兜底，**拦不住 NaN**——`1.20.1-forge` 会产生 NaN 段，而 `NaN !== 0` 成立、`NaN > 0` 为假，被误判为更小；② VersionStatsPanel 的排序比较器在 `'其他'` 桶（非数字）上返回 `NaN`，而 **`sort` 的比较器返回 NaN 属未定义行为**。`compareVersion` 用 `parseInt` + `filter` 剔除 NaN 段，两处行为均得以修正。

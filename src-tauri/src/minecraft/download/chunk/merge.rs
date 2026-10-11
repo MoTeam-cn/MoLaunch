@@ -53,17 +53,23 @@ pub(super) fn merge_chunks(
         }
     }
 
-    let tmp_path = format!("{}.merging", local_path);
-    {
-        let mut output = std::fs::File::create(&tmp_path)?;
+    // 原子替换：用闭包式原子写，因为这里是流式拼接而非一次性写入。
+    // 原实现用固定的 "{}.merging" 临时名，并发合并同一目标会互相覆盖。
+    crate::utils::fs::write_atomic_with(std::path::Path::new(local_path), |tmp| {
+        let mut output =
+            std::fs::File::create(tmp).map_err(|e| format!("创建临时文件失败: {e}"))?;
         for i in 0..chunk_count {
             let part_path = format!("{}.part{}", local_path, i);
-            let mut part_file = std::fs::File::open(&part_path)?;
-            std::io::copy(&mut part_file, &mut output)?;
+            let mut part_file = std::fs::File::open(&part_path)
+                .map_err(|e| format!("打开分片失败 {part_path}: {e}"))?;
+            std::io::copy(&mut part_file, &mut output)
+                .map_err(|e| format!("写入目标文件失败: {e}"))?;
         }
-        output.flush()?;
-    }
-    // 原子替换
-    std::fs::rename(&tmp_path, local_path)?;
+        output
+            .flush()
+            .map_err(|e| format!("刷新目标文件失败: {e}"))?;
+        Ok(())
+    })
+    .map_err(std::io::Error::other)?;
     Ok(())
 }

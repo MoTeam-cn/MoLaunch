@@ -233,55 +233,58 @@ pub fn package_archive(
         ));
     }
 
-    let temporary = output_path.with_extension("jar.partial");
-    let _ = std::fs::remove_file(&temporary);
-    let file =
-        File::create(&temporary).map_err(|e| format!("unable to create temporary JAR: {e}"))?;
-    let mut writer = zip::ZipWriter::new(file);
-    let options = SimpleFileOptions::default().compression_method(zip::CompressionMethod::Deflated);
+    // 闭包式原子写：zip writer 需要持有临时文件句柄，无法先拿到全部字节
+    crate::utils::fs::write_atomic_with(output_path, |temporary| {
+        let file =
+            File::create(temporary).map_err(|e| format!("unable to create temporary JAR: {e}"))?;
+        let mut writer = zip::ZipWriter::new(file);
+        let options =
+            SimpleFileOptions::default().compression_method(zip::CompressionMethod::Deflated);
 
-    for entry in &manifest.entries {
-        let source = PathPolicy::workspace_path(workspace, &entry.workspace_path)?;
-        if !source.is_file() {
-            continue;
+        for entry in &manifest.entries {
+            let source = PathPolicy::workspace_path(workspace, &entry.workspace_path)?;
+            if !source.is_file() {
+                continue;
+            }
+            let bytes = std::fs::read(&source)
+                .map_err(|e| format!("unable to read {}: {e}", source.display()))?;
+            writer
+                .start_file(&entry.archive_path, options)
+                .map_err(|e| {
+                    format!("unable to write archive entry {}: {e}", entry.archive_path)
+                })?;
+            writer.write_all(&bytes).map_err(|e| {
+                format!("unable to write archive entry {}: {e}", entry.archive_path)
+            })?;
         }
-        let bytes = std::fs::read(&source)
-            .map_err(|e| format!("unable to read {}: {e}", source.display()))?;
-        writer
-            .start_file(&entry.archive_path, options)
-            .map_err(|e| format!("unable to write archive entry {}: {e}", entry.archive_path))?;
-        writer
-            .write_all(&bytes)
-            .map_err(|e| format!("unable to write archive entry {}: {e}", entry.archive_path))?;
-    }
 
-    // 新生成的 zh_cn 等文件（不在 manifest 中且非内部文件）一并打包
-    for relative in collect_files(workspace)? {
-        if is_internal_file(&relative) {
-            continue;
+        // 新生成的 zh_cn 等文件（不在 manifest 中且非内部文件）一并打包
+        for relative in collect_files(workspace)? {
+            if is_internal_file(&relative) {
+                continue;
+            }
+            if manifest
+                .entries
+                .iter()
+                .any(|entry| entry.workspace_path == relative)
+            {
+                continue;
+            }
+            let bytes = std::fs::read(workspace.join(&relative))
+                .map_err(|e| format!("unable to read {relative}: {e}"))?;
+            writer
+                .start_file(&relative, options)
+                .map_err(|e| format!("unable to write archive entry {relative}: {e}"))?;
+            writer
+                .write_all(&bytes)
+                .map_err(|e| format!("unable to write archive entry {relative}: {e}"))?;
         }
-        if manifest
-            .entries
-            .iter()
-            .any(|entry| entry.workspace_path == relative)
-        {
-            continue;
-        }
-        let bytes = std::fs::read(workspace.join(&relative))
-            .map_err(|e| format!("unable to read {relative}: {e}"))?;
-        writer
-            .start_file(&relative, options)
-            .map_err(|e| format!("unable to write archive entry {relative}: {e}"))?;
-        writer
-            .write_all(&bytes)
-            .map_err(|e| format!("unable to write archive entry {relative}: {e}"))?;
-    }
 
-    writer
-        .finish()
-        .map_err(|e| format!("unable to finalize output JAR: {e}"))?;
-    std::fs::rename(&temporary, output_path)
-        .map_err(|e| format!("unable to move temporary JAR into place: {e}"))?;
+        writer
+            .finish()
+            .map_err(|e| format!("unable to finalize output JAR: {e}"))?;
+        Ok(())
+    })?;
     Ok(())
 }
 

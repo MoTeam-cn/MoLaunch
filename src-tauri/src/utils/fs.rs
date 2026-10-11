@@ -101,15 +101,36 @@ pub fn dir_total_size(dir: &std::path::Path) -> u64 {
 ///
 /// 注意：仅保证同分区 rename 的原子性；不保证 fsync 落盘。
 pub fn write_atomic(path: &std::path::Path, bytes: &[u8]) -> Result<(), String> {
+    write_atomic_with(path, |tmp| {
+        std::fs::write(tmp, bytes).map_err(|e| format!("写入临时文件失败: {}", e))
+    })
+}
+
+/// 原子写入文件（自定义写入过程）
+///
+/// 与 write_atomic 相同，但把「写临时文件」这一步交给 f——适用于需要在 rename 前
+/// 对临时文件做额外处理（如补可执行位），或无法一次性拿到全部字节（如流式拼接、
+/// 交由第三方 writer 落盘）的场景。f 收到的是临时文件路径。
+///
+/// 注意：f 失败时不会清理已生成的临时文件（与原各处手写实现的行为一致）。
+pub fn write_atomic_with<F>(path: &std::path::Path, f: F) -> Result<(), String>
+where
+    F: FnOnce(&std::path::Path) -> Result<(), String>,
+{
+    let tmp = temp_path_for(path);
+    if let Some(parent) = path.parent() {
+        std::fs::create_dir_all(parent).map_err(|e| format!("创建目录失败: {}", e))?;
+    }
+    f(&tmp)?;
+    std::fs::rename(&tmp, path).map_err(|e| format!("替换目标文件失败: {}", e))
+}
+
+/// 生成目标文件对应的唯一临时路径（同目录、带自增序号）
+fn temp_path_for(path: &std::path::Path) -> std::path::PathBuf {
     use std::sync::atomic::{AtomicU64, Ordering};
     static TMP_SEQ: AtomicU64 = AtomicU64::new(0);
     let seq = TMP_SEQ.fetch_add(1, Ordering::Relaxed);
     let mut tmp = path.as_os_str().to_owned();
     tmp.push(format!(".tmp{}", seq));
-    let tmp = std::path::PathBuf::from(tmp);
-    if let Some(parent) = path.parent() {
-        std::fs::create_dir_all(parent).map_err(|e| format!("创建目录失败: {}", e))?;
-    }
-    std::fs::write(&tmp, bytes).map_err(|e| format!("写入临时文件失败: {}", e))?;
-    std::fs::rename(&tmp, path).map_err(|e| format!("替换目标文件失败: {}", e))
+    std::path::PathBuf::from(tmp)
 }

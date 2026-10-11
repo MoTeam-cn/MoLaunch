@@ -291,15 +291,14 @@ async fn download_and_cache() -> Result<PathBuf, String> {
     let bytes = download_kernel(&url, platform).await?;
 
     let path = cached_kernel_path()?;
-    if let Some(dir) = path.parent() {
-        std::fs::create_dir_all(dir).map_err(|e| format!("创建内核缓存目录失败: {e}"))?;
-    }
 
-    // 先写临时文件再改名：避免下载中断留下半个可执行文件被当成有效缓存
-    let tmp = path.with_extension("tmp");
-    std::fs::write(&tmp, &bytes).map_err(|e| format!("写入内核缓存失败: {e}"))?;
-    crate::minecraft::system::shell::make_executable(&tmp);
-    std::fs::rename(&tmp, &path).map_err(|e| format!("落盘内核缓存失败: {e}"))?;
+    // 先写临时文件再改名：避免下载中断留下半个可执行文件被当成有效缓存。
+    // 用闭包式原子写——需要在 rename 前对临时文件补可执行位。
+    crate::utils::fs::write_atomic_with(&path, |tmp| {
+        std::fs::write(tmp, &bytes).map_err(|e| format!("写入内核缓存失败: {e}"))?;
+        crate::minecraft::system::shell::make_executable(tmp);
+        Ok(())
+    })?;
 
     crate::log_info!(
         "[Redstone] 内核已下载并缓存: {} ({} 字节)",
