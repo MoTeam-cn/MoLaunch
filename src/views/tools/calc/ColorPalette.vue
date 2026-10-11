@@ -15,6 +15,7 @@ const Input = defineAsyncComponent(() => import('@/components/common/Input.vue')
 const Button = defineAsyncComponent(() => import('@/components/common/Button.vue'))
 const Tooltip = defineAsyncComponent(() => import('@/components/common/Tooltip.vue'))
 const Slider = defineAsyncComponent(() => import('@/components/common/Slider.vue'))
+import { rgbToHex, rgbToHsl } from '@/utils/color'
 import { toastSuccess, toastError } from '@/utils/toast'
 import { copyToClipboard } from '@/utils/seedmap/format'
 
@@ -46,32 +47,12 @@ const mcDyes = [
   { name: '黑色', code: '§0', rgb: [25, 22, 22] },
 ]
 
-function rgbToHex(r: number, g: number, b: number): string {
-  return '#' + [r, g, b].map((v) => v.toString(16).padStart(2, '0')).join('').toUpperCase()
-}
-
-function rgbToHsl(r: number, g: number, b: number): [number, number, number] {
-  r /= 255; g /= 255; b /= 255
-  const max = Math.max(r, g, b), min = Math.min(r, g, b)
-  let h = 0, s = 0
-  const l = (max + min) / 2
-  if (max !== min) {
-    const d = max - min
-    s = l > 0.5 ? d / (2 - max - min) : d / (max + min)
-    switch (max) {
-      case r: h = (g - b) / d + (g < b ? 6 : 0); break
-      case g: h = (b - r) / d + 2; break
-      case b: h = (r - g) / d + 4; break
-    }
-    h /= 6
-  }
-  return [Math.round(h * 360), Math.round(s * 100), Math.round(l * 100)]
-}
-
-const hexValue = computed(() => rgbToHex(r.value, g.value, b.value))
+// 颜色转换统一走 utils/color（本页原先自写了一份等价实现，且 rgbToHsl 只是
+// 缩放不同——共享版返回 0~1，这里按度数/百分比取整展示）
+const hexValue = computed(() => rgbToHex(r.value, g.value, b.value, { uppercase: true }))
 const hslValue = computed(() => {
   const [h, s, l] = rgbToHsl(r.value, g.value, b.value)
-  return `HSL(${h}, ${s}%, ${l}%)`
+  return `HSL(${Math.round(h * 360)}, ${Math.round(s * 100)}%, ${Math.round(l * 100)}%)`
 })
 
 // 同步 HEX 输入 → RGB
@@ -86,7 +67,7 @@ watch(hexInput, (val) => {
 
 // RGB 变化时同步 hexInput（避免循环：只在 hexInput 不匹配时更新）
 watch([r, g, b], () => {
-  const expected = rgbToHex(r.value, g.value, b.value).replace('#', '')
+  const expected = rgbToHex(r.value, g.value, b.value, { uppercase: true }).replace('#', '')
   if (hexInput.value.replace(/^#/, '').toUpperCase() !== expected) {
     hexInput.value = expected
   }

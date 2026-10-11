@@ -8,6 +8,7 @@
  */
 import { ref, defineAsyncComponent } from 'vue'
 import { useSdkStore } from '@/stores/sdk'
+import { maskDeviceId } from '@/utils/format'
 const Tooltip = defineAsyncComponent(() => import('@/components/common/Tooltip.vue'))
 const Alert = defineAsyncComponent(() => import('@/components/common/Alert.vue'))
 
@@ -32,7 +33,7 @@ function getDeviceIdDisplay(): string {
   // 去除 mcsdk- 前缀后展示
   const display = id.startsWith('mcsdk-') ? id.slice(6) : id
   if (deviceIdRevealed.value) return display
-  return display.length > 8 ? display.substring(0, 4) + '****' + display.substring(display.length - 4) : '****'
+  return maskDeviceId(display)
 }
 </script>
 

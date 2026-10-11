@@ -139,6 +139,7 @@ export function formatTime(
  * 设备 ID 打码展示（保留前 4 后 4，中间用 **** 遮盖）
  */
 export function maskDeviceId(id: string): string {
-  if (id.length <= 8) return id
+  // 长度不足 8 时不再返回原值——那等于放弃打码，与「打码展示」的语义矛盾
+  if (id.length <= 8) return '****'
   return `${id.slice(0, 4)}****${id.slice(-4)}`
 }

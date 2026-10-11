@@ -19,13 +19,24 @@ export function hexToRgb(hex: string): [number, number, number] {
   return [(num >> 16) & 0xff, (num >> 8) & 0xff, num & 0xff]
 }
 
-/** RGB → HEX（返回 #rrggbb） */
-export function rgbToHex(r: number, g: number, b: number): string {
+/**
+ * RGB → HEX（默认返回小写 #rrggbb）
+ *
+ * options.uppercase 为 true 时返回大写 #RRGGBB——少数调用点（调色板的颜色代码
+ * 展示、渐变色生成）需要大写，统一在此参数化，避免各处再写一份。
+ */
+export function rgbToHex(
+  r: number,
+  g: number,
+  b: number,
+  options?: { uppercase?: boolean },
+): string {
   const toHex = (n: number) => {
     const clamped = Math.max(0, Math.min(255, Math.round(n)))
     return clamped.toString(16).padStart(2, '0')
   }
-  return `#${toHex(r)}${toHex(g)}${toHex(b)}`
+  const hex = `#${toHex(r)}${toHex(g)}${toHex(b)}`
+  return options?.uppercase ? hex.toUpperCase() : hex
 }
 
 /** RGB → HSL（h/s/l 均为 0-1） */

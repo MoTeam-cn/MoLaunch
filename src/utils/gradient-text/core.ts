@@ -14,6 +14,7 @@ import type {
   GradientTextRun,
   TextFormat,
 } from './types'
+import { rgbToHex } from '@/utils/color'
 import { TEXT_FORMATS } from './types'
 
 export const DEFAULT_GRADIENT_COLORS = ['#A855F7', '#22C55E']
@@ -557,8 +558,5 @@ function hexToColor(hex: string): GradientColor {
 }
 
 function colorToHex(color: GradientColor): string {
-  return `#${[color.red, color.green, color.blue]
-    .map((component) => Math.max(0, Math.min(255, component)).toString(16).padStart(2, '0'))
-    .join('')
-    .toUpperCase()}`
+  return rgbToHex(color.red, color.green, color.blue, { uppercase: true })
 }
