@@ -9,6 +9,8 @@ use std::sync::Arc;
 use tauri::AppHandle;
 use tauri::Emitter;
 
+use crate::log_info;
+use crate::log_warn;
 use crate::minecraft::download::config::DownloadManagerConfig;
 use crate::minecraft::download::manager::DownloadManager;
 use crate::minecraft::download::types::{DownloadStatus, DownloadTask, GlobalProgress};
@@ -32,11 +34,11 @@ pub(super) async fn download_and_install_windows(
     std::fs::create_dir_all(&temp_dir).map_err(|e| format!("创建临时目录失败: {e}"))?;
     let new_exe = temp_dir.join("MoLaunch_new.exe");
 
-    log::info!("[Updater] 开始下载新版本: {}", info.download_url);
+    log_info!("[Updater] 开始下载新版本: {}", info.download_url);
     let downloaded = download_with_manager(state, &info.download_url, &new_exe, Some(app))
         .await
         .map_err(|e| format!("下载安装包失败: {e}"))?;
-    log::info!(
+    log_info!(
         "[Updater] 下载完成: {} ({} bytes)",
         new_exe.display(),
         downloaded
@@ -53,7 +55,7 @@ pub(super) async fn download_and_install_windows(
     // 进度已推送至 100%（前端据此切换 installing），停留片刻让用户感知"安装中"再退出
     std::thread::sleep(std::time::Duration::from_secs(1));
 
-    log::info!(
+    log_info!(
         "[Updater] 启动 updater.exe: old={}, new={}, pid={}",
         current_exe.display(),
         new_exe.display(),
@@ -137,7 +139,7 @@ pub(super) async fn download_update_to_appdata_impl(
         std::fs::create_dir_all(parent).map_err(|e| format!("创建目录失败: {e}"))?;
     }
 
-    log::info!(
+    log_info!(
         "[Updater] 后台下载新版本 {} 到: {}",
         info.version,
         last_exe.display()
@@ -155,7 +157,7 @@ pub(super) async fn download_update_to_appdata_impl(
         return Err(format!("写入 last.sig 失败: {e}"));
     }
 
-    log::info!(
+    log_info!(
         "[Updater] 后台下载完成: {} ({} bytes)",
         last_exe.display(),
         downloaded
@@ -175,7 +177,7 @@ pub(super) async fn download_update_to_appdata_impl(
 pub(super) async fn apply_pending_update_impl(_app: &AppHandle) -> Result<bool, String> {
     let last_exe = last_exe_path()?;
     if !last_exe.exists() {
-        log::info!("[Updater] 无待安装更新（last.exe 不存在），正常退出");
+        log_info!("[Updater] 无待安装更新（last.exe 不存在），正常退出");
         return Ok(false);
     }
 
@@ -185,7 +187,7 @@ pub(super) async fn apply_pending_update_impl(_app: &AppHandle) -> Result<bool, 
     let signature = match std::fs::read_to_string(&last_sig) {
         Ok(s) if !s.trim().is_empty() => s.trim().to_string(),
         _ => {
-            log::warn!("[Updater] last.sig 缺失或为空，清理不完整的待安装更新");
+            log_warn!("[Updater] last.sig 缺失或为空，清理不完整的待安装更新");
             let _ = std::fs::remove_file(&last_exe);
             let _ = std::fs::remove_file(&last_sig);
             return Ok(false);
@@ -199,7 +201,7 @@ pub(super) async fn apply_pending_update_impl(_app: &AppHandle) -> Result<bool, 
     let current_exe = std::env::current_exe().map_err(|e| format!("获取当前 exe 路径失败: {e}"))?;
     let pid = std::process::id();
 
-    log::info!(
+    log_info!(
         "[Updater] 退出时应用更新: old={}, new={}, pid={}",
         current_exe.display(),
         last_exe.display(),

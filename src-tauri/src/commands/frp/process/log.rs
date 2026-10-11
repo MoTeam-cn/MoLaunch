@@ -201,17 +201,22 @@ fn extract_log_timestamp(line: &str) -> String {
         }
     }
     // 形式 3：frpc 原生格式 "YYYY-MM-DD HH:MM:SS.ms ..."
-    // 取前 23 个字符（"YYYY-MM-DD HH:MM:SS.mmm" 长度）
-    if trimmed.len() >= 23 {
-        let prefix = &trimmed[..23];
+    // 取前 23 个字符（"YYYY-MM-DD HH:MM:SS.mmm" 长度）——必须按**字符**取：
+    // 按字节切（trimmed[..23]）在非 ASCII 行（日志里混入中文）会踩
+    // char boundary 直接 panic，而本函数对日志的每一行调用
+    let prefix: String = trimmed.chars().take(23).collect();
+    if prefix.chars().count() >= 23
         // 简单校验是否符合日期格式
-        if prefix.chars().nth(4) == Some('-')
-            && prefix.chars().nth(7) == Some('-')
-            && prefix.chars().nth(10) == Some(' ')
-            && prefix.chars().nth(13) == Some(':')
-        {
-            return prefix.to_string();
-        }
+        && prefix.chars().nth(4) == Some('-')
+        && prefix.chars().nth(7) == Some('-')
+        && prefix.chars().nth(10) == Some(' ')
+        && prefix.chars().nth(13) == Some(':')
+    {
+        return prefix;
     }
     String::new()
 }
+
+#[cfg(test)]
+#[path = "log_test.rs"]
+mod log_test;

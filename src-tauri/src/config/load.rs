@@ -208,6 +208,23 @@ pub fn load_config() -> Result<Option<AppConfig>, String> {
         }
     }
 
+    // Online.network_identity（节点标识，未配置时保留默认空串）
+    app_config.online.network_identity = config.get_or(
+        "Online",
+        "network_identity",
+        &app_config.online.network_identity,
+    );
+
+    // Online.easytier_public_peers（公共 easytier 中继节点，JSON 序列化存储）
+    if let Some(list_json) = config.get("Online", "easytier_public_peers") {
+        match serde_json::from_str::<Vec<String>>(&list_json) {
+            Ok(peers) => app_config.online.easytier_public_peers = peers,
+            Err(e) => {
+                log_warn!("Failed to parse easytier_public_peers list: {}", e);
+            }
+        }
+    }
+
     // TLS（信任源模式，未配置时保留默认 builtin）
     app_config.tls.trust_mode = config.get_or("TLS", "trust_mode", &app_config.tls.trust_mode);
 

@@ -49,6 +49,12 @@
 
 ### Fixed
 
+- **修复 frpc 日志时间戳解析在非 ASCII 行 panic**（[log.rs](src-tauri/src/commands/frp/process/log.rs) / [log_test.rs](src-tauri/src/commands/frp/process/log_test.rs)（新增））：`extract_log_timestamp` 用 `&trimmed[..23]` 按**字节**切片，而注释写的是「取前 23 个字符」。日志里只要混入中文，第 23 字节就可能落在字符中间，直接 `byte index 23 is not a char boundary` panic——而该函数对每一行日志调用。已改为 `chars().take(23)`。standalone 复现程序确认：修复前 panic、修复后不 panic，且标准时间戳行解析结果不变。
+
+- **修复 Online 配置不落盘**（[save.rs](src-tauri/src/config/save.rs) / [load.rs](src-tauri/src/config/load.rs)）：`OnlineConfig` 有 7 个字段，`save.rs` 只写 3 个。`network_identity`（[NetworkIdentityEditor.vue](src/components/settings/NetworkIdentityEditor.vue)）与 `easytier_public_peers`（[EasyTierPeersEditor.vue](src/components/settings/EasyTierPeersEditor.vue)）都能经 `apply_config` 改（[patch.rs](src-tauri/src/commands/system/apply_config/types/patch.rs)）却从不写盘，重启即丢。已补两字段的 save/load（数组走 JSON 序列化，与既有 `github_proxies` 一致）。
+
+- **修复 17 处日志宏走错通道被静默丢弃**（[check.rs](src-tauri/src/commands/system/updater/check.rs) / [install_windows.rs](src-tauri/src/commands/system/updater/install_windows.rs) / [scan.rs](src-tauri/src/commands/version/export/scan.rs)）：三处用 `log::info!` / `log::warn!` / `log::debug!`（`log` crate），但 `lib.rs` 已移除 `env_logger::init()`，全项目也没有任何 `log::set_logger` / `set_boxed_logger` 桥接——这些日志全部被丢弃，其中包含 `install_windows.rs` 的安全相关告警。已统一改为项目宏 `log_info!` / `log_warn!` / `log_debug!`。
+
 - **修复整合包实例名 / 压缩包文件名的路径穿越**（[helpers.rs](src-tauri/src/commands/community/install/helpers.rs) / [helpers_test.rs](src-tauri/src/commands/community/install/helpers_test.rs)（新增） / [online.rs](src-tauri/src/commands/community/install/modpack/online.rs)）：
   - `validate_instance_name` 的文档（[helpers.rs:170](src-tauri/src/commands/community/install/helpers.rs)）一直声称拒绝 `< > : " / \ | ? *`，但实现的 `matches!` **漏掉了 `/` 与 `\`**。实例名会被 `game_dir.join("versions").join(name)` 拼进路径（[online.rs:41](src-tauri/src/commands/community/install/modpack/online.rs) / [local.rs:90](src-tauri/src/commands/community/install/modpack/local.rs)），漏掉分隔符即可用 `../` 逃出 `versions/`。已补齐字符类。
   - `install_modpack` 的 `file_name` 此前只过 `validate_modpack_extension`（仅看最后一个 `.` 后的扩展名，`"../../../evil.zip"` 能通过），随后被 `instance_dir.join(&file_name)` 拼接（[online.rs:45](src-tauri/src/commands/community/install/modpack/online.rs)）。已补 `crate::utils::path::sanitize_file_name`。

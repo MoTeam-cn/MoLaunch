@@ -216,6 +216,19 @@ pub fn save_config(config: &AppConfig) -> Result<(), String> {
         "github_proxies",
         &serde_json::to_string(&config.online.github_proxies).unwrap_or_else(|_| "[]".to_string()),
     );
+    // 节点标识（房客侧 easytier hostname，空串表示使用默认）
+    ini.set(
+        "Online",
+        "network_identity",
+        &config.online.network_identity,
+    );
+    // 公共 easytier 中继节点（JSON 序列化存储，重启不丢失）
+    ini.set(
+        "Online",
+        "easytier_public_peers",
+        &serde_json::to_string(&config.online.easytier_public_peers)
+            .unwrap_or_else(|_| "[]".to_string()),
+    );
 
     // TLS（信任源模式持久化，IgnoreTls 走注册表不在此处）
     ini.set("TLS", "trust_mode", &config.tls.trust_mode);

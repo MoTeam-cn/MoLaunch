@@ -5,6 +5,7 @@ use tauri::AppHandle;
 
 use super::UpdateInfo;
 use crate::api_paths::UPDATES_CHECK;
+use crate::log_info;
 use crate::state::AppState;
 
 /// GitHub Releases 仓库（备用更新源）
@@ -157,7 +158,7 @@ pub async fn check_update(state: &AppState, _app: &AppHandle) -> Result<UpdateIn
     );
     let url = format!("{}{}{}", base_url.trim_end_matches('/'), path, sign_query);
 
-    log::info!(
+    log_info!(
         "[Updater] 检查更新（签名: {}）: {}",
         sign_lx.as_deref().unwrap_or("none"),
         crate::utils::net::sanitize_url_for_log(&url)
@@ -175,7 +176,7 @@ pub async fn check_update(state: &AppState, _app: &AppHandle) -> Result<UpdateIn
 
     // 204/304 = 无更新
     if response.status() == 204 || response.status() == 304 {
-        log::info!("[Updater] 服务器返回 {}（无可用更新）", response.status());
+        log_info!("[Updater] 服务器返回 {}（无可用更新）", response.status());
         return Ok(UpdateInfo::default());
     }
 
@@ -193,7 +194,7 @@ pub async fn check_update(state: &AppState, _app: &AppHandle) -> Result<UpdateIn
         Some(data) => {
             let code = json.get("code").and_then(|v| v.as_i64()).unwrap_or(0);
             if code != 1 {
-                log::info!("[Updater] 服务器返回 code={}（无可用更新）", code);
+                log_info!("[Updater] 服务器返回 code={}（无可用更新）", code);
                 return Ok(UpdateInfo::default());
             }
             data
@@ -214,17 +215,17 @@ pub async fn check_update(state: &AppState, _app: &AppHandle) -> Result<UpdateIn
         .and_then(|v| v.as_str())
         .unwrap_or("");
     if version.is_empty() {
-        log::info!("[Updater] manifest 无 version 字段（无可用更新）");
+        log_info!("[Updater] manifest 无 version 字段（无可用更新）");
         return Ok(UpdateInfo::default());
     }
 
     // 版本比较：manifest 版本必须大于当前版本才算有更新
     if !is_version_newer(version, current_version) {
-        log::info!("[Updater] 当前版本 {} 已是最新", current_version);
+        log_info!("[Updater] 当前版本 {} 已是最新", current_version);
         return Ok(UpdateInfo::default());
     }
 
-    log::info!("[Updater] 发现新版本: {} -> {}", current_version, version);
+    log_info!("[Updater] 发现新版本: {} -> {}", current_version, version);
 
     let download_url = manifest
         .get("url")
@@ -297,7 +298,7 @@ async fn check_update_github(current_version: &str) -> Result<UpdateInfo, String
         return Err("GitHub Release 缺少 tag_name".to_string());
     }
     if !is_version_newer(version, current_version) {
-        log::info!("[Updater] 当前版本 {} 已是最新（GitHub）", current_version);
+        log_info!("[Updater] 当前版本 {} 已是最新（GitHub）", current_version);
         return Ok(UpdateInfo::default());
     }
 
@@ -306,7 +307,7 @@ async fn check_update_github(current_version: &str) -> Result<UpdateInfo, String
     })?;
     crate::utils::net::validate_github_download_url(&download_url)?;
 
-    log::info!(
+    log_info!(
         "[Updater] 发现新版本（GitHub）: {} -> {}",
         current_version,
         version

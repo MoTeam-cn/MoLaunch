@@ -8,6 +8,8 @@ use std::path::Path;
 
 use regex::Regex;
 
+use crate::log_debug;
+
 use super::options::GLOBAL_EXCLUDES;
 use super::types::{ExportFileInfo, ExportOption};
 
@@ -37,7 +39,7 @@ pub fn collect_export_files(
         return Ok(Vec::new());
     }
 
-    log::debug!("[Export] 合并后共 {} 条规则（含排除规则）", rules.len());
+    log_debug!("[Export] 合并后共 {} 条规则（含排除规则）", rules.len());
 
     // 2. 编译规则为 regex
     let compiled = compile_rules(&rules)?;
