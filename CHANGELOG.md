@@ -20,6 +20,14 @@
 
 ### Changed
 
+- **升级 ESLint 工具链，`npm audit` 全量归零**（[package.json](package.json) / [.eslintrc.cjs](.eslintrc.cjs) / [ci.yml](.github/workflows/ci.yml)）：
+  - `eslint-plugin-vue` `^9.20.1` → `^10.11.1`（其 postcss-selector-parser 依赖升至 `^7.1.4`，消除 GHSA-rj75-hqrm-r3gf）。
+  - 移除 `@vue/eslint-config-typescript@13`，改为直接使用 `@typescript-eslint/eslint-plugin` / `@typescript-eslint/parser` `^8.71.1` + `vue-eslint-parser` `^10.4.1`。
+  - 关键收益：`@typescript-eslint/typescript-estree` v8 改用 `tinyglobby`，不再引入 `globby → fast-glob → micromatch → braces`，从而消除了上游无修复版本的 `braces`（GHSA-vfj7-8cjw-p6xm）及其整条依赖链。
+  - [.eslintrc.cjs](.eslintrc.cjs) 相应改写：改用 `plugin:vue/recommended`（v10 已移除 `vue3-*` 旧配置名）、显式指定 vue-eslint-parser 与 TS 内部 parser、补回 `no-undef` 关闭 override（原由 @vue/eslint-config-typescript 提供）、`.cjs` 豁免 `no-require-imports`；v8 recommended 新提升为 error 的三条规则（`no-explicit-any` / `no-unused-expressions` / `no-empty-object-type`）保持原有 `warn` 严重度，避免把 25 处既有代码问题混入本次依赖升级。
+  - [ci.yml](.github/workflows/ci.yml) 安全审计恢复为全量门禁 `npm audit --audit-level=high`。
+  - 结果：`npm audit` **0 漏洞**（生产与开发依赖全部清零）。
+
 - **Tailwind CSS 3 → 4 迁移**（[tailwind.config.js](tailwind.config.js) / [postcss.config.js](postcss.config.js) / [main.css](src/assets/styles/main.css) / [package.json](package.json)）：用官方 `@tailwindcss/upgrade` codemod 迁移，涉及 148 个文件。
   - PostCSS 插件由 `tailwindcss` + `autoprefixer` 改为 `@tailwindcss/postcss`（v4 内置前缀处理，移除 autoprefixer）。
   - CSS 入口改为 `@import 'tailwindcss'` + `@config '../../../tailwind.config.js'`，保留既有主题色（primary CSS 变量链、page / brand / dialog）与 safelist。
