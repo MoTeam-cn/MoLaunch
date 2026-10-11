@@ -3,8 +3,6 @@
 use std::collections::{HashMap, HashSet};
 use std::path::Path;
 
-use sha2::{Digest, Sha256};
-
 use super::super::jar;
 use super::super::lang;
 use super::super::types::{ExistingChinese, LanguageKind, LanguageSource, Quote, ResourceCoverage};
@@ -13,9 +11,7 @@ use super::super::types::{ExistingChinese, LanguageKind, LanguageSource, Quote, 
 pub fn file_hash(path: &Path) -> Result<String, String> {
     let bytes =
         std::fs::read(path).map_err(|e| format!("unable to read {}: {e}", path.display()))?;
-    let mut hasher = Sha256::new();
-    hasher.update(&bytes);
-    Ok(hex::encode(hasher.finalize()))
+    Ok(crate::utils::hash::sha256_hex(&bytes))
 }
 
 /// 资源覆盖诊断：每个工作区文件的处置结论

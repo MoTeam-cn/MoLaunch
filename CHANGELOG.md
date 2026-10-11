@@ -49,6 +49,8 @@
 
 ### Fixed
 
+- **修正查重报告的一处误报并统一真正的 SHA256 实现**（[coverage.rs](src-tauri/src/mod_translation/analyze/coverage.rs)）：查重报告称「sha256 → 十六进制内联实现 6 处」，实际核对后其中 `image_cache/store.rs` 用的是 **SHA1**（缓存文件名）、`version/export/network.rs` 用的是 **SHA512**（CurseForge 指纹，API 强制要求），`file_checker.rs` 的两处是 MD5/SHA1 通用分支。报告把「`hex::encode` 这个写法」当成了「sha256→hex」。**若按报告盲目统一为 `sha256_hex`，会直接改坏图片缓存的文件名与 CurseForge 指纹。** 仅对确为 SHA256 的 `coverage.rs::file_hash` 改为复用 `utils::hash::sha256_hex`，其余保持原算法。
+
 - **迁移最后一处 ZIP 解压实现并增强共享函数**（[archive.rs](src-tauri/src/utils/archive.rs) / [helpers.rs](src-tauri/src/commands/tools/archive/helpers.rs)）：`tools/archive/helpers.rs::unzip_to_dir` 是第 5 处、也是最后一处独立解压实现（其段级校验原本已在目录分支之前，行为正确），已迁移到 `utils::archive::extract_zip_safely`。迁移过程中把该实现独有的两点补进共享函数：**跳过 symlink 条目**（本实现只创建普通文件，symlink 条目会把链接目标当内容写成垃圾文件）、**用 `file.is_dir()` 而非仅看结尾 `/` 判目录**（目录条目可以不以斜杠结尾）。至此全仓库解压实现收敛为一处。
 
 - **修复第四处 ZIP 解压目录条目路径穿越**（[easytier_download.rs](src-tauri/src/commands/online/manager/easytier_download.rs)）：该处同样只有文件分支做 canonicalize 校验，目录分支直接 `create_dir_all`。**此处在安全审计的 Zip Slip 清单之外**，是在做去重迁移时才发现的（查重审计列出了 5 处解压实现，安全审计只报了 3 处）。已迁移到 `utils::archive::extract_zip_safely`，段级校验随之生效。
