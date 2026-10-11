@@ -51,7 +51,7 @@ function cancel() {
     >
       <div
         v-if="modelValue"
-        class="fixed inset-0 z-[10000] flex items-center justify-center p-4"
+        class="fixed inset-0 z-10000 flex items-center justify-center p-4"
         @click.self="cancel"
       >
         <div class="absolute inset-0 bg-black/40" />
@@ -84,7 +84,7 @@ function cancel() {
           <!-- 右上角关闭（等同取消） -->
           <!-- 保留原生 button：此处为 28px 图标式关闭钮，Button.vue 的 scoped size 类固定宽高无法覆盖 -->
           <button
-            class="absolute top-3.5 right-3.5 w-7 h-7 flex items-center justify-center rounded hover:bg-gray-100 text-gray-400 hover:text-gray-600 transition-colors"
+            class="absolute top-3.5 right-3.5 w-7 h-7 flex items-center justify-center rounded-sm hover:bg-gray-100 text-gray-400 hover:text-gray-600 transition-colors"
             @click="cancel"
           >
             <XMarkIcon class="w-4 h-4" />

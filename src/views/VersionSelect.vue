@@ -141,7 +141,7 @@ onMounted(() => loadInstalled())
 </script>
 
 <template>
-  <div class="flex h-full rounded-xl overflow-hidden bg-white shadow-sm">
+  <div class="flex h-full rounded-xl overflow-hidden bg-white shadow-xs">
     <!-- 左侧：文件夹列表（FolderSidebar 子组件） -->
     <FolderSidebar @switched="loadInstalled" />
 
@@ -187,7 +187,7 @@ onMounted(() => loadInstalled())
 
         <!-- 空状态 -->
         <div v-else-if="!hasVersions" class="flex h-full items-center justify-center">
-          <div class="flex flex-col items-center gap-4 rounded-lg border border-gray-200 bg-white px-12 py-10 text-center shadow-sm">
+          <div class="flex flex-col items-center gap-4 rounded-lg border border-gray-200 bg-white px-12 py-10 text-center shadow-xs">
             <ArchiveBoxIcon class="h-12 w-12 text-gray-300" />
             <div>
               <p class="text-base font-medium text-gray-700">无可用版本</p>
@@ -222,7 +222,7 @@ onMounted(() => loadInstalled())
               @click="toggleGroup(group.key)"
             >
               <div class="flex items-center gap-2.5">
-                <img :src="group.icon" class="h-5 w-5 rounded-sm" alt="">
+                <img :src="group.icon" class="h-5 w-5 rounded-xs" alt="">
                 <span class="text-sm font-semibold text-gray-900">{{ group.title }}</span>
                 <Tag size="small" color="gray">{{ group.versions.length }}</Tag>
               </div>
@@ -247,7 +247,7 @@ onMounted(() => loadInstalled())
                         : 'border-l-2 border-transparent'"
                       @click="selectVersion(ver.id)"
                     >
-                      <img :src="resolveVersionIconWithLogo(ver.logo, ver.id, ver.version_type)" class="h-8 w-8 flex-none rounded" alt="">
+                      <img :src="resolveVersionIconWithLogo(ver.logo, ver.id, ver.version_type)" class="h-8 w-8 flex-none rounded-sm" alt="">
                       <div class="min-w-0 flex-1">
                         <div class="truncate text-sm font-medium text-gray-900">{{ ver.id }}</div>
                         <div class="mt-0.5 text-xs text-gray-400">{{ typeMeta(ver.inferredType).label }}</div>

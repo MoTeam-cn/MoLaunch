@@ -136,7 +136,7 @@ onMounted(async () => {
 </script>
 
 <template>
-  <section class="rounded-xl border border-gray-200 bg-white p-5 shadow-sm">
+  <section class="rounded-xl border border-gray-200 bg-white p-5 shadow-xs">
     <h3 class="mb-4 text-sm font-semibold text-gray-700">内存分配</h3>
 
     <!-- 内存可视化条（跟随全局时不显示） -->

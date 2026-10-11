@@ -95,7 +95,7 @@ const avatarLoginType = computed(() => {
           <Button
             type="outline"
             size="mini"
-            class="!text-red-500 hover:!border-red-300 hover:!bg-red-50"
+            class="text-red-500! hover:border-red-300! hover:bg-red-50!"
             @click.stop="emit('logout', card, $event)"
           >
             <template #icon>

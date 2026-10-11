@@ -45,7 +45,7 @@ watch(
       </div>
 
       <!-- 分割线 -->
-      <div class="h-px bg-gradient-to-r from-gray-100 to-gray-200"></div>
+      <div class="h-px bg-linear-to-r from-gray-100 to-gray-200"></div>
 
       <!-- 总进度（加权平均） -->
       <div>
@@ -56,7 +56,7 @@ watch(
       </div>
 
       <!-- 分割线 -->
-      <div class="h-px bg-gradient-to-r from-gray-100 to-gray-200"></div>
+      <div class="h-px bg-linear-to-r from-gray-100 to-gray-200"></div>
 
       <!-- 下载速度 -->
       <div>
@@ -67,7 +67,7 @@ watch(
       </div>
 
       <!-- 分割线 -->
-      <div class="h-px bg-gradient-to-r from-gray-100 to-gray-200"></div>
+      <div class="h-px bg-linear-to-r from-gray-100 to-gray-200"></div>
 
       <!-- 已下载 / 总大小（累计） -->
       <div>
@@ -91,7 +91,7 @@ watch(
       </div>
 
       <!-- 分割线 -->
-      <div class="h-px bg-gradient-to-r from-gray-100 to-gray-200"></div>
+      <div class="h-px bg-linear-to-r from-gray-100 to-gray-200"></div>
 
       <!-- 剩余文件 -->
       <div>

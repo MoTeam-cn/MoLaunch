@@ -37,7 +37,7 @@ function goToSelect() {
     <div class="flex min-w-0 flex-1 items-center gap-2 overflow-hidden">
       <img
         :src="currentLogoIcon || currentMeta.icon"
-        class="h-4 w-4 flex-none rounded-sm"
+        class="h-4 w-4 flex-none rounded-xs"
         alt=""
       >
       <span v-if="selectedId" class="min-w-0 flex-1 truncate">{{ selectedId }}</span>

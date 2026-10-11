@@ -189,7 +189,7 @@ function removeNode() {
 <template>
   <div>
     <!-- 当前节点行 -->
-    <div class="group flex items-center gap-1.5 py-1 rounded px-1 hover:bg-gray-50">
+    <div class="group flex items-center gap-1.5 py-1 rounded-sm px-1 hover:bg-gray-50">
       <div class="flex flex-1 min-w-0 items-center gap-1.5 cursor-pointer" @click="toggle">
         <ChevronDownIcon v-if="isContainer && isExpanded" class="h-3.5 w-3.5 flex-none text-gray-400" />
         <ChevronRightIcon v-else-if="isContainer" class="h-3.5 w-3.5 flex-none text-gray-400" />
@@ -242,7 +242,7 @@ function removeNode() {
       <div v-if="editable && !isRoot" class="hidden group-hover:flex flex-none items-center gap-1">
         <Tooltip v-if="isContainer" text="新增">
           <button
-            class="rounded p-0.5 text-gray-400 hover:text-primary-600 transition-colors"
+            class="rounded-sm p-0.5 text-gray-400 hover:text-primary-600 transition-colors"
             @click.stop="node.tag_type === 'compound' ? startAdd() : addListItem()"
           >
             <PlusIcon class="h-3.5 w-3.5" />
@@ -250,7 +250,7 @@ function removeNode() {
         </Tooltip>
         <Tooltip text="删除">
           <button
-            class="rounded p-0.5 text-gray-400 hover:text-red-500 transition-colors"
+            class="rounded-sm p-0.5 text-gray-400 hover:text-red-500 transition-colors"
             @click.stop="removeNode"
           >
             <TrashIcon class="h-3.5 w-3.5" />
@@ -264,12 +264,12 @@ function removeNode() {
       <Input v-model="addName" size="small" class="w-32" placeholder="字段名" @keydown.enter="confirmAdd" />
       <Select v-model="addType" :options="typeOptions" class="w-28" />
       <Tooltip text="确认">
-        <button class="rounded p-1 text-gray-500 hover:text-primary-600" @click="confirmAdd">
+        <button class="rounded-sm p-1 text-gray-500 hover:text-primary-600" @click="confirmAdd">
           <CheckIcon class="h-3.5 w-3.5" />
         </button>
       </Tooltip>
       <Tooltip text="取消">
-        <button class="rounded p-1 text-gray-500 hover:text-gray-700" @click="addMode = false">
+        <button class="rounded-sm p-1 text-gray-500 hover:text-gray-700" @click="addMode = false">
           <XMarkIcon class="h-3.5 w-3.5" />
         </button>
       </Tooltip>

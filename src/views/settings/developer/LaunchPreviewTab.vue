@@ -143,7 +143,7 @@ async function copyArg(arg: string) {
             <span class="text-xs font-semibold text-gray-700">预览结果 · {{ preview.version_id }}</span>
             <span class="text-xs text-gray-400 font-mono">{{ preview.login_type }} · {{ preview.username }}</span>
           </div>
-          <div data-inner-scroll class="max-h-[20rem] overflow-y-auto divide-y divide-gray-100">
+          <div data-inner-scroll class="max-h-80 overflow-y-auto divide-y divide-gray-100">
             <!-- Java -->
             <div class="px-4 py-3">
               <p class="text-xs font-bold text-gray-900 mb-1.5">Java 路径</p>

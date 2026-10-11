@@ -118,7 +118,7 @@ function handleClose() {
     >
       <div
         v-if="visible"
-        class="fixed inset-0 z-[10003] flex items-start justify-center px-4 pt-14 pb-4"
+        class="fixed inset-0 z-10003 flex items-start justify-center px-4 pt-14 pb-4"
         @click.self="handleClose"
       >
         <div class="absolute inset-0 bg-black/40" />

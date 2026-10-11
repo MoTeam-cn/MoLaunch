@@ -166,7 +166,7 @@ onMounted(() => {
           <Button
             type="ghost"
             size="small"
-            :class="translateEnabled ? '!text-primary-600 !bg-primary-50' : ''"
+            :class="translateEnabled ? 'text-primary-600! bg-primary-50!' : ''"
             @click="translateEnabled = !translateEnabled"
           >
             <template #icon><LanguageIcon class="w-4 h-4" /></template>
@@ -209,7 +209,7 @@ onMounted(() => {
             <div class="flex items-center gap-2 flex-wrap">
               <span class="text-sm font-semibold">{{ diagnoseResult.title }}</span>
               <span
-                class="px-1.5 py-0.5 rounded text-xs font-medium uppercase"
+                class="px-1.5 py-0.5 rounded-sm text-xs font-medium uppercase"
                 :class="diagnoseBadgeClass(diagnoseResult.category)"
               >
                 {{ diagnoseResult.category }}
@@ -224,7 +224,7 @@ onMounted(() => {
               <summary class="text-xs cursor-pointer opacity-75 hover:opacity-100">
                 查看关键日志（{{ diagnoseResult.evidence.length }} 行）
               </summary>
-              <div class="mt-1 p-2 rounded bg-gray-900/50 font-mono text-xs space-y-0.5">
+              <div class="mt-1 p-2 rounded-sm bg-gray-900/50 font-mono text-xs space-y-0.5">
                 <div
                   v-for="(line, i) in diagnoseResult.evidence"
                   :key="i"
@@ -282,7 +282,7 @@ onMounted(() => {
       <span class="flex items-center gap-2 flex-wrap">
         {{ store.selectedLogTunnelId ? '隧道：' + store.selectedLogTunnelId : '全部隧道' }}
         <template v-if="extractedLink">
-          <span class="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-primary-50 text-primary-700">
+          <span class="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-sm bg-primary-50 text-primary-700">
             <LinkIcon class="w-3 h-3" />
             {{ extractedLink }}
           </span>

@@ -37,7 +37,7 @@ const emit = defineEmits<{
       <label
         v-for="model in remoteModels"
         :key="model"
-        class="flex items-center justify-between px-2 py-1 rounded hover:bg-gray-50 cursor-pointer"
+        class="flex items-center justify-between px-2 py-1 rounded-sm hover:bg-gray-50 cursor-pointer"
       >
         <Checkbox :checked="enabledModels.includes(model)" @change="emit('toggle', model)">
           {{ model }}

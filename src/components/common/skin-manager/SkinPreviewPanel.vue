@@ -44,7 +44,7 @@ defineEmits<{ save: [] }>()
       <div class="text-[10px] text-gray-400">拖动旋转</div>
     </div>
     <!-- 3D 人物模型（skinview3d 渲染，皮肤 + 披风） -->
-    <div class="flex justify-center rounded-md bg-white p-2 shadow-sm">
+    <div class="flex justify-center rounded-md bg-white p-2 shadow-xs">
       <SkinModel3D
         :skin-url="skinUrl"
         :cape-url="capeUrl"
@@ -66,7 +66,7 @@ defineEmits<{ save: [] }>()
         <!-- 保留原生 button：下载图标按钮（h-7 w-7 + border），
              Button.vue 的 scoped size 类固定 height/padding 会使图标按钮过宽 -->
         <button
-          class="flex-none flex h-7 w-7 items-center justify-center rounded border border-gray-200 text-gray-600 transition-colors hover:bg-gray-50 disabled:opacity-40"
+          class="flex-none flex h-7 w-7 items-center justify-center rounded-sm border border-gray-200 text-gray-600 transition-colors hover:bg-gray-50 disabled:opacity-40"
           :disabled="!skinUrl"
           @click="$emit('save')"
         >

@@ -100,7 +100,7 @@ onUnmounted(() => {
 </script>
 
 <template>
-  <div class="flex h-full rounded-xl overflow-hidden bg-white shadow-sm">
+  <div class="flex h-full rounded-xl overflow-hidden bg-white shadow-xs">
     <!-- 左侧分类菜单（公共组件，tab 同步到 URL query） -->
     <NavSidebar v-model="activeCategory" :categories="categories" />
 
@@ -119,7 +119,7 @@ onUnmounted(() => {
           // about / developer 子组件已自带 p-6 内边距（SubTabBar 需贴边），避免双重 padding
           activeCategory === 'about' || activeCategory === 'developer' ? '' : 'p-6',
           // cache 页面需要内部管理滚动（顶部固定+列表滑动），去掉 padding 让子组件自管理
-          activeCategory === 'cache' ? '!p-0' : '',
+          activeCategory === 'cache' ? 'p-0!' : '',
           // 非 cache 页面统一由外部容器提供纵向滚动
           activeCategory !== 'cache' ? 'overflow-y-auto' : '',
         ]"

@@ -8,31 +8,439 @@
   MIT License full text will be added here
 */
 
-@tailwind base;
-@tailwind components;
-@tailwind utilities;
+@import 'tailwindcss';
 
-/* 成就生成器内置字体：Minecraft 官方默认像素字体 + unifont CJK 子集（Minecraft 中文同款） */
-@font-face {
-  font-family: 'Minecraft Default';
-  src: url('../fonts/MinecraftDefault-Regular.ttf') format('truetype');
+@config '../../../tailwind.config.js';
+
+/*
+  The default border color has changed to `currentcolor` in Tailwind CSS v4,
+  so we've added these compatibility styles to make sure everything still
+  looks the same as it did with Tailwind CSS v3.
+
+  If we ever want to remove these styles, we need to add an explicit border
+  color utility to any element that depends on these defaults.
+*/
+@layer base {
+  *,
+  ::after,
+  ::before,
+  ::backdrop,
+  ::file-selector-button {
+    border-color: var(--color-gray-200, currentcolor);
+  }
+}
+
+@utility btn {
+  /* ============================================================
+   * 按钮基础样式
+   * height: 32px, padding 0 15px, font-size 14px, border-radius 2px
+   * transition: all 0.1s cubic-bezier(0,0,1,1)
+   * ============================================================ */
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  box-sizing: border-box;
+  height: 32px;
+  padding: 0 15px;
+  font-size: 14px;
   font-weight: 400;
-  font-style: normal;
-  font-display: swap;
+  line-height: 1.5715;
+  white-space: nowrap;
+  border-radius: 2px;
+  border: 1px solid transparent;
+  cursor: pointer;
+  user-select: none;
+  outline: none;
+  transition: all 0.1s cubic-bezier(0, 0, 1, 1);
+  &:active {
+    transition: none;
+  }
+  &:disabled {
+    cursor: not-allowed;
+  }
 }
 
-@font-face {
-  font-family: 'Minecraft Default';
-  src: url('../fonts/MinecraftDefault-Bold.ttf') format('truetype');
-  font-weight: 700;
-  font-style: normal;
-  font-display: swap;
+@utility btn-primary {
+  /* Primary：蓝底白字
+     default primary-500 / hover primary-400 / active primary-600 / disabled primary-300 */
+  @apply btn;
+  color: #ffffff;
+  background-color: var(--color-primary-500);
+  border-color: transparent;
+  &:hover:not(:disabled) {
+    background-color: var(--color-primary-400);
+  }
+  &:active:not(:disabled) {
+    background-color: var(--color-primary-600);
+  }
+  &:disabled {
+    background-color: var(--color-primary-300);
+  }
+  .search-input & {
+    border-top-left-radius: 0;
+    border-bottom-left-radius: 0;
+    padding: 0 12px;
+  }
 }
 
-@font-face {
-  font-family: 'Unifont CJK';
-  src: url('../fonts/Unifont-CJK.otf') format('opentype');
-  font-display: swap;
+@utility btn-secondary {
+  /* Secondary：灰底深字
+     default bg #f2f3f5 color #4e5969 / hover bg #e5e6eb / active bg #c9cdd4
+     disabled bg #f7f8fa color #c9cdd4 */
+  @apply btn;
+  color: #4e5969;
+  background-color: #f2f3f5;
+  border-color: transparent;
+  &:hover:not(:disabled) {
+    background-color: #e5e6eb;
+  }
+  &:active:not(:disabled) {
+    background-color: #c9cdd4;
+  }
+  &:disabled {
+    color: #c9cdd4;
+    background-color: #f7f8fa;
+  }
+}
+
+@utility btn-outline {
+  /* Outline：透明底蓝边框
+     default primary-500 / hover primary-400 / active primary-600 / disabled primary-300 */
+  @apply btn;
+  color: var(--color-primary-500);
+  background-color: transparent;
+  border-color: var(--color-primary-500);
+  &:hover:not(:disabled) {
+    color: var(--color-primary-400);
+    border-color: var(--color-primary-400);
+  }
+  &:active:not(:disabled) {
+    color: var(--color-primary-600);
+    border-color: var(--color-primary-600);
+  }
+  &:disabled {
+    color: var(--color-primary-300);
+    border-color: var(--color-primary-300);
+  }
+}
+
+@utility btn-ghost {
+  /* Ghost：透明底，hover 浅灰 */
+  @apply btn;
+  color: #4e5969;
+  background-color: transparent;
+  border-color: transparent;
+  &:hover:not(:disabled) {
+    color: var(--color-primary-500);
+    background-color: #f2f3f5;
+  }
+}
+
+@utility btn-text {
+  /* Text：文本按钮 */
+  @apply btn;
+  padding: 0 8px;
+  color: var(--color-primary-500);
+  background-color: transparent;
+  border-color: transparent;
+  &:hover:not(:disabled) {
+    background-color: #f2f3f5;
+  }
+  &:active:not(:disabled) {
+    background-color: #e5e6eb;
+  }
+  &:disabled {
+    color: var(--color-primary-300);
+  }
+}
+
+@utility tag {
+  /* ============================================================
+   * 标签样式（复刻 Arco Design Tag）
+   * 默认（无预设色）：灰底深字（fill-2 / text-1）
+   * 预设色：浅色底 + 深色字（Arco 色板 1 号 / 6 号）
+   * 尺寸：small 20px / medium 24px / large 28px，border-radius 2px
+   * ============================================================ */
+  display: inline-flex;
+  align-items: center;
+  box-sizing: border-box;
+  height: 24px;
+  padding: 0 8px;
+  font-size: 12px;
+  font-weight: 500;
+  line-height: 1;
+  white-space: nowrap;
+  border: 1px solid transparent;
+  border-radius: 2px;
+  color: #1d2129;
+  background-color: #f2f3f5;
+  border-color: #f2f3f5;
+  user-select: none;
+  transition: all 0.1s cubic-bezier(0, 0, 1, 1);
+}
+
+@utility tag-size-small {
+  height: 20px;
+  padding: 0 6px;
+  font-size: 12px;
+}
+
+@utility tag-size-medium {
+  height: 24px;
+  padding: 0 8px;
+  font-size: 12px;
+}
+
+@utility tag-size-large {
+  height: 28px;
+  padding: 0 10px;
+  font-size: 14px;
+}
+
+@utility tag-red {
+  /* 预设颜色：浅色底 + 深色字（Arco 色板 1 号 / 6 号） */
+  color: #f53f3f;
+  background-color: #ffece8;
+  border-color: #ffece8;
+}
+
+@utility tag-orangered {
+  color: #ff7d00;
+  background-color: #fff3e8;
+  border-color: #fff3e8;
+}
+
+@utility tag-orange {
+  color: #ff9a2e;
+  background-color: #fff7e8;
+  border-color: #fff7e8;
+}
+
+@utility tag-gold {
+  color: #f7ba1e;
+  background-color: #fffce8;
+  border-color: #fffce8;
+}
+
+@utility tag-lime {
+  color: #9fdb1d;
+  background-color: #fcffe8;
+  border-color: #fcffe8;
+}
+
+@utility tag-green {
+  color: #00b42a;
+  background-color: #e8ffea;
+  border-color: #e8ffea;
+}
+
+@utility tag-cyan {
+  color: #14c9c9;
+  background-color: #e8fffb;
+  border-color: #e8fffb;
+}
+
+@utility tag-blue {
+  color: #3491fa;
+  background-color: #e8f3ff;
+  border-color: #e8f3ff;
+}
+
+@utility tag-arcoblue {
+  color: #165dff;
+  background-color: #e8f3ff;
+  border-color: #e8f3ff;
+}
+
+@utility tag-purple {
+  color: #722ed1;
+  background-color: #f5e8ff;
+  border-color: #f5e8ff;
+}
+
+@utility tag-pinkpurple {
+  color: #d91ad9;
+  background-color: #ffe8fb;
+  border-color: #ffe8fb;
+}
+
+@utility tag-magenta {
+  color: #f5319d;
+  background-color: #ffe8f1;
+  border-color: #ffe8f1;
+}
+
+@utility tag-gray {
+  color: #86909c;
+  background-color: #f2f3f5;
+  border-color: #f2f3f5;
+}
+
+@utility tag-primary {
+  /* primary：跟随项目主题色（浅色底 + 主题色字，换肤时自动变化） */
+  color: var(--color-primary-500);
+  background-color: rgb(var(--color-primary-rgb-500) / 0.1);
+  border-color: transparent;
+}
+
+@utility tag-icon {
+  /* 图标与关闭按钮 */
+  display: inline-flex;
+  margin-right: 4px;
+}
+
+@utility tag-close-btn {
+  display: inline-flex;
+  align-items: center;
+  margin-left: 4px;
+  cursor: pointer;
+  color: inherit;
+  opacity: 0.6;
+  transition: opacity 0.1s cubic-bezier(0, 0, 1, 1);
+  &:hover {
+    opacity: 1;
+  }
+}
+
+@utility tag-close-icon {
+  width: 10px;
+  height: 10px;
+}
+
+@utility input {
+  /* ============================================================
+   * 输入框样式
+   * height: 32px, padding 0 12px, font-size 14px, border-radius 2px
+   * default bg #f2f3f5 border transparent
+   * hover bg #e5e6eb
+   * focus bg #fff border #165dff
+   * placeholder color #86909c
+   * ============================================================ */
+  display: inline-flex;
+  align-items: center;
+  box-sizing: border-box;
+  width: 100%;
+  height: 32px;
+  padding: 0 12px;
+  font-size: 14px;
+  line-height: 1.5715;
+  color: #1d2129;
+  background-color: #f2f3f5;
+  border: 1px solid transparent;
+  border-radius: 2px;
+  outline: none;
+  transition:
+    color 0.1s cubic-bezier(0, 0, 1, 1),
+    border-color 0.1s cubic-bezier(0, 0, 1, 1),
+    background-color 0.1s cubic-bezier(0, 0, 1, 1);
+  &::placeholder {
+    color: #86909c;
+  }
+  &:hover:not(:disabled):not(:focus) {
+    background-color: #e5e6eb;
+  }
+  &:focus {
+    z-index: 1;
+    background-color: #ffffff;
+    border-color: var(--color-primary-500);
+  }
+  &:disabled {
+    color: #c9cdd4;
+    background-color: #f2f3f5;
+    cursor: not-allowed;
+  }
+  .search-input & {
+    border-top-right-radius: 0;
+    border-bottom-right-radius: 0;
+  }
+}
+
+@utility search-input {
+  /* ============================================================
+   * 搜索框样式
+   * 结构：.search-input > input.input + button.btn-primary
+   * 按钮去掉左侧圆角贴合输入框
+   * ============================================================ */
+  display: inline-flex;
+  align-items: stretch;
+  width: 100%;
+  & .input {
+    border-top-right-radius: 0;
+    border-bottom-right-radius: 0;
+  }
+  & .btn-primary {
+    border-top-left-radius: 0;
+    border-bottom-left-radius: 0;
+    padding: 0 12px;
+  }
+}
+
+@utility card {
+  @apply bg-white rounded-xl shadow-xs border border-gray-200 p-6;
+}
+
+@utility badge {
+  @apply inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium;
+}
+
+@utility badge-success {
+  @apply badge bg-green-100 text-green-800;
+}
+
+@utility badge-warning {
+  @apply badge bg-yellow-100 text-yellow-800;
+}
+
+@utility badge-error {
+  @apply badge bg-red-100 text-red-800;
+}
+
+@utility modal-shell {
+  /* ============================================================
+   * 弹窗高度限制统一方案（参考 ResourceDetail.vue）
+   * 解决：动态内容弹窗在长列表/多步骤场景下溢出视口
+   * 结构：.modal-shell > .modal-body > (.modal-scroll 内容滚动区)
+   * - .modal-shell：外层定位容器，顶部对齐避免大高度弹窗上下溢出
+   * - .modal-body：弹窗主体，calc(100vh-100px) 整体高度上限 + flex 列布局
+   * - .modal-scroll：内容滚动区，占据剩余空间独立滚动（header/footer 不动）
+   * 调用方需自行指定宽度（max-w-md/max-w-2xl 等）和背景色
+   * 顶部对齐场景额外加 mt-2 微调；垂直居中场景用 flex items-center justify-center
+   * ============================================================ */
+  @apply fixed inset-0 z-10000 flex items-start justify-center px-4 pt-14 pb-4;
+}
+
+@utility modal-body {
+  @apply relative w-full bg-white rounded-lg shadow-xl flex flex-col;
+  max-height: calc(100vh - 100px);
+}
+
+@utility modal-scroll {
+  @apply flex-1 overflow-y-auto;
+}
+
+@layer utilities {
+  /* 成就生成器内置字体：Minecraft 官方默认像素字体 + unifont CJK 子集（Minecraft 中文同款） */
+  @font-face {
+    font-family: 'Minecraft Default';
+    src: url('../fonts/MinecraftDefault-Regular.ttf') format('truetype');
+    font-weight: 400;
+    font-style: normal;
+    font-display: swap;
+  }
+
+  @font-face {
+    font-family: 'Minecraft Default';
+    src: url('../fonts/MinecraftDefault-Bold.ttf') format('truetype');
+    font-weight: 700;
+    font-style: normal;
+    font-display: swap;
+  }
+
+  @font-face {
+    font-family: 'Unifont CJK';
+    src: url('../fonts/Unifont-CJK.otf') format('opentype');
+    font-display: swap;
+  }
 }
 
 @layer base {
@@ -85,369 +493,6 @@
     /* 主内容区背景：主题色 100 档 25% 透明度叠加白底，呈现淡色调
      * 跟随主题色变化（原硬编码 #e0ecff） */
     background-color: rgb(var(--color-primary-rgb-100) / 0.25);
-  }
-}
-
-@layer components {
-  /* ============================================================
-   * 按钮基础样式
-   * height: 32px, padding 0 15px, font-size 14px, border-radius 2px
-   * transition: all 0.1s cubic-bezier(0,0,1,1)
-   * ============================================================ */
-  .btn {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    box-sizing: border-box;
-    height: 32px;
-    padding: 0 15px;
-    font-size: 14px;
-    font-weight: 400;
-    line-height: 1.5715;
-    white-space: nowrap;
-    border-radius: 2px;
-    border: 1px solid transparent;
-    cursor: pointer;
-    user-select: none;
-    outline: none;
-    transition: all 0.1s cubic-bezier(0, 0, 1, 1);
-  }
-  .btn:active {
-    transition: none;
-  }
-  .btn:disabled {
-    cursor: not-allowed;
-  }
-
-  /* Primary：蓝底白字
-     default primary-500 / hover primary-400 / active primary-600 / disabled primary-300 */
-  .btn-primary {
-    @apply btn;
-    color: #ffffff;
-    background-color: var(--color-primary-500);
-    border-color: transparent;
-  }
-  .btn-primary:hover:not(:disabled) {
-    background-color: var(--color-primary-400);
-  }
-  .btn-primary:active:not(:disabled) {
-    background-color: var(--color-primary-600);
-  }
-  .btn-primary:disabled {
-    background-color: var(--color-primary-300);
-  }
-
-  /* Secondary：灰底深字
-     default bg #f2f3f5 color #4e5969 / hover bg #e5e6eb / active bg #c9cdd4
-     disabled bg #f7f8fa color #c9cdd4 */
-  .btn-secondary {
-    @apply btn;
-    color: #4e5969;
-    background-color: #f2f3f5;
-    border-color: transparent;
-  }
-  .btn-secondary:hover:not(:disabled) {
-    background-color: #e5e6eb;
-  }
-  .btn-secondary:active:not(:disabled) {
-    background-color: #c9cdd4;
-  }
-  .btn-secondary:disabled {
-    color: #c9cdd4;
-    background-color: #f7f8fa;
-  }
-
-  /* Outline：透明底蓝边框
-     default primary-500 / hover primary-400 / active primary-600 / disabled primary-300 */
-  .btn-outline {
-    @apply btn;
-    color: var(--color-primary-500);
-    background-color: transparent;
-    border-color: var(--color-primary-500);
-  }
-  .btn-outline:hover:not(:disabled) {
-    color: var(--color-primary-400);
-    border-color: var(--color-primary-400);
-  }
-  .btn-outline:active:not(:disabled) {
-    color: var(--color-primary-600);
-    border-color: var(--color-primary-600);
-  }
-  .btn-outline:disabled {
-    color: var(--color-primary-300);
-    border-color: var(--color-primary-300);
-  }
-
-  /* Ghost：透明底，hover 浅灰 */
-  .btn-ghost {
-    @apply btn;
-    color: #4e5969;
-    background-color: transparent;
-    border-color: transparent;
-  }
-  .btn-ghost:hover:not(:disabled) {
-    color: var(--color-primary-500);
-    background-color: #f2f3f5;
-  }
-
-  /* Text：文本按钮 */
-  .btn-text {
-    @apply btn;
-    padding: 0 8px;
-    color: var(--color-primary-500);
-    background-color: transparent;
-    border-color: transparent;
-  }
-  .btn-text:hover:not(:disabled) {
-    background-color: #f2f3f5;
-  }
-  .btn-text:active:not(:disabled) {
-    background-color: #e5e6eb;
-  }
-  .btn-text:disabled {
-    color: var(--color-primary-300);
-  }
-
-  /* ============================================================
-   * 标签样式（复刻 Arco Design Tag）
-   * 默认（无预设色）：灰底深字（fill-2 / text-1）
-   * 预设色：浅色底 + 深色字（Arco 色板 1 号 / 6 号）
-   * 尺寸：small 20px / medium 24px / large 28px，border-radius 2px
-   * ============================================================ */
-  .tag {
-    display: inline-flex;
-    align-items: center;
-    box-sizing: border-box;
-    height: 24px;
-    padding: 0 8px;
-    font-size: 12px;
-    font-weight: 500;
-    line-height: 1;
-    white-space: nowrap;
-    border: 1px solid transparent;
-    border-radius: 2px;
-    color: #1d2129;
-    background-color: #f2f3f5;
-    border-color: #f2f3f5;
-    user-select: none;
-    transition: all 0.1s cubic-bezier(0, 0, 1, 1);
-  }
-  .tag-size-small {
-    height: 20px;
-    padding: 0 6px;
-    font-size: 12px;
-  }
-  .tag-size-medium {
-    height: 24px;
-    padding: 0 8px;
-    font-size: 12px;
-  }
-  .tag-size-large {
-    height: 28px;
-    padding: 0 10px;
-    font-size: 14px;
-  }
-
-  /* 预设颜色：浅色底 + 深色字（Arco 色板 1 号 / 6 号） */
-  .tag-red {
-    color: #f53f3f;
-    background-color: #ffece8;
-    border-color: #ffece8;
-  }
-  .tag-orangered {
-    color: #ff7d00;
-    background-color: #fff3e8;
-    border-color: #fff3e8;
-  }
-  .tag-orange {
-    color: #ff9a2e;
-    background-color: #fff7e8;
-    border-color: #fff7e8;
-  }
-  .tag-gold {
-    color: #f7ba1e;
-    background-color: #fffce8;
-    border-color: #fffce8;
-  }
-  .tag-lime {
-    color: #9fdb1d;
-    background-color: #fcffe8;
-    border-color: #fcffe8;
-  }
-  .tag-green {
-    color: #00b42a;
-    background-color: #e8ffea;
-    border-color: #e8ffea;
-  }
-  .tag-cyan {
-    color: #14c9c9;
-    background-color: #e8fffb;
-    border-color: #e8fffb;
-  }
-  .tag-blue {
-    color: #3491fa;
-    background-color: #e8f3ff;
-    border-color: #e8f3ff;
-  }
-  .tag-arcoblue {
-    color: #165dff;
-    background-color: #e8f3ff;
-    border-color: #e8f3ff;
-  }
-  .tag-purple {
-    color: #722ed1;
-    background-color: #f5e8ff;
-    border-color: #f5e8ff;
-  }
-  .tag-pinkpurple {
-    color: #d91ad9;
-    background-color: #ffe8fb;
-    border-color: #ffe8fb;
-  }
-  .tag-magenta {
-    color: #f5319d;
-    background-color: #ffe8f1;
-    border-color: #ffe8f1;
-  }
-  .tag-gray {
-    color: #86909c;
-    background-color: #f2f3f5;
-    border-color: #f2f3f5;
-  }
-
-  /* primary：跟随项目主题色（浅色底 + 主题色字，换肤时自动变化） */
-  .tag-primary {
-    color: var(--color-primary-500);
-    background-color: rgb(var(--color-primary-rgb-500) / 0.1);
-    border-color: transparent;
-  }
-
-  /* 图标与关闭按钮 */
-  .tag-icon {
-    display: inline-flex;
-    margin-right: 4px;
-  }
-  .tag-close-btn {
-    display: inline-flex;
-    align-items: center;
-    margin-left: 4px;
-    cursor: pointer;
-    color: inherit;
-    opacity: 0.6;
-    transition: opacity 0.1s cubic-bezier(0, 0, 1, 1);
-  }
-  .tag-close-btn:hover {
-    opacity: 1;
-  }
-  .tag-close-icon {
-    width: 10px;
-    height: 10px;
-  }
-
-  /* ============================================================
-   * 输入框样式
-   * height: 32px, padding 0 12px, font-size 14px, border-radius 2px
-   * default bg #f2f3f5 border transparent
-   * hover bg #e5e6eb
-   * focus bg #fff border #165dff
-   * placeholder color #86909c
-   * ============================================================ */
-  .input {
-    display: inline-flex;
-    align-items: center;
-    box-sizing: border-box;
-    width: 100%;
-    height: 32px;
-    padding: 0 12px;
-    font-size: 14px;
-    line-height: 1.5715;
-    color: #1d2129;
-    background-color: #f2f3f5;
-    border: 1px solid transparent;
-    border-radius: 2px;
-    outline: none;
-    transition: color 0.1s cubic-bezier(0, 0, 1, 1),
-      border-color 0.1s cubic-bezier(0, 0, 1, 1),
-      background-color 0.1s cubic-bezier(0, 0, 1, 1);
-  }
-  .input::placeholder {
-    color: #86909c;
-  }
-  .input:hover:not(:disabled):not(:focus) {
-    background-color: #e5e6eb;
-  }
-  .input:focus {
-    z-index: 1;
-    background-color: #ffffff;
-    border-color: var(--color-primary-500);
-  }
-  .input:disabled {
-    color: #c9cdd4;
-    background-color: #f2f3f5;
-    cursor: not-allowed;
-  }
-
-  /* ============================================================
-   * 搜索框样式
-   * 结构：.search-input > input.input + button.btn-primary
-   * 按钮去掉左侧圆角贴合输入框
-   * ============================================================ */
-  .search-input {
-    display: inline-flex;
-    align-items: stretch;
-    width: 100%;
-  }
-  .search-input .input {
-    border-top-right-radius: 0;
-    border-bottom-right-radius: 0;
-  }
-  .search-input .btn-primary {
-    border-top-left-radius: 0;
-    border-bottom-left-radius: 0;
-    padding: 0 12px;
-  }
-
-  .card {
-    @apply bg-white rounded-xl shadow-sm border border-gray-200 p-6;
-  }
-
-  .badge {
-    @apply inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium;
-  }
-
-  .badge-success {
-    @apply badge bg-green-100 text-green-800;
-  }
-
-  .badge-warning {
-    @apply badge bg-yellow-100 text-yellow-800;
-  }
-
-  .badge-error {
-    @apply badge bg-red-100 text-red-800;
-  }
-
-  /* ============================================================
-   * 弹窗高度限制统一方案（参考 ResourceDetail.vue）
-   * 解决：动态内容弹窗在长列表/多步骤场景下溢出视口
-   * 结构：.modal-shell > .modal-body > (.modal-scroll 内容滚动区)
-   * - .modal-shell：外层定位容器，顶部对齐避免大高度弹窗上下溢出
-   * - .modal-body：弹窗主体，calc(100vh-100px) 整体高度上限 + flex 列布局
-   * - .modal-scroll：内容滚动区，占据剩余空间独立滚动（header/footer 不动）
-   * 调用方需自行指定宽度（max-w-md/max-w-2xl 等）和背景色
-   * 顶部对齐场景额外加 mt-2 微调；垂直居中场景用 flex items-center justify-center
-   * ============================================================ */
-  .modal-shell {
-    @apply fixed inset-0 z-[10000] flex items-start justify-center px-4 pt-14 pb-4;
-  }
-
-  .modal-body {
-    @apply relative w-full bg-white rounded-lg shadow-xl flex flex-col;
-    max-height: calc(100vh - 100px);
-  }
-
-  .modal-scroll {
-    @apply flex-1 overflow-y-auto;
   }
 }
 

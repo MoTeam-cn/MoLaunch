@@ -136,7 +136,7 @@ function saveEdit() {
       </div>
       <div
         v-else
-        class="max-w-[78%] rounded-lg bg-primary-500 px-4 py-2.5 text-sm text-white whitespace-pre-wrap break-words"
+        class="max-w-[78%] rounded-lg bg-primary-500 px-4 py-2.5 text-sm text-white whitespace-pre-wrap wrap-break-word"
       >{{ message.content }}</div>
     </div>
 
@@ -158,13 +158,13 @@ function saveEdit() {
           </button>
           <span
             v-if="retryLabel"
-            class="ml-auto rounded bg-amber-100 px-1.5 py-0.5 text-[10px] leading-none whitespace-nowrap text-amber-700"
+            class="ml-auto rounded-sm bg-amber-100 px-1.5 py-0.5 text-[10px] leading-none whitespace-nowrap text-amber-700"
           >{{ retryLabel }}</span>
         </div>
         <!-- 深度思考内容（仅展开时显示；虚线分隔思考内容与正文，收起时不渲染避免撑出多余空隙） -->
         <div v-if="message.reasoningContent && thinkingOpen" class="mb-1.5 border-b border-dashed border-gray-200 pb-1.5">
           <div
-            class="max-h-64 overflow-y-auto rounded bg-gray-100/90 px-2.5 py-2 text-xs leading-relaxed whitespace-pre-wrap break-words text-gray-600"
+            class="max-h-64 overflow-y-auto rounded-sm bg-gray-100/90 px-2.5 py-2 text-xs leading-relaxed whitespace-pre-wrap wrap-break-word text-gray-600"
           >{{ message.reasoningContent }}</div>
         </div>
         <!-- eslint-disable vue/no-v-html -- renderMarkdown 已用 DOMPurify 消毒 -->
@@ -186,10 +186,10 @@ function saveEdit() {
         <div v-if="message.content" class="mt-1.5 flex items-center justify-between gap-1.5">
           <span class="min-w-0 truncate text-[10px] leading-none text-gray-400">由AI生成的内容，注意甄别</span>
           <div class="flex shrink-0 items-center gap-1.5">
-            <span v-if="tokenStats" class="rounded bg-gray-200/90 px-1.5 py-0.5 text-[10px] leading-none whitespace-nowrap text-gray-500 tabular-nums">
+            <span v-if="tokenStats" class="rounded-sm bg-gray-200/90 px-1.5 py-0.5 text-[10px] leading-none whitespace-nowrap text-gray-500 tabular-nums">
               {{ formatTokens(tokenStats.completion) }} token<span v-if="tokenStats.speed > 0"> · {{ formatTokens(tokenStats.speed) }} t/s</span>
             </span>
-            <span v-if="displayModel && message.content" class="rounded bg-gray-200/90 px-1.5 py-0.5 text-[10px] leading-none text-gray-500">{{ displayModel }}</span>
+            <span v-if="displayModel && message.content" class="rounded-sm bg-gray-200/90 px-1.5 py-0.5 text-[10px] leading-none text-gray-500">{{ displayModel }}</span>
           </div>
         </div>
       </div>

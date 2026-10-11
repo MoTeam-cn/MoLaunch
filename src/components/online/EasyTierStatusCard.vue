@@ -73,21 +73,21 @@ onMounted(async () => {
             <TagIcon class="w-4 h-4 text-gray-400" />
             <span>core 版本</span>
           </div>
-          <code class="text-xs text-gray-900 bg-gray-50 px-2 py-0.5 rounded">{{ version || '-' }}</code>
+          <code class="text-xs text-gray-900 bg-gray-50 px-2 py-0.5 rounded-sm">{{ version || '-' }}</code>
         </div>
         <div class="px-1 py-3 flex items-center justify-between">
           <div class="flex items-center gap-2 text-sm text-gray-600">
             <GlobeAltIcon class="w-4 h-4 text-gray-400" />
             <span>虚拟网络</span>
           </div>
-          <code class="text-xs text-gray-900 bg-gray-50 px-2 py-0.5 rounded max-w-[220px] truncate">{{ networkName || '-' }}</code>
+          <code class="text-xs text-gray-900 bg-gray-50 px-2 py-0.5 rounded-sm max-w-[220px] truncate">{{ networkName || '-' }}</code>
         </div>
         <div class="px-1 py-3 flex items-center justify-between">
           <div class="flex items-center gap-2 text-sm text-gray-600">
             <GlobeAltIcon class="w-4 h-4 text-gray-400" />
             <span>虚拟 IP</span>
           </div>
-          <code class="text-xs text-gray-900 bg-gray-50 px-2 py-0.5 rounded font-mono">{{ ip || '-' }}</code>
+          <code class="text-xs text-gray-900 bg-gray-50 px-2 py-0.5 rounded-sm font-mono">{{ ip || '-' }}</code>
         </div>
         <div class="px-1 py-3 flex items-center justify-between">
           <div class="flex items-center gap-2 text-sm text-gray-600">

@@ -142,21 +142,21 @@ onMounted(() => loadStats())
             <div
               v-for="entry in group.entries"
               :key="entry.path"
-              class="flex items-center justify-between rounded bg-gray-50 px-3 py-2"
+              class="flex items-center justify-between rounded-sm bg-gray-50 px-3 py-2"
             >
               <div class="min-w-0 flex-1">
                 <div class="flex items-center gap-2">
                   <span class="text-xs font-medium text-gray-900">{{ entry.name }}</span>
                   <span
                     v-if="entry.ttlHours !== null"
-                    class="inline-flex items-center gap-0.5 rounded bg-yellow-50 px-1 py-0.5 text-[9px] font-medium text-yellow-700"
+                    class="inline-flex items-center gap-0.5 rounded-sm bg-yellow-50 px-1 py-0.5 text-[9px] font-medium text-yellow-700"
                   >
                     <ClockIcon class="h-2.5 w-2.5" />
                     24h
                   </span>
                   <span
                     v-else
-                    class="inline-flex items-center rounded bg-gray-200 px-1 py-0.5 text-[9px] font-medium text-gray-500"
+                    class="inline-flex items-center rounded-sm bg-gray-200 px-1 py-0.5 text-[9px] font-medium text-gray-500"
                   >
                     不清理
                   </span>

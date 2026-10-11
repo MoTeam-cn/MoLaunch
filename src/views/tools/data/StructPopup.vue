@@ -62,7 +62,7 @@ async function onCopyTp() {
       <span class="font-medium text-sm text-gray-900">
         {{ getStructIcon(struct.stype).label }}
       </span>
-      <Button type="ghost" size="mini" class="!w-6 !h-6 !p-0 ml-auto" @click="emit('close')">
+      <Button type="ghost" size="mini" class="w-6! h-6! p-0! ml-auto" @click="emit('close')">
         <XMarkIcon class="w-4 h-4 text-gray-500" />
       </Button>
     </div>

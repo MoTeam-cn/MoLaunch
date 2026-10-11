@@ -49,7 +49,7 @@ const filtered = () => {
     >
       <div
         v-if="visible"
-        class="fixed inset-0 z-[10000] flex items-center justify-center p-4"
+        class="fixed inset-0 z-10000 flex items-center justify-center p-4"
         @click.self="emit('cancel')"
       >
         <div class="absolute inset-0 bg-black/40" />

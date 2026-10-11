@@ -42,15 +42,15 @@ defineProps<{
     <div
       v-for="dep in deps"
       :key="dep.id"
-      class="flex items-center gap-2 py-1 px-1.5 rounded hover:bg-gray-50 transition-colors"
+      class="flex items-center gap-2 py-1 px-1.5 rounded-sm hover:bg-gray-50 transition-colors"
     >
       <CachedImage
         :src="dep.logo_url"
         :alt="dep.raw_name"
-        class="w-5 h-5 rounded shrink-0 object-cover"
+        class="w-5 h-5 rounded-sm shrink-0 object-cover"
       >
         <template #fallback>
-          <div class="w-5 h-5 rounded shrink-0 bg-gray-100 flex items-center justify-center">
+          <div class="w-5 h-5 rounded-sm shrink-0 bg-gray-100 flex items-center justify-center">
             <CubeIcon class="w-3 h-3 text-gray-400" />
           </div>
         </template>
@@ -59,7 +59,7 @@ defineProps<{
         {{ dep.translated_name || dep.raw_name }}
       </span>
       <span
-        class="text-[9px] px-1 py-0.5 rounded shrink-0"
+        class="text-[9px] px-1 py-0.5 rounded-sm shrink-0"
         :class="dep.platform === 'CurseForge' ? 'bg-orange-100 text-orange-600' : 'bg-green-100 text-green-600'"
       >
         {{ dep.platform === 'CurseForge' ? 'CF' : 'MR' }}

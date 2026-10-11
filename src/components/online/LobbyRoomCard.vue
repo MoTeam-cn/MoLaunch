@@ -48,9 +48,9 @@ const disabledReason = computed(() => {
 </script>
 
 <template>
-  <div class="rounded-lg border border-gray-200 bg-white px-4 py-3 hover:border-primary-300 hover:shadow-sm transition-all">
+  <div class="rounded-lg border border-gray-200 bg-white px-4 py-3 hover:border-primary-300 hover:shadow-xs transition-all">
     <div class="flex items-center gap-2 flex-wrap">
-      <code class="text-sm font-mono font-semibold text-gray-900 bg-gray-100 px-2 py-0.5 rounded">{{ room.publicIdentifier }}</code>
+      <code class="text-sm font-mono font-semibold text-gray-900 bg-gray-100 px-2 py-0.5 rounded-sm">{{ room.publicIdentifier }}</code>
       <Tag v-if="loaderLabel" size="small" color="arcoblue">{{ loaderLabel }}</Tag>
       <span v-if="room.hostMcVersion" class="text-xs text-gray-500">MC {{ room.hostMcVersion }}</span>
       <Tooltip v-if="room.hasPassword" text="需要密码">

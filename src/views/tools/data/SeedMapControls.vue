@@ -43,17 +43,17 @@ const emit = defineEmits<{
 
 <template>
   <!-- 悬浮坐标 + 群系名 -->
-  <div v-if="mouseBlock" class="absolute top-2 left-2 px-2 py-1 bg-black/70 text-white text-xs rounded font-mono pointer-events-none z-10">
+  <div v-if="mouseBlock" class="absolute top-2 left-2 px-2 py-1 bg-black/70 text-white text-xs rounded-sm font-mono pointer-events-none z-10">
     {{ formatCoord(mouseBlock.x, mouseBlock.z) }}
     <span v-if="mouseBiomeName" class="ml-1 text-gray-300">{{ mouseBiomeName }}</span>
   </div>
   <!-- 悬浮结构提示 -->
-  <div v-if="hoverStruct" class="absolute top-2 right-2 px-2 py-1 bg-black/80 text-white text-xs rounded pointer-events-none z-10">
+  <div v-if="hoverStruct" class="absolute top-2 right-2 px-2 py-1 bg-black/80 text-white text-xs rounded-sm pointer-events-none z-10">
     {{ getStructIcon(hoverStruct.stype).label }}
     {{ formatCoord(hoverStruct.x, hoverStruct.z) }}
   </div>
   <!-- 悬浮出生点/要塞提示 -->
-  <div v-else-if="hoverMarker" class="absolute top-2 right-2 px-2 py-1 bg-black/80 text-white text-xs rounded pointer-events-none z-10">
+  <div v-else-if="hoverMarker" class="absolute top-2 right-2 px-2 py-1 bg-black/80 text-white text-xs rounded-sm pointer-events-none z-10">
     {{ hoverMarker.label }}
     {{ formatCoord(hoverMarker.x, hoverMarker.z) }}
   </div>
@@ -61,7 +61,7 @@ const emit = defineEmits<{
   <!-- 左下角：大型群系 + 坐标输入 + 点击坐标 -->
   <div class="absolute bottom-2 left-2 flex flex-col gap-1 z-10">
     <!-- 坐标输入面板（展开时显示） -->
-    <div v-if="showCoordPanel" class="mb-1 p-2 bg-white/95 rounded shadow-lg flex flex-col gap-1">
+    <div v-if="showCoordPanel" class="mb-1 p-2 bg-white/95 rounded-sm shadow-lg flex flex-col gap-1">
       <div class="flex items-center gap-1">
         <Input v-model="userX" placeholder="X" width="60px" @keydown.enter="emit('goToUserCoord')" />
         <Input v-model="userZ" placeholder="Z" width="60px" @keydown.enter="emit('goToUserCoord')" />
@@ -73,7 +73,7 @@ const emit = defineEmits<{
         <Button
           :type="doContour ? 'primary' : 'secondary'"
           size="mini"
-          class="!h-7"
+          class="h-7!"
           @click="doContour = !doContour"
         >等高线</Button>
         <span class="text-xs text-gray-600">限高</span>
@@ -82,14 +82,14 @@ const emit = defineEmits<{
     </div>
     <!-- 点击坐标显示（含复制按钮，复用项目 Button.vue） -->
     <div v-if="lastClickBlock" class="flex items-center gap-1">
-      <span class="px-2 py-0.5 bg-black/70 text-white text-xs rounded font-mono pointer-events-none">
+      <span class="px-2 py-0.5 bg-black/70 text-white text-xs rounded-sm font-mono pointer-events-none">
         {{ formatCoord(lastClickBlock.x, lastClickBlock.z) }}
       </span>
       <Tooltip text="复制坐标" position="top" :delay="200">
         <Button
           type="ghost"
           size="mini"
-          class="!h-5 !px-1.5 !text-xs"
+          class="h-5! px-1.5! text-xs!"
           @click="emit('copyCoord', lastClickBlock!.x, lastClickBlock!.z)"
         >复制</Button>
       </Tooltip>
@@ -101,7 +101,7 @@ const emit = defineEmits<{
           :type="largeBiomes ? 'primary' : 'secondary'"
           size="mini"
           :disabled="dimension !== 0"
-          class="!w-7 !h-7 !p-0 !flex !justify-center !items-center"
+          class="w-7! h-7! p-0! flex! justify-center! items-center!"
           @click="largeBiomes = !largeBiomes"
         >
           <Squares2X2Icon class="h-4 w-4" />
@@ -111,7 +111,7 @@ const emit = defineEmits<{
         <Button
           :type="showCoordPanel ? 'primary' : 'secondary'"
           size="mini"
-          class="!w-7 !h-7 !p-0 !flex !justify-center !items-center"
+          class="w-7! h-7! p-0! flex! justify-center! items-center!"
           @click="showCoordPanel = !showCoordPanel"
         >
           <MapPinIcon class="h-4 w-4" />
@@ -123,13 +123,13 @@ const emit = defineEmits<{
   <!-- 右下角：缩放控件 -->
   <div class="absolute bottom-2 right-2 flex flex-col gap-1 z-10">
     <Tooltip text="放大" position="left" :delay="200">
-      <Button type="secondary" size="mini" class="!w-7 !h-7 !p-0 !flex !justify-center !items-center" @click="emit('zoomIn')"><PlusIcon class="h-4 w-4" /></Button>
+      <Button type="secondary" size="mini" class="w-7! h-7! p-0! flex! justify-center! items-center!" @click="emit('zoomIn')"><PlusIcon class="h-4 w-4" /></Button>
     </Tooltip>
     <Tooltip text="缩小" position="left" :delay="200">
-      <Button type="secondary" size="mini" class="!w-7 !h-7 !p-0 !flex !justify-center !items-center" @click="emit('zoomOut')"><MinusIcon class="h-4 w-4" /></Button>
+      <Button type="secondary" size="mini" class="w-7! h-7! p-0! flex! justify-center! items-center!" @click="emit('zoomOut')"><MinusIcon class="h-4 w-4" /></Button>
     </Tooltip>
     <Tooltip text="重置视图" position="left" :delay="200">
-      <Button type="secondary" size="mini" class="!w-7 !h-7 !p-0 !flex !justify-center !items-center" @click="emit('resetView')"><AdjustmentsHorizontalIcon class="h-4 w-4" /></Button>
+      <Button type="secondary" size="mini" class="w-7! h-7! p-0! flex! justify-center! items-center!" @click="emit('resetView')"><AdjustmentsHorizontalIcon class="h-4 w-4" /></Button>
     </Tooltip>
   </div>
 

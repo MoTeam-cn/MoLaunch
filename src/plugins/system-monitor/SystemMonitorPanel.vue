@@ -197,7 +197,7 @@ class="font-medium" :class="{
           <!-- 保留原生 button：纯图标刷新按钮（px-1.5 py-0.5 + h-3 w-3 图标），
                Button.vue 最小 mini 尺寸 24px 高度过大，会破坏紧凑行内布局 -->
           <button
-            class="inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-[10px] text-gray-400 hover:bg-gray-100 hover:text-gray-600"
+            class="inline-flex items-center gap-1 rounded-sm px-1.5 py-0.5 text-[10px] text-gray-400 hover:bg-gray-100 hover:text-gray-600"
             :disabled="cacheLoading"
             @click="refreshCache"
           >

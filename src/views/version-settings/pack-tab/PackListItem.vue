@@ -66,7 +66,7 @@ const displayUrl = computed(() => props.pack.cached_logo_url || iconUrl.value ||
       <!-- 禁用角标 -->
       <div
         v-if="!pack.is_enabled"
-        class="absolute -bottom-1 -right-1 flex h-4 w-4 items-center justify-center rounded-full bg-gray-400 text-white shadow"
+        class="absolute -bottom-1 -right-1 flex h-4 w-4 items-center justify-center rounded-full bg-gray-400 text-white shadow-sm"
       >
         <PauseIcon class="h-2.5 w-2.5" />
       </div>

@@ -74,7 +74,7 @@ const {
           :kind="kind"
           @install="handleInstall"
         />
-        <div v-else class="overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm">
+        <div v-else class="overflow-hidden rounded-xl border border-gray-200 bg-white shadow-xs">
           <ul class="divide-y divide-gray-100">
             <PackListItem
               v-for="pack in filteredPacks"

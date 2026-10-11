@@ -61,7 +61,7 @@ onMounted(async () => {
 </script>
 
 <template>
-  <div class="rounded-lg border border-gray-200 bg-white shadow-sm">
+  <div class="rounded-lg border border-gray-200 bg-white shadow-xs">
     <!-- 标题栏：不吸顶常驻，随外层容器统一滚动 -->
     <div class="flex items-center justify-between gap-3 border-b border-gray-200 px-4 py-3">
       <div class="flex min-w-0 items-center gap-2">

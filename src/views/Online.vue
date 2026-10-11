@@ -186,7 +186,7 @@ const currentProps = computed<Record<string, unknown>>(() => {
       云端离线时不再整页遮罩：页面可进入，联机大厅/创建房间/加入房间由 useOnlineNav 置为封禁态
       （灰色 + 锁图标，点击弹窗告知原因）；FRP（第三方隧道）不依赖 MoLaunch 云端仍可用。
     -->
-    <div class="flex h-full rounded-xl overflow-hidden bg-white shadow-sm">
+    <div class="flex h-full rounded-xl overflow-hidden bg-white shadow-xs">
       <!-- 左侧分类菜单（支持子菜单展开动画） -->
       <NavSidebar :model-value="activeCategory" :categories="categories" @update:model-value="handleCategoryChange" />
 

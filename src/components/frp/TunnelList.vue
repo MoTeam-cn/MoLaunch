@@ -62,14 +62,14 @@ async function handleCopyLink(tunnel: TunnelWithStatus) {
     <div
       v-for="tunnel in tunnels"
       :key="tunnel.id"
-      class="rounded-lg border border-gray-200 bg-white p-4 hover:border-primary-300 hover:shadow-sm transition-all"
+      class="rounded-lg border border-gray-200 bg-white p-4 hover:border-primary-300 hover:shadow-xs transition-all"
     >
       <div class="flex items-start justify-between gap-3">
         <div class="flex-1 min-w-0">
           <div class="flex items-center gap-2 flex-wrap">
             <span class="text-sm font-semibold text-gray-900">{{ tunnel.name }}</span>
             <span
-              class="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-xs font-medium"
+              class="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-sm text-xs font-medium"
               :class="tunnel.status === 'running'
                 ? 'bg-green-50 text-green-700'
                 : 'bg-gray-100 text-gray-500'"
@@ -80,10 +80,10 @@ async function handleCopyLink(tunnel: TunnelWithStatus) {
               />
               {{ tunnel.status === 'running' ? '运行中' : '已停止' }}
             </span>
-            <span class="inline-flex items-center px-1.5 py-0.5 rounded text-xs font-medium bg-primary-50 text-primary-700 uppercase">
+            <span class="inline-flex items-center px-1.5 py-0.5 rounded-sm text-xs font-medium bg-primary-50 text-primary-700 uppercase">
               {{ tunnel.tunnelType }}
             </span>
-            <span class="inline-flex items-center px-1.5 py-0.5 rounded text-xs font-medium bg-gray-50 text-gray-500">
+            <span class="inline-flex items-center px-1.5 py-0.5 rounded-sm text-xs font-medium bg-gray-50 text-gray-500">
               {{ providerName(tunnel.providerId) }}
             </span>
           </div>

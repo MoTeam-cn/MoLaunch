@@ -94,7 +94,7 @@ async function replaceTexture(dataUri: string) {
       <Tooltip :text="name" class="min-w-0 flex-1 truncate" overflow-only>
         <h4 class="w-full truncate text-sm font-medium text-gray-700">{{ name }}</h4>
       </Tooltip>
-      <span v-if="animated" class="shrink-0 rounded bg-purple-100 px-1.5 py-0.5 text-xs text-purple-600">
+      <span v-if="animated" class="shrink-0 rounded-sm bg-purple-100 px-1.5 py-0.5 text-xs text-purple-600">
         动画纹理
       </span>
       <div class="ml-auto flex shrink-0 items-center gap-2">
@@ -136,7 +136,7 @@ async function replaceTexture(dataUri: string) {
       :name="name"
       @close="editMode = null"
     />
-    <div v-else-if="displaySrc" class="grid place-items-center rounded border border-gray-200 bg-gray-50 p-4">
+    <div v-else-if="displaySrc" class="grid place-items-center rounded-sm border border-gray-200 bg-gray-50 p-4">
       <img :src="displaySrc" class="max-h-96 max-w-full object-contain" alt="纹理预览" />
     </div>
     <p v-else class="text-sm text-gray-400">纹理加载失败</p>

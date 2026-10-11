@@ -194,14 +194,14 @@ async function handleDetectNat() {
               <UserCircleIcon class="w-4 h-4 text-gray-400" />
               <span>设备 ID</span>
             </div>
-            <code class="text-xs text-gray-900 bg-gray-50 px-2 py-0.5 rounded">{{ status.device_id ? stripMcsdkPrefix(status.device_id) : '-' }}</code>
+            <code class="text-xs text-gray-900 bg-gray-50 px-2 py-0.5 rounded-sm">{{ status.device_id ? stripMcsdkPrefix(status.device_id) : '-' }}</code>
           </div>
           <div class="px-1 py-3 flex items-center justify-between">
             <div class="flex items-center gap-2 text-sm text-gray-600">
               <GlobeAltIcon class="w-4 h-4 text-gray-400" />
               <span>api-server</span>
             </div>
-            <code class="text-xs text-gray-900 bg-gray-50 px-2 py-0.5 rounded max-w-[260px] truncate">
+            <code class="text-xs text-gray-900 bg-gray-50 px-2 py-0.5 rounded-sm max-w-[260px] truncate">
               {{ status.api_server_url || '-' }}
             </code>
           </div>

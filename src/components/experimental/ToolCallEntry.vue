@@ -51,7 +51,7 @@ function toggleDetail(i: number) {
     <!-- 极简收起条：默认收起 -->
     <button
       type="button"
-      class="flex items-center gap-1.5 rounded px-1.5 py-0.5 text-[11px] text-gray-400 transition-colors hover:bg-gray-100 hover:text-gray-600"
+      class="flex items-center gap-1.5 rounded-sm px-1.5 py-0.5 text-[11px] text-gray-400 transition-colors hover:bg-gray-100 hover:text-gray-600"
       @click="expanded = !expanded"
     >
       <CommandLineIcon class="h-3.5 w-3.5" />
@@ -68,13 +68,13 @@ function toggleDetail(i: number) {
             <!-- 调用该工具前模型输出的过渡文本（同一轮内多个工具共享） -->
             <p
               v-if="call.preContent"
-              class="mb-1 rounded bg-gray-50/80 px-2 py-1 text-[11px] leading-relaxed text-gray-500 whitespace-pre-wrap break-words"
+              class="mb-1 rounded-sm bg-gray-50/80 px-2 py-1 text-[11px] leading-relaxed text-gray-500 whitespace-pre-wrap wrap-break-word"
             >
               {{ call.preContent }}
             </p>
             <button
               type="button"
-              class="flex w-full items-center gap-1.5 rounded px-1 py-0.5 text-left transition-colors hover:bg-gray-100"
+              class="flex w-full items-center gap-1.5 rounded-sm px-1 py-0.5 text-left transition-colors hover:bg-gray-100"
               @click="toggleDetail(i)"
             >
               <span class="truncate text-xs font-medium text-gray-600">{{ call.name }}</span>
@@ -89,20 +89,20 @@ function toggleDetail(i: number) {
                 <div>
                   <div class="mb-0.5 flex items-center justify-between text-gray-400">
                     <span>入参（arguments）</span>
-                    <button type="button" class="rounded px-1 text-gray-400 transition-colors hover:text-primary-500" @click="copy(call.arguments)">
+                    <button type="button" class="rounded-sm px-1 text-gray-400 transition-colors hover:text-primary-500" @click="copy(call.arguments)">
                       复制
                     </button>
                   </div>
-                  <pre class="max-h-32 overflow-auto rounded bg-gray-50 p-1.5 font-mono whitespace-pre-wrap break-all text-gray-600">{{ call.arguments || '（无）' }}</pre>
+                  <pre class="max-h-32 overflow-auto rounded-sm bg-gray-50 p-1.5 font-mono whitespace-pre-wrap break-all text-gray-600">{{ call.arguments || '（无）' }}</pre>
                 </div>
                 <div v-if="call.status === 'done'">
                   <div class="mb-0.5 flex items-center justify-between text-gray-400">
                     <span>执行结果（output）</span>
-                    <button type="button" class="rounded px-1 text-gray-400 transition-colors hover:text-primary-500" @click="copy(call.output)">
+                    <button type="button" class="rounded-sm px-1 text-gray-400 transition-colors hover:text-primary-500" @click="copy(call.output)">
                       复制
                     </button>
                   </div>
-                  <pre class="max-h-40 overflow-auto rounded bg-gray-50 p-1.5 font-mono whitespace-pre-wrap break-all text-gray-600">{{ call.output || '（空）' }}</pre>
+                  <pre class="max-h-40 overflow-auto rounded-sm bg-gray-50 p-1.5 font-mono whitespace-pre-wrap break-all text-gray-600">{{ call.output || '（空）' }}</pre>
                 </div>
               </div>
             </Transition>

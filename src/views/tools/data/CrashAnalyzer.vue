@@ -124,7 +124,7 @@ function clearAll() {
               </span>
               <span class="text-sm font-medium text-gray-900">{{ item.title }}</span>
             </div>
-            <div v-if="item.detail" class="mt-1.5 rounded bg-gray-50 px-2 py-1 text-xs text-gray-600 break-all">
+            <div v-if="item.detail" class="mt-1.5 rounded-sm bg-gray-50 px-2 py-1 text-xs text-gray-600 break-all">
               {{ item.detail }}
             </div>
             <div v-if="item.suggestion" class="mt-1.5 text-xs text-green-600">

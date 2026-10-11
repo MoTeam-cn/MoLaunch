@@ -140,7 +140,7 @@ async function onExportPluginSample(asZip: boolean) {
         </div>
 
         <!-- 导出示例插件模板（开发者测试用） -->
-        <div class="mt-4 flex items-center justify-between rounded border border-dashed border-gray-300 bg-white/50 px-3 py-2">
+        <div class="mt-4 flex items-center justify-between rounded-sm border border-dashed border-gray-300 bg-white/50 px-3 py-2">
           <div class="min-w-0">
             <p class="text-xs font-medium text-gray-700">导出插件示例模板</p>
             <p class="mt-0.5 text-[11px] text-gray-400">
@@ -160,7 +160,7 @@ async function onExportPluginSample(asZip: boolean) {
         </div>
 
         <!-- manifest.json 示例（含 processPermissions） -->
-        <div class="mt-4 rounded bg-gray-50 p-3 text-xs text-gray-500">
+        <div class="mt-4 rounded-sm bg-gray-50 p-3 text-xs text-gray-500">
           <p class="mb-1 font-medium text-gray-700">manifest.json 格式示例：</p>
           <pre class="overflow-x-auto text-[11px] leading-relaxed">{
   "id": "my-plugin",

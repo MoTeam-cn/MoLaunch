@@ -206,11 +206,11 @@ defineExpose({
     <!-- eslint-disable vue/no-v-html -- 富文本消息已用 DOMPurify 消毒 -->
     <p
       v-if="options.messageHtml"
-      class="text-sm text-gray-600 leading-relaxed break-words"
+      class="text-sm text-gray-600 leading-relaxed wrap-break-word"
       v-html="DOMPurify.sanitize(options.messageHtml)"
     />
     <!-- eslint-enable vue/no-v-html -->
-    <p v-else class="text-sm text-gray-600 leading-relaxed whitespace-pre-line break-words">{{ options.message }}</p>
+    <p v-else class="text-sm text-gray-600 leading-relaxed whitespace-pre-line wrap-break-word">{{ options.message }}</p>
 
     <!-- 输入框 -->
     <div v-if="options.showInput" class="mt-4">
@@ -238,7 +238,7 @@ defineExpose({
       </Button>
       <div :class="contentClass">
         <div class="overflow-hidden">
-          <div class="mt-2 p-2.5 bg-gray-50 rounded text-xs text-gray-600 font-mono break-all max-h-40 overflow-y-auto">
+          <div class="mt-2 p-2.5 bg-gray-50 rounded-sm text-xs text-gray-600 font-mono break-all max-h-40 overflow-y-auto">
             {{ options.details }}
             <Button
               type="text"

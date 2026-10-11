@@ -62,7 +62,7 @@ const {
           <div class="flex-1 min-w-0">
             <div class="flex items-center gap-2 flex-wrap">
               <span class="text-sm font-semibold text-gray-900">{{ provider.name }}</span>
-              <span v-if="authBadge(provider.authType)" class="inline-flex items-center px-1.5 py-0.5 rounded text-xs font-medium" :class="authBadge(provider.authType)!.cls">
+              <span v-if="authBadge(provider.authType)" class="inline-flex items-center px-1.5 py-0.5 rounded-sm text-xs font-medium" :class="authBadge(provider.authType)!.cls">
                 {{ authBadge(provider.authType)!.text }}
               </span>
             </div>
@@ -84,7 +84,7 @@ const {
             <!-- 权限范围 -->
             <div v-if="store.authStatuses[provider.id]?.scopes?.length" class="flex items-center gap-1 mt-1 flex-wrap">
               <span class="text-xs text-gray-400">权限：</span>
-              <span v-for="scope in store.authStatuses[provider.id]!.scopes" :key="scope" class="inline-flex px-1.5 py-0.5 rounded text-xs bg-gray-100 text-gray-600">{{ scope }}</span>
+              <span v-for="scope in store.authStatuses[provider.id]!.scopes" :key="scope" class="inline-flex px-1.5 py-0.5 rounded-sm text-xs bg-gray-100 text-gray-600">{{ scope }}</span>
             </div>
 
             <!-- Device Code 流程展示 -->

@@ -96,7 +96,7 @@ onMounted(loadSetup)
 <template>
   <div class="mx-auto max-w-3xl space-y-5">
     <!-- 启动选项 -->
-    <section class="rounded-xl border border-gray-200 bg-white p-5 shadow-sm">
+    <section class="rounded-xl border border-gray-200 bg-white p-5 shadow-xs">
       <h3 class="mb-4 text-sm font-semibold text-gray-700">启动选项</h3>
       <div class="space-y-4">
         <div class="flex items-center gap-3">
@@ -162,7 +162,7 @@ onMounted(loadSetup)
     <MemorySection />
 
     <!-- 服务器 -->
-    <section class="rounded-xl border border-gray-200 bg-white p-5 shadow-sm">
+    <section class="rounded-xl border border-gray-200 bg-white p-5 shadow-xs">
       <h3 class="mb-4 text-sm font-semibold text-gray-700">服务器</h3>
       <div class="flex items-center gap-3">
         <label class="w-28 flex-none text-xs text-gray-500">自动进入服务器</label>
@@ -186,7 +186,7 @@ onMounted(loadSetup)
     <AdvanceFieldsPanel />
 
     <!-- 进阶开关（复用 ToggleRow 公共组件）-->
-    <div class="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
+    <div class="bg-white rounded-xl border border-gray-200 shadow-xs overflow-hidden">
       <h3 class="text-sm font-semibold text-gray-900 px-5 pt-5 pb-3">进阶开关</h3>
       <div class="divide-y divide-gray-100">
         <ToggleRow

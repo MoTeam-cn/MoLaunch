@@ -144,7 +144,7 @@ const formatCodes = [
       <!-- 颜色预览 + HEX 输入 -->
       <div class="flex items-center gap-3">
         <div
-          class="h-12 w-12 flex-none rounded-lg border border-gray-200 shadow-sm"
+          class="h-12 w-12 flex-none rounded-lg border border-gray-200 shadow-xs"
           :style="colorPreviewStyle"
         ></div>
         <div class="flex-1 space-y-1.5">
@@ -195,7 +195,7 @@ const formatCodes = [
             <div
               role="button"
               tabindex="0"
-              class="h-8 w-full rounded border border-gray-200 transition-transform hover:scale-110 cursor-pointer"
+              class="h-8 w-full rounded-sm border border-gray-200 transition-transform hover:scale-110 cursor-pointer"
               :style="{ backgroundColor: `rgb(${dye.rgb.join(',')})` }"
               @click="selectDye(dye.rgb)"
               @keydown.enter="selectDye(dye.rgb)"

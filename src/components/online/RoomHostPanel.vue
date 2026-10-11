@@ -107,7 +107,7 @@ onMounted(() => {
         <span class="text-xs text-gray-500">easytier 虚拟网络</span>
         <EasyTierStatusBadge />
       </div>
-      <div v-if="roomHost.easytier.error.value" class="mt-2 p-2 bg-red-50 rounded text-xs text-red-700 flex items-start gap-1.5">
+      <div v-if="roomHost.easytier.error.value" class="mt-2 p-2 bg-red-50 rounded-sm text-xs text-red-700 flex items-start gap-1.5">
         <ExclamationTriangleIcon class="w-3.5 h-3.5 mt-0.5 shrink-0" />
         <span>{{ roomHost.easytier.error.value }}</span>
       </div>
@@ -122,7 +122,7 @@ onMounted(() => {
     <Card title="MC 端口">
       <div class="py-1 flex items-center justify-between">
         <span class="text-xs text-gray-500">当前端口（自动探测）</span>
-        <code class="text-sm font-mono font-semibold text-green-700 bg-green-50 px-2 py-0.5 rounded">
+        <code class="text-sm font-mono font-semibold text-green-700 bg-green-50 px-2 py-0.5 rounded-sm">
           {{ store.easytierRuntime.mcPort || '未探测到' }}
         </code>
       </div>

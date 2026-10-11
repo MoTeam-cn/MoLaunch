@@ -150,7 +150,7 @@ async function exportPng() {
         <Input v-model="keyword" placeholder="搜索物品（ID / 名称 / 中文 / 拼音）…" size="small" clearable />
         <div
           v-if="atlas && filteredItems.length && !selected"
-          class="mt-2 max-h-48 overflow-y-auto rounded border border-gray-200"
+          class="mt-2 max-h-48 overflow-y-auto rounded-sm border border-gray-200"
         >
           <button
             v-for="item in filteredItems"
@@ -166,7 +166,7 @@ async function exportPng() {
         </div>
         <div
           v-if="selected && atlas"
-          class="mt-2 flex items-center justify-between rounded border border-primary-200 bg-primary-50 px-3 py-2"
+          class="mt-2 flex items-center justify-between rounded-sm border border-primary-200 bg-primary-50 px-3 py-2"
         >
           <span class="flex items-center gap-2 text-xs font-medium text-primary-700">
             <RecipeItemIcon :texture="selected.texture" :atlas-url="getAtlasPngUrl()" :atlas="atlas" :size="20" />
@@ -204,7 +204,7 @@ async function exportPng() {
       <div class="relative flex flex-col items-center gap-4 rounded-lg bg-gray-100 p-4">
         <canvas
           ref="canvasRef"
-          class="rounded shadow-sm"
+          class="rounded-sm shadow-xs"
           :style="{ width: ACHIEVEMENT_SIZE.width + 'px', height: ACHIEVEMENT_SIZE.height + 'px' }"
         />
         <Button size="small" :disabled="exporting" @click="exportPng">

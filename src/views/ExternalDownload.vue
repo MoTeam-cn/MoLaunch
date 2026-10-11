@@ -97,7 +97,7 @@ const {
         </div>
 
         <!-- 下载进度区 -->
-        <div v-if="downloading" class="rounded border border-gray-200 bg-gray-50 p-4">
+        <div v-if="downloading" class="rounded-sm border border-gray-200 bg-gray-50 p-4">
           <!-- 文件名 + 操作按钮 -->
           <div class="mb-3 flex items-center justify-between">
             <span class="truncate text-sm font-medium text-gray-900">{{ currentFileName }}</span>
@@ -161,7 +161,7 @@ const {
       <div class="px-5 pb-5 space-y-2 text-xs leading-relaxed text-gray-600">
         <p>
           本工具将下载地址发送给启动器内置下载引擎：后端通过
-          <code class="rounded bg-gray-100 px-1 py-0.5 text-gray-800">DownloadManager</code>
+          <code class="rounded-sm bg-gray-100 px-1 py-0.5 text-gray-800">DownloadManager</code>
           发起请求，把文件以多线程分片方式下载到下载目录，并接入全局下载进度（可在下载管理页查看）。
         </p>
         <p>

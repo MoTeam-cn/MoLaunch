@@ -287,7 +287,7 @@ watch(() => [props.uuid, props.loginType, props.skinUrl, props.serverUrl, skinVe
     <!-- 回退：首字母渐变背景 -->
     <div
       v-else
-      class="flex h-full w-full items-center justify-center bg-gradient-to-br font-bold text-white"
+      class="flex h-full w-full items-center justify-center bg-linear-to-br font-bold text-white"
       :class="[avatarGradient, rounded ? 'rounded-full' : 'rounded-md']"
       :style="{ fontSize: `${size * 0.4}px` }"
     >

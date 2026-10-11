@@ -68,7 +68,7 @@ const {
     </div>
 
     <!-- 示例模板操作（填入内联编辑器 / 导出文件） -->
-    <div class="flex items-center justify-between rounded border border-dashed border-gray-300 bg-white/50 px-3 py-2">
+    <div class="flex items-center justify-between rounded-sm border border-dashed border-gray-300 bg-white/50 px-3 py-2">
       <div class="min-w-0">
         <p class="text-xs font-medium text-gray-700">示例模板（{{ customConfig.format.toUpperCase() }}）</p>
         <p class="mt-0.5 text-[11px] text-gray-400">

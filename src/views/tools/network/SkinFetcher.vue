@@ -148,7 +148,7 @@ async function saveImage(kind: 'skin' | 'cape') {
               <UserIcon class="h-4 w-4 text-gray-500" />
               <span class="text-sm font-semibold text-gray-900">{{ result.name }}</span>
               <span
-                class="rounded bg-blue-100 px-1.5 py-0.5 text-xs font-medium text-blue-700"
+                class="rounded-sm bg-blue-100 px-1.5 py-0.5 text-xs font-medium text-blue-700"
               >{{ modelLabel }}</span>
             </div>
             <div class="flex items-center gap-1 text-xs text-gray-500">
@@ -167,7 +167,7 @@ async function saveImage(kind: 'skin' | 'cape') {
                 <span class="text-xs font-medium text-gray-700">3D 预览</span>
                 <span class="text-[10px] text-gray-400">拖动旋转 / 滚轮缩放</span>
               </div>
-              <div class="flex justify-center rounded-md bg-white p-2 shadow-sm">
+              <div class="flex justify-center rounded-md bg-white p-2 shadow-xs">
                 <SkinModel3D
                   :skin-url="skinUrl"
                   :cape-url="capeUrl"
@@ -193,7 +193,7 @@ async function saveImage(kind: 'skin' | 'cape') {
                 <img
                   :src="result.skin_image"
                   :alt="result.name + ' 的皮肤'"
-                  class="h-28 w-28 object-contain rounded bg-gray-100"
+                  class="h-28 w-28 object-contain rounded-sm bg-gray-100"
                 />
               </div>
               <div v-if="result.cape_image" class="rounded-lg border border-gray-200 p-3">
@@ -212,7 +212,7 @@ async function saveImage(kind: 'skin' | 'cape') {
                 <img
                   :src="result.cape_image"
                   :alt="result.name + ' 的披风'"
-                  class="h-28 w-28 object-contain rounded bg-gray-100"
+                  class="h-28 w-28 object-contain rounded-sm bg-gray-100"
                 />
               </div>
               <div

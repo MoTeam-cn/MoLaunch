@@ -203,7 +203,7 @@ const isCancelled = computed(() => phase.value === 'cancelled')
       <template v-else>
         <div
           class="flex min-h-0 flex-1 flex-col gap-6 transition-all duration-300"
-          :class="{ 'pointer-events-none blur-sm opacity-50': completedFixed }"
+          :class="{ 'pointer-events-none blur-xs opacity-50': completedFixed }"
         >
           <div v-if="showScanBar" class="space-y-2">
             <div class="flex items-center justify-between text-xs">
@@ -212,7 +212,7 @@ const isCancelled = computed(() => phase.value === 'cancelled')
             </div>
             <div class="h-1.5 overflow-hidden rounded-full bg-gray-100">
               <div
-                class="h-full rounded-full bg-gradient-to-r from-primary-400 to-primary-600 transition-all duration-300 ease-out"
+                class="h-full rounded-full bg-linear-to-r from-primary-400 to-primary-600 transition-all duration-300 ease-out"
                 :style="{ width: `${scanProgress}%` }"
               ></div>
             </div>
@@ -252,7 +252,7 @@ const isCancelled = computed(() => phase.value === 'cancelled')
             </div>
             <div class="h-1.5 overflow-hidden rounded-full bg-gray-100">
               <div
-                class="h-full rounded-full bg-gradient-to-r from-primary-400 to-primary-600 transition-all duration-300 ease-out"
+                class="h-full rounded-full bg-linear-to-r from-primary-400 to-primary-600 transition-all duration-300 ease-out"
                 :style="{ width: `${installProgress}%` }"
               ></div>
             </div>
@@ -274,7 +274,7 @@ const isCancelled = computed(() => phase.value === 'cancelled')
 
         <div
           v-if="completedFixed"
-          class="absolute inset-0 z-10 flex items-center justify-center bg-white/60 backdrop-blur-sm"
+          class="absolute inset-0 z-10 flex items-center justify-center bg-white/60 backdrop-blur-xs"
         >
           <div class="flex flex-col items-center gap-3 rounded-xl bg-white/95 px-8 py-6 shadow-lg">
             <CheckCircleIcon class="h-12 w-12 text-green-500" />

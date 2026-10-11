@@ -129,12 +129,12 @@ onMounted(async () => {
 <template>
   <div class="flex h-full gap-2 p-2">
     <!-- 左侧启动面板（固定宽度 320px） -->
-    <aside class="flex w-80 flex-none flex-col overflow-hidden rounded-lg border border-gray-200 bg-white shadow-sm">
+    <aside class="flex w-80 flex-none flex-col overflow-hidden rounded-lg border border-gray-200 bg-white shadow-xs">
       <LaunchPanel />
     </aside>
 
     <!-- 右侧内容区（弹性宽度，根据插件配置动态渲染） -->
-    <main class="flex-1 overflow-hidden rounded-lg border border-gray-200 bg-white shadow-sm">
+    <main class="flex-1 overflow-hidden rounded-lg border border-gray-200 bg-white shadow-xs">
       <component :is="homePanelComponent" v-bind="homePanelProps" />
     </main>
   </div>

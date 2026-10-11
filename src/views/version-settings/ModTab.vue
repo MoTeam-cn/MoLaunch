@@ -138,7 +138,7 @@ onUnmounted(() => {
           :mods-count="mods.length"
           @install="handleInstallMod"
         />
-        <div v-else class="overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm">
+        <div v-else class="overflow-hidden rounded-xl border border-gray-200 bg-white shadow-xs">
           <ul class="divide-y divide-gray-100">
             <ModListItem
               v-for="mod in filteredMods"

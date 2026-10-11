@@ -130,7 +130,7 @@ onUnmounted(() => {
 <template>
   <Teleport to="body">
     <Transition name="fade">
-      <div v-if="visible" class="fixed inset-0 z-[10000] flex items-center justify-center p-4" @click.self="handleCancel">
+      <div v-if="visible" class="fixed inset-0 z-10000 flex items-center justify-center p-4" @click.self="handleCancel">
         <div class="absolute inset-0 bg-black/50" />
 
         <div class="relative w-full max-w-md bg-white rounded-2xl shadow-xl">

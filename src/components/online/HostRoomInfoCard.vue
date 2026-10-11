@@ -79,7 +79,7 @@ async function copyFullCode() {
         <div class="flex items-center gap-1.5">
           <Tooltip text="点击切换完整码">
             <code
-              class="text-base font-semibold text-primary-600 tracking-wider bg-primary-50 px-3 py-1 rounded cursor-pointer select-all"
+              class="text-base font-semibold text-primary-600 tracking-wider bg-primary-50 px-3 py-1 rounded-sm cursor-pointer select-all"
               @click="showFullCode = !showFullCode"
             >
               {{ showFullCode ? room.roomCode : room.publicIdentifier }}

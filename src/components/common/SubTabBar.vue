@@ -89,7 +89,7 @@ onMounted(updateIndicator)
   <div
     ref="containerRef"
     class="sub-tab-bar relative flex items-center gap-1 overflow-x-auto border-b border-gray-200 bg-white px-1"
-    :class="[sticky ? 'sticky top-0 z-20 shadow-sm' : '', { 'show-scrollbar': hovered }]"
+    :class="[sticky ? 'sticky top-0 z-20 shadow-xs' : '', { 'show-scrollbar': hovered }]"
     @mouseenter="hovered = true"
     @mouseleave="hovered = false"
   >

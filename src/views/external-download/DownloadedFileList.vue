@@ -52,7 +52,7 @@ const emit = defineEmits<{
           <Button
             type="ghost"
             size="mini"
-            class="!h-7 !w-7 !p-0 text-gray-400 hover:!text-red-500"
+            class="h-7! w-7! p-0! text-gray-400 hover:text-red-500!"
             @click="emit('delete', file.name)"
           >
             <TrashIcon class="h-4 w-4" />

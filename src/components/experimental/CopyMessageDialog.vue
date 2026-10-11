@@ -69,16 +69,16 @@ async function copyMarkdown() {
     <Transition name="dialog">
       <div
         v-if="modelValue"
-        class="fixed inset-0 z-[100] flex items-center justify-center bg-black/25 p-4"
+        class="fixed inset-0 z-100 flex items-center justify-center bg-black/25 p-4"
         @click.self="close"
       >
-        <div class="dialog-card w-[26rem] max-w-full rounded-xl bg-white p-4 shadow-2xl">
+        <div class="dialog-card w-104 max-w-full rounded-xl bg-white p-4 shadow-2xl">
           <!-- 标题 -->
           <div class="mb-3 flex items-center justify-between">
             <span class="text-sm font-semibold text-gray-800">复制消息</span>
             <button
               type="button"
-              class="rounded p-1 text-gray-400 transition-colors hover:bg-gray-100 hover:text-gray-600"
+              class="rounded-sm p-1 text-gray-400 transition-colors hover:bg-gray-100 hover:text-gray-600"
               @click="close"
             >
               <XMarkIcon class="h-4 w-4" />

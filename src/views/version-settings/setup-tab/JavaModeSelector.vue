@@ -207,7 +207,7 @@ watch(personalization, async (p) => {
 
     <!-- folder 模式：提示 -->
     <div v-else-if="javaMode === 'folder'" class="rounded-md bg-blue-50 px-3 py-2 text-xs text-blue-600">
-      将在版本文件夹下的 <code class="rounded bg-blue-100 px-1">runtime/</code>、<code class="rounded bg-blue-100 px-1">jre/</code>、<code class="rounded bg-blue-100 px-1">java/</code> 子目录中查找 Java。若未找到则回退到自动选择。
+      将在版本文件夹下的 <code class="rounded-sm bg-blue-100 px-1">runtime/</code>、<code class="rounded-sm bg-blue-100 px-1">jre/</code>、<code class="rounded-sm bg-blue-100 px-1">java/</code> 子目录中查找 Java。若未找到则回退到自动选择。
     </div>
 
     <!-- custom 模式：子组件接管（列表选择 + 导入 + 刷新 + 警告） -->

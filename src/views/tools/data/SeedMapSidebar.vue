@@ -30,7 +30,7 @@ defineProps<{
       <Button
         :type="showSpawn ? 'primary' : 'outline'"
         size="mini"
-        class="!w-7 !h-7 !p-0 !flex !justify-center !items-center"
+        class="w-7! h-7! p-0! flex! justify-center! items-center!"
         @click="showSpawn = !showSpawn"
       >
         <HomeIcon class="h-4 w-4" />
@@ -40,7 +40,7 @@ defineProps<{
       <Button
         :type="showStronghold ? 'primary' : 'outline'"
         size="mini"
-        class="!w-7 !h-7 !p-0 !flex !justify-center !items-center"
+        class="w-7! h-7! p-0! flex! justify-center! items-center!"
         @click="showStronghold = !showStronghold"
       >
         <KeyIcon class="h-4 w-4" />
@@ -54,7 +54,7 @@ defineProps<{
       <Button
         :type="showNonViable ? 'primary' : 'outline'"
         size="mini"
-        class="!w-7 !h-7 !p-0 !flex !justify-center !items-center"
+        class="w-7! h-7! p-0! flex! justify-center! items-center!"
         @click="showNonViable = !showNonViable"
       >
         <ShieldCheckIcon class="h-4 w-4" />
@@ -71,7 +71,7 @@ defineProps<{
       <Button
         :type="isStructureSelected(s.name) ? 'primary' : 'outline'"
         size="mini"
-        class="!w-7 !h-7 !p-0 !flex !justify-center !items-center"
+        class="w-7! h-7! p-0! flex! justify-center! items-center!"
         @click="toggleStructureType(s.name)"
       >
         <img

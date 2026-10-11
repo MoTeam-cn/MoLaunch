@@ -203,7 +203,7 @@ function formatTime(ts: number): string {
             <button
               v-for="item in LOG_SHARE_PROVIDERS"
               :key="item.value"
-              class="flex w-full items-start gap-2 rounded px-2 py-1.5 text-left text-xs hover:bg-gray-50"
+              class="flex w-full items-start gap-2 rounded-sm px-2 py-1.5 text-left text-xs hover:bg-gray-50"
               @click="shareTo(item.value)"
             >
               <div class="min-w-0">

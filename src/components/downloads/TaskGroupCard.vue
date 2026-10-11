@@ -85,8 +85,8 @@ const { taskGroups, toggleGroup, isExpanded } = useDownloadTaskGroups(
             size="mini"
             :disabled="togglingPause"
             :class="isPaused
-              ? '!text-green-600 hover:!bg-green-50'
-              : '!text-amber-600 hover:!bg-amber-50'"
+              ? 'text-green-600! hover:bg-green-50!'
+              : 'text-amber-600! hover:bg-amber-50!'"
             @click="emit('togglePause')"
           >
             <template #icon>
@@ -105,7 +105,7 @@ const { taskGroups, toggleGroup, isExpanded } = useDownloadTaskGroups(
             type="text"
             size="mini"
             :disabled="cancelling"
-            class="!text-red-600 hover:!bg-red-50"
+            class="text-red-600! hover:bg-red-50!"
             @click="emit('cancel')"
           >
             <template #icon>
@@ -125,7 +125,7 @@ const { taskGroups, toggleGroup, isExpanded } = useDownloadTaskGroups(
           role="button"
           tabindex="0"
           class="w-full flex items-center gap-2 py-1"
-          :class="g.isIndependent ? 'cursor-default' : 'hover:bg-gray-50 rounded -mx-1 px-1 cursor-pointer'"
+          :class="g.isIndependent ? 'cursor-default' : 'hover:bg-gray-50 rounded-sm -mx-1 px-1 cursor-pointer'"
           @click="g.isIndependent ? undefined : toggleGroup(g.key)"
           @keydown.enter="g.isIndependent ? undefined : toggleGroup(g.key)"
           @keydown.space.prevent="g.isIndependent ? undefined : toggleGroup(g.key)"

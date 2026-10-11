@@ -165,7 +165,7 @@ onBeforeUnmount(() => {
             </Tooltip>
             <Tooltip text="删除会话">
               <button
-                class="absolute top-1/2 right-1.5 hidden -translate-y-1/2 rounded p-1 text-gray-400 transition-colors hover:text-red-500 group-hover:block"
+                class="absolute top-1/2 right-1.5 hidden -translate-y-1/2 rounded-sm p-1 text-gray-400 transition-colors hover:text-red-500 group-hover:block"
                 @click.stop="emit('remove', conv)"
               >
                 <TrashIcon class="h-3.5 w-3.5" />

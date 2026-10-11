@@ -116,7 +116,7 @@ onMounted(async () => {
 
           <div class="min-w-0 flex-1">
             <div class="flex items-center justify-between gap-2">
-              <Button type="text" size="small" class="!px-0 !py-0" @click="openLink(item.home)">
+              <Button type="text" size="small" class="px-0! py-0!" @click="openLink(item.home)">
                 <span class="text-[13px] font-semibold text-gray-800">{{ item.name }}</span>
                 <template #icon><ArrowTopRightOnSquareIcon class="h-3 w-3 text-gray-400" /></template>
               </Button>
@@ -124,7 +124,7 @@ onMounted(async () => {
               <!-- 保留原生 button：自定义尺寸展开按钮（px-2 py-1 text-[11px] + 图标旋转），
                    Button.vue 的 scoped size 类固定 padding 会破坏紧凑尺寸 -->
               <button
-                class="flex items-center gap-1 rounded px-2 py-1 text-[11px] text-gray-500 transition-colors hover:bg-gray-100 hover:text-gray-700"
+                class="flex items-center gap-1 rounded-sm px-2 py-1 text-[11px] text-gray-500 transition-colors hover:bg-gray-100 hover:text-gray-700"
                 :aria-expanded="isItemExpanded(item.name)"
                 @click="toggleItemExpanded(item.name)"
               >
@@ -238,7 +238,7 @@ onMounted(async () => {
           <p>
             <span class="font-medium text-gray-600">关于 Element Plus Icons：</span>
             本启动器前端默认使用 Heroicons Vue 作为主图标库，但其图标集相对精简，部分场景（如日志级别提示、状态徽标、对话框图标等）缺少合适样式或表达不够直观。
-            为保证视觉一致性与信息传达准确性，开发者从 Element Plus Icons 开源图标库中检索所需图标，仅提取其 SVG path 数据并集中写入项目内的 <code class="rounded bg-gray-100 px-1 py-0.5 text-[11px] text-gray-700">src/utils/element-icons.ts</code> 文件复用，未引入 Element Plus 运行时依赖。
+            为保证视觉一致性与信息传达准确性，开发者从 Element Plus Icons 开源图标库中检索所需图标，仅提取其 SVG path 数据并集中写入项目内的 <code class="rounded-sm bg-gray-100 px-1 py-0.5 text-[11px] text-gray-700">src/utils/element-icons.ts</code> 文件复用，未引入 Element Plus 运行时依赖。
             该文件顶部已添加 Element Plus Icons MIT 许可证要求的版权声明与完整许可文本，可自行查看源代码确认。在此特别声明并致谢。
           </p>
         </div>

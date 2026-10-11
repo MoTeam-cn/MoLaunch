@@ -54,8 +54,8 @@ const filenameOptions = [
     <!-- 加载占位（避免初始值与实际值不一致导致的闪烁） -->
     <div v-if="!loaded" class="bg-white rounded-lg border border-gray-300 overflow-hidden">
       <div class="px-5 py-5">
-        <div class="h-4 w-24 bg-gray-200 rounded animate-pulse mb-4" />
-        <div class="h-10 bg-gray-100 rounded animate-pulse" />
+        <div class="h-4 w-24 bg-gray-200 rounded-sm animate-pulse mb-4" />
+        <div class="h-10 bg-gray-100 rounded-sm animate-pulse" />
       </div>
     </div>
 

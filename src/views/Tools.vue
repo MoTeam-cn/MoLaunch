@@ -93,7 +93,7 @@ const activeDesc = () =>
 </script>
 
 <template>
-  <div class="flex h-full rounded-xl overflow-hidden bg-white shadow-sm">
+  <div class="flex h-full rounded-xl overflow-hidden bg-white shadow-xs">
     <!-- 左侧分类菜单（公共组件，tab 同步到 URL query） -->
     <NavSidebar v-model="activeCategory" :categories="categories" />
 

@@ -58,7 +58,7 @@ describe('gradient-text', () => {
     ).toBe('&#12AB34A')
   })
 
-  it('should match Minecraft preview text shadow colors', () => {
+  it('should match Minecraft preview text shadow-sm colors', () => {
     expect(getMinecraftTextShadow('#FF0000')).toBe('#800000')
     expect(getMinecraftTextShadow(null)).toBe('#000000')
   })

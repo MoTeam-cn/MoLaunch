@@ -199,7 +199,7 @@ onBeforeUnmount(stop)
           v-for="v in [1, 2, 4]"
           :key="v"
           type="button"
-          class="rounded border px-2 py-1 text-xs"
+          class="rounded-sm border px-2 py-1 text-xs"
           :class="speed === v ? 'border-blue-400 bg-blue-50 text-blue-600' : 'border-gray-300 text-gray-600 hover:bg-gray-50'"
           @click="setSpeed(v)"
         >
@@ -219,7 +219,7 @@ onBeforeUnmount(stop)
     <div v-if="loadError" class="text-sm text-red-600">{{ loadError }}</div>
     <div
       v-else
-      class="grid place-items-center rounded border border-gray-200 bg-gray-50 p-4"
+      class="grid place-items-center rounded-sm border border-gray-200 bg-gray-50 p-4"
     >
       <canvas ref="canvasRef" class="image-pixelated" :style="displayStyle" />
     </div>

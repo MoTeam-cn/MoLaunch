@@ -192,7 +192,7 @@ onBeforeUnmount(() => {
     <div
       class="flex flex-col items-stretch gap-1 rounded-lg transition-all duration-200 ease-out"
       :class="hovered
-        ? 'bg-white/95 backdrop-blur-sm shadow-md border border-gray-100 p-1.5 w-32'
+        ? 'bg-white/95 backdrop-blur-xs shadow-md border border-gray-100 p-1.5 w-32'
         : 'bg-transparent p-0.5 w-4'"
     >
       <div
@@ -200,7 +200,7 @@ onBeforeUnmount(() => {
         :key="item.id"
         role="button"
         tabindex="0"
-        class="flex items-center rounded-md cursor-pointer outline-none transition-colors duration-150"
+        class="flex items-center rounded-md cursor-pointer outline-hidden transition-colors duration-150"
         :class="[
           hovered ? 'px-2 py-1.5' : 'px-0 py-1 justify-center',
           activeId === item.id

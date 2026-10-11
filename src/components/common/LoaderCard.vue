@@ -78,7 +78,7 @@ function clear(e: Event) {
       @click="toggle"
     >
       <div class="flex items-center gap-2 min-w-0">
-        <img v-if="icon" :src="icon" class="w-5 h-5 rounded shrink-0" />
+        <img v-if="icon" :src="icon" class="w-5 h-5 rounded-sm shrink-0" />
         <span class="text-sm font-medium text-gray-900 shrink-0">{{ name }}</span>
         <span
           v-if="selected"
@@ -126,7 +126,7 @@ function clear(e: Event) {
               :class="[
                 disabled ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer',
                 selected === ver.key
-                  ? `border-${color}-400 bg-${color}-50 shadow-sm`
+                  ? `border-${color}-400 bg-${color}-50 shadow-xs`
                   : `border-gray-200 hover:border-${color}-300 hover:bg-${color}-50/50`
               ]"
               @click="select(ver.key)"

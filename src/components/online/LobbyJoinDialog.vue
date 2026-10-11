@@ -83,7 +83,7 @@ function onClosed() {
 
     <p class="text-sm text-gray-600">
       房间
-      <code class="bg-gray-100 px-1.5 py-0.5 rounded text-gray-800">{{ room.publicIdentifier }}</code>
+      <code class="bg-gray-100 px-1.5 py-0.5 rounded-sm text-gray-800">{{ room.publicIdentifier }}</code>
       需要密码，请输入后加入
     </p>
 

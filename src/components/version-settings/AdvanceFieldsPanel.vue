@@ -67,7 +67,7 @@ onMounted(loadSetup)
 </script>
 
 <template>
-  <section class="rounded-xl border border-gray-200 bg-white p-5 shadow-sm">
+  <section class="rounded-xl border border-gray-200 bg-white p-5 shadow-xs">
     <h3 class="mb-4 text-sm font-semibold text-gray-700">高级选项</h3>
     <div class="space-y-4">
       <div v-for="f in advanceFields" :key="f.field">

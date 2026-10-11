@@ -118,7 +118,7 @@ async function doSave() {
         新增条目
       </Button>
     </div>
-    <div class="max-h-[400px] overflow-y-auto rounded border border-gray-200">
+    <div class="max-h-[400px] overflow-y-auto rounded-sm border border-gray-200">
       <table class="w-full text-left text-xs">
         <thead class="sticky top-0 bg-gray-50 text-gray-500">
           <tr>
@@ -138,7 +138,7 @@ async function doSave() {
             <td class="px-2 py-1">
               <Tooltip text="删除">
               <button
-                class="rounded p-1 text-gray-400 hover:bg-red-50 hover:text-red-500"
+                class="rounded-sm p-1 text-gray-400 hover:bg-red-50 hover:text-red-500"
                 @click="removeRow(i)"
               >
                 <TrashIcon class="h-3.5 w-3.5" />

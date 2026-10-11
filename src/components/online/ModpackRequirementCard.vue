@@ -142,18 +142,18 @@ onMounted(() => {
 
       <!-- 状态提示区 -->
       <!-- 已安装 -->
-      <div v-if="checkState === 'installed'" class="mt-2 p-2.5 bg-green-50 rounded text-xs text-green-700 flex items-start gap-1.5">
+      <div v-if="checkState === 'installed'" class="mt-2 p-2.5 bg-green-50 rounded-sm text-xs text-green-700 flex items-start gap-1.5">
         <CheckCircleIcon class="w-3.5 h-3.5 mt-0.5 shrink-0" />
         <div class="flex-1">
           <div>本地已安装同款整合包，可直接加入房间</div>
           <div v-if="installedVersionId" class="mt-0.5 text-green-600">
-            版本 ID: <code class="bg-white px-1 py-0.5 rounded">{{ installedVersionId }}</code>
+            版本 ID: <code class="bg-white px-1 py-0.5 rounded-sm">{{ installedVersionId }}</code>
           </div>
         </div>
       </div>
 
       <!-- 可安装 -->
-      <div v-else-if="checkState === 'notInstalled' && canInstall" class="mt-2 p-2.5 bg-blue-50 rounded text-xs text-blue-700 flex items-start gap-1.5">
+      <div v-else-if="checkState === 'notInstalled' && canInstall" class="mt-2 p-2.5 bg-blue-50 rounded-sm text-xs text-blue-700 flex items-start gap-1.5">
         <ExclamationTriangleIcon class="w-3.5 h-3.5 mt-0.5 shrink-0" />
         <div class="flex-1">
           <div>本地未安装此整合包，点击下方按钮一键安装</div>
@@ -167,7 +167,7 @@ onMounted(() => {
       </div>
 
       <!-- 不可安装（来源不支持） -->
-      <div v-else-if="checkState === 'notInstalled' && !canInstall" class="mt-2 p-2.5 bg-red-50 rounded text-xs text-red-700 flex items-start gap-1.5">
+      <div v-else-if="checkState === 'notInstalled' && !canInstall" class="mt-2 p-2.5 bg-red-50 rounded-sm text-xs text-red-700 flex items-start gap-1.5">
         <ExclamationTriangleIcon class="w-3.5 h-3.5 mt-0.5 shrink-0" />
         <div class="flex-1">
           <div>不支持的整合包来源：{{ modpack.source }}</div>
@@ -176,7 +176,7 @@ onMounted(() => {
       </div>
 
       <!-- 校验失败 -->
-      <div v-else-if="checkState === 'error'" class="mt-2 p-2.5 bg-red-50 rounded text-xs text-red-700 flex items-start gap-1.5">
+      <div v-else-if="checkState === 'error'" class="mt-2 p-2.5 bg-red-50 rounded-sm text-xs text-red-700 flex items-start gap-1.5">
         <ExclamationTriangleIcon class="w-3.5 h-3.5 mt-0.5 shrink-0" />
         <div class="flex-1">
           <div>校验本地整合包失败：{{ errorMsg }}</div>
@@ -192,7 +192,7 @@ onMounted(() => {
       </div>
 
       <!-- 校验中 -->
-      <div v-else class="mt-2 p-2.5 bg-gray-50 rounded text-xs text-gray-500 flex items-center gap-1.5">
+      <div v-else class="mt-2 p-2.5 bg-gray-50 rounded-sm text-xs text-gray-500 flex items-center gap-1.5">
         <ArrowPathIcon class="w-3.5 h-3.5 animate-spin" />
         <span>正在校验本地是否已安装...</span>
       </div>

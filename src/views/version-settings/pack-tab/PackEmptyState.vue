@@ -26,7 +26,7 @@ const kindLabel = props.kind === 'resourcepack' ? '资源包' : '光影'
 <template>
   <!-- 不可用（仅光影：无 OptiFine/Iris 加载器） -->
   <div v-if="variant === 'not-modable'" class="flex items-center justify-center py-12">
-    <div class="rounded-xl border border-gray-200 bg-white p-8 text-center shadow-sm">
+    <div class="rounded-xl border border-gray-200 bg-white p-8 text-center shadow-xs">
       <div class="mb-3 text-lg font-semibold text-gray-700">该版本不支持{{ kindLabel }}</div>
       <div class="mx-auto mb-5 h-0.5 w-12 bg-gray-300"></div>
       <p class="mb-5 text-sm text-gray-500">

@@ -248,7 +248,7 @@ onBeforeUnmount(disposeRenderer)
         拖拽旋转 · 滚轮缩放
       </span>
       <button
-        class="ml-auto shrink-0 rounded border border-gray-200 px-2 py-1 text-xs text-gray-600 hover:border-blue-400 hover:bg-blue-50"
+        class="ml-auto shrink-0 rounded-sm border border-gray-200 px-2 py-1 text-xs text-gray-600 hover:border-blue-400 hover:bg-blue-50"
         :class="autoRotate ? 'border-blue-400 bg-blue-50 text-blue-600' : ''"
         @click="autoRotate = !autoRotate"
       >
@@ -256,7 +256,7 @@ onBeforeUnmount(disposeRenderer)
       </button>
     </div>
     <div
-      class="relative h-[300px] overflow-hidden rounded border border-gray-200 bg-gray-900"
+      class="relative h-[300px] overflow-hidden rounded-sm border border-gray-200 bg-gray-900"
     >
       <canvas
         ref="canvasEl"

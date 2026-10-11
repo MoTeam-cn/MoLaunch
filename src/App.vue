@@ -245,7 +245,7 @@ async function restorePage(savedPath: string): Promise<void> {
   <!-- 会话恢复期间的加载遮罩 -->
   <Teleport to="body">
     <Transition name="fade">
-      <div v-if="isRestoring" class="fixed inset-0 z-[9998] flex items-center justify-center bg-white/80 backdrop-blur-sm">
+      <div v-if="isRestoring" class="fixed inset-0 z-9998 flex items-center justify-center bg-white/80 backdrop-blur-xs">
         <div class="flex flex-col items-center gap-3">
           <div class="h-8 w-8 animate-spin rounded-full border-[3px] border-primary-200 border-t-primary-500" />
           <p class="text-sm text-gray-500">正在加载...</p>

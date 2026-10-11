@@ -72,7 +72,7 @@ function randomColor() {
       <div
         v-for="(_, index) in colors"
         :key="index"
-        class="flex items-center gap-2 rounded border border-gray-200 bg-gray-50 px-3 py-2"
+        class="flex items-center gap-2 rounded-sm border border-gray-200 bg-gray-50 px-3 py-2"
       >
         <span class="w-6 flex-none text-xs text-gray-400">{{ index + 1 }}</span>
         <ColorPicker :model-value="colors[index]" @update:model-value="updateColor(index, $event)" />

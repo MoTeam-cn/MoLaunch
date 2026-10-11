@@ -131,7 +131,7 @@ function entryClass(entry: CheckEntry): string {
           <div class="flex items-center justify-between gap-2">
             <span class="text-sm font-semibold text-gray-900 truncate">{{ r.tunnelName }}</span>
             <span
-              class="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-xs font-medium shrink-0"
+              class="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-sm text-xs font-medium shrink-0"
               :class="r.overall
                 ? 'bg-green-50 text-green-700'
                 : 'bg-red-50 text-red-600'"

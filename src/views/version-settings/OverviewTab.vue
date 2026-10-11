@@ -40,9 +40,9 @@ const {
 <template>
   <div class="mx-auto max-w-2xl space-y-5">
     <!-- 版本展示卡片 -->
-    <section class="rounded-xl border border-gray-200 bg-white p-5 shadow-sm">
+    <section class="rounded-xl border border-gray-200 bg-white p-5 shadow-xs">
       <div class="flex items-center gap-4">
-        <img :src="currentLogoIcon" class="h-16 w-16 flex-none rounded-lg shadow-sm" alt="">
+        <img :src="currentLogoIcon" class="h-16 w-16 flex-none rounded-lg shadow-xs" alt="">
         <div class="min-w-0 flex-1">
           <div class="truncate text-xl font-semibold text-gray-900">{{ selectedId }}</div>
           <div class="mt-1 flex flex-wrap items-center gap-2">
@@ -58,13 +58,13 @@ const {
         <Button
           type="text"
           size="small"
-          class="!rounded-lg !border !px-3 !py-1.5 !text-xs !gap-1.5"
+          class="rounded-lg! border! px-3! py-1.5! text-xs! gap-1.5!"
           :class="personalization?.isStar
-            ? '!border-yellow-400 !bg-yellow-50 !text-yellow-600'
-            : '!border-gray-300 !bg-white !text-gray-500 hover:!border-yellow-400 hover:!text-yellow-600'"
+            ? 'border-yellow-400! bg-yellow-50! text-yellow-600!'
+            : 'border-gray-300! bg-white! text-gray-500! hover:border-yellow-400! hover:text-yellow-600!'"
           @click="handleToggleStar"
         >
-          <svg class="h-3.5 w-3.5 !mr-0" viewBox="0 0 20 20" :fill="personalization?.isStar ? 'currentColor' : 'none'" stroke="currentColor" stroke-width="1.5">
+          <svg class="h-3.5 w-3.5 mr-0!" viewBox="0 0 20 20" :fill="personalization?.isStar ? 'currentColor' : 'none'" stroke="currentColor" stroke-width="1.5">
             <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
           </svg>
           {{ personalization?.isStar ? '已收藏' : '收藏' }}
@@ -73,7 +73,7 @@ const {
     </section>
 
     <!-- 个性化 -->
-    <section class="rounded-xl border border-gray-200 bg-white p-5 shadow-sm">
+    <section class="rounded-xl border border-gray-200 bg-white p-5 shadow-xs">
       <h3 class="mb-3 text-sm font-semibold text-gray-700">个性化</h3>
       <div class="space-y-3">
         <div class="flex items-center gap-3">
@@ -106,7 +106,7 @@ const {
               <!-- Select 组件的自定义触发器（结构性元素，非视觉按钮） -->
               <div role="button" tabindex="0" class="flex w-full items-center justify-between rounded-md border border-gray-300 bg-white px-2.5 py-1.5 text-sm text-gray-700 transition-colors hover:border-primary-500 cursor-pointer" @click="toggle" @keydown.enter="toggle">
                 <span class="flex items-center gap-2">
-                  <img v-if="currentLogoIcon" :src="currentLogoIcon" class="h-4 w-4 rounded-sm" alt="">
+                  <img v-if="currentLogoIcon" :src="currentLogoIcon" class="h-4 w-4 rounded-xs" alt="">
                   <span>{{ label }}</span>
                 </span>
                 <svg class="h-3.5 w-3.5 text-gray-400 transition-transform" :class="{ 'rotate-180': open }" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M5.23 7.21a.75.75 0 011.06.02L10 11.168l3.71-3.938a.75.75 0 111.08 1.04l-4.25 4.5a.75.75 0 01-1.08 0l-4.25-4.5a.75.75 0 01.02-1.06z" clip-rule="evenodd" /></svg>
@@ -114,7 +114,7 @@ const {
             </template>
             <template #option="{ option, selected }">
               <span class="flex items-center gap-2">
-                <img v-if="option.icon" :src="option.icon" class="h-4 w-4 rounded-sm" alt="">
+                <img v-if="option.icon" :src="option.icon" class="h-4 w-4 rounded-xs" alt="">
                 <span>{{ option.label }}</span>
               </span>
               <svg v-if="selected" class="h-4 w-4 text-primary-500" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M16.704 4.153a.75.75 0 01.143 1.052l-8 10.5a.75.75 0 01-1.127.075l-4.5-4.5a.75.75 0 011.06-1.06l3.894 3.893 7.48-9.817a.75.75 0 011.05-.143z" clip-rule="evenodd" /></svg>
@@ -134,7 +134,7 @@ const {
     </section>
 
     <!-- 快捷方式 -->
-    <section class="rounded-xl border border-gray-200 bg-white p-5 shadow-sm">
+    <section class="rounded-xl border border-gray-200 bg-white p-5 shadow-xs">
       <h3 class="mb-3 text-sm font-semibold text-gray-700">快捷方式</h3>
       <div class="flex flex-wrap gap-3">
         <Button
@@ -157,7 +157,7 @@ const {
     </section>
 
     <!-- 高级管理 -->
-    <section class="rounded-xl border border-gray-200 bg-white p-5 shadow-sm">
+    <section class="rounded-xl border border-gray-200 bg-white p-5 shadow-xs">
       <h3 class="mb-3 text-sm font-semibold text-gray-700">高级管理</h3>
       <div class="flex flex-wrap gap-3">
         <Button type="outline" :disabled="fixing" @click="handleExportScript">

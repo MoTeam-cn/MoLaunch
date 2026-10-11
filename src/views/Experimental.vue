@@ -40,7 +40,7 @@ const disclaimerVisible = ref(!hasAgreedToday('experimental'))
 </script>
 
 <template>
-  <div class="flex h-full rounded-xl overflow-hidden bg-white shadow-sm">
+  <div class="flex h-full rounded-xl overflow-hidden bg-white shadow-xs">
     <NavSidebar v-model="activeCategory" :categories="categories" />
 
     <div class="flex-1 flex flex-col overflow-hidden">

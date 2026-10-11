@@ -90,7 +90,7 @@ const platformLabel = computed(() => props.project.platform)
         <span
           v-for="loader in loaders"
           :key="loader"
-          class="shrink-0 px-1 py-0.5 rounded text-[10px] font-medium bg-blue-50 text-blue-600"
+          class="shrink-0 px-1 py-0.5 rounded-sm text-[10px] font-medium bg-blue-50 text-blue-600"
         >{{ loader }}</span>
       </div>
 
@@ -103,7 +103,7 @@ const platformLabel = computed(() => props.project.platform)
           <span
             v-for="tag in topTags"
             :key="tag"
-            class="px-1 py-0.5 rounded bg-gray-50 text-gray-400"
+            class="px-1 py-0.5 rounded-sm bg-gray-50 text-gray-400"
           >{{ tag }}</span>
         </div>
       </div>

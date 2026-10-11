@@ -70,7 +70,7 @@ const props = defineProps<{
       <div
         v-for="(entry, entryIdx) in getListEntries(props.section, props.dataCtx)"
         :key="entryIdx"
-        class="flex items-center justify-between rounded bg-gray-50 px-3 py-2"
+        class="flex items-center justify-between rounded-sm bg-gray-50 px-3 py-2"
       >
         <div class="min-w-0 flex-1">
           <template v-for="(field, fieldIdx) in props.section.fields" :key="fieldIdx">

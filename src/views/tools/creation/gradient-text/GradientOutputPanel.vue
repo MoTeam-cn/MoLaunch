@@ -77,8 +77,8 @@ function downloadOutput() {
     <!-- 预览 -->
     <div>
       <label class="mb-1.5 block text-xs font-medium text-gray-700">MC 游戏内预览</label>
-      <div class="min-h-[96px] rounded border border-gray-200 bg-gray-900 px-4 py-3">
-        <p class="break-words text-xl leading-relaxed text-white">
+      <div class="min-h-[96px] rounded-sm border border-gray-200 bg-gray-900 px-4 py-3">
+        <p class="wrap-break-word text-xl leading-relaxed text-white">
           <template v-for="(character, index) in previewCharacters" :key="index">
             <span
               v-if="!character.newline"
@@ -129,7 +129,7 @@ function downloadOutput() {
     <!-- 输出结果 -->
     <div>
       <label class="mb-1.5 block text-xs font-medium text-gray-700">生成结果</label>
-      <pre class="max-h-40 overflow-y-auto whitespace-pre-wrap break-all rounded border border-gray-200 bg-gray-50 px-3 py-2 text-xs text-gray-800">{{ output }}</pre>
+      <pre class="max-h-40 overflow-y-auto whitespace-pre-wrap break-all rounded-sm border border-gray-200 bg-gray-50 px-3 py-2 text-xs text-gray-800">{{ output }}</pre>
       <div class="mt-2 flex items-center gap-2">
         <Button type="primary" size="small" @click="copyOutput">
           <template #icon><ClipboardDocumentIcon class="h-3.5 w-3.5" /></template>

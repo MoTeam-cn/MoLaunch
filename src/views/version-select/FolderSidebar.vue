@@ -188,7 +188,7 @@ defineExpose({ loadFolders })
         <Button
           type="ghost"
           long
-          class="!justify-start !px-4"
+          class="justify-start! px-4!"
           @click="addFolder"
         >
           <template #icon>
@@ -199,7 +199,7 @@ defineExpose({ loadFolders })
         <Button
           type="ghost"
           long
-          class="!justify-start !px-4"
+          class="justify-start! px-4!"
           @click="importModpack"
         >
           <template #icon>

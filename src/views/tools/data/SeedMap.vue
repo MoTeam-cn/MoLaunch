@@ -105,7 +105,7 @@ function handleLoadFromSave(payload: { seed: string; mcVersion: number; worldNam
 
     <!-- OpenLayers 地图容器 -->
     <div class="px-5 pb-5">
-      <div class="relative w-full border border-gray-200 rounded overflow-hidden bg-gray-900">
+      <div class="relative w-full border border-gray-200 rounded-sm overflow-hidden bg-gray-900">
         <div ref="mapContainer" class="w-full" style="height: 480px;">
           <!-- OL Overlay popup 容器：始终挂载（OL Overlay 通过 element 引用），
                内部 StructPopup 用 v-if 控制（避免空 popup 渲染） -->

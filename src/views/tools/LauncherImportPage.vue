@@ -156,12 +156,12 @@ onMounted(loadSources)
       <div
         v-for="source in sources"
         :key="source.kind + source.base_path"
-        class="rounded-xl border border-gray-100 bg-white p-4 shadow-sm"
+        class="rounded-xl border border-gray-100 bg-white p-4 shadow-xs"
       >
         <div class="mb-3 flex items-center justify-between">
           <div class="flex items-center gap-2">
             <span class="text-sm font-semibold text-gray-700">{{ source.label }}</span>
-            <span class="rounded bg-gray-100 px-1.5 py-0.5 text-xs text-gray-500">
+            <span class="rounded-sm bg-gray-100 px-1.5 py-0.5 text-xs text-gray-500">
               {{ source.instances.length }} 个实例
             </span>
           </div>
@@ -183,10 +183,10 @@ onMounted(loadSources)
             <div class="min-w-0 flex-1">
               <div class="flex items-center gap-2">
                 <span class="truncate text-sm text-gray-700">{{ inst.name }}</span>
-                <span v-if="inst.mc_version" class="rounded bg-blue-50 px-1.5 py-0.5 text-xs text-blue-600">
+                <span v-if="inst.mc_version" class="rounded-sm bg-blue-50 px-1.5 py-0.5 text-xs text-blue-600">
                   {{ inst.mc_version }}
                 </span>
-                <span :class="['rounded px-1.5 py-0.5 text-xs', loaderBadge(inst.loader).cls]">
+                <span :class="['rounded-sm px-1.5 py-0.5 text-xs', loaderBadge(inst.loader).cls]">
                   {{ loaderBadge(inst.loader).text }}
                 </span>
               </div>

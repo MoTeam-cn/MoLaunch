@@ -78,8 +78,8 @@ function releaseColor(rt: string): string {
 
 // 折叠动画 class（expanded 由外部传入，用纯函数；400ms 内容过渡 + 图标容器 transition-all）
 const { contentClassOf, iconClassOf } = useCollapseAnimation({
-  contentTransition: 'transition-[grid-template-rows] duration-[400ms] ease-[cubic-bezier(0.4,0,0.2,1)]',
-  iconTransition: 'transition-all duration-300 ease-[cubic-bezier(0.4,0,0.2,1)]',
+  contentTransition: 'transition-[grid-template-rows] duration-400 ease-in-out',
+  iconTransition: 'transition-all duration-300 ease-in-out',
   collapsedRotateClass: 'rotate-0',
 })
 </script>
@@ -131,7 +131,7 @@ const { contentClassOf, iconClassOf } = useCollapseAnimation({
     >
       <div class="overflow-hidden">
         <div
-          class="p-1.5 space-y-0.5 transition-all duration-[350ms] ease-[cubic-bezier(0.4,0,0.2,1)]"
+          class="p-1.5 space-y-0.5 transition-all duration-350 ease-in-out"
           :class="expanded
             ? 'opacity-100 translate-y-0 transition-delay-[50ms]'
             : 'opacity-0 -translate-y-2 transition-delay-0'"

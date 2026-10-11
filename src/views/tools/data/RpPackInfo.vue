@@ -35,10 +35,10 @@ function countFiles(node?: RpTreeNode): number {
     <img
       v-if="current.icon_data_url"
       :src="current.icon_data_url"
-      class="h-11 w-11 shrink-0 rounded border border-gray-300 object-contain"
+      class="h-11 w-11 shrink-0 rounded-sm border border-gray-300 object-contain"
       alt="包图标"
     />
-    <div v-else class="grid h-11 w-11 shrink-0 place-items-center rounded border border-gray-300 bg-gray-50">
+    <div v-else class="grid h-11 w-11 shrink-0 place-items-center rounded-sm border border-gray-300 bg-gray-50">
       <CubeIcon class="h-6 w-6 text-gray-400" />
     </div>
     <div class="min-w-0 flex-1">

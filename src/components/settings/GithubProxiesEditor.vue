@@ -107,7 +107,7 @@ onMounted(() => {
       <p class="text-xs text-gray-500">
         easytier 内核等外部文件下载时按镜像优先、官方保底竞速选源。path 模式为「镜像前缀 + GitHub 路径」，full 模式为「镜像 + 完整 GitHub URL」。
       </p>
-      <div v-if="!proxiesLoaded" class="mt-3 h-20 bg-gray-100 rounded animate-pulse" />
+      <div v-if="!proxiesLoaded" class="mt-3 h-20 bg-gray-100 rounded-sm animate-pulse" />
       <template v-else>
         <!-- 表头：名称/类型固定，镜像地址 minmax(0,1fr) 自适应填满剩余宽度（长地址不被截断），
              第 4 列 auto 仅占删除按钮内容宽、紧跟其后，无中间留白。

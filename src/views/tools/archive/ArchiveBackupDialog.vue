@@ -98,7 +98,7 @@ async function pickBackupOutput() {
 <template>
   <div
     v-if="target"
-    class="fixed inset-0 z-[10000] flex items-center justify-center p-4"
+    class="fixed inset-0 z-10000 flex items-center justify-center p-4"
     @click.self="emit('close')"
   >
     <div class="absolute inset-0 bg-black/40" />

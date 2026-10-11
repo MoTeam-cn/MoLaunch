@@ -87,7 +87,7 @@ async function copyCommand() {
       <!-- 指令结果 -->
       <div class="border-t border-gray-100 pt-4">
         <div class="text-xs font-medium text-gray-500 mb-2">生成指令</div>
-        <div class="rounded-lg bg-gray-50 px-3 py-2.5 font-mono text-xs break-all text-gray-700 min-h-[2.5rem]">
+        <div class="rounded-lg bg-gray-50 px-3 py-2.5 font-mono text-xs break-all text-gray-700 min-h-10">
           {{ command }}
         </div>
         <div class="mt-2 flex justify-end">

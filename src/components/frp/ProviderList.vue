@@ -187,7 +187,7 @@ async function handleUpdate(p: ProviderInfo) {
       <div
         v-for="provider in providers"
         :key="provider.id"
-        class="rounded-lg border border-gray-200 bg-white p-4 hover:border-primary-300 hover:shadow-sm transition-all"
+        class="rounded-lg border border-gray-200 bg-white p-4 hover:border-primary-300 hover:shadow-xs transition-all"
         :class="{ 'opacity-60': !provider.enabled }"
       >
         <div class="flex items-start gap-3">
@@ -203,27 +203,27 @@ async function handleUpdate(p: ProviderInfo) {
               <span class="text-sm font-semibold text-gray-900">{{ provider.name }}</span>
               <span
                 v-if="provider.builtin"
-                class="inline-flex items-center px-1.5 py-0.5 rounded text-xs font-medium bg-gray-100 text-gray-600"
+                class="inline-flex items-center px-1.5 py-0.5 rounded-sm text-xs font-medium bg-gray-100 text-gray-600"
               >
                 内置
               </span>
               <span
                 v-if="authBadge(provider.authType)"
-                class="inline-flex items-center px-1.5 py-0.5 rounded text-xs font-medium"
+                class="inline-flex items-center px-1.5 py-0.5 rounded-sm text-xs font-medium"
                 :class="authBadge(provider.authType)!.cls"
               >
                 {{ authBadge(provider.authType)!.text }}
               </span>
               <span
                 v-if="distBadge(provider.distribution)"
-                class="inline-flex items-center px-1.5 py-0.5 rounded text-xs font-medium"
+                class="inline-flex items-center px-1.5 py-0.5 rounded-sm text-xs font-medium"
                 :class="distBadge(provider.distribution)!.cls"
               >
                 {{ distBadge(provider.distribution)!.text }}
               </span>
               <span
                 v-if="provider.builtin && hasUpdate(provider)"
-                class="inline-flex items-center px-1.5 py-0.5 rounded text-xs font-medium bg-amber-50 text-amber-700"
+                class="inline-flex items-center px-1.5 py-0.5 rounded-sm text-xs font-medium bg-amber-50 text-amber-700"
               >
                 有新版本 v{{ provider.latestVersion }}
               </span>

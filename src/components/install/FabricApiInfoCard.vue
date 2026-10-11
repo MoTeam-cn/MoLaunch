@@ -34,7 +34,7 @@ defineEmits<{ retry: [] }>()
     <!-- 标题栏 -->
     <div class="flex items-center justify-between px-4 py-2.5 bg-blue-50/40">
       <div class="flex items-center gap-2 min-w-0">
-        <img :src="fabricIcon" class="w-4 h-4 rounded shrink-0 opacity-80" />
+        <img :src="fabricIcon" class="w-4 h-4 rounded-sm shrink-0 opacity-80" />
         <span class="text-sm font-medium text-gray-900 shrink-0">Fabric API</span>
         <Tag size="small" color="blue">将自动安装</Tag>
       </div>

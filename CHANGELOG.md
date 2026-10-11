@@ -18,6 +18,15 @@
 
 ### Changed
 
+- **Tailwind CSS 3 → 4 迁移**（[tailwind.config.js](tailwind.config.js) / [postcss.config.js](postcss.config.js) / [main.css](src/assets/styles/main.css) / [package.json](package.json)）：用官方 `@tailwindcss/upgrade` codemod 迁移，涉及 148 个文件。
+  - PostCSS 插件由 `tailwindcss` + `autoprefixer` 改为 `@tailwindcss/postcss`（v4 内置前缀处理，移除 autoprefixer）。
+  - CSS 入口改为 `@import 'tailwindcss'` + `@config '../../../tailwind.config.js'`，保留既有主题色（primary CSS 变量链、page / brand / dialog）与 safelist。
+  - `@layer components` 中的自定义类（.btn / .tag / .input / .search-input / .card / .badge / .modal-* 等）迁移为 `@utility`。
+  - 按官方对照表自动改写重命名工具类：rounded→rounded-sm、rounded-sm→rounded-xs、shadow→shadow-sm、shadow-sm→shadow-xs、blur→blur-sm、blur-sm→blur-xs、outline-none→outline-hidden、bg-gradient-to-*→bg-linear-to-*、flex-shrink-0→shrink-0、z-[10000]→z-10000。
+  - 补 v4 默认边框色变更的兼容层（`border-color: var(--color-gray-200, currentcolor)`），保持 v3 观感。
+  - 修正 codemod 误改的非类名常量：`Button` 的 `type="outline"` 属性值被误改为 `outline-solid`（26 处）、`Checkbox` 的 `blur` emit 声明被误改为 `blur-sm`（1 处），均已还原。
+  - 效果：tailwind 依赖链中的 chokidar / postcss-nested / autoprefixer 已移除；生产依赖审计 0 漏洞。
+
 - **CI 安全审计改为按生产依赖门禁**（[ci.yml](.github/workflows/ci.yml)）：`npm audit --audit-level=high` 改为 `npm audit --omit=dev --audit-level=high`，并新增一条不阻塞的全量审计用于可见性。原因：修复生产依赖后剩余 high/moderate 全部来自 devDependencies（tailwindcss 3 依赖链中的 braces 上游无修复版本，last_affected = 3.0.3；@typescript-eslint 链需 ESLint 9 + flat config 大版本迁移），这些依赖不进入发布产物。
 
 - **升级存在安全公告的前端依赖并锁定传递依赖下限**（[package.json](package.json) / [package-lock.json](package-lock.json)）：直接依赖 axios `^1.19.0` → `^1.20.0`（对应 9 条 Dependabot 公告）、dompurify `^3.4.12` → `^3.4.16`、vitest `^3.2.7` → `^4.1.11`；新增 `overrides` 固定 decode-uri-component `^0.5.0`、colord `^2.9.4`、js-yaml `^4.3.2`、browserslist `^4.28.7`、baseline-browser-mapping `^2.11.0`，并以范围键 `fflate@<0.6.11` 仅覆盖 0.6.x 分支（不影响 numcodecs 使用的 0.8.x）。

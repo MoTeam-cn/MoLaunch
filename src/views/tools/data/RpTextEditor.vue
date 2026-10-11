@@ -102,7 +102,7 @@ async function doSave() {
       <ExclamationTriangleIcon class="h-3.5 w-3.5" />
       有未保存的修改
     </div>
-    <div v-if="dirty && jsonError" class="rounded border border-red-200 bg-red-50 px-2 py-1 text-xs text-red-600">
+    <div v-if="dirty && jsonError" class="rounded-sm border border-red-200 bg-red-50 px-2 py-1 text-xs text-red-600">
       {{ jsonError }}
     </div>
     <Input

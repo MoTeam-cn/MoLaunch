@@ -116,7 +116,7 @@ watch(() => props.capes, loadIcons, { immediate: true, deep: true })
         @click="emit('equip', cape.id)"
       >
         <!-- 披风图标（从披风纹理裁剪） -->
-        <div class="flex h-8 w-5 flex-none items-center justify-center overflow-hidden rounded bg-gray-50">
+        <div class="flex h-8 w-5 flex-none items-center justify-center overflow-hidden rounded-sm bg-gray-50">
           <img
             v-if="iconMap.has(cape.id)"
             :src="iconMap.get(cape.id)"

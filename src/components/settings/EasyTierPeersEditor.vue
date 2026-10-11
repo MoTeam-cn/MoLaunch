@@ -52,8 +52,8 @@ async function handleSavePeers() {
 <template>
   <div v-if="!loadedPeers" class="bg-white rounded-lg border border-gray-300 overflow-hidden">
     <div class="px-5 py-5">
-      <div class="h-4 w-28 bg-gray-200 rounded animate-pulse mb-4" />
-      <div class="h-20 bg-gray-100 rounded animate-pulse" />
+      <div class="h-4 w-28 bg-gray-200 rounded-sm animate-pulse mb-4" />
+      <div class="h-20 bg-gray-100 rounded-sm animate-pulse" />
     </div>
   </div>
   <div v-else class="bg-white rounded-lg border border-gray-300 overflow-hidden">

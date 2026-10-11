@@ -197,7 +197,7 @@ watch(
                 />
                 <div class="progress-sweep" />
               </div>
-              <span class="w-[4.5rem] text-right text-[11px] text-gray-400 whitespace-nowrap tabular-nums">
+              <span class="w-18 text-right text-[11px] text-gray-400 whitespace-nowrap tabular-nums">
                 {{ c.formatTokens(c.tokenEstimate.value) }} / {{ c.formatTokens(c.maxInputTokens.value) }}
               </span>
             </div>

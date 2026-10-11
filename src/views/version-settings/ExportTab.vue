@@ -106,7 +106,7 @@ const bottomHint = computed(() => {
     <div class="flex-1 overflow-y-auto p-6">
       <div class="mx-auto max-w-2xl space-y-5">
         <!-- 基本信息 -->
-        <section class="rounded-xl border border-gray-200 bg-white p-5 shadow-sm">
+        <section class="rounded-xl border border-gray-200 bg-white p-5 shadow-xs">
           <h3 class="mb-3 text-sm font-semibold text-gray-700">基本信息</h3>
           <div class="space-y-3">
             <div class="flex items-center gap-3">
@@ -152,7 +152,7 @@ const bottomHint = computed(() => {
         </section>
 
         <!-- 导出选项 -->
-        <section class="rounded-xl border border-gray-200 bg-white p-5 shadow-sm">
+        <section class="rounded-xl border border-gray-200 bg-white p-5 shadow-xs">
           <div class="mb-3 flex items-center justify-between">
             <h3 class="text-sm font-semibold text-gray-700">导出选项</h3>
             <div class="flex gap-2">

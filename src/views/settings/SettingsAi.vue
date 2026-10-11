@@ -108,8 +108,8 @@ onUnmounted(async () => {
     <h3 class="text-sm font-semibold text-gray-900 px-5 pt-5 pb-3">本地 AI 服务</h3>
 
     <div v-if="loading" class="px-5 pb-5 space-y-3">
-      <div class="h-10 bg-gray-100 rounded animate-pulse" />
-      <div class="h-10 bg-gray-100 rounded animate-pulse" />
+      <div class="h-10 bg-gray-100 rounded-sm animate-pulse" />
+      <div class="h-10 bg-gray-100 rounded-sm animate-pulse" />
     </div>
 
     <template v-else>

@@ -65,7 +65,7 @@ function selectRow(id: string) {
             </td>
             <td class="px-2 py-2 text-xs text-gray-500">{{ formatDate(ver.release_date) }}</td>
             <td class="px-2 py-2">
-              <span class="text-[10px] px-1.5 py-0.5 rounded font-medium" :class="releaseTypeClass(ver.release_type)">
+              <span class="text-[10px] px-1.5 py-0.5 rounded-sm font-medium" :class="releaseTypeClass(ver.release_type)">
                 {{ ver.release_type }}
               </span>
             </td>

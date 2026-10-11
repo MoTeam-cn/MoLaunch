@@ -55,7 +55,7 @@ const emit = defineEmits<{
       <button
         v-for="p in packs"
         :key="p.path"
-        class="flex items-center gap-2 rounded border border-gray-200 px-3 py-2 text-left text-sm text-gray-700 hover:border-blue-400 hover:bg-blue-50"
+        class="flex items-center gap-2 rounded-sm border border-gray-200 px-3 py-2 text-left text-sm text-gray-700 hover:border-blue-400 hover:bg-blue-50"
         :disabled="opening"
         @click="emit('open', p.path)"
       >

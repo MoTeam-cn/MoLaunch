@@ -64,7 +64,7 @@ function handleLinkClick() {
   <!-- bar 风格：白底左色条 -->
   <div
     v-if="variant === 'bar'"
-    class="flex rounded-r-lg bg-white shadow-sm overflow-hidden"
+    class="flex rounded-r-lg bg-white shadow-xs overflow-hidden"
     :class="truncate ? 'items-center h-8' : 'items-start min-h-8'"
   >
     <div class="w-[3px] self-stretch shrink-0" :class="barConfig.color"></div>

@@ -52,7 +52,7 @@ const {
         <div
           v-if="currentCard"
           :key="currentCard.key"
-          class="flex h-full flex-col rounded-xl border border-gray-200 bg-gradient-to-br from-gray-50 to-white px-5 py-4 shadow-sm"
+          class="flex h-full flex-col rounded-xl border border-gray-200 bg-linear-to-br from-gray-50 to-white px-5 py-4 shadow-xs"
         >
           <!-- 标题行 -->
           <div class="flex items-center gap-2 text-gray-500">

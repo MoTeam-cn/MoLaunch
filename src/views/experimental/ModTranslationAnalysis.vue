@@ -88,7 +88,7 @@ const dispositionLabels: Record<string, string> = {
         </div>
       </div>
 
-      <div class="mt-4 border border-gray-200 rounded overflow-hidden">
+      <div class="mt-4 border border-gray-200 rounded-sm overflow-hidden">
         <div class="bg-gray-50 px-3 py-2 text-xs text-gray-500 flex items-center gap-3 border-b border-gray-200">
           <span class="w-32 shrink-0">类型</span>
           <span class="flex-1 truncate">文件</span>
@@ -133,7 +133,7 @@ const dispositionLabels: Record<string, string> = {
               <div>class 批次：{{ props.analyzeResult.quote.classBatches }}</div>
               <div>预估点数：{{ props.analyzeResult.quote.points }}</div>
             </div>
-            <div class="border border-gray-200 rounded overflow-hidden">
+            <div class="border border-gray-200 rounded-sm overflow-hidden">
               <div class="max-h-40 overflow-y-auto divide-y divide-gray-100">
                 <div
                   v-for="item in props.analyzeResult.coverage"

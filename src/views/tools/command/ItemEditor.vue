@@ -91,7 +91,7 @@ async function copyCommand() {
       <div>
         <div class="text-xs font-medium text-gray-500 mb-2">选择物品</div>
         <Input v-model="keyword" placeholder="搜索物品（ID / 名称 / 中文 / 拼音）…" size="small" clearable />
-        <div v-if="filteredItems.length && !selected" class="mt-2 max-h-48 overflow-y-auto rounded border border-gray-200">
+        <div v-if="filteredItems.length && !selected" class="mt-2 max-h-48 overflow-y-auto rounded-sm border border-gray-200">
           <button
             v-for="item in filteredItems"
             :key="item.id"
@@ -103,7 +103,7 @@ async function copyCommand() {
             <span class="truncate text-gray-400">{{ item.zh || item.name }}</span>
           </button>
         </div>
-        <div v-if="selected" class="mt-2 flex items-center justify-between rounded border border-primary-200 bg-primary-50 px-3 py-2">
+        <div v-if="selected" class="mt-2 flex items-center justify-between rounded-sm border border-primary-200 bg-primary-50 px-3 py-2">
           <span class="text-xs font-medium text-primary-700">{{ selected.id }}</span>
           <Button type="text" size="mini" @click="selected = null">重新选择</Button>
         </div>
@@ -166,7 +166,7 @@ async function copyCommand() {
       <!-- 指令结果 -->
       <div class="border-t border-gray-100 pt-4">
         <div class="text-xs font-medium text-gray-500 mb-2">生成指令</div>
-        <div class="rounded-lg bg-gray-50 px-3 py-2.5 font-mono text-xs break-all text-gray-700 min-h-[2.5rem]">
+        <div class="rounded-lg bg-gray-50 px-3 py-2.5 font-mono text-xs break-all text-gray-700 min-h-10">
           {{ command || '请先选择物品' }}
         </div>
         <div class="mt-2 flex justify-end">

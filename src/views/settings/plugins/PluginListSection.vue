@@ -155,7 +155,7 @@ async function onRefresh() {
             <div class="flex flex-wrap items-center gap-2">
               <p class="text-sm font-medium text-gray-900">{{ manifest.name }}</p>
               <span
-                class="inline-flex items-center gap-0.5 rounded px-1.5 py-0.5 text-[10px] font-medium"
+                class="inline-flex items-center gap-0.5 rounded-sm px-1.5 py-0.5 text-[10px] font-medium"
                 :class="manifest.builtin
                   ? 'bg-gray-100 text-gray-600'
                   : 'bg-blue-50 text-blue-700'"
@@ -165,7 +165,7 @@ async function onRefresh() {
                 {{ manifest.builtin ? '内置' : '外部' }}
               </span>
               <Tooltip :text="`能力：${getCapabilityText(manifest.id)}`">
-                <span class="inline-flex items-center gap-0.5 rounded bg-primary-50 px-1.5 py-0.5 text-[10px] font-medium text-primary-700">
+                <span class="inline-flex items-center gap-0.5 rounded-sm bg-primary-50 px-1.5 py-0.5 text-[10px] font-medium text-primary-700">
                   <InformationCircleIcon class="h-3 w-3" />
                   {{ getCapabilityText(manifest.id) }}
                 </span>
@@ -183,7 +183,7 @@ async function onRefresh() {
                 <!-- 内置插件：全部 -->
                 <span
                   v-if="getDeclaredPermissions(manifest.id) === null"
-                  class="inline-flex items-center rounded bg-green-50 px-1.5 py-0.5 text-[10px] font-medium text-green-700"
+                  class="inline-flex items-center rounded-sm bg-green-50 px-1.5 py-0.5 text-[10px] font-medium text-green-700"
                 >
                   <ShieldCheckIcon class="mr-0.5 h-2.5 w-2.5" />
                   全部（无沙箱限制）
@@ -196,7 +196,7 @@ async function onRefresh() {
                     :text="`${getPermMeta(perm).description} — ${getPermMeta(perm).useCase}`"
                   >
                     <span
-                      class="inline-flex items-center gap-0.5 rounded px-1.5 py-0.5 text-[10px] font-medium"
+                      class="inline-flex items-center gap-0.5 rounded-sm px-1.5 py-0.5 text-[10px] font-medium"
                       :class="getPermMeta(perm).risk === 'high'
                         ? 'bg-red-50 text-red-700'
                         : 'bg-blue-50 text-blue-700'"
@@ -209,7 +209,7 @@ async function onRefresh() {
                   <span
                     v-for="perm in PERMISSION_REGISTRY.filter((p) => p.alwaysAllowed)"
                     :key="perm.name"
-                    class="inline-flex items-center rounded bg-gray-100 px-1.5 py-0.5 text-[10px] font-medium text-gray-500"
+                    class="inline-flex items-center rounded-sm bg-gray-100 px-1.5 py-0.5 text-[10px] font-medium text-gray-500"
                   >
                     {{ perm.name }} *
                   </span>
@@ -248,7 +248,7 @@ async function onRefresh() {
                  Button.vue 的 scoped size 类固定 padding 会破坏紧凑尺寸 -->
             <button
               v-if="!manifest.builtin"
-              class="inline-flex items-center gap-1 rounded px-2 py-1 text-[11px] text-red-500 hover:bg-red-50"
+              class="inline-flex items-center gap-1 rounded-sm px-2 py-1 text-[11px] text-red-500 hover:bg-red-50"
               @click="onUninstallPlugin(manifest.id, manifest.name)"
             >
               <TrashIcon class="h-3 w-3" />

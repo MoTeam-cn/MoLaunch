@@ -254,7 +254,7 @@ onUnmounted(() => {
             <ServerStackIcon class="w-4 h-4 text-gray-400" />
             <span>房间标识</span>
           </div>
-          <code class="text-sm font-semibold text-primary-600 tracking-wider bg-primary-50 px-2 py-1 rounded">
+          <code class="text-sm font-semibold text-primary-600 tracking-wider bg-primary-50 px-2 py-1 rounded-sm">
             {{ room.publicIdentifier }}
           </code>
         </div>
@@ -289,7 +289,7 @@ onUnmounted(() => {
           {{ connStateText }}
         </span>
       </div>
-      <div v-if="easytier.error.value" class="mt-2 p-2 bg-red-50 rounded text-xs text-red-700 flex items-start gap-1.5">
+      <div v-if="easytier.error.value" class="mt-2 p-2 bg-red-50 rounded-sm text-xs text-red-700 flex items-start gap-1.5">
         <ExclamationTriangleIcon class="w-3.5 h-3.5 mt-0.5 shrink-0" />
         <span>{{ easytier.error.value }}</span>
       </div>
@@ -301,7 +301,7 @@ onUnmounted(() => {
     <Card title="进服地址">
       <div v-if="entryAddress" class="py-1 flex items-center justify-between gap-2">
         <div class="flex-1 min-w-0">
-          <code class="text-base font-mono font-semibold text-green-700 bg-green-50 px-3 py-1.5 rounded block truncate">
+          <code class="text-base font-mono font-semibold text-green-700 bg-green-50 px-3 py-1.5 rounded-sm block truncate">
             {{ entryAddress }}
           </code>
         </div>

@@ -30,9 +30,9 @@ import { ShieldCheckIcon } from '@heroicons/vue/24/outline'
         <div
           v-for="perm in PERMISSION_REGISTRY.filter((p) => p.alwaysAllowed)"
           :key="perm.name"
-          class="grid grid-cols-[180px_1fr] items-start gap-3 rounded bg-gray-50 px-3 py-2"
+          class="grid grid-cols-[180px_1fr] items-start gap-3 rounded-sm bg-gray-50 px-3 py-2"
         >
-          <span class="inline-flex items-center rounded bg-gray-200 px-1.5 py-0.5 text-[10px] font-mono font-medium text-gray-600">
+          <span class="inline-flex items-center rounded-sm bg-gray-200 px-1.5 py-0.5 text-[10px] font-mono font-medium text-gray-600">
             {{ perm.name }}
           </span>
           <div class="min-w-0">
@@ -50,16 +50,16 @@ import { ShieldCheckIcon } from '@heroicons/vue/24/outline'
         <div
           v-for="perm in NORMAL_PERMISSIONS"
           :key="perm.name"
-          class="grid grid-cols-[180px_1fr] items-start gap-3 rounded bg-blue-50/50 px-3 py-2"
+          class="grid grid-cols-[180px_1fr] items-start gap-3 rounded-sm bg-blue-50/50 px-3 py-2"
         >
-          <span class="inline-flex items-center rounded bg-blue-50 px-1.5 py-0.5 text-[10px] font-mono font-medium text-blue-700">
+          <span class="inline-flex items-center rounded-sm bg-blue-50 px-1.5 py-0.5 text-[10px] font-mono font-medium text-blue-700">
             {{ perm.name }}
           </span>
           <div class="min-w-0">
             <div class="flex flex-wrap items-center gap-2">
               <p class="text-xs text-gray-700">{{ perm.description }}</p>
               <span
-                class="inline-flex items-center rounded px-1 py-0.5 text-[9px] font-medium"
+                class="inline-flex items-center rounded-sm px-1 py-0.5 text-[9px] font-medium"
                 :class="RISK_STYLES[perm.risk].bg + ' ' + RISK_STYLES[perm.risk].text"
               >
                 {{ RISK_STYLES[perm.risk].label }}
@@ -78,16 +78,16 @@ import { ShieldCheckIcon } from '@heroicons/vue/24/outline'
         <div
           v-for="perm in ADVANCED_PERMISSIONS"
           :key="perm.name"
-          class="grid grid-cols-[180px_1fr] items-start gap-3 rounded bg-red-50/50 px-3 py-2"
+          class="grid grid-cols-[180px_1fr] items-start gap-3 rounded-sm bg-red-50/50 px-3 py-2"
         >
-          <span class="inline-flex items-center rounded bg-red-50 px-1.5 py-0.5 text-[10px] font-mono font-medium text-red-700">
+          <span class="inline-flex items-center rounded-sm bg-red-50 px-1.5 py-0.5 text-[10px] font-mono font-medium text-red-700">
             {{ perm.name }}
           </span>
           <div class="min-w-0">
             <div class="flex flex-wrap items-center gap-2">
               <p class="text-xs text-gray-700">{{ perm.description }}</p>
               <span
-                class="inline-flex items-center rounded px-1 py-0.5 text-[9px] font-medium"
+                class="inline-flex items-center rounded-sm px-1 py-0.5 text-[9px] font-medium"
                 :class="RISK_STYLES[perm.risk].bg + ' ' + RISK_STYLES[perm.risk].text"
               >
                 {{ RISK_STYLES[perm.risk].label }}

@@ -105,7 +105,7 @@ defineExpose({ checkArrows })
     <!-- 左箭头 -->
     <button
       v-if="showLeftArrow"
-      class="shrink-0 absolute left-0 z-10 w-6 h-7 flex items-center justify-center bg-white/90 backdrop-blur-sm rounded-md shadow-sm hover:bg-gray-50 transition-opacity"
+      class="shrink-0 absolute left-0 z-10 w-6 h-7 flex items-center justify-center bg-white/90 backdrop-blur-xs rounded-md shadow-xs hover:bg-gray-50 transition-opacity"
       @click="scrollBy('left')"
     >
       <ChevronLeftIcon class="w-4 h-4 text-gray-500" />
@@ -150,7 +150,7 @@ defineExpose({ checkArrows })
     <!-- 右箭头 -->
     <button
       v-if="showRightArrow"
-      class="shrink-0 absolute right-0 z-10 w-6 h-7 flex items-center justify-center bg-white/90 backdrop-blur-sm rounded-md shadow-sm hover:bg-gray-50 transition-opacity"
+      class="shrink-0 absolute right-0 z-10 w-6 h-7 flex items-center justify-center bg-white/90 backdrop-blur-xs rounded-md shadow-xs hover:bg-gray-50 transition-opacity"
       @click="scrollBy('right')"
     >
       <ChevronRightIcon class="w-4 h-4 text-gray-500" />

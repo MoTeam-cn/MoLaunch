@@ -99,7 +99,7 @@ watch(
     >
       <div
         v-if="visible && project"
-        class="fixed inset-0 z-[10000] flex items-start justify-center px-4 pt-14 pb-4"
+        class="fixed inset-0 z-10000 flex items-start justify-center px-4 pt-14 pb-4"
         @click.self="emit('close')"
       >
         <div class="absolute inset-0 bg-black/40" />
@@ -128,7 +128,7 @@ watch(
                 <div class="w-full max-w-sm">
                   <div class="h-1.5 overflow-hidden rounded-full bg-gray-100">
                     <div
-                      class="h-full rounded-full bg-gradient-to-r from-primary-400 to-primary-600 transition-all duration-300 ease-out"
+                      class="h-full rounded-full bg-linear-to-r from-primary-400 to-primary-600 transition-all duration-300 ease-out"
                       :style="{ width: Math.min(100, percent) + '%' }"
                     />
                   </div>

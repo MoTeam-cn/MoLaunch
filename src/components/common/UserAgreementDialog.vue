@@ -1,7 +1,7 @@
 <template>
   <Teleport to="body">
     <Transition name="agreement-fade">
-      <div v-if="visible" class="fixed inset-0 z-[10050] flex items-center justify-center p-4">
+      <div v-if="visible" class="fixed inset-0 z-10050 flex items-center justify-center p-4">
         <div data-tauri-drag-region class="absolute inset-0 bg-black/40" />
 
         <div class="relative w-full max-w-3xl overflow-hidden rounded-lg bg-white shadow-xl">
@@ -11,7 +11,7 @@
               <ShieldCheckIcon class="h-5 w-5 shrink-0 text-primary-500" />
               <span class="truncate text-sm font-semibold text-gray-800">{{ config?.title || 'MoLaunch 用户协议' }}</span>
             </div>
-            <span class="shrink-0 rounded bg-gray-100 px-1.5 py-0.5 text-[11px] text-gray-500">v{{ currentVersion }}</span>
+            <span class="shrink-0 rounded-sm bg-gray-100 px-1.5 py-0.5 text-[11px] text-gray-500">v{{ currentVersion }}</span>
           </div>
 
           <!-- 内容区 -->
@@ -67,7 +67,7 @@
               <p class="flex-1 text-[12px] leading-relaxed text-gray-600">确定要退出 MoLaunch 吗？</p>
               <div class="flex shrink-0 items-center gap-2">
                 <Button type="ghost" size="small" @click="leaving = false">返回上一步</Button>
-                <Button type="ghost" size="small" class="!text-red-500" @click="handleCancel">确定退出</Button>
+                <Button type="ghost" size="small" class="text-red-500!" @click="handleCancel">确定退出</Button>
               </div>
             </div>
             <!-- 正常态：已读确认 + 取消 / 同意 -->

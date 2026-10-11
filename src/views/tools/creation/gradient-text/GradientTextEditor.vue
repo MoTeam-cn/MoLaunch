@@ -79,7 +79,7 @@ const activeFormats = computed(() => currentLineFormats())
       ref="textareaRef"
       v-model="plainText"
       rows="4"
-      class="w-full resize-y rounded border border-gray-300 px-3 py-2 text-sm leading-relaxed text-gray-800 outline-none transition focus:border-primary-500"
+      class="w-full resize-y rounded-sm border border-gray-300 px-3 py-2 text-sm leading-relaxed text-gray-800 outline-hidden transition focus:border-primary-500"
       placeholder="输入要生成渐变效果的文字…"
       @input="syncDocumentFromPlainText(($event.target as HTMLTextAreaElement).value)"
     />
@@ -87,7 +87,7 @@ const activeFormats = computed(() => currentLineFormats())
       <Tooltip v-for="meta in formatMeta" :key="meta.format" :text="meta.title">
         <button
           type="button"
-          class="flex h-7 w-7 items-center justify-center rounded border text-xs font-semibold transition"
+          class="flex h-7 w-7 items-center justify-center rounded-sm border text-xs font-semibold transition"
           :class="
             activeFormats.has(meta.format)
               ? 'border-primary-500 bg-primary-50 text-primary-600'

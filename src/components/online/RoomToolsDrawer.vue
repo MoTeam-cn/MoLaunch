@@ -146,7 +146,7 @@ function latencyColor(ms: number): string {
           </div>
           <div v-if="mcResult.error" class="text-xs text-red-600">{{ mcResult.error }}</div>
           <template v-else>
-            <div class="text-xs text-gray-700 whitespace-pre-wrap break-words">{{ mcResult.motd || '（无 MOTD）' }}</div>
+            <div class="text-xs text-gray-700 whitespace-pre-wrap wrap-break-word">{{ mcResult.motd || '（无 MOTD）' }}</div>
             <div class="flex items-center gap-4 text-xs text-gray-500">
               <span class="flex items-center gap-1"><UsersIcon class="w-3.5 h-3.5" />{{ mcResult.online }} / {{ mcResult.max }}</span>
               <span class="flex items-center gap-1"><TagIcon class="w-3.5 h-3.5" />{{ mcResult.version || '未知版本' }}</span>

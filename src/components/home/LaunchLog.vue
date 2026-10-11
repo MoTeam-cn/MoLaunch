@@ -129,7 +129,7 @@ const javaDlStageText = computed(() => {
         <div class="w-full max-w-md">
           <div class="h-1.5 overflow-hidden rounded-full bg-gray-100">
             <div
-              class="h-full rounded-full bg-gradient-to-r from-primary-400 to-primary-600 transition-all duration-300 ease-out"
+              class="h-full rounded-full bg-linear-to-r from-primary-400 to-primary-600 transition-all duration-300 ease-out"
               :style="{ width: displayPercent + '%' }"
             />
           </div>

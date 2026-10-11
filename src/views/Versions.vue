@@ -131,7 +131,7 @@ onMounted(async () => {
 </script>
 
 <template>
-  <div class="flex h-full rounded-xl overflow-hidden bg-white shadow-sm">
+  <div class="flex h-full rounded-xl overflow-hidden bg-white shadow-xs">
     <!-- 左侧菜单（公共组件，tab 同步到 URL query；底部插槽渲染「打开游戏目录」按钮） -->
     <NavSidebar :model-value="activeCategory" :categories="categories" @update:model-value="handleSelectCategory">
       <div class="p-3 border-t border-gray-200">

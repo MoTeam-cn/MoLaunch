@@ -206,7 +206,7 @@ onBeforeUnmount(() => {
       <div class="ml-auto flex items-center gap-1.5">
         <button
           type="button"
-          class="flex items-center gap-1 rounded border px-2 py-1 text-xs"
+          class="flex items-center gap-1 rounded-sm border px-2 py-1 text-xs"
           :class="tool === 'pencil' ? 'border-blue-400 bg-blue-50 text-blue-600' : 'border-gray-300 text-gray-600 hover:bg-gray-50'"
           @click="tool = 'pencil'"
         >
@@ -214,7 +214,7 @@ onBeforeUnmount(() => {
         </button>
         <button
           type="button"
-          class="flex items-center gap-1 rounded border px-2 py-1 text-xs"
+          class="flex items-center gap-1 rounded-sm border px-2 py-1 text-xs"
           :class="tool === 'eraser' ? 'border-blue-400 bg-blue-50 text-blue-600' : 'border-gray-300 text-gray-600 hover:bg-gray-50'"
           @click="tool = 'eraser'"
         >
@@ -222,7 +222,7 @@ onBeforeUnmount(() => {
         </button>
         <button
           type="button"
-          class="flex items-center gap-1 rounded border px-2 py-1 text-xs"
+          class="flex items-center gap-1 rounded-sm border px-2 py-1 text-xs"
           :class="tool === 'picker' ? 'border-blue-400 bg-blue-50 text-blue-600' : 'border-gray-300 text-gray-600 hover:bg-gray-50'"
           @click="tool = 'picker'"
         >
@@ -230,7 +230,7 @@ onBeforeUnmount(() => {
         </button>
         <button
           type="button"
-          class="flex items-center gap-1 rounded border px-2 py-1 text-xs"
+          class="flex items-center gap-1 rounded-sm border px-2 py-1 text-xs"
           :class="showGrid ? 'border-blue-400 bg-blue-50 text-blue-600' : 'border-gray-300 text-gray-600 hover:bg-gray-50'"
           @click="showGrid = !showGrid"
         >
@@ -238,7 +238,7 @@ onBeforeUnmount(() => {
         </button>
         <button
           type="button"
-          class="flex items-center gap-1 rounded border border-gray-300 px-2 py-1 text-xs text-gray-600 hover:bg-gray-50 disabled:opacity-40"
+          class="flex items-center gap-1 rounded-sm border border-gray-300 px-2 py-1 text-xs text-gray-600 hover:bg-gray-50 disabled:opacity-40"
           :disabled="!canUndo"
           @click="undo"
         >
@@ -255,12 +255,12 @@ onBeforeUnmount(() => {
       </div>
     </div>
 
-    <div class="flex flex-wrap items-center gap-1.5 rounded border border-gray-200 bg-gray-50 p-2">
+    <div class="flex flex-wrap items-center gap-1.5 rounded-sm border border-gray-200 bg-gray-50 p-2">
       <span class="text-xs text-gray-500">颜色</span>
       <Tooltip v-for="c in MC_COLORS" :key="c" :text="c">
         <button
           type="button"
-          class="h-5 w-5 rounded-sm border border-black/10"
+          class="h-5 w-5 rounded-xs border border-black/10"
           :class="color.toLowerCase() === c.toLowerCase() ? 'ring-2 ring-blue-500 ring-offset-1' : ''"
           :style="{ backgroundColor: c }"
           @click="color = c"
@@ -268,7 +268,7 @@ onBeforeUnmount(() => {
       </Tooltip>
       <Tooltip text="自定义颜色">
         <label
-          class="relative ml-1 h-5 w-5 cursor-pointer overflow-hidden rounded-sm border border-gray-300 bg-white"
+          class="relative ml-1 h-5 w-5 cursor-pointer overflow-hidden rounded-xs border border-gray-300 bg-white"
         >
           <input v-model="color" type="color" class="absolute inset-0 h-full w-full cursor-pointer opacity-0" />
         </label>
@@ -279,7 +279,7 @@ onBeforeUnmount(() => {
     <div v-if="loading" class="py-8 text-center text-sm text-gray-400">纹理加载中…</div>
     <div
       v-else
-      class="grid place-items-center overflow-auto rounded border border-gray-200 bg-white p-2"
+      class="grid place-items-center overflow-auto rounded-sm border border-gray-200 bg-white p-2"
     >
       <canvas
         ref="canvasRef"

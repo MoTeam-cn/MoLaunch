@@ -152,7 +152,7 @@ watch(
     <!-- 读取中 -->
     <div
       v-if="enabled && loading"
-      class="modpack-fade-in flex items-center gap-2 px-3 py-2 bg-gray-50 rounded text-xs text-gray-500"
+      class="modpack-fade-in flex items-center gap-2 px-3 py-2 bg-gray-50 rounded-sm text-xs text-gray-500"
     >
       <ArrowPathIcon class="w-3.5 h-3.5 animate-spin" />
       <span>正在读取整合包元数据...</span>
@@ -161,7 +161,7 @@ watch(
     <!-- 错误提示 -->
     <div
       v-else-if="enabled && error"
-      class="modpack-fade-in px-3 py-2 bg-red-50 rounded text-xs text-red-600"
+      class="modpack-fade-in px-3 py-2 bg-red-50 rounded-sm text-xs text-red-600"
     >
       {{ error }}
     </div>
@@ -169,7 +169,7 @@ watch(
     <!-- 整合包信息卡 -->
     <div
       v-else-if="enabled && localMeta"
-      class="modpack-fade-in px-3 py-2.5 bg-primary-50/40 rounded border border-primary-100 space-y-1.5"
+      class="modpack-fade-in px-3 py-2.5 bg-primary-50/40 rounded-sm border border-primary-100 space-y-1.5"
     >
       <div class="flex items-center gap-2">
         <CubeIcon class="w-4 h-4 text-primary-600 shrink-0" />
@@ -188,7 +188,7 @@ watch(
     <!-- 空状态：无整合包元数据（icon + text 垂直水平居中） -->
     <div
       v-else-if="enabled && !localMeta && !loading && !error"
-      class="modpack-fade-in py-5 flex flex-col items-center justify-center gap-2 text-gray-400 bg-gray-50 rounded"
+      class="modpack-fade-in py-5 flex flex-col items-center justify-center gap-2 text-gray-400 bg-gray-50 rounded-sm"
     >
       <ArchiveBoxXMarkIcon class="w-6 h-6" />
       <span class="text-xs">该版本无整合包元数据（非平台安装或原版）</span>

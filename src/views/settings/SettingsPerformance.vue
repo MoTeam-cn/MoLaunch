@@ -40,8 +40,8 @@ function saveReleaseMemoryOnTray(v: boolean) {
     <div v-if="!loaded" class="space-y-6">
       <div class="bg-white rounded-lg border border-gray-300 overflow-hidden">
         <div class="px-5 py-5">
-          <div class="h-4 w-24 bg-gray-200 rounded animate-pulse mb-4" />
-          <div class="h-10 bg-gray-100 rounded animate-pulse" />
+          <div class="h-4 w-24 bg-gray-200 rounded-sm animate-pulse mb-4" />
+          <div class="h-10 bg-gray-100 rounded-sm animate-pulse" />
         </div>
       </div>
     </div>

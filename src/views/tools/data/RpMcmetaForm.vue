@@ -170,7 +170,7 @@ async function doSave() {
       <h4 class="text-sm font-medium text-gray-700">pack.mcmeta</h4>
       <span class="text-xs text-gray-400">包元信息</span>
     </div>
-    <div class="overflow-hidden rounded border border-gray-200">
+    <div class="overflow-hidden rounded-sm border border-gray-200">
       <div class="flex border-b border-gray-200">
         <div class="w-32 shrink-0 bg-gray-50 px-3 py-2 text-xs text-gray-500">pack_format</div>
         <div class="flex-1 px-3 py-1.5">

@@ -182,7 +182,7 @@ onActivated(() => {
           v-for="pkg in packages"
           :key="pkg.modpackId"
           class="rounded-lg border bg-white overflow-hidden"
-          :class="expandedId === pkg.modpackId ? 'border-primary-300 shadow-sm' : 'border-gray-200 hover:border-primary-300 hover:shadow-sm transition-all'"
+          :class="expandedId === pkg.modpackId ? 'border-primary-300 shadow-xs' : 'border-gray-200 hover:border-primary-300 hover:shadow-xs transition-all'"
         >
           <button
             type="button"
@@ -222,7 +222,7 @@ onActivated(() => {
         <div
           v-if="otherRoomCount > 0"
           class="rounded-lg border bg-white overflow-hidden"
-          :class="expandedId === OTHER_GROUP_ID ? 'border-primary-300 shadow-sm' : 'border-gray-200 hover:border-primary-300 hover:shadow-sm transition-all'"
+          :class="expandedId === OTHER_GROUP_ID ? 'border-primary-300 shadow-xs' : 'border-gray-200 hover:border-primary-300 hover:shadow-xs transition-all'"
         >
           <button
             type="button"

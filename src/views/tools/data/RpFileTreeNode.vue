@@ -66,7 +66,7 @@ function handleClick(child: RpTreeNode) {
     <div v-for="child in node.children" :key="child.rel_path">
       <Tooltip :text="child.rel_path" block overflow-only>
         <div
-          class="flex cursor-pointer select-none items-center gap-1 rounded px-1.5 py-0.5 text-sm"
+          class="flex cursor-pointer select-none items-center gap-1 rounded-sm px-1.5 py-0.5 text-sm"
           :class="
             child.kind === 'file' && child.rel_path === selectedPath
               ? 'bg-blue-100 text-blue-700'
@@ -87,7 +87,7 @@ function handleClick(child: RpTreeNode) {
           <span class="truncate">{{ child.name }}</span>
           <span
             v-if="child.animated"
-            class="ml-1 shrink-0 rounded bg-purple-100 px-1 text-[10px] leading-4 text-purple-600"
+            class="ml-1 shrink-0 rounded-sm bg-purple-100 px-1 text-[10px] leading-4 text-purple-600"
           >动画</span>
           <span v-if="child.kind === 'file'" class="ml-auto shrink-0 pl-1 text-[10px] text-gray-400">
             {{ formatBytes(child.size) }}

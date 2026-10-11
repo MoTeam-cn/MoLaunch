@@ -50,7 +50,7 @@ const hasCompatibleVersion = () => props.dep.suggestedVersion !== null
          Button.vue 的 scoped size 类与布局不适合复选框场景 -->
     <button
       type="button"
-      class="w-5 h-5 shrink-0 flex items-center justify-center rounded border-2 transition-colors"
+      class="w-5 h-5 shrink-0 flex items-center justify-center rounded-sm border-2 transition-colors"
       :class="selected
         ? 'bg-primary-500 border-primary-500'
         : 'bg-white border-gray-300 hover:border-primary-400'"
@@ -63,7 +63,7 @@ const hasCompatibleVersion = () => props.dep.suggestedVersion !== null
     </button>
 
     <!-- logo -->
-    <div class="w-8 h-8 shrink-0 rounded overflow-hidden bg-gray-100 flex items-center justify-center">
+    <div class="w-8 h-8 shrink-0 rounded-sm overflow-hidden bg-gray-100 flex items-center justify-center">
       <CachedImage :src="logoUrl()" :alt="projectName()" class="w-full h-full object-cover">
         <template #fallback>
           <svg class="w-5 h-5 text-gray-300" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
@@ -79,7 +79,7 @@ const hasCompatibleVersion = () => props.dep.suggestedVersion !== null
         <span class="text-sm font-medium text-gray-900 truncate">{{ projectName() }}</span>
         <Tag size="small" color="gray" class="shrink-0">{{ platformLabel() }}</Tag>
         <Tooltip v-if="depthLabel()" :text="depthLabel()" position="top">
-          <span class="text-[10px] px-1 py-0.5 rounded bg-amber-100 text-amber-600 shrink-0">{{ depthLabel() }}</span>
+          <span class="text-[10px] px-1 py-0.5 rounded-sm bg-amber-100 text-amber-600 shrink-0">{{ depthLabel() }}</span>
         </Tooltip>
       </div>
       <div class="text-xs text-gray-500 truncate">{{ versionInfo() }}</div>
