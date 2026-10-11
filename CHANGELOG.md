@@ -49,6 +49,8 @@
 
 ### Fixed
 
+- **抽出系统内存可视化条组件**（[MemoryUsageBar.vue](src/components/settings/MemoryUsageBar.vue)（新增））：[MemorySection.vue](src/views/version-settings/MemorySection.vue) 与 [MemoryAllocation.vue](src/views/settings/settings-launch/MemoryAllocation.vue) 各自维护一份逐字相同的三段内存比例条模板（总览 + 已用/游戏/剩余三段 + 图例，共约 26 行）。已抽出共享组件，数据经 props 传入（本组件不持有数据源）；[useMemoryVisualizer.ts](src/composables/useMemoryVisualizer.ts) 的 `SystemMemory` 接口随之导出供组件复用。两处父组件不再需要 `Tooltip` 与 `formatBytes`，已清理。
+
 - **统一版本号比较**（[versions.ts](src/utils/recipe-generator/versions.ts) / [VersionStatsPanel.vue](src/plugins/version-stats/VersionStatsPanel.vue)）：两处各自实现逐段数字比较，已改为复用 [utils/version.ts](src/utils/version.ts) 的 `compareVersion`。顺带修掉两个真实缺陷：① `compareMinecraftVersions` 用 `Number()` 后以 `?? 0` 兜底，**拦不住 NaN**——`1.20.1-forge` 会产生 NaN 段，而 `NaN !== 0` 成立、`NaN > 0` 为假，被误判为更小；② VersionStatsPanel 的排序比较器在 `'其他'` 桶（非数字）上返回 `NaN`，而 **`sort` 的比较器返回 NaN 属未定义行为**。`compareVersion` 用 `parseInt` + `filter` 剔除 NaN 段，两处行为均得以修正。
 
 - **复用共享 RGB→HEX 工具**（[RpPixelEditor.vue](src/views/tools/data/RpPixelEditor.vue)）：该文件自写的 `rgbToHex` 与 [utils/color.ts](src/utils/color.ts) 的同名函数语义一致（均为小写 `#rrggbb`），已删除本地实现改用共享版（共享版额外做 0–255 clamp）。

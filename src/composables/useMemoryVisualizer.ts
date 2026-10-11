@@ -13,7 +13,7 @@ import * as tauri from '@/utils/tauri'
 /** 后端内存推送事件名（与 src-tauri/src/commands/system/memory_push.rs 约定一致） */
 const MEMORY_PUSH_EVENT = 'memory-info'
 
-interface SystemMemory {
+export interface SystemMemory {
   total: number
   used: number
   available: number
