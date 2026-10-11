@@ -71,6 +71,9 @@ pub struct LaunchAdvancedSnapshot {
 pub struct OnlineSnapshot {
     #[serde(rename = "onlineApiServerUrl")]
     pub api_server_url: String,
+    /// 是否启用联机大厅（与云端交互总开关）
+    #[serde(rename = "onlineLobbyEnabled", default)]
+    pub lobby_enabled: bool,
     /// 用户自定义 TURN 服务器列表（阶段三子任务 7 新增）
     #[serde(rename = "onlineCustomTurnServers", default)]
     pub custom_turn_servers: Vec<IceServerEntry>,

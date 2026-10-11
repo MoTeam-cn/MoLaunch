@@ -124,6 +124,14 @@ function handleCategoryChange(id: string): void {
       install.promptMissing(sealed.label)
       return
     }
+    if (!onlineStore.lobbyEnabled) {
+      // 未启用联机大厅：不是连接失败，而是用户尚未开启与云端交互
+      showWarning(
+        '功能已封存',
+        `「${sealed.label}」需要先在「设置 → 联机」页启用联机大厅（与云端交互）后才能使用。`,
+      )
+      return
+    }
     showWarning(
       '功能已封存',
       `「${sealed.label}」需要连接云端服务，当前云端连接失败，暂不可用。`,

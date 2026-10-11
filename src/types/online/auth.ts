@@ -38,6 +38,8 @@ export interface AuthInitResult {
   status: DeviceStatus
   /** 错误信息（null 表示成功；非 null 表示云端连接失败，需降级） */
   error: string | null
+  /** 是否因「联机大厅未启用」而跳过云端交互（true 时未发起任何网络请求） */
+  disabled: boolean
 }
 
 /**

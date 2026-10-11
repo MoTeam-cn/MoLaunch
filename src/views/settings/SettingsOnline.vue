@@ -1,9 +1,10 @@
 <script setup lang="ts">
 /**
- * 设置 - 联机 Tab：ApiServerCard + easytier 内核/公共节点 + 设备管理
+ * 设置 - 联机 Tab：联机大厅开关 + ApiServerCard + easytier 内核/公共节点 + 设备管理
  */
 import { onMounted, defineAsyncComponent } from 'vue'
 import { useOnlineStore } from '@/stores/online'
+const OnlineLobbyCard = defineAsyncComponent(() => import('@/components/settings/OnlineLobbyCard.vue'))
 const ApiServerCard = defineAsyncComponent(() => import('@/components/settings/ApiServerCard.vue'))
 const EasyTierKernelCard = defineAsyncComponent(() => import('@/components/settings/EasyTierKernelCard.vue'))
 const GithubProxiesEditor = defineAsyncComponent(() => import('@/components/settings/GithubProxiesEditor.vue'))
@@ -20,6 +21,9 @@ onMounted(() => {
 
 <template>
   <div class="space-y-6">
+    <!-- 联机大厅开关（与云端交互总开关） -->
+    <OnlineLobbyCard />
+
     <!-- api-server 配置（自管理加载状态） -->
     <ApiServerCard />
 

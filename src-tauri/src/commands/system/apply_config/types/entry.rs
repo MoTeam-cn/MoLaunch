@@ -89,6 +89,7 @@ pub fn build_snapshot(
         },
         online: OnlineSnapshot {
             api_server_url: config.online.api_server_url.clone(),
+            lobby_enabled: config.online.lobby_enabled,
             custom_turn_servers: config.online.custom_turn_servers.clone(),
             easytier_public_peers: config.online.easytier_public_peers.clone(),
             github_proxies: config.online.github_proxies.clone(),

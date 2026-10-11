@@ -58,6 +58,12 @@ pub struct LaunchAdvancedConfig {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct OnlineConfig {
     pub api_server_url: String,
+    /// 是否启用联机大厅（用户显式开启并同意与云端交互后为 true）
+    ///
+    /// 为 false 时启动流程不发起任何云端请求（不静默注册、不续期 token），
+    /// 联机大厅/房间等云端功能整体不可用；FRP 使用独立凭证体系，不受此开关影响。
+    #[serde(default)]
+    pub lobby_enabled: bool,
     #[serde(default)]
     pub custom_turn_servers: Vec<IceServerEntry>,
     /// easytier-core 可执行文件路径（绝对路径；留空使用内置嵌入式资源，释放到 AppData/.Molaunch/easytier/）
@@ -78,6 +84,7 @@ impl Default for OnlineConfig {
     fn default() -> Self {
         Self {
             api_server_url: "https://api.molaunch.moiu.cn".to_string(),
+            lobby_enabled: false,
             custom_turn_servers: Vec::new(),
             easytier_core_path: crate::state::config::defaults::default_easytier_core_path(),
             network_identity: String::new(),

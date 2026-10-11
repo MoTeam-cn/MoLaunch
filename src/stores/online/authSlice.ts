@@ -18,7 +18,7 @@ import {
   refreshAuth as refreshAuthApi,
 } from '@/utils/api/online-manager'
 import { applyConfig, getConfigMap } from '@/utils/api/config'
-import { toastSuccess, toastError } from '@/utils/toast'
+import { toastSuccess, toastError, toastWarning } from '@/utils/toast'
 import { safeCall } from '@/utils/async'
 
 /** 创建联机 store 设备认证切片 */
@@ -43,6 +43,13 @@ export function useOnlineAuthSlice() {
   const cloudConnected = ref(false)
   /** 云端连接错误信息（cloudConnected=false 时非空，用于弹窗提示） */
   const cloudError = ref<string | null>(null)
+  /**
+   * 是否已启用联机大厅（与云端交互总开关）
+   *
+   * 为 false 时程序不与云端发生任何交互：启动不静默注册、不续期 token，
+   * 联机相关功能整体不可用。用户需在「设置 → 联机」页显式开启并同意。
+   */
+  const lobbyEnabled = ref(false)
   /**
    * 是否正在执行启动认证 / 重连
    *
@@ -101,6 +108,21 @@ export function useOnlineAuthSlice() {
       const cfg = await getConfigMap()
       apiServerUrl.value = cfg.onlineApiServerUrl
     }, '[Online] sync api server url from config')
+  }
+
+  /** 从后端配置同步联机大厅开关（启动流程据此决定是否与云端交互） */
+  async function syncLobbyEnabledFromConfig(): Promise<void> {
+    await safeCall(async () => {
+      const cfg = await getConfigMap()
+      lobbyEnabled.value = cfg.onlineLobbyEnabled
+    }, '[Online] sync lobby enabled from config')
+  }
+
+  /** 标记为「未启用联机大厅」：不算云端连接失败，仅关闭联机功能 */
+  function markCloudDisabled(): void {
+    cloudConnected.value = false
+    cloudError.value = null
+    initializing.value = false
   }
 
   /** 注册新设备 */
@@ -193,6 +215,11 @@ export function useOnlineAuthSlice() {
    * @returns 是否成功连接云端
    */
   async function initAuth(): Promise<boolean> {
+    // 未启用联机大厅：不与云端交互（后端 auth_init 同样会短路，这里直接跳过 IPC）
+    if (!lobbyEnabled.value) {
+      markCloudDisabled()
+      return false
+    }
     initializing.value = true
     cloudError.value = null
     const result = await safeCall(
@@ -200,6 +227,11 @@ export function useOnlineAuthSlice() {
         const res = await initAuthApi()
         deviceStatus.value = res.status
         apiServerUrl.value = res.status.api_server_url
+        if (res.disabled) {
+          // 后端判定未启用（前后端配置不同步）：按未启用处理，不报云端错误
+          markCloudDisabled()
+          return false
+        }
         if (res.error) {
           cloudConnected.value = false
           cloudError.value = res.error
@@ -230,6 +262,12 @@ export function useOnlineAuthSlice() {
    * @returns 是否重连成功
    */
   async function reconnect(): Promise<boolean> {
+    // 未启用联机大厅：不发起任何云端请求
+    if (!lobbyEnabled.value) {
+      markCloudDisabled()
+      toastWarning('请先在「设置 → 联机」页启用联机大厅')
+      return false
+    }
     initializing.value = true
     cloudError.value = null
     // 先尝试 refresh，失败再走完整 initAuth
@@ -259,6 +297,31 @@ export function useOnlineAuthSlice() {
     return ok
   }
 
+  /**
+   * 设置联机大厅开关（设置页开关调用）
+   *
+   * 开启：写入配置 → 立即执行一次启动认证（静默注册/续期）
+   * 关闭：写入配置 → 停止云端交互（不再续期，联机功能整体不可用）
+   *
+   * @returns 是否保存成功
+   */
+  async function setLobbyEnabled(enabled: boolean): Promise<boolean> {
+    const ok = await safeCall(
+      async () => {
+        await applyConfig({ onlineLobbyEnabled: enabled })
+        lobbyEnabled.value = enabled
+      },
+      '[Online] set lobby enabled',
+    )
+    if (ok === undefined) return false
+    if (enabled) {
+      await initAuth()
+    } else {
+      markCloudDisabled()
+    }
+    return true
+  }
+
   return {
     // 设备认证状态
     deviceStatus,
@@ -269,6 +332,8 @@ export function useOnlineAuthSlice() {
     cloudConnected,
     cloudError,
     initializing,
+    // 联机大厅开关（与云端交互总开关）
+    lobbyEnabled,
     // 设备认证方法
     refreshStatus,
     syncApiServerUrlFromConfig,
@@ -280,5 +345,9 @@ export function useOnlineAuthSlice() {
     // 启动静默认证 + 重连
     initAuth,
     reconnect,
+    // 联机大厅开关
+    syncLobbyEnabledFromConfig,
+    setLobbyEnabled,
+    markCloudDisabled,
   }
 }

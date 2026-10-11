@@ -170,6 +170,7 @@ onMounted(() => {
               type="outline"
               size="small"
               :loading="onlineStore.initializing"
+              :disabled="!onlineStore.lobbyEnabled"
               @click="handleReconnect"
             >
               <template #icon><WifiIcon class="w-4 h-4" /></template>

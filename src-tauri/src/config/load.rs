@@ -186,6 +186,11 @@ pub fn load_config() -> Result<Option<AppConfig>, String> {
         }
     }
 
+    // Online.lobby_enabled（联机大厅开关，默认关闭：未启用前不与云端交互）
+    if let Some(v) = config.get("Online", "lobby_enabled") {
+        app_config.online.lobby_enabled = v == "true" || v == "1";
+    }
+
     // Online.github_proxies（GitHub 镜像源，JSON 序列化存储）
     if let Some(list_json) = config.get("Online", "github_proxies") {
         match serde_json::from_str::<Vec<crate::utils::github_download::GithubProxy>>(&list_json) {

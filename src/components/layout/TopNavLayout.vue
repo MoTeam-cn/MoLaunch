@@ -203,7 +203,9 @@ onUnmounted(() => {
             v-for="item in visibleNavItems"
             :key="item.path"
             :text="item.cloudDependent && !onlineStore.cloudConnected
-              ? '云端连接失败：房间管理/联机大厅/设备信息已封存，FRP 仍可使用'
+              ? (onlineStore.lobbyEnabled
+                ? '云端连接失败：房间管理/联机大厅/设备信息已封存，FRP 仍可使用'
+                : '联机大厅未启用：可在「设置 → 联机」页启用后恢复，FRP 不受影响')
               : ''"
             position="bottom"
           >

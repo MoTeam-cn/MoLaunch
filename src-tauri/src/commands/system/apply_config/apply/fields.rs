@@ -243,6 +243,10 @@ pub(super) fn apply_external_download(config: &mut crate::state::AppConfig, patc
 ///   关闭状态下静默忽略，不写入 config.ini，不报错（与 ignore_tls 关闭联动语义一致）。
 /// - `custom_turn_servers`：`Some` 即更新（含空数组，表示清空所有自定义 TURN）
 pub(super) fn apply_online(config: &mut crate::state::AppConfig, patch: &ConfigPatch) {
+    if let Some(enabled) = patch.online.lobby_enabled {
+        log_info!("[Config] online_lobby_enabled = {}", enabled);
+        config.online.lobby_enabled = enabled;
+    }
     if let Some(ref url) = patch.online.api_server_url {
         if !url.is_empty() {
             // 开发者模式校验：未开启时静默忽略，保护 config.ini 不被写入

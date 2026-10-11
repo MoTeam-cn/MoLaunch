@@ -72,6 +72,11 @@ pub struct LaunchAdvancedPatch {
 pub struct OnlinePatch {
     #[serde(rename = "onlineApiServerUrl")]
     pub api_server_url: Option<String>,
+    /// 是否启用联机大厅（与云端交互总开关）
+    ///
+    /// `Some` 表示要更新此字段；`None` 表示不更新。
+    #[serde(rename = "onlineLobbyEnabled")]
+    pub lobby_enabled: Option<bool>,
     /// 用户自定义 TURN 服务器列表（阶段三子任务 7 新增）
     ///
     /// `Some` 表示要更新此字段（含空数组，表示清空所有自定义 TURN）；

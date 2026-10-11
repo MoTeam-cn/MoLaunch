@@ -58,6 +58,9 @@ pub struct AuthInitResult {
     pub status: DeviceStatus,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub error: Option<String>,
+    /// 是否因「联机大厅未启用」而跳过云端交互（true 时未发起任何网络请求）
+    #[serde(default)]
+    pub disabled: bool,
 }
 
 // 辅助函数（子模块共用）

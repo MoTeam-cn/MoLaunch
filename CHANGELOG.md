@@ -4,6 +4,18 @@
 
 ## [Unreleased]
 
+### Added
+
+- **联机大厅开关：未启用时不与云端交互**（[OnlineLobbyCard.vue](src/components/settings/OnlineLobbyCard.vue) / [SettingsOnline.vue](src/views/settings/SettingsOnline.vue) / [App.vue](src/App.vue) / [authSlice.ts](src/stores/online/authSlice.ts) / [auth_register_login.rs](src-tauri/src/commands/online/manager/auth_register_login.rs)）：
+  - 新增配置项 `Online.lobby_enabled`（前端 `onlineLobbyEnabled`），默认**关闭**；设置页「联机」新增「联机大厅」开关，开启前必须先确认与云端交互说明。
+  - 关闭时启动流程完全不与云端交互：不再静默注册设备、不再静默续期或重新登录 token。后端 `auth_init` 同步增加守卫，未启用时直接返回本地凭证快照（`disabled=true`），不发起任何网络请求。
+  - FRP 使用独立的第三方凭证体系，不受该开关影响。
+
+### Changed
+
+- **联机封禁提示区分「未启用」与「连接失败」**（[Online.vue](src/views/Online.vue) / [TopNavLayout.vue](src/components/layout/TopNavLayout.vue) / [ApiServerCard.vue](src/components/settings/ApiServerCard.vue)）：未启用联机大厅时提示改为「需先启用联机大厅」，不再误报为云端连接失败；设置页「重新连接」按钮在未启用时禁用，`reconnect()` 直接返回且不发起 refresh 请求。
+- 配置读写链路新增 `Online.lobby_enabled`（[models.rs](src-tauri/src/state/config/models.rs) / [load.rs](src-tauri/src/config/load.rs) / [save.rs](src-tauri/src/config/save.rs) / [patch.rs](src-tauri/src/commands/system/apply_config/types/patch.rs) / [snapshot.rs](src-tauri/src/commands/system/apply_config/types/snapshot.rs) / [fields.rs](src-tauri/src/commands/system/apply_config/apply/fields.rs) / [config.ts](src/utils/api/config.ts) / [auth.ts](src/types/online/auth.ts)）。
+
 ### Fixed
 
 - **修正版本卡片展开动画的无效过渡延迟类名**（[VersionGroupCard.vue](src/components/community/resource-detail/VersionGroupCard.vue)）：`transition-delay-[50ms]` / `transition-delay-0` 并非 Tailwind 工具类（正确写法为 `delay-[50ms]` / `delay-0`），自 v3 起即未生成任何样式，展开动画的错峰延迟从未生效；已改为 `delay-*`。

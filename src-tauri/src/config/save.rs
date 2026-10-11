@@ -198,6 +198,15 @@ pub fn save_config(config: &AppConfig) -> Result<(), String> {
 
     // Online
     ini.set("Online", "api_server_url", &config.online.api_server_url);
+    ini.set(
+        "Online",
+        "lobby_enabled",
+        if config.online.lobby_enabled {
+            "true"
+        } else {
+            "false"
+        },
+    );
     // GitHub 镜像源（JSON 序列化存储，重启不丢失）
     ini.set(
         "Online",

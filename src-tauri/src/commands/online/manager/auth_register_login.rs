@@ -182,6 +182,25 @@ fn register_auth_init(d: &mut Dispatcher) {
             // 加载本地凭证（None = 首次启动未注册）
             let existing = storage.load().await.unwrap_or(None);
 
+            // 联机大厅未启用：不发起任何云端请求（不静默注册、不续期 token、不重新登录）
+            let lobby_enabled = {
+                let config = state.config.lock().await;
+                config.online.lobby_enabled
+            };
+            if !lobby_enabled {
+                log_info!("[Online] auth_init: 联机大厅未启用，跳过云端交互");
+                let status = match existing {
+                    Some(ref creds) => super::build_device_status(creds, api_url),
+                    None => super::build_device_status(&Default::default(), api_url),
+                };
+                return serde_json::to_value(AuthInitResult {
+                    status,
+                    error: None,
+                    disabled: true,
+                })
+                .map_err(|e| e.to_string());
+            }
+
             // 检查凭证与服务端地址一致性：用户切换 api_server_url 后旧凭证对新域名无效
             let existing = match existing {
                 Some(ref creds)
@@ -276,6 +295,7 @@ fn register_auth_init(d: &mut Dispatcher) {
             serde_json::to_value(AuthInitResult {
                 status,
                 error: None,
+                disabled: false,
             })
             .map_err(|e| e.to_string())
         }),
