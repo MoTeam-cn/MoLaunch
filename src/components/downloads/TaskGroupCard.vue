@@ -20,7 +20,8 @@ import {
   PlayCircleIcon,
   XCircleIcon,
 } from '@heroicons/vue/24/outline'
-import { onMounted, onUnmounted, ref, defineAsyncComponent } from 'vue'
+import { defineAsyncComponent } from 'vue'
+import { useNowTicker } from '@/composables/useNowTicker'
 import { useDownloadTaskGroups } from '@/composables/useDownloadTaskGroups'
 import type { DownloadStage } from '@/types/download'
 
@@ -46,16 +47,8 @@ const emit = defineEmits<{
   cancel: []
 }>()
 
-// 定时刷新 now，驱动 useDownloadTaskGroups 的伪进度补丁重算
-// 后端 ticker 到 95% 后卡住，前端基于 now 继续小数点上涨到 99.9%
-const now = ref(Date.now())
-let nowTimer: ReturnType<typeof setInterval> | null = null
-onMounted(() => {
-  nowTimer = setInterval(() => { now.value = Date.now() }, 200)
-})
-onUnmounted(() => {
-  if (nowTimer) clearInterval(nowTimer)
-})
+// now 定时刷新（200ms）驱动 useDownloadTaskGroups 的伪进度补丁重算，实现见 useNowTicker
+const now = useNowTicker()
 
 const { taskGroups, toggleGroup, isExpanded } = useDownloadTaskGroups(
   () => props.stages,

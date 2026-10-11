@@ -7,7 +7,8 @@
  * - 无任务时：空状态（DownloadEmptyState 子组件）
  */
 
-import { computed, onMounted, onUnmounted, ref, watch, defineAsyncComponent } from 'vue'
+import { computed, onMounted, ref, watch, defineAsyncComponent } from 'vue'
+import { useNowTicker } from '@/composables/useNowTicker'
 import { useRouter } from 'vue-router'
 import { useVersionStore } from '@/stores/version'
 import { showConfirm } from '@/utils/modal'
@@ -96,17 +97,9 @@ watch(hasActiveDownload, (active, wasActive) => {
 const progress = computed(() => versionStore.downloadProgress)
 const isPaused = computed(() => progress.value?.isPaused ?? false)
 
-// 定时刷新 now，驱动 percentage 伪进度补丁重算
-// 后端 ticker 到 95% 后卡住，前端基于 now 继续小数点上涨到 99.9%
-const now = ref(Date.now())
+// now 定时刷新（200ms）驱动 percentage 伪进度补丁重算，实现见 useNowTicker
+const now = useNowTicker()
 const percentageStartTime = ref<number | null>(null)
-let nowTimer: ReturnType<typeof setInterval> | null = null
-onMounted(() => {
-  nowTimer = setInterval(() => { now.value = Date.now() }, 200)
-})
-onUnmounted(() => {
-  if (nowTimer) clearInterval(nowTimer)
-})
 
 const realPercentage = computed(() => progress.value?.percentage || 0)
 

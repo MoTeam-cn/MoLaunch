@@ -49,6 +49,8 @@
 
 ### Fixed
 
+- **抽出 now 定时刷新 composable**（[useNowTicker.ts](src/composables/useNowTicker.ts)（新增））：[Downloads.vue](src/views/Downloads.vue) 与 [TaskGroupCard.vue](src/components/downloads/TaskGroupCard.vue) 各写了一份逐字相同的 200ms `now` 定时器（`ref(Date.now())` + `setInterval` + `onUnmounted` 清理），用于下载「伪进度」补丁重算。已抽出 `useNowTicker(intervalMs = 200)`（内部用 `onUnmounted` 自动清理，调用方无需管理），两处改为调用；随之移除不再需要的 `onUnmounted`（Downloads）与 `onMounted/onUnmounted`、`ref`（TaskGroupCard）导入。
+
 - **统一下载速度格式化**（[external-task.ts](src/composables/external-task.ts)）：`formatBytes(x) + '/s'` 与 `utils/format.ts::formatSpeed` 逐字相同，已改用后者。
 
 - **记录一处不可合并的打码差异**（[SystemInfoTab.vue](src/views/settings/more/SystemInfoTab.vue)）：该处打码逻辑与 `utils::format::maskDeviceId` 的「前 4 后 4」部分相同，但**短 ID 兜底不同**——`maskDeviceId` 对长度 ≤8 的 ID 返回**原值**，而 SystemInfoTab 返回 `'****'`。若合并到 `maskDeviceId`，短设备 ID 会明文显示，属隐私倒退，故**不合并**。[Watermark.vue](src/components/common/Watermark.vue) 用的是「前 8 后 4」，规则亦不同。
