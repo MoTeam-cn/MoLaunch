@@ -6,7 +6,6 @@
  */
 import { toastInfo, toastSuccess, toastError, toastWarning } from '@/utils/toast'
 import { showInfo, showConfirm, showPrompt } from '@/utils/modal'
-import { safeCallSync } from '@/utils/async'
 import type { LayoutSection } from './types'
 
 /**
@@ -105,32 +104,6 @@ function setupMolaunchApi() {
 }
 
 /**
- * 危险脚本模式（静态扫描，命中则拒绝执行）
- *
- * html section 脚本经 new Function 在主窗口上下文执行，可访问全局 DOM 与 Tauri IPC，
- * 因此拦截以下危险调用：
- *
- * 注意：生产 CSP 为 script-src 'self' 'wasm-unsafe-eval'（只放行 WebAssembly，不含
- * 'unsafe-eval'），浏览器会以 EvalError 拒绝 new Function。实测确认该分支在生产构建中
- * 无法执行，脚本失败经 safeCallSync 落到 console.error。本扫描是纵深防御，不是唯一屏障。
- * - window.molaunch 敏感方法（spawnProcess / createWindow）
- * - Tauri IPC 直接调用（__TAURI_INTERNALS__ / __TAURI__ 全局对象）
- * - 主窗口 DOM 篡改（document.body / documentElement 内容替换、document.write）
- */
-const DANGEROUS_SCRIPT_PATTERNS: RegExp[] = [
-  /molaunch\s*[[.]\s*['"]?(spawnProcess|createWindow)['"]?/i,
-  /__TAURI_INTERNALS__/,
-  /__TAURI__/,
-  /document\.(body|documentElement)\.(innerHTML|outerHTML)\s*=/,
-  /document\.write\s*\(/,
-]
-
-/** 静态扫描脚本内容，命中危险模式返回 true */
-function isDangerousScript(code: string): boolean {
-  return DANGEROUS_SCRIPT_PATTERNS.some((re) => re.test(code))
-}
-
-/**
  * 用 shadow DOM 渲染 html section
  *
  * 通过内容指纹避免相同内容重复渲染，每次渲染重建 shadow root 内容并执行用户脚本。
@@ -171,14 +144,8 @@ export function renderHtmlShadow(
   // 确保 window.molaunch API 可用
   setupMolaunchApi()
 
-  // 执行用户脚本（先静态扫描危险调用，命中则拒绝执行）
-  // 注：script 已通过 if 守卫，但 TS 无法在闭包内窄化，提取到局部变量
-  const script = section.script
-  if (script) {
-    if (isDangerousScript(script)) {
-      console.warn('[CustomLayout] html section 脚本包含危险调用，已拒绝执行')
-    } else {
-      safeCallSync(() => new Function(script)(), '[CustomLayout] run html section script')
-    }
-  }
+  // 自定义布局的 html section **不支持脚本**：生产 CSP（script-src 'self'
+  // 'wasm-unsafe-eval'）会以 EvalError 拒绝 new Function，脚本在任何构建下都不会执行。
+  // 原实现（new Function + 危险调用黑名单扫描）已移除——黑名单可被字符串拼接绕过，
+  // CSP 才是真正的屏障；保留死代码只会让人误以为该功能可用。
 }

@@ -161,9 +161,13 @@ fn build_client_inner(params: ClientBuildParams<'_>) -> reqwest::Client {
     if !params.no_timeout {
         builder = builder.timeout(params.timeout);
     }
-    if let Some(policy) = params.redirect {
-        builder = builder.redirect(policy);
-    }
+    // 未显式指定策略时用「逐跳校验」策略：保留跟随重定向，但每一跳目标必须是公网，
+    // 防止校验过的公网 URL 经开放重定向落到内网（utils/net.rs::safe_redirect_policy）
+    builder = builder.redirect(
+        params
+            .redirect
+            .unwrap_or_else(crate::utils::net::safe_redirect_policy),
+    );
 
     if let Some(addr) = resolve_local_address(params.ip_version) {
         builder = builder.local_address(addr);

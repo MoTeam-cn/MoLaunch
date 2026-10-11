@@ -49,6 +49,10 @@
 
 ### Fixed
 
+- **移除自定义布局 html section 的死脚本代码**（[htmlShadowRenderer.ts](src/plugins/custom-layout/htmlShadowRenderer.ts)）：生产 CSP 为 `script-src 'self' 'wasm-unsafe-eval'`，只放行 WebAssembly，浏览器会以 EvalError 拒绝 `new Function`（Playwright 实测确认），故脚本分支在任何构建下都不会执行。已移除 `new Function` 执行与危险调用黑名单扫描（黑名单可被字符串拼接绕过，真正的屏障是 CSP），并在注释中明确「html section 不支持脚本」。**未放宽 CSP**。
+
+- **新增重定向逐跳校验策略**（[net.rs](src-tauri/src/utils/net.rs) / [client.rs](src-tauri/src/http/client.rs)）：此前 `validate_public_http_url` 只作用于初始 URL，而客户端跟随重定向，公网 URL 可经开放重定向跳到内网地址绕过校验。新增 `safe_redirect_policy()`：**保留跟随重定向**（短链跳直链是正常需求），但对每一跳的目标重新校验，跳数上限 10；若初始 URL 本身就不是公网（用户自建的局域网镜像站），则不做逐跳限制，避免拦死「内网镜像 → 内网 CDN」的正常跳转。未显式指定策略的客户端统一使用该策略。
+
 - **修复第三处 ZIP 解压目录条目路径穿越**（[archive.rs](src-tauri/src/commands/frp/binary/archive.rs)）：与 [zip.rs](src-tauri/src/commands/frp/install/zip.rs) / [install.rs](src-tauri/src/commands/plugins/install.rs) 同源——目录条目分支直接 `create_dir_all` 后 `continue`，文件分支的 canonicalize 校验走不到；且此处不剥 prefix，条目名即相对路径。已把 `ensure_safe_relative_path` 提到创建目录之前。
 
 - **修复社区资源官网链接未校验 scheme 即交系统处理**（[ResourceDetailHeader.vue](src/components/community/resource-detail/ResourceDetailHeader.vue)）：`project.website` 来自社区平台元数据（资源作者可控），原样交给 `open` → `ShellExecuteW`。已改为经 `isSafeExternalUrl`（仅 http/https）校验后走 `openExternal`。

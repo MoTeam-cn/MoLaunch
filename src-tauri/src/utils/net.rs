@@ -40,6 +40,37 @@ pub fn is_private_address(addr: &str) -> bool {
     addr.eq_ignore_ascii_case("localhost")
 }
 
+/// 逐跳校验的重定向策略（**保留跟随**，短链跳直链是正常需求）
+///
+/// 只校验初始 URL 不足以防护：公网 URL 可经开放重定向跳到内网地址，
+/// 从而绕过 `validate_public_http_url`。这里对**每一跳**的目标重新校验。
+///
+/// 例外：若初始 URL 本身就不是公网（例如用户自建的局域网镜像站），
+/// 则不做逐跳限制——否则会把「内网镜像 → 内网 CDN」这类正常跳转拦死。
+pub fn safe_redirect_policy() -> reqwest::redirect::Policy {
+    reqwest::redirect::Policy::custom(|attempt| {
+        // 跳数上限与 reqwest 默认一致
+        if attempt.previous().len() >= 10 {
+            return attempt.error("重定向次数过多");
+        }
+        let initial_is_public = attempt
+            .previous()
+            .first()
+            .map(|u| validate_public_http_url(u.as_str()).is_ok())
+            .unwrap_or(true);
+        if !initial_is_public {
+            return attempt.follow();
+        }
+        match validate_public_http_url(attempt.url().as_str()) {
+            Ok(()) => attempt.follow(),
+            Err(e) => {
+                let msg = format!("重定向目标被拒绝: {} ({})", attempt.url(), e);
+                attempt.error(msg)
+            }
+        }
+    })
+}
+
 /// 校验 HTTP(S) 下载 URL 是否安全（防 SSRF）
 ///
 /// - 协议白名单：仅 http/https
