@@ -6,6 +6,7 @@
  * 下半：内核日志阅读（logs/ 目录按日期文件，深色终端风格，复用 log-display 配色与解析）
  * 内核优先运行时从官网下载并缓存到应用数据目录，下载不可用时回退应用内置内核；
  * 运行日志由内核写入 `<temp>/MoLaunch/hongshi/logs/`。
+ * macOS 由官方停止提供内核，检测到该平台时整页替换为不支持说明。
  */
 import { ref, computed, watch, onMounted, onActivated, defineAsyncComponent } from 'vue'
 import {
@@ -16,6 +17,8 @@ import {
   CheckCircleIcon,
 } from '@heroicons/vue/24/outline'
 import { redstoneLogFiles, redstoneReadLog, redstoneStatus } from '@/utils/api/redstone'
+import { MACOS_UNSUPPORTED_MESSAGE } from '@/composables/useRedStonePanel'
+import { isMacOS } from '@/utils/platform'
 import { parseLogLines, logLineClass } from '@/utils/log-display'
 import { toastError } from '@/utils/toast'
 import { formatBytes } from '@/utils/format'
@@ -26,6 +29,8 @@ const Select = defineAsyncComponent(() => import('@/components/common/Select.vue
 const Tag = defineAsyncComponent(() => import('@/components/common/Tag.vue'))
 const Alert = defineAsyncComponent(() => import('@/components/common/Alert.vue'))
 
+/** 官方已停止提供 macOS 内核，该平台不提供红石联机 */
+const platformUnsupported = isMacOS()
 /** 内核状态（redstone_status 返回） */
 const status = ref<RedStoneStatusResult | null>(null)
 /** 日志文件列表（按修改时间倒序，最新在前） */
@@ -51,6 +56,7 @@ const fileOptions = computed(() =>
 
 /** 加载内核状态（进程存活 + 内核 stdout 解析出的隧道地址） */
 async function loadStatus() {
+  if (platformUnsupported) return
   statusLoading.value = true
   try {
     status.value = await redstoneStatus()
@@ -63,6 +69,7 @@ async function loadStatus() {
 
 /** 加载日志文件列表，选中最新的日志文件（没有选中项时） */
 async function loadLogFiles() {
+  if (platformUnsupported) return
   try {
     logFiles.value = (await redstoneLogFiles()).files
     if (!logFiles.value.some((f) => f.fileName === selectedFile.value)) {
@@ -116,7 +123,17 @@ onActivated(() => {
 </script>
 
 <template>
-  <div class="space-y-4">
+  <Card v-if="platformUnsupported" title="暂不支持 macOS">
+    <div class="space-y-3">
+      <Alert variant="soft" type="error" :message="MACOS_UNSUPPORTED_MESSAGE" />
+      <Alert
+        variant="soft"
+        type="info"
+        message="如需在 macOS 上联机，可改用「搭桥联机」或「FRP」；若官方日后恢复 macOS 内核，无需更新启动器即可自动恢复"
+      />
+    </div>
+  </Card>
+  <div v-else class="space-y-4">
     <Card title="内核状态">
       <div v-if="!statusLoading && status" class="space-y-3">
         <div class="flex items-center gap-2">

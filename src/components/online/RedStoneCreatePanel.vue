@@ -2,8 +2,9 @@
 /**
  * 红石联机 - 创建房间面板
  *
- * 选择中转服务器 + 本地 MC 端口拉起 hongshi 内核创建隧道；
+ * 选择中转服务器 + 本地 MC 端口拉起 hongshic 内核创建隧道；
  * 状态机/轮询/端口选择与事件回填逻辑见 useRedStonePanel，本文件仅模板组装。
+ * macOS 由官方停止提供内核，检测到该平台时整页替换为不支持说明。
  */
 import { computed, defineAsyncComponent } from 'vue'
 import {
@@ -21,9 +22,14 @@ const Input = defineAsyncComponent(() => import('@/components/common/Input.vue')
 const Select = defineAsyncComponent(() => import('@/components/common/Select.vue'))
 const Tag = defineAsyncComponent(() => import('@/components/common/Tag.vue'))
 const Alert = defineAsyncComponent(() => import('@/components/common/Alert.vue'))
-import { latencyTagColor, useRedStonePanel } from '@/composables/useRedStonePanel'
+import {
+  MACOS_UNSUPPORTED_MESSAGE,
+  latencyTagColor,
+  useRedStonePanel,
+} from '@/composables/useRedStonePanel'
 
 const {
+  platformUnsupported,
   serverLoading, serverError, useManualServer, server, mcPort, portSelecting,
   phase, errorMessage, creating, stopping, restarting,
   serverOptions, address, latencyTesting,
@@ -35,7 +41,17 @@ const selectedOption = computed(() => serverOptions.value.find((o) => o.value ==
 </script>
 
 <template>
-  <div class="space-y-4">
+  <Card v-if="platformUnsupported" title="暂不支持 macOS">
+    <div class="space-y-3">
+      <Alert variant="soft" type="error" :message="MACOS_UNSUPPORTED_MESSAGE" />
+      <Alert
+        variant="soft"
+        type="info"
+        message="如需在 macOS 上联机，可改用「搭桥联机」或「FRP」；若官方日后恢复 macOS 内核，无需更新启动器即可自动恢复"
+      />
+    </div>
+  </Card>
+  <div v-else class="space-y-4">
     <Card title="中转服务器">
       <div class="space-y-3">
         <Alert v-if="serverError" variant="soft" type="error" :message="serverError" />

@@ -21,7 +21,7 @@
 - **红石内核运行时下载 + 本地缓存 + 兜底**（[kernel.rs](src-tauri/src/commands/redstone/kernel.rs)（新增） / [kernel_test.rs](src-tauri/src/commands/redstone/kernel_test.rs)（新增） / [resources.rs](src-tauri/src/resources.rs)）：
   - 官方对内核做**版本校验**（旧内核会被服务端直接拒绝），所以「编译期嵌入内核」必然周期性失效——对方每发一版启动器都得跟着发版。改为三级获取：AppData 缓存命中 → 运行时从 `hongshi.site/api/download/client?platform=&arch=` 下载并**原子写入缓存** → 下载失败（服务不可用或该平台未发布）回退应用内置兜底内核。
   - 下载内容按平台校验可执行文件魔数（PE / ELF / Mach-O），防止把 JSON/HTML 错误体当成内核写进缓存；先写 `.tmp` 再改名，避免下载中断留下半个文件被当作有效缓存；非 Windows 平台补可执行位。
-  - 实测 macOS 两个架构：官方下载页挂了链接但**实际未发布**（404），该平台目前只能走内置兜底；等官方发布后无需发版即可自动生效。
+  - 官方已停止提供 macOS 构建（下载页仍挂链接但实际 404），该平台**不再支持红石联机**，处理见下方 Changed。
 
 - **联机大厅开关：未启用时不与云端交互**（[OnlineLobbyCard.vue](src/components/settings/OnlineLobbyCard.vue) / [SettingsOnline.vue](src/views/settings/SettingsOnline.vue) / [App.vue](src/App.vue) / [authSlice.ts](src/stores/online/authSlice.ts) / [auth_register_login.rs](src-tauri/src/commands/online/manager/auth_register_login.rs)）：
   - 新增配置项 `Online.lobby_enabled`（前端 `onlineLobbyEnabled`），默认**关闭**；设置页「联机」新增「联机大厅」开关，开启前必须先确认与云端交互说明。
@@ -29,6 +29,10 @@
   - FRP 使用独立的第三方凭证体系，不受该开关影响。
 
 ### Changed
+
+- **红石联机不再支持 macOS**（[kernel.rs](src-tauri/src/commands/redstone/kernel.rs) / [resources.rs](src-tauri/src/resources.rs) / [platform.ts](src/utils/platform.ts)（新增） / [useRedStonePanel.ts](src/composables/useRedStonePanel.ts) / [RedStoneCreatePanel.vue](src/components/online/RedStoneCreatePanel.vue) / [RedStoneKernelPanel.vue](src/components/online/RedStoneKernelPanel.vue)）：官方已停止提供 macOS 内核（下载页仍挂 `macos-amd64` / `macos-arm64` 链接但**实际 404**），同步移除该平台支持。
+  - 删除仓库内残留的 macOS 内核二进制；[resources.rs](src-tauri/src/resources.rs) 去掉 macOS 嵌入分支；[kernel.rs](src-tauri/src/commands/redstone/kernel.rs) 的 `platform_arch()` 不再映射 macOS，并新增 `is_platform_supported()` 平台闸门——`ensure_kernel()` 在 macOS 上直接返回「红石联机已不再支持 macOS：官方已停止提供 macOS 内核」，不再走下载与兜底。
+  - 前端新增 [platform.ts](src/utils/platform.ts) 的 `isMacOS()`（`navigator.platform` 优先、`userAgent` 兜底）：创建面板与内核面板在 macOS 上**整页替换为不支持说明**，并指向「搭桥联机」/「FRP」作为替代；composable 侧对加载服务器列表、创建/重启隧道、恢复状态全部短路，不再发起任何红石相关请求。
 
 - **红石联机切换到 Redstone Online2（hongshic）内核契约**（[tunnel.rs](src-tauri/src/commands/redstone/tunnel.rs) / [tunnel_test.rs](src-tauri/src/commands/redstone/tunnel_test.rs) / [manager.rs](src-tauri/src/commands/redstone/manager.rs) / [redstone.ts](src/utils/api/redstone.ts) / [types/redstone.ts](src/types/redstone.ts) / [RedStoneKernelPanel.vue](src/components/online/RedStoneKernelPanel.vue)）：官网已改版，旧契约**两处同时失效**（列表端点 404 + 旧内核被服务端以「客户端版本过时」拒绝），旧版红石联机已完全不可用，本次整体对齐新契约。
   - 服务器列表 `hongshi.site/newserver.json`（已 404）→ `hongshi.site/api/server/list`（响应仍是 `region → host` 映射，解析逻辑复用）。

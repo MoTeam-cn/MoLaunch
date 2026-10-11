@@ -156,14 +156,8 @@ fn embedded_bytes(path: &str) -> Option<&'static [u8]> {
         "hongshi/hongshi" => Some(include_bytes!(
             "../resources/hongshi/linux/aarch64/hongshic-linux-arm64"
         )),
-        #[cfg(all(target_os = "macos", target_arch = "x86_64"))]
-        "hongshi/hongshi" => Some(include_bytes!(
-            "../resources/hongshi/macos/x86_64/hongshi-darwin-amd64"
-        )),
-        #[cfg(all(target_os = "macos", target_arch = "aarch64"))]
-        "hongshi/hongshi" => Some(include_bytes!(
-            "../resources/hongshi/macos/aarch64/hongshi-darwin-arm64"
-        )),
+        // macOS 无分支：官方已停止提供 macOS 内核（下载页仍挂链接但实际 404），
+        // 该平台由 kernel::ensure_kernel 直接返回明确的不支持错误。
         _ => None,
     }
 }

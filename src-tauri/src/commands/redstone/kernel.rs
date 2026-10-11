@@ -36,10 +36,17 @@ impl KernelSource {
     }
 }
 
+/// 官方是否仍为当前平台提供内核
+///
+/// 官方已停止提供 macOS 构建（下载页仍挂链接但实际 404），该平台判为不支持。
+pub fn is_platform_supported() -> bool {
+    !cfg!(target_os = "macos")
+}
+
 /// 当前平台对应的官方命名（platform, arch）
 ///
 /// 官方取值：platform ∈ windows|linux|macos，arch ∈ amd64|arm64。
-/// 未覆盖的组合返回 None（如 Windows arm64，官方未发布）。
+/// 未覆盖的组合返回 None（如 macOS 官方已停供、Windows arm64 未发布）。
 pub fn platform_arch() -> Option<(&'static str, &'static str)> {
     #[cfg(all(target_os = "windows", target_arch = "x86_64"))]
     {
@@ -52,14 +59,6 @@ pub fn platform_arch() -> Option<(&'static str, &'static str)> {
     #[cfg(all(target_os = "linux", target_arch = "aarch64"))]
     {
         return Some(("linux", "arm64"));
-    }
-    #[cfg(all(target_os = "macos", target_arch = "x86_64"))]
-    {
-        return Some(("macos", "amd64"));
-    }
-    #[cfg(all(target_os = "macos", target_arch = "aarch64"))]
-    {
-        return Some(("macos", "arm64"));
     }
     #[allow(unreachable_code)]
     None
@@ -87,6 +86,11 @@ pub fn cached_kernel_path() -> Result<PathBuf, String> {
 ///
 /// 返回（内核路径，来源）。三条路径都不可用时返回带原因的错误。
 pub async fn ensure_kernel() -> Result<(PathBuf, KernelSource), String> {
+    // 0. 平台闸门：官方已停供的平台直接给出明确原因，不再走下载与兜底
+    if !is_platform_supported() {
+        return Err("红石联机已不再支持 macOS：官方已停止提供 macOS 内核".to_string());
+    }
+
     // 1. 本地缓存
     if let Ok(path) = cached_kernel_path() {
         if path.is_file() {

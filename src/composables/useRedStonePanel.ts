@@ -12,12 +12,15 @@ import { addressLatencyTest } from '@/utils/api/tools'
 import { copyToClipboard } from '@/utils/clipboard'
 import { toastError, toastInfo, toastSuccess } from '@/utils/toast'
 import { openPickerWindow } from '@/utils/picker-window'
+import { isMacOS } from '@/utils/platform'
 import { useTauriEvent } from '@/utils/tauriEvent'
 import type { RedStoneServer, RedStoneStatusResult } from '@/types/redstone'
 
 const POLL_INTERVAL = 2000
 const POLL_TIMEOUT = 15000
 const CLOSED_MESSAGE = '房间已关闭（长时间无人或服务器维护）'
+/** macOS 不支持提示（官方已停止提供 macOS 内核） */
+export const MACOS_UNSUPPORTED_MESSAGE = '红石联机已不再支持 macOS：官方已停止提供 macOS 内核'
 export type RedStoneCreatePhase = 'idle' | 'creating' | 'open' | 'closed' | 'error'
 
 /**
@@ -34,6 +37,8 @@ export function latencyTagColor(ms: number | null): string {
 
 /** 红石联机创建面板逻辑（含端口选择与 MC 端口事件自动回填） */
 export function useRedStonePanel() {
+  /** 官方已停止提供 macOS 内核，该平台不提供红石联机（由面板显示错误卡） */
+  const platformUnsupported = isMacOS()
   const servers = ref<RedStoneServer[]>([])
   const serverLoading = ref(false)
   const serverError = ref('')
@@ -71,6 +76,7 @@ export function useRedStonePanel() {
     return e instanceof Error ? e.message : String(e)
   }
   async function loadServers() {
+    if (platformUnsupported) return
     serverLoading.value = true
     serverError.value = ''
     try {
@@ -243,6 +249,10 @@ export function useRedStonePanel() {
   }
 
   function handleCreate() {
+    if (platformUnsupported) {
+      toastError(MACOS_UNSUPPORTED_MESSAGE)
+      return
+    }
     if (creating.value) return
     const error = validateInputs()
     if (error) {
@@ -255,6 +265,10 @@ export function useRedStonePanel() {
 
   /** 重启 = 先 stop 再 start（沿用当前服务器与端口） */
   async function handleRestart() {
+    if (platformUnsupported) {
+      toastError(MACOS_UNSUPPORTED_MESSAGE)
+      return
+    }
     if (creating.value || restarting.value) return
     const error = validateInputs()
     if (error) {
@@ -294,6 +308,7 @@ export function useRedStonePanel() {
   }
 
   async function restoreStatus() {
+    if (platformUnsupported) return
     try {
       const res = await redstoneStatus()
       status.value = res
@@ -328,6 +343,8 @@ export function useRedStonePanel() {
   })
 
   onMounted(() => {
+    // 不支持平台：不发起任何红石相关请求，交由面板显示错误卡
+    if (platformUnsupported) return
     mountedOnce = true
     void restoreStatus()
     void loadServers()
@@ -346,6 +363,7 @@ export function useRedStonePanel() {
   onUnmounted(() => clearPollTimer())
 
   return {
+    platformUnsupported,
     servers,
     serverLoading,
     serverError,
