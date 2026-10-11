@@ -315,9 +315,12 @@ impl EasyTier {
         {
             cmd.creation_flags(0x0800_0000); // CREATE_NO_WINDOW
         }
-        let output = cmd
-            .output()
+        // 必须带超时：调用方 easytier_status / emit_easytier_status 会**持有
+        // state.easytier 锁**跨这个 await（easytier_actions.rs:65-66 / :288-289），
+        // 无超时时只要 easytier-cli 卡住，join / stop / 状态查询会全部被连带阻塞。
+        let output = tokio::time::timeout(std::time::Duration::from_secs(10), cmd.output())
             .await
+            .map_err(|_| "执行 easytier-cli 超时（10 秒）".to_string())?
             .map_err(|e| format!("执行 easytier-cli 失败: {e}"))?;
         if !output.status.success() {
             return Err(format!(

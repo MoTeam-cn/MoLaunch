@@ -49,6 +49,10 @@
 
 ### Fixed
 
+- **修复 frpc 进程表无条件移除导致新进程失联**（[monitor.rs](src-tauri/src/commands/frp/process/monitor.rs)）：进程表按 `tunnel_id` 键控，monitor task 在子进程退出后**无条件** `RUNNING.remove(&tunnel_id)`。当「启动 → 进程退出 → 再启动」重叠时，上一个 monitor task 的收尾会晚于新进程注册，把**新进程的句柄**删掉，新 frpc 从此无法经 UI 停止（成为孤儿进程）。已改为按 `pid` 比对后再移除（compare-and-remove）。
+
+- **修复 easytier-cli 无超时调用导致状态锁被长期占用**（[easytier.rs](src-tauri/src/minecraft/online/scaffolding/easytier.rs)）：`easytier_cli_raw` 的 `cmd.output().await` 无超时，而 `emit_easytier_status`（[easytier_actions.rs:65-66](src-tauri/src/commands/online/manager/easytier_actions.rs)）与 `easytier_status` IPC（[easytier_actions.rs:288-289](src-tauri/src/commands/online/manager/easytier_actions.rs)）都**持有 `state.easytier` 锁跨这个 await**——easytier-cli 一旦卡住，join / stop / 状态查询 / peers 全部被连带阻塞。已加 10 秒超时，把持锁时间封顶。
+
 - **修复 ZIP 解压目录条目路径穿越（Zip Slip）**（[zip.rs](src-tauri/src/commands/frp/install/zip.rs) / [zip_test.rs](src-tauri/src/commands/frp/install/zip_test.rs)（新增） / [install.rs](src-tauri/src/commands/plugins/install.rs)）：两处 `extract_zip_safely` 都只有**文件条目**分支做 canonicalize 校验，**目录条目**分支直接 `create_dir_all` 后 `continue`，校验根本走不到。用真实恶意 ZIP 复现：条目 `../escaped_dir/` 使函数返回 `Ok(())` 且在目标目录之外建出目录。已把段级校验 `ensure_safe_relative_path` 提到创建任何目录**之前**（覆盖目录与文件两类条目），并新增回归用例。
 
 - **修复图片缓存 SSRF**（[download.rs](src-tauri/src/minecraft/image_cache/download.rs)）：`spawn_download` 对前端传入的图片 URL 无任何校验，直接交给 reqwest 下载；图片 URL 来自社区元数据（他人可控），可让启动器代发对内网地址的 GET。已在发起下载前补 `crate::utils::net::validate_public_http_url`（与 [skin/dispatcher.rs](src-tauri/src/commands/skin/dispatcher.rs) / [tools/download.rs](src-tauri/src/commands/tools/download.rs) / [resource.rs](src-tauri/src/commands/community/install/resource.rs) 的既有做法一致），拒绝 `file://`、localhost、内网段、169.254 与带 userinfo 的 URL。

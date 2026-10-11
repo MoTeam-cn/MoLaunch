@@ -65,7 +65,15 @@ pub(super) async fn register_and_monitor(
                 spawned.child.wait().await
             }
         };
-        RUNNING.lock().await.remove(&tunnel_id);
+        // 只移除仍属于本进程的句柄：进程表按 tunnel_id 键控，
+        // 若「启动 → 进程退出 → 再启动」重叠，本 task 的收尾晚于新进程注册时，
+        // 无条件 remove 会把**新进程**的句柄删掉，导致新 frpc 失联无法停止。
+        {
+            let mut running = RUNNING.lock().await;
+            if running.get(&tunnel_id).map(|h| h.pid) == Some(pid) {
+                running.remove(&tunnel_id);
+            }
+        }
         let (exit_code, error) = match status {
             Ok(status) => {
                 let code = status.code();
