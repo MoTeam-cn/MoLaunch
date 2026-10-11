@@ -8,7 +8,7 @@ use super::super::provider::{frpc_path, is_frpc_ready, system_default_dir, write
 use super::archive;
 use crate::log_info;
 use crate::state::AppState;
-use crate::utils::github_download::{build_proxy_url, fetch_latest_release};
+use crate::utils::github_download::fetch_latest_release;
 
 /// frp 官方 GitHub 仓库（版本随上游自动同步）
 const FRP_REPO: &str = "fatedier/frp";
@@ -77,21 +77,11 @@ pub(super) async fn ensure_system_default_frpc(
     log_info!("[Frp] GitHub 返回最新 frpc 版本: {}", version);
 
     // 2. 构造下载 URL：镜像竞速选最快（github_proxies 由前端启动时测速筛选），官方保底
-    let mut urls: Vec<String> = Vec::new();
     let proxies = state.github_proxies.lock().await.clone();
-    if !proxies.is_empty() {
-        let candidates: Vec<String> = proxies
-            .iter()
-            .map(|p| build_proxy_url(p, FRP_REPO, &version, &asset))
-            .collect();
-        crate::log_debug!("[Frp] 镜像竞速候选: {:?}", candidates);
-        if let Ok(fastest) = crate::utils::probe::pick_fastest(&candidates, None).await {
-            urls.push(fastest);
-        }
-    }
-    urls.push(format!(
-        "https://github.com/{FRP_REPO}/releases/download/v{version}/{asset}"
-    ));
+    let urls = crate::utils::github_download::build_release_url_candidates(
+        &proxies, FRP_REPO, &version, &asset, None,
+    )
+    .await?;
 
     // 3. 通过 DownloadSession 下载压缩包（复用项目下载基础设施，支持进度/暂停/取消）
     //

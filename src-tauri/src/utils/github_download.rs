@@ -37,6 +37,43 @@ pub fn build_proxy_url(proxy: &GithubProxy, repo: &str, version: &str, asset: &s
     }
 }
 
+/// 构造 release 资产的下载 URL 候选列表：镜像竞速最快者在前，官方地址保底。
+///
+/// 统一替代 frp 厂商包与 easytier 内核两处手搓的同构代码。返回列表至少含官方地址一项，
+/// 交给 DownloadTask 的 urls 做顺序回退。
+///
+/// - cancel：传入则竞速期间可取消；竞速被取消时返回 Err，不再继续官方保底
+pub async fn build_release_url_candidates(
+    proxies: &[GithubProxy],
+    repo: &str,
+    version: &str,
+    asset: &str,
+    cancel: Option<std::sync::Arc<std::sync::atomic::AtomicBool>>,
+) -> Result<Vec<String>, String> {
+    let mut urls: Vec<String> = Vec::new();
+    if !proxies.is_empty() {
+        let candidates: Vec<String> = proxies
+            .iter()
+            .map(|p| build_proxy_url(p, repo, version, asset))
+            .collect();
+        crate::log_debug!("[GitHub] 镜像竞速候选: {:?}", candidates);
+        match pick_fastest(&candidates, cancel.clone()).await {
+            Ok(fastest) => urls.push(fastest),
+            Err(_) => {
+                if let Some(c) = &cancel {
+                    if c.load(std::sync::atomic::Ordering::SeqCst) {
+                        return Err("下载已取消".to_string());
+                    }
+                }
+            }
+        }
+    }
+    urls.push(format!(
+        "https://github.com/{repo}/releases/download/v{version}/{asset}"
+    ));
+    Ok(urls)
+}
+
 /// 查询指定仓库最新版本号（主源失败回退备选；失败返回错误由前端提示）
 pub async fn fetch_latest_release(client: &reqwest::Client, repo: &str) -> Result<String, String> {
     let primary = format!("{GITHUB_API_PRIMARY}/repos/{repo}/releases/latest");

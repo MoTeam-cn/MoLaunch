@@ -49,6 +49,10 @@
 
 ### Fixed
 
+- **抽公共 release 下载 URL 候选构造**（[github_download.rs](src-tauri/src/utils/github_download.rs)）：frp 厂商包（[system_default.rs](src-tauri/src/commands/frp/binary/system_default.rs)）与 easytier 内核（[easytier_download.rs](src-tauri/src/commands/online/manager/easytier_download.rs)）各手搓了一份「镜像竞速选最快 + 官方保底」的候选 URL 列表，逻辑同构、仅 easytier 多带取消判断。已抽出 `build_release_url_candidates(proxies, repo, version, asset, cancel)`，两处改为调用。
+
+- **订正查重报告关于本条的描述**：报告称「GitHub release 资产下载编排三处实现，共享函数无人调用」，实际核对后——`download_to` / `download_release_zip` 确实零引用，但前两处调用点并未复刻它们，而是把候选 URL 交给项目自己的 `DownloadTask` / `DownloadSession`（该基础设施自带进度/暂停/取消与 URL 顺序回退）；第三处（[easytier_install.rs](src-tauri/src/commands/online/manager/easytier_install.rs)）是 `probe_github_proxies` 命令处理器，与下载无关。**真正的重复只有候选 URL 构造那一段**，已按此收敛，未强行把调用点改成 `download_release_zip`（那会丢掉 DownloadSession 的进度/取消能力）。`download_to` / `download_release_zip` 零引用这一事实已记录，未删除。
+
 - **抽公共目录大小统计函数**（[fs.rs](src-tauri/src/utils/fs.rs)）：`dir_total_size` / `dir_size` 原有四份逐字相同的实现——[version/pack_common/entries.rs](src-tauri/src/commands/version/pack_common/entries.rs)、[tools/archive/helpers.rs](src-tauri/src/commands/tools/archive/helpers.rs)、[tools/resourcepack/list.rs](src-tauri/src/commands/tools/resourcepack/list.rs)、[tools/resourcepack/explore/tree.rs](src-tauri/src/commands/tools/resourcepack/explore/tree.rs)，签名与语义完全一致（读目录失败返回 0、目录递归、文件累加 metadata len）。已抽出 `utils::fs::dir_total_size` 并让四处委托。
 
 - **抽公共目录复制函数**（[fs.rs](src-tauri/src/utils/fs.rs)）：`copy_dir_recursive` 原有四份实现，其中三份（[migrations/common.rs](src-tauri/src/migrations/common.rs)、[version/pack_common/entries.rs](src-tauri/src/commands/version/pack_common/entries.rs)、[plugins/install.rs](src-tauri/src/commands/plugins/install.rs)）逻辑逐字相同、仅返回类型不同（`Result<(), String>` vs `std::io::Result<()>`）。已抽出 `utils::fs::copy_dir_recursive` 并让三处委托，返回类型差异在调用点用 `map_err(std::io::Error::other)` 消化。

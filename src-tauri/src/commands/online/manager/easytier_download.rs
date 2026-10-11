@@ -12,8 +12,6 @@ use std::time::Duration;
 use crate::log_info;
 use crate::minecraft::download::types::{DownloadStatus, DownloadTask, GlobalProgress};
 use crate::state::AppState;
-use crate::utils::github_download::build_proxy_url;
-use crate::utils::probe::pick_fastest;
 
 use super::easytier_install::{
     asset_name, cli_name, core_name, emit_progress, install_dir, EASYTIER_REPO, VERSION_FILE,
@@ -115,26 +113,14 @@ pub(super) async fn install_version(
             .collect::<Vec<_>>()
     );
     // 候选 URL：镜像优先（竞速选最快镜像），官方保底
-    let mut urls: Vec<String> = Vec::new();
-    if !proxies.is_empty() {
-        if state.easytier_cancel.load(Ordering::SeqCst) {
-            return Err("下载已取消".to_string());
-        }
-        let candidates: Vec<String> = proxies
-            .iter()
-            .map(|p| build_proxy_url(p, EASYTIER_REPO, version, &asset))
-            .collect();
-        crate::log_debug!("[EasyTier] 镜像竞速候选: {candidates:?}");
-        if let Ok(fastest) = pick_fastest(&candidates, Some(state.easytier_cancel.clone())).await {
-            urls.push(fastest);
-        } else if state.easytier_cancel.load(Ordering::SeqCst) {
-            // 竞速期间被取消：直接中断，不继续官方保底
-            return Err("下载已取消".to_string());
-        }
-    }
-    urls.push(format!(
-        "https://github.com/{EASYTIER_REPO}/releases/download/v{version}/{asset}"
-    ));
+    let urls = crate::utils::github_download::build_release_url_candidates(
+        &proxies,
+        EASYTIER_REPO,
+        version,
+        &asset,
+        Some(state.easytier_cancel.clone()),
+    )
+    .await?;
 
     // 探测大小前检查取消（HEAD 探测最长 10s，取消应立即中断）
     if state.easytier_cancel.load(Ordering::SeqCst) {
