@@ -20,11 +20,14 @@ pub const TIME: &str = "/v3/time";
 
 // ===== 更新 =====
 
-/// 更新清单（GET，启动器自用端点，占位符由调用方替换）
+/// 更新检查（GET，启动器自用端点，签名校验，占位符由调用方替换）
+///
+/// 无需设备注册与 JWT：签名参数 `sign-lx` / `sign-ts` / `sign-v1` 由
+/// `crate::utils::update_sign::build_sign_query` 追加。
 ///
 /// 注意：`/v3/updates/manifest` 是 Tauri updater 插件专用端点
 /// （见 tauri.conf.json 的 plugins.updater.endpoints），启动器不得复用。
-pub const UPDATES_MANIFEST_RAW: &str = "/v1/updates/manifest/raw?target={{target}}&arch={{arch}}&current_version={{current_version}}&channel={{channel}}";
+pub const UPDATES_CHECK: &str = "/v3/updates/check?target={{target}}&arch={{arch}}&current_version={{current_version}}&channel={{channel}}";
 
 // ===== v1 FRP =====
 

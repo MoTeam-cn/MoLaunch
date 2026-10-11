@@ -6,6 +6,12 @@
 
 ### Added
 
+- **更新检查签名接口（`/v3/updates/check`）**（[api_paths.rs](src-tauri/src/api_paths.rs) / [update_sign.rs](src-tauri/src/utils/update_sign.rs)（新增） / [check.rs](src-tauri/src/commands/system/updater/check.rs)）：
+  - 启动器改用**启动器自用**端点 `/v3/updates/check`：无需设备注册与 JWT，不再加载设备凭证、不再触发设备 token 续期。（`/v3/updates/manifest` 是 Tauri updater 插件专用端点，见 `tauri.conf.json` 的 `plugins.updater.endpoints`，启动器不得复用。）
+  - 签名走查询参数 `sign-lx`（签名方案版本）/ `sign-ts`（Unix 秒）/ `sign-v1`（64 位小写 hex HMAC-SHA256），待签串为固定字段元组，与 api-server `utils/update_sign.rs` 同协议。
+  - 密钥来源：编译期内嵌 K0（构建期环境变量 `MOLAUNCH_UPDATE_SIGN_KEY`）+ 服务端响应回带的 `sign_hint` 落盘 appdata。**轮换密钥无需发版**：老客户端靠服务端 soft 策略照常拿到更新，并在同一次响应里取回新密钥。
+  - 解析兼容 `data.manifest` 嵌套形态与 `data` 直出清单形态。
+
 - **GitHub Releases 备用更新源**（[models.rs](src-tauri/src/state/config/models.rs) / [check.rs](src-tauri/src/commands/system/updater/check.rs) / [net.rs](src-tauri/src/utils/net.rs) / [AboutTab.vue](src/views/settings/more/AboutTab.vue)）：
   - 新增配置项 `Update.source`（前端 `updateSource`，默认 `api`）：`api` = MoLaunch 云端，`github` = GitHub Releases。
   - GitHub 源查询 `repos/MoTeam-cn/MoLaunch/releases/latest`：版本取 tag、更新日志取 release body、安装包按平台从 assets 中挑选（Windows 取便携版 `*_x64.exe` 并排除 `-setup.exe` 安装版；macOS 取 `*.app.tar.gz`；Linux 取 `*.AppImage`），未匹配到则报错引导手动下载。
@@ -19,7 +25,8 @@
 
 ### Changed
 
-- **云端功能改为「用到时就地询问」**（[Online.vue](src/views/Online.vue)）：未启用联机大厅时点击联机大厅/创建房间/加入房间，不再只弹「功能已封存」，而是就地询问是否启用（说明需与云端交互注册设备并续期令牌），确认后立即启用并继续进入该分类。红石联机与 FRP 不依赖云端，始终可用。
+- **更新检查不再依赖设备注册**（[check.rs](src-tauri/src/commands/system/updater/check.rs)）：移除 `load_creds_with_auto_refresh` 调用，检查更新与联机大厅开关彻底解耦；`force_update` / `min_version` / `rollout_pct` 等全量字段仍然保留（新端点返回完整清单，不再使用简化的插件端点）。
+（[Online.vue](src/views/Online.vue)）：未启用联机大厅时点击联机大厅/创建房间/加入房间，不再只弹「功能已封存」，而是就地询问是否启用（说明需与云端交互注册设备并续期令牌），确认后立即启用并继续进入该分类。红石联机与 FRP 不依赖云端，始终可用。
 - **联机封禁提示区分「未启用」与「连接失败」**（[Online.vue](src/views/Online.vue) / [TopNavLayout.vue](src/components/layout/TopNavLayout.vue) / [ApiServerCard.vue](src/components/settings/ApiServerCard.vue)）：未启用联机大厅时提示改为「需先启用联机大厅」，不再误报为云端连接失败；设置页「重新连接」按钮在未启用时禁用，`reconnect()` 直接返回且不发起 refresh 请求。
 - 配置读写链路新增 `Online.lobby_enabled`（[models.rs](src-tauri/src/state/config/models.rs) / [load.rs](src-tauri/src/config/load.rs) / [save.rs](src-tauri/src/config/save.rs) / [patch.rs](src-tauri/src/commands/system/apply_config/types/patch.rs) / [snapshot.rs](src-tauri/src/commands/system/apply_config/types/snapshot.rs) / [fields.rs](src-tauri/src/commands/system/apply_config/apply/fields.rs) / [config.ts](src/utils/api/config.ts) / [auth.ts](src/types/online/auth.ts)）。
 

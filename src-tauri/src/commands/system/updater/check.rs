@@ -4,11 +4,14 @@ use serde_json::Value;
 use tauri::AppHandle;
 
 use super::UpdateInfo;
-use crate::api_paths::UPDATES_MANIFEST_RAW;
+use crate::api_paths::UPDATES_CHECK;
 use crate::state::AppState;
 
 /// GitHub Releases 仓库（备用更新源）
 const GITHUB_REPO: &str = "MoTeam-cn/MoLaunch";
+
+/// 更新检查端点路径（参与签名，必须与 api-server 一致）
+const UPDATE_CHECK_PATH: &str = "/v3/updates/check";
 
 /// 当前平台标识（用于 updater endpoint 的 target 参数）
 ///
@@ -97,7 +100,8 @@ fn is_version_newer(manifest: &str, current: &str) -> bool {
 /// 手动解析 manifest JSON 并比较版本，不依赖 tauri-plugin-updater 的内部 HTTP 客户端。
 ///
 /// **更新源**：由 `AppConfig.update_source` 决定
-/// - `api`（默认）：MoLaunch 云端 `/v1/updates/manifest/raw`（需要设备 JWT）。
+/// - `api`（默认）：MoLaunch 云端 `/v3/updates/check`（启动器自用端点，签名校验，
+///   **无需设备注册与 JWT**，因此不会触发设备 token 续期）。
 /// - `github`：GitHub Releases `releases/latest`，无需任何鉴权。
 ///
 /// 注意：`/v3/updates/manifest` 是 Tauri updater 插件专用端点
@@ -126,7 +130,7 @@ pub async fn check_update(state: &AppState, _app: &AppHandle) -> Result<UpdateIn
         config.online.api_server_url.clone()
     };
 
-    // 2. 构建 URL（base_url + 路径模板替换，模板见 crate::api_paths::UPDATES_MANIFEST_RAW）
+    // 2. 构建 URL（base_url + 路径模板替换 + 签名参数，模板见 crate::api_paths::UPDATES_CHECK）
     // channel 由当前版本后缀自动推导（alpha/beta/stable）；开发者模式可覆盖分支用于调试
     let channel = {
         let branch = crate::commands::system::developer::get_update_branch();
@@ -136,32 +140,32 @@ pub async fn check_update(state: &AppState, _app: &AppHandle) -> Result<UpdateIn
             branch
         }
     };
-    let path = UPDATES_MANIFEST_RAW
+    let path = UPDATES_CHECK
         .replace("{{target}}", target)
         .replace("{{arch}}", arch)
         .replace("{{current_version}}", current_version)
         .replace("{{channel}}", &channel);
-    let url = format!("{}{}", base_url.trim_end_matches('/'), path);
 
-    // 3. 尝试加载设备 JWT（未注册时忽略，无 auth 请求）
-    let jwt = crate::commands::online::manager::load_creds_with_auto_refresh(state)
-        .await
-        .ok()
-        .map(|creds| creds.device_token);
+    // 3. 签名参数（内嵌 K0 + 本地落盘的 hint；无密钥时不带签名，服务端 soft 策略照常返回清单）
+    //    本端点不加载任何设备凭证，因此检查更新不会触发设备 token 续期
+    let (sign_query, sign_lx) = crate::utils::update_sign::build_sign_query(
+        UPDATE_CHECK_PATH,
+        target,
+        arch,
+        current_version,
+        &channel,
+    );
+    let url = format!("{}{}{}", base_url.trim_end_matches('/'), path, sign_query);
 
     log::info!(
-        "[Updater] 检查更新: {} (auth: {})",
-        crate::utils::net::sanitize_url_for_log(&url),
-        jwt.is_some()
+        "[Updater] 检查更新（签名: {}）: {}",
+        sign_lx.as_deref().unwrap_or("none"),
+        crate::utils::net::sanitize_url_for_log(&url)
     );
 
-    // 4. 构建请求（有 JWT 则携带 Authorization 头）
+    // 4. 构建请求（公开端点，不携带任何凭证）
     let client = crate::http::get_client();
-    let mut req_builder = client.get(&url);
-    if let Some(ref token) = jwt {
-        req_builder = req_builder.header("Authorization", format!("Bearer {}", token));
-    }
-    let response = req_builder.send().await.map_err(|e| {
+    let response = client.get(&url).send().await.map_err(|e| {
         if crate::http::is_tls_cert_error(&e) {
             "检测到中间人攻击，已自动断开链接".to_string()
         } else {
@@ -184,8 +188,7 @@ pub async fn check_update(state: &AppState, _app: &AppHandle) -> Result<UpdateIn
         .await
         .map_err(|e| format!("解析更新信息失败: {e}"))?;
 
-    // v3 公开端点返回裸对象 { version, url, signature, notes }；
-    // 兼容历史 v1 业务端点的 UnifiedResponse 包装 { code, msg, data }
+    // UnifiedResponse 包装：{ code, msg, data }
     let data = match json.get("data") {
         Some(data) => {
             let code = json.get("code").and_then(|v| v.as_i64()).unwrap_or(0);
@@ -198,7 +201,18 @@ pub async fn check_update(state: &AppState, _app: &AppHandle) -> Result<UpdateIn
         None => &json,
     };
 
-    let version = data.get("version").and_then(|v| v.as_str()).unwrap_or("");
+    // 签名有效的响应会回带比本地更新的密钥，落盘供下次请求使用（轮换自愈）
+    if let Some(hint) = data.get("sign_hint") {
+        crate::utils::update_sign::save_hint(hint);
+    }
+
+    // /v3/updates/check 把清单包在 data.manifest 下；兼容 data 直接就是清单的形态
+    let manifest = data.get("manifest").unwrap_or(data);
+
+    let version = manifest
+        .get("version")
+        .and_then(|v| v.as_str())
+        .unwrap_or("");
     if version.is_empty() {
         log::info!("[Updater] manifest 无 version 字段（无可用更新）");
         return Ok(UpdateInfo::default());
@@ -212,7 +226,7 @@ pub async fn check_update(state: &AppState, _app: &AppHandle) -> Result<UpdateIn
 
     log::info!("[Updater] 发现新版本: {} -> {}", current_version, version);
 
-    let download_url = data
+    let download_url = manifest
         .get("url")
         .and_then(|v| v.as_str())
         .unwrap_or("")
@@ -225,17 +239,17 @@ pub async fn check_update(state: &AppState, _app: &AppHandle) -> Result<UpdateIn
     Ok(UpdateInfo {
         available: true,
         version: version.to_string(),
-        notes: data
+        notes: manifest
             .get("notes")
             .and_then(|v| v.as_str())
             .unwrap_or("")
             .to_string(),
-        force_update: data
+        force_update: manifest
             .get("force_update")
             .and_then(|v| v.as_bool())
             .unwrap_or(false),
         download_url,
-        signature: data
+        signature: manifest
             .get("signature")
             .and_then(|v| v.as_str())
             .unwrap_or("")

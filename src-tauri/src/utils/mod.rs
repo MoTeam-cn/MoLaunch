@@ -21,4 +21,5 @@ pub mod path;
 pub mod probe;
 pub mod sdk_crypto;
 pub mod sqlite;
+pub mod update_sign;
 pub mod version;
