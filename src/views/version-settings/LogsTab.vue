@@ -11,7 +11,8 @@ import { listInstanceLogs, readInstanceLog } from '@/utils/api/version'
 import type { InstanceLogFile } from '@/utils/api/version'
 import { sanitizeShareLog, uploadLogShare, LOG_SHARE_PROVIDERS } from '@/utils/logShare'
 import type { LogShareProvider } from '@/utils/logShare'
-import { open } from '@tauri-apps/plugin-shell'
+import { openExternal } from '@/utils/openExternal'
+import { formatBytes, formatTimestamp } from '@/utils/format'
 import { toastError, toastSuccess } from '@/utils/toast'
 import { ArrowPathIcon, DocumentTextIcon, PaperAirplaneIcon } from '@heroicons/vue/24/outline'
 const Select = defineAsyncComponent(() => import('@/components/common/Select.vue'))
@@ -134,7 +135,8 @@ async function shareTo(provider: LogShareProvider) {
   sharing.value = provider
   try {
     const url = await uploadLogShare(sanitizeShareLog(content.value), provider)
-    await open(url)
+    // 经 openExternal 统一校验 scheme，避免第三方响应里的异常 scheme 交系统处理
+    await openExternal(url)
     toastSuccess('日志已分享，已打开分享页面')
   } catch (e) {
     toastError('分享失败：' + String(e))
@@ -143,18 +145,6 @@ async function shareTo(provider: LogShareProvider) {
   }
 }
 
-function formatSize(size: number): string {
-  if (size < 1024) return `${size} B`
-  if (size < 1024 * 1024) return `${(size / 1024).toFixed(1)} KB`
-  return `${(size / 1024 / 1024).toFixed(2)} MB`
-}
-
-function formatTime(ts: number): string {
-  if (!ts) return ''
-  const d = new Date(ts * 1000)
-  const p = (n: number) => String(n).padStart(2, '0')
-  return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())} ${p(d.getHours())}:${p(d.getMinutes())}`
-}
 </script>
 
 <template>
@@ -170,8 +160,8 @@ function formatTime(ts: number): string {
         />
       </div>
       <div v-if="selectedFile" class="min-w-0 flex-1 truncate text-xs text-gray-400">
-        <span class="mr-3">{{ formatSize(selectedFile.size) }}</span>
-        <span>{{ formatTime(selectedFile.modified) }}</span>
+        <span class="mr-3">{{ formatBytes(selectedFile.size) }}</span>
+        <span>{{ formatTimestamp(selectedFile.modified, { withSeconds: false }) }}</span>
         <span v-if="lineCount > 0" class="ml-3">{{ lineCount }} 行</span>
       </div>
       <div class="flex flex-none items-center gap-2">
