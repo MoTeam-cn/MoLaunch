@@ -1,7 +1,7 @@
 /**
  * HTML section shadow DOM 渲染器（从 CustomLayoutPanel.vue 提取）
  *
- * CSS 隔离（shadow root 内样式互不影响）；JS 经 new Function 在主窗口上下文执行（可直接调 window.molaunch SDK）；
+ * CSS 隔离（shadow root 内样式互不影响）；JS 不执行（原 new Function 实现已移除，生产 CSP 亦会以 EvalError 拒绝）；
  * 无 iframe 消除 sandbox 安全警告；molaunch API 桥接 toast/modal，懒加载且仅初始化一次。
  */
 import { toastInfo, toastSuccess, toastError, toastWarning } from '@/utils/toast'
