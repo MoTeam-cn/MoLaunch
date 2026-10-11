@@ -49,6 +49,8 @@
 
 ### Fixed
 
+- **收敛手写的十六进制编码**（[hash.rs](src-tauri/src/utils/hash.rs) / [launcher_profiles.rs](src-tauri/src/minecraft/launcher_profiles.rs)）：全仓仅这两处还在手写 `bytes.iter().map(|b| format!("{:02x}", b)).collect()`，其余六处早已使用 `hex::encode`。新增 `utils::hash::hex_encode`（内部即 `hex::encode`），`sha256_hex` 与 `random_hex_id` 改用之。**注意**：[mod_translation](src-tauri/src/mod_translation) 下的 `format!("{:x}", hasher.finalize())` 与本函数**不等价**（不做零填充），刻意保持独立，不可合并。
+
 - **设备 ID 打码统一并修正短 ID 行为**（[format.ts](src/utils/format.ts) / [SystemInfoTab.vue](src/views/settings/more/SystemInfoTab.vue)）：`maskDeviceId` 对长度 ≤8 的 ID 原先**返回原值**，等于放弃打码，与「打码展示」的语义矛盾；现改为返回 `'****'`。据此 [SystemInfoTab.vue](src/views/settings/more/SystemInfoTab.vue) 里那份等价的打码逻辑（短 ID 分支本就是 `'****'`）得以删除并改用共享函数。**注意**：`maskDeviceId` 的短 ID 分支是行为变更，会影响 [LuckyTool.vue](src/views/quick-tools/LuckyTool.vue) 的显示（短 ID 由明文变为掩码）。
 
 - **RGB→HEX 全面收敛到大写可选项**（[color.ts](src/utils/color.ts)）：给 `rgbToHex` 增加 `options.uppercase`，据此合并另外两处等价实现——[ColorPalette.vue](src/views/tools/calc/ColorPalette.vue) 与 [gradient-text/core.ts](src/utils/gradient-text/core.ts) 原先各自输出大写 `#RRGGBB`，现已统一调用共享函数。ColorPalette 自写的 `rgbToHsl` 与共享版**数值完全等价**（仅缩放不同：共享版返回 0~1），一并删除，改由调用方按度数/百分比取整。

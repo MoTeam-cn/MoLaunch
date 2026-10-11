@@ -17,7 +17,7 @@ use rand::RngCore;
 fn random_hex_id(len: usize) -> String {
     let mut bytes = vec![0u8; len / 2];
     rand::thread_rng().fill_bytes(&mut bytes);
-    bytes.iter().map(|b| format!("{:02x}", b)).collect()
+    crate::utils::hash::hex_encode(&bytes)
 }
 
 /// 认证数据库账号 ID
