@@ -98,9 +98,7 @@ pub fn save_checkpoint(directory: &Path, checkpoint: &Checkpoint) -> Result<(), 
     let content =
         serde_json::to_string(checkpoint).map_err(|e| format!("序列化检查点失败: {e}"))?;
     let path = directory.join(CHECKPOINT_FILE);
-    let temporary = path.with_extension("json.tmp");
-    std::fs::write(&temporary, content).map_err(|e| format!("写入检查点失败: {e}"))?;
-    std::fs::rename(&temporary, &path).map_err(|e| format!("落盘检查点失败: {e}"))
+    crate::utils::fs::write_atomic(&path, content.as_bytes())
 }
 
 #[cfg(test)]

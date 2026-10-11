@@ -81,8 +81,5 @@ fn write_target(
             lang::render_localized_text(&snap)
         }
     };
-    let tmp = target_path.with_extension("tmp");
-    std::fs::write(&tmp, output).map_err(|e| format!("无法写入 {}: {e}", tmp.display()))?;
-    std::fs::rename(&tmp, &target_path)
-        .map_err(|e| format!("无法替换 {}: {e}", target_path.display()))
+    crate::utils::fs::write_atomic(&target_path, output.as_bytes())
 }

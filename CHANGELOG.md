@@ -49,6 +49,8 @@
 
 ### Fixed
 
+- **新增通用原子写函数并迁移 mod_translation 五处**（[fs.rs](src-tauri/src/utils/fs.rs)）：各调用点普遍手搓「写固定名 tmp → rename」，其中 [translate_lang.rs](src-tauri/src/mod_translation/translate_lang.rs)、[translate_class/apply.rs](src-tauri/src/mod_translation/translate_class/apply.rs)、[resume.rs](src-tauri/src/mod_translation/resume.rs)、[repair_apply.rs](src-tauri/src/mod_translation/repair_apply.rs)、[memory.rs](src-tauri/src/mod_translation/memory.rs) 五处都用 `with_extension("tmp")` 的**固定临时名**——这正是 [storage/fs.rs](src-tauri/src/storage/fs.rs) 注释里记录的并发缺陷（多个写入共用同一 tmp 导致 rename 找不到源文件，os error 2）。新增 `utils::fs::write_atomic(path, bytes)`：临时文件名带**自增序号**、自动建父目录，五处已迁移。
+
 - **抽公共 release 下载 URL 候选构造**（[github_download.rs](src-tauri/src/utils/github_download.rs)）：frp 厂商包（[system_default.rs](src-tauri/src/commands/frp/binary/system_default.rs)）与 easytier 内核（[easytier_download.rs](src-tauri/src/commands/online/manager/easytier_download.rs)）各手搓了一份「镜像竞速选最快 + 官方保底」的候选 URL 列表，逻辑同构、仅 easytier 多带取消判断。已抽出 `build_release_url_candidates(proxies, repo, version, asset, cancel)`，两处改为调用。
 
 - **订正查重报告关于本条的描述**：报告称「GitHub release 资产下载编排三处实现，共享函数无人调用」，实际核对后——`download_to` / `download_release_zip` 确实零引用，但前两处调用点并未复刻它们，而是把候选 URL 交给项目自己的 `DownloadTask` / `DownloadSession`（该基础设施自带进度/暂停/取消与 URL 顺序回退）；第三处（[easytier_install.rs](src-tauri/src/commands/online/manager/easytier_install.rs)）是 `probe_github_proxies` 命令处理器，与下载无关。**真正的重复只有候选 URL 构造那一段**，已按此收敛，未强行把调用点改成 `download_release_zip`（那会丢掉 DownloadSession 的进度/取消能力）。`download_to` / `download_release_zip` 零引用这一事实已记录，未删除。

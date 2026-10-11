@@ -286,11 +286,7 @@ fn write_back(
             lang::align_free_text(&lines, translations).join("\n")
         }
     };
-    let temporary = target_path.with_extension("tmp");
-    std::fs::write(&temporary, output)
-        .map_err(|e| format!("无法写入 {}: {e}", temporary.display()))?;
-    std::fs::rename(&temporary, &target_path)
-        .map_err(|e| format!("无法移动 {}: {e}", target_path.display()))
+    crate::utils::fs::write_atomic(&target_path, output.as_bytes())
 }
 
 #[cfg(test)]

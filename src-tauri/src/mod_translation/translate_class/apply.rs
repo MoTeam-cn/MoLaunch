@@ -68,11 +68,7 @@ fn apply_class_translation(
         if rewritten == bytes {
             return Err(format!("class 候选在声明路径中不存在：{relative}"));
         }
-        let temporary = target_path.with_extension("class.tmp");
-        std::fs::write(&temporary, &rewritten)
-            .map_err(|e| format!("无法写入 {}: {e}", temporary.display()))?;
-        std::fs::rename(&temporary, &target_path)
-            .map_err(|e| format!("无法移动 {}: {e}", target_path.display()))?;
+        crate::utils::fs::write_atomic(&target_path, &rewritten)?;
         if !class_ledger.replaced_files.contains(relative) {
             class_ledger.replaced_files.push(relative.clone());
         }

@@ -126,9 +126,7 @@ impl TranslationMemory {
         };
         let content =
             serde_json::to_string(&file).map_err(|e| format!("翻译记忆序列化失败: {e}"))?;
-        let temporary = self.path.with_extension("json.tmp");
-        std::fs::write(&temporary, content).map_err(|e| format!("写入翻译记忆失败: {e}"))?;
-        std::fs::rename(&temporary, &self.path).map_err(|e| format!("移动翻译记忆失败: {e}"))?;
+        crate::utils::fs::write_atomic(&self.path, content.as_bytes())?;
         self.dirty = false;
         Ok(())
     }

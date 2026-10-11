@@ -93,3 +93,23 @@ pub fn dir_total_size(dir: &std::path::Path) -> u64 {
     }
     total
 }
+
+/// 原子写入文件：先写同目录下的唯一临时文件，再 rename 覆盖目标。
+///
+/// 临时文件名带自增序号，避免并发写入共用同一 tmp 导致 rename 找不到源文件
+/// （os error 2）。各调用点原先普遍用 with_extension("tmp") 的固定名，存在此问题。
+///
+/// 注意：仅保证同分区 rename 的原子性；不保证 fsync 落盘。
+pub fn write_atomic(path: &std::path::Path, bytes: &[u8]) -> Result<(), String> {
+    use std::sync::atomic::{AtomicU64, Ordering};
+    static TMP_SEQ: AtomicU64 = AtomicU64::new(0);
+    let seq = TMP_SEQ.fetch_add(1, Ordering::Relaxed);
+    let mut tmp = path.as_os_str().to_owned();
+    tmp.push(format!(".tmp{}", seq));
+    let tmp = std::path::PathBuf::from(tmp);
+    if let Some(parent) = path.parent() {
+        std::fs::create_dir_all(parent).map_err(|e| format!("创建目录失败: {}", e))?;
+    }
+    std::fs::write(&tmp, bytes).map_err(|e| format!("写入临时文件失败: {}", e))?;
+    std::fs::rename(&tmp, path).map_err(|e| format!("替换目标文件失败: {}", e))
+}
