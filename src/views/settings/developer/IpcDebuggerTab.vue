@@ -5,6 +5,7 @@
  * 选择 Tauri 命令名（Select 下拉，后端 generate_handler 注册的命令）+ JSON 参数直接 invoke，
  * 查看返回结果或错误。
  */
+import { copyToClipboard } from '@/utils/clipboard'
 import { ref, computed, defineAsyncComponent, onMounted } from 'vue'
 const Button = defineAsyncComponent(() => import('@/components/common/Button.vue'))
 const Input = defineAsyncComponent(() => import('@/components/common/Input.vue'))
@@ -106,7 +107,7 @@ async function copyResult() {
   const text = result.value ?? error.value
   if (!text) return
   try {
-    await navigator.clipboard.writeText(text)
+    await copyToClipboard(text)
   } catch {
     toastError('复制失败')
   }

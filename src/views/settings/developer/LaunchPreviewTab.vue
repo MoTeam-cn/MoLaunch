@@ -5,6 +5,7 @@
  * 选择已安装版本，后端组装最终启动参数（JVM 参数 / classpath / 游戏参数）但不启动游戏。
  * 账号信息取当前登录账号；未登录时按离线兜底处理。
  */
+import { copyToClipboard } from '@/utils/clipboard'
 import { ref, computed, onMounted, defineAsyncComponent } from 'vue'
 const Button = defineAsyncComponent(() => import('@/components/common/Button.vue'))
 const Select = defineAsyncComponent(() => import('@/components/common/Select.vue'))
@@ -78,7 +79,7 @@ async function copyAll() {
     ...preview.value.game_args.map(a => `  ${a}`),
   ].join('\n')
   try {
-    await navigator.clipboard.writeText(text)
+    await copyToClipboard(text)
   } catch {
     toastError('复制失败')
   }
@@ -92,7 +93,7 @@ function shortArg(arg: string): string {
 /** 点击 Tag 复制完整参数 */
 async function copyArg(arg: string) {
   try {
-    await navigator.clipboard.writeText(arg)
+    await copyToClipboard(arg)
     toastSuccess('已复制参数')
   } catch {
     toastError('复制失败')

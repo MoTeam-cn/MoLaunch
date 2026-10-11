@@ -2,6 +2,7 @@
 /**
  * 渐变文字生成器 - 颜色预设管理（保存/加载/导入导出）
  */
+import { copyToClipboard } from '@/utils/clipboard'
 import { ref, defineAsyncComponent } from 'vue'
 const Input = defineAsyncComponent(() => import('@/components/common/Input.vue'))
 const Button = defineAsyncComponent(() => import('@/components/common/Button.vue'))
@@ -56,7 +57,7 @@ function removePreset(id: string) {
 
 async function exportPresets() {
   try {
-    await navigator.clipboard.writeText(serializeGradientPresets(props.presets))
+    await copyToClipboard(serializeGradientPresets(props.presets))
     toastSuccess('预设 JSON 已复制到剪贴板')
   } catch {
     toastError('复制失败')

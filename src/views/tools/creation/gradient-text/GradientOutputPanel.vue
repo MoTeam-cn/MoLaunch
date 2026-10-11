@@ -2,6 +2,7 @@
 /**
  * 渐变文字生成器 - 预览 + 输出配置 + 生成结果
  */
+import { copyToClipboard } from '@/utils/clipboard'
 import { computed, defineAsyncComponent } from 'vue'
 const Select = defineAsyncComponent(() => import('@/components/common/Select.vue'))
 const Checkbox = defineAsyncComponent(() => import('@/components/common/Checkbox.vue'))
@@ -52,7 +53,7 @@ const adapterOptions = computed(() =>
 
 async function copyOutput() {
   try {
-    await navigator.clipboard.writeText(output.value)
+    await copyToClipboard(output.value)
     toastSuccess('已复制到剪贴板')
   } catch {
     toastError('复制失败，请手动选择复制')

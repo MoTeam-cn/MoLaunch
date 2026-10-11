@@ -5,6 +5,7 @@
  * 交互：点击空格子弹出抽屉选择物品/标签填入该格；点击已放置格子可清除；
  * 结果槽滚轮可调整产出数量；顶部切换版本/类型，实时校验并预览配方 JSON。
  */
+import { copyToClipboard } from '@/utils/clipboard'
 import { computed, onMounted, reactive, ref, watch, defineAsyncComponent } from 'vue'
 const RecipeDisplayPanel = defineAsyncComponent(() => import('./RecipeDisplayPanel.vue'))
 const RecipeSettingsForm = defineAsyncComponent(() => import('./RecipeSettingsForm.vue'))
@@ -163,7 +164,7 @@ function updateCount(slot: RecipeSlot, count: number) {
 async function copyJson() {
   if (!recipeJsonText.value) return
   try {
-    await navigator.clipboard.writeText(recipeJsonText.value)
+    await copyToClipboard(recipeJsonText.value)
     toastSuccess('配方 JSON 已复制到剪贴板')
   } catch {
     toastError('复制失败，请手动选择复制')
