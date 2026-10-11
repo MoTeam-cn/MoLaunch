@@ -149,24 +149,7 @@ pub async fn install_external_plugin_from_zip(zip_path: String) -> Result<String
 
 /// 递归复制源目录到目标目录
 fn copy_dir_recursive(src: &Path, dst: &Path) -> std::io::Result<()> {
-    if !dst.exists() {
-        std::fs::create_dir_all(dst)?;
-    }
-
-    for entry in std::fs::read_dir(src)? {
-        let entry = entry?;
-        let path = entry.path();
-        let file_name = entry.file_name();
-        let dst_path = dst.join(&file_name);
-
-        if path.is_dir() {
-            copy_dir_recursive(&path, &dst_path)?;
-        } else {
-            std::fs::copy(&path, &dst_path)?;
-        }
-    }
-
-    Ok(())
+    crate::utils::fs::copy_dir_recursive(src, dst).map_err(std::io::Error::other)
 }
 
 /// 探测 ZIP 前缀（扁平结构返回 ""，单根目录返回 "xxx/"）

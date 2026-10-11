@@ -48,3 +48,27 @@ pub fn newest_file(dir: &Path, ext: Option<&str>) -> Option<std::path::PathBuf> 
         })
         .max_by_key(|p| p.metadata().and_then(|m| m.modified()).ok())
 }
+
+/// 递归复制目录内容到目标目录（目标不存在则创建，同名文件覆盖）
+///
+/// 统一替代 migrations/common.rs、version/pack_common/entries.rs、plugins/install.rs
+/// 中逐字相同的三份实现。
+///
+/// 注意：本函数不做过滤、不返回计数。带 skip 集合与计数需求的增量合并
+/// （如 frp/install/files.rs）语义不同，不要强行套用。
+pub fn copy_dir_recursive(src: &std::path::Path, dst: &std::path::Path) -> Result<(), String> {
+    if !dst.exists() {
+        std::fs::create_dir_all(dst).map_err(|e| format!("创建目录失败: {}", e))?;
+    }
+    for entry in std::fs::read_dir(src).map_err(|e| format!("读取目录失败: {}", e))? {
+        let entry = entry.map_err(|e| format!("读取目录项失败: {}", e))?;
+        let path = entry.path();
+        let dst_path = dst.join(entry.file_name());
+        if path.is_dir() {
+            copy_dir_recursive(&path, &dst_path)?;
+        } else {
+            std::fs::copy(&path, &dst_path).map_err(|e| format!("复制文件失败: {}", e))?;
+        }
+    }
+    Ok(())
+}

@@ -56,6 +56,10 @@ fn version_changed(new_version: &str, old_version: Option<&str>) -> bool {
     old_version.map(|old| old != new_version).unwrap_or(true)
 }
 
+/// 带跳过集合与计数返回的增量复制。
+///
+/// 注意：**不要**与 utils::fs::copy_dir_recursive 合并——本函数有 skip 过滤、
+/// 返回复制计数、并为文件补建父目录，语义与那个「整目录复制」不同。
 pub(super) fn copy_dir_recursive(
     src: &Path,
     dst: &Path,

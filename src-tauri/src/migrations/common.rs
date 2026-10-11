@@ -21,24 +21,10 @@ pub(super) fn dir_is_non_empty(dir: &std::path::Path) -> bool {
         .unwrap_or(false)
 }
 
-/// 递归复制目录
+/// 递归复制目录（实现统一在 utils/fs.rs）
 pub(super) fn copy_dir_recursive(
     src: &std::path::Path,
     dst: &std::path::Path,
 ) -> Result<(), String> {
-    if !dst.exists() {
-        std::fs::create_dir_all(dst).map_err(|e| format!("创建目录失败: {}", e))?;
-    }
-    for entry in std::fs::read_dir(src).map_err(|e| format!("读取目录失败: {}", e))? {
-        let entry = entry.map_err(|e| format!("读取目录项失败: {}", e))?;
-        let path = entry.path();
-        let file_name = entry.file_name();
-        let dst_path = dst.join(&file_name);
-        if path.is_dir() {
-            copy_dir_recursive(&path, &dst_path)?;
-        } else {
-            std::fs::copy(&path, &dst_path).map_err(|e| format!("复制文件失败: {}", e))?;
-        }
-    }
-    Ok(())
+    crate::utils::fs::copy_dir_recursive(src, dst)
 }

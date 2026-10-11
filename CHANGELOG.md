@@ -49,6 +49,10 @@
 
 ### Fixed
 
+- **抽公共目录复制函数**（[fs.rs](src-tauri/src/utils/fs.rs)）：`copy_dir_recursive` 原有四份实现，其中三份（[migrations/common.rs](src-tauri/src/migrations/common.rs)、[version/pack_common/entries.rs](src-tauri/src/commands/version/pack_common/entries.rs)、[plugins/install.rs](src-tauri/src/commands/plugins/install.rs)）逻辑逐字相同、仅返回类型不同（`Result<(), String>` vs `std::io::Result<()>`）。已抽出 `utils::fs::copy_dir_recursive` 并让三处委托，返回类型差异在调用点用 `map_err(std::io::Error::other)` 消化。
+
+- **未合并第四处并加注释说明原因**（[frp/install/files.rs](src-tauri/src/commands/frp/install/files.rs)）：该处签名为 `(src, dst, skip, base) -> Result<u32, String>`，带跳过集合过滤、返回复制计数、并为文件补建父目录，与「整目录复制」语义不同。已在函数上注明不要与 `utils::fs::copy_dir_recursive` 合并，避免后人误合。
+
 - **统一剪贴板调用**（[clipboard.ts](src/utils/clipboard.ts)）：[LaunchPreviewTab.vue](src/views/settings/developer/LaunchPreviewTab.vue)（2 处）、[IpcDebuggerTab.vue](src/views/settings/developer/IpcDebuggerTab.vue)、[RecipeGeneratorPage.vue](src/views/tools/creation/recipe-generator/RecipeGeneratorPage.vue)、[GradientPresetsManager.vue](src/views/tools/creation/gradient-text/GradientPresetsManager.vue)、[GradientOutputPanel.vue](src/views/tools/creation/gradient-text/GradientOutputPanel.vue) 共 6 处直接调 `navigator.clipboard.writeText`，绕过 `utils/clipboard.ts::copyToClipboard` 的统一错误处理与可选 toast。已全部收口，全仓仅剩 `utils/clipboard.ts` 自身持有 `navigator.clipboard`。
 
 - **修正查重报告的一处误报并统一真正的 SHA256 实现**（[coverage.rs](src-tauri/src/mod_translation/analyze/coverage.rs)）：查重报告称「sha256 → 十六进制内联实现 6 处」，实际核对后其中 `image_cache/store.rs` 用的是 **SHA1**（缓存文件名）、`version/export/network.rs` 用的是 **SHA512**（CurseForge 指纹，API 强制要求），`file_checker.rs` 的两处是 MD5/SHA1 通用分支。报告把「`hex::encode` 这个写法」当成了「sha256→hex」。**若按报告盲目统一为 `sha256_hex`，会直接改坏图片缓存的文件名与 CurseForge 指纹。** 仅对确为 SHA256 的 `coverage.rs::file_hash` 改为复用 `utils::hash::sha256_hex`，其余保持原算法。

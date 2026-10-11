@@ -135,18 +135,7 @@ pub(crate) fn delete_entry(dir: &Path, file_name: &str) -> Result<(), String> {
 }
 
 fn copy_dir_recursive(src: &Path, dst: &Path) -> Result<(), String> {
-    std::fs::create_dir_all(dst).map_err(|e| format!("创建目录失败: {}", e))?;
-    for entry in std::fs::read_dir(src).map_err(|e| format!("读取目录失败: {}", e))? {
-        let entry = entry.map_err(|e| format!("读取目录项失败: {}", e))?;
-        let src_path = entry.path();
-        let dst_path = dst.join(entry.file_name());
-        if src_path.is_dir() {
-            copy_dir_recursive(&src_path, &dst_path)?;
-        } else {
-            std::fs::copy(&src_path, &dst_path).map_err(|e| format!("复制文件失败: {}", e))?;
-        }
-    }
-    Ok(())
+    crate::utils::fs::copy_dir_recursive(src, dst)
 }
 
 /// 从外部路径安装条目（文件或目录，自动去除启停后缀），返回安装后的文件名
