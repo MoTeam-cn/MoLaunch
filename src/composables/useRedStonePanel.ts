@@ -98,7 +98,6 @@ export function useRedStonePanel() {
 
   /** 启动红石相关加载与事件监听（平台支持时才调用） */
   function startRedstone() {
-    mountedOnce = true
     void restoreStatus()
     void loadServers()
     void autoFillPort()
@@ -423,7 +422,10 @@ export function useRedStonePanel() {
   })
 
   onMounted(() => {
-    // 先探测平台支持（会实际打官方端点）；不支持则不发起任何红石请求，由面板显示错误卡
+    // keep-alive 首次激活紧跟 mounted：必须**同步**占位，否则 onActivated 会先于
+    // 平台探测返回而执行，去重守卫失效（多打一次 status IPC，且切回时跳过状态恢复）
+    mountedOnce = true
+    // 再探测平台支持（会实际打官方端点）；不支持则不发起任何红石请求，由面板显示错误卡
     void (async () => {
       if (await checkPlatformSupport()) startRedstone()
     })()

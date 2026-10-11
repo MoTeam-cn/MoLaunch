@@ -49,6 +49,8 @@
 
 ### Fixed
 
+- **修复红石创建面板 keep-alive 去重标志失效**（[useRedStonePanel.ts](src/composables/useRedStonePanel.ts)）：平台支持探测改为异步后，`mountedOnce` 被挪到 `startRedstone()` 里置位，而该函数要等 `await checkPlatformSupport()` 才执行——于是 `onActivated` 先跑、守卫失效：首次进入会重复调用一次 `restoreStatus()`，且标志随后置 true 无人复位，导致第一次切走再切回时跳过状态恢复（若离开时隧道处于创建中，`startPolling()` 不会恢复，面板停在「创建中」）。改为在 `onMounted` 同步段置位。
+
 - **修复内核自动更新的 HEAD 大小比对恒判「已更新」**（[kernel.rs](src-tauri/src/commands/redstone/kernel.rs) / [net.rs](src-tauri/src/utils/net.rs)）：reqwest 对 **HEAD** 响应的 `Response::content_length()` 恒为 0（HEAD 无 body），直接用它比对会把「官方未更新」误判成「已更新」，导致**每次启动都重新下载内核**。改为从 `Content-Length` 响应头读取。
 
 ### Refactored
