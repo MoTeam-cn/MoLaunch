@@ -56,6 +56,17 @@ pub async fn get_image_url(remote_url: &str, app: Option<AppHandle>) -> CachedIm
 
 /// 异步下载图片到缓存（带去重）
 fn spawn_download(remote_url: String, app: AppHandle) {
+    // SSRF 防护：只允许公网 http(s)，拒绝 file:// / localhost / 内网段 / 169.254 / 带 userinfo 的 URL。
+    // 图片 URL 来自社区元数据（他人可控），不加校验即可让启动器代发对内网地址的 GET。
+    // 与 skin/dispatcher.rs、tools/download.rs、community/install/resource.rs 的既有做法一致。
+    if let Err(e) = crate::utils::net::validate_public_http_url(&remote_url) {
+        crate::log_warn!(
+            "[ImageCache] 拒绝下载非公网图片 URL: {} ({})",
+            remote_url,
+            e
+        );
+        return;
+    }
     // 检查是否已在下载
     let url_for_check = remote_url.clone();
     let app_clone = app.clone();

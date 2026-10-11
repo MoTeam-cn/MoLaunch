@@ -49,6 +49,12 @@
 
 ### Fixed
 
+- **修复 ZIP 解压目录条目路径穿越（Zip Slip）**（[zip.rs](src-tauri/src/commands/frp/install/zip.rs) / [zip_test.rs](src-tauri/src/commands/frp/install/zip_test.rs)（新增） / [install.rs](src-tauri/src/commands/plugins/install.rs)）：两处 `extract_zip_safely` 都只有**文件条目**分支做 canonicalize 校验，**目录条目**分支直接 `create_dir_all` 后 `continue`，校验根本走不到。用真实恶意 ZIP 复现：条目 `../escaped_dir/` 使函数返回 `Ok(())` 且在目标目录之外建出目录。已把段级校验 `ensure_safe_relative_path` 提到创建任何目录**之前**（覆盖目录与文件两类条目），并新增回归用例。
+
+- **修复图片缓存 SSRF**（[download.rs](src-tauri/src/minecraft/image_cache/download.rs)）：`spawn_download` 对前端传入的图片 URL 无任何校验，直接交给 reqwest 下载；图片 URL 来自社区元数据（他人可控），可让启动器代发对内网地址的 GET。已在发起下载前补 `crate::utils::net::validate_public_http_url`（与 [skin/dispatcher.rs](src-tauri/src/commands/skin/dispatcher.rs) / [tools/download.rs](src-tauri/src/commands/tools/download.rs) / [resource.rs](src-tauri/src/commands/community/install/resource.rs) 的既有做法一致），拒绝 `file://`、localhost、内网段、169.254 与带 userinfo 的 URL。
+
+- **订正自定义布局 html section 脚本的注释**（[htmlShadowRenderer.ts](src/plugins/custom-layout/htmlShadowRenderer.ts)）：注释原称脚本「在主窗口上下文执行，可访问全局 DOM 与 Tauri IPC」，但生产 CSP 为 `script-src 'self' 'wasm-unsafe-eval'`——`'wasm-unsafe-eval'` 只放行 WebAssembly，不含 `'unsafe-eval'`。Playwright 实测确认 `new Function` 与 `eval` 均被以 EvalError 拒绝、WebAssembly 放行，故该分支在生产构建中无法执行。已注明实际情况（行为未改，CSP 未放宽）。
+
 - **修复 frpc 日志时间戳解析在非 ASCII 行 panic**（[log.rs](src-tauri/src/commands/frp/process/log.rs) / [log_test.rs](src-tauri/src/commands/frp/process/log_test.rs)（新增））：`extract_log_timestamp` 用 `&trimmed[..23]` 按**字节**切片，而注释写的是「取前 23 个字符」。日志里只要混入中文，第 23 字节就可能落在字符中间，直接 `byte index 23 is not a char boundary` panic——而该函数对每一行日志调用。已改为 `chars().take(23)`。standalone 复现程序确认：修复前 panic、修复后不 panic，且标准时间戳行解析结果不变。
 
 - **修复 Online 配置不落盘**（[save.rs](src-tauri/src/config/save.rs) / [load.rs](src-tauri/src/config/load.rs)）：`OnlineConfig` 有 7 个字段，`save.rs` 只写 3 个。`network_identity`（[NetworkIdentityEditor.vue](src/components/settings/NetworkIdentityEditor.vue)）与 `easytier_public_peers`（[EasyTierPeersEditor.vue](src/components/settings/EasyTierPeersEditor.vue)）都能经 `apply_config` 改（[patch.rs](src-tauri/src/commands/system/apply_config/types/patch.rs)）却从不写盘，重启即丢。已补两字段的 save/load（数组走 JSON 序列化，与既有 `github_proxies` 一致）。

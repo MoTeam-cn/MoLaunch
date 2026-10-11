@@ -119,6 +119,10 @@ fn extract_zip_safely<R: Read + std::io::Seek>(
         if rel.is_empty() {
             continue;
         }
+        // 段级校验必须放在创建任何目录**之前**：原先只有文件条目做 canonicalize 校验，
+        // 目录条目直接 create_dir_all 并 continue，可用 "../x/" 在 dst 之外建目录
+        crate::utils::path::ensure_safe_relative_path(rel)
+            .map_err(|e| format!("Zip Slip 检测: {} ({})", rel, e))?;
         let path = dst.join(rel);
         if rel.ends_with('/') {
             std::fs::create_dir_all(path).map_err(|e| format!("创建目录失败: {}", e))?;
@@ -139,3 +143,7 @@ fn extract_zip_safely<R: Read + std::io::Seek>(
     }
     Ok(())
 }
+
+#[cfg(test)]
+#[path = "zip_test.rs"]
+mod zip_test;

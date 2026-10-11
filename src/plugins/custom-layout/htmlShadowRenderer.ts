@@ -109,6 +109,10 @@ function setupMolaunchApi() {
  *
  * html section 脚本经 new Function 在主窗口上下文执行，可访问全局 DOM 与 Tauri IPC，
  * 因此拦截以下危险调用：
+ *
+ * 注意：生产 CSP 为 script-src 'self' 'wasm-unsafe-eval'（只放行 WebAssembly，不含
+ * 'unsafe-eval'），浏览器会以 EvalError 拒绝 new Function。实测确认该分支在生产构建中
+ * 无法执行，脚本失败经 safeCallSync 落到 console.error。本扫描是纵深防御，不是唯一屏障。
  * - window.molaunch 敏感方法（spawnProcess / createWindow）
  * - Tauri IPC 直接调用（__TAURI_INTERNALS__ / __TAURI__ 全局对象）
  * - 主窗口 DOM 篡改（document.body / documentElement 内容替换、document.write）

@@ -233,6 +233,15 @@ fn extract_zip_safely<R: std::io::Read + std::io::Seek>(
             continue;
         }
 
+        // 段级校验必须放在创建任何目录**之前**：原先只有文件项做 canonicalize 校验，
+        // 目录项直接 create_dir_all 并 continue，可用 "../x/" 在 dst 之外建目录
+        crate::utils::path::ensure_safe_relative_path(rel).map_err(|e| {
+            std::io::Error::new(
+                std::io::ErrorKind::PermissionDenied,
+                format!("Zip Slip detected: {} ({})", rel, e),
+            )
+        })?;
+
         // 目录项
         if rel.ends_with('/') {
             let dir_path = dst.join(rel);
