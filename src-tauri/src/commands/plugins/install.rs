@@ -175,37 +175,7 @@ fn copy_dir_recursive(src: &Path, dst: &Path) -> std::io::Result<()> {
 /// - 若所有文件都在同一根目录下，返回 "xxx/"
 /// - 多根目录或无文件，视为扁平结构
 fn determine_zip_prefix(names: &[String]) -> Result<String, String> {
-    let mut root_dirs = std::collections::HashSet::new();
-    let mut has_flat_files = false;
-
-    for name in names {
-        if name.contains('/') {
-            let root = name.split('/').next().unwrap_or("");
-            if !root.is_empty() {
-                root_dirs.insert(root.to_string());
-            }
-        } else if !name.is_empty() {
-            // 扁平结构（根直接有文件）
-            has_flat_files = true;
-        }
-    }
-
-    // 如果有扁平文件，视为扁平结构
-    if has_flat_files {
-        return Ok(String::new());
-    }
-
-    // 如果只有一个根目录，返回 "xxx/"
-    if root_dirs.len() == 1 {
-        let root = root_dirs
-            .iter()
-            .next()
-            .ok_or_else(|| "ZIP 无有效根目录".to_string())?;
-        return Ok(format!("{}/", root));
-    }
-
-    // 多根或无根，视为扁平结构
-    Ok(String::new())
+    Ok(crate::utils::archive::determine_zip_prefix(names))
 }
 
 /// 安全解压 ZIP（防 Zip Slip：canonicalize 父目录后校验目标在 dst 内）
@@ -214,59 +184,6 @@ fn extract_zip_safely<R: std::io::Read + std::io::Seek>(
     prefix: &str,
     dst: &Path,
 ) -> std::io::Result<()> {
-    let canonical_dst = dst.canonicalize().unwrap_or_else(|_| dst.to_path_buf());
-
-    for i in 0..archive.len() {
-        let mut file = archive
-            .by_index(i)
-            .map_err(|e| std::io::Error::other(e.to_string()))?;
-        let name = file.name().to_string();
-
-        // 跳过非前缀的项
-        if !name.starts_with(prefix) {
-            continue;
-        }
-
-        // 去掉前缀得到相对路径
-        let rel = &name[prefix.len()..];
-        if rel.is_empty() {
-            continue;
-        }
-
-        // 段级校验必须放在创建任何目录**之前**：原先只有文件项做 canonicalize 校验，
-        // 目录项直接 create_dir_all 并 continue，可用 "../x/" 在 dst 之外建目录
-        crate::utils::path::ensure_safe_relative_path(rel).map_err(|e| {
-            std::io::Error::new(
-                std::io::ErrorKind::PermissionDenied,
-                format!("Zip Slip detected: {} ({})", rel, e),
-            )
-        })?;
-
-        // 目录项
-        if rel.ends_with('/') {
-            let dir_path = dst.join(rel);
-            std::fs::create_dir_all(&dir_path)?;
-            continue;
-        }
-
-        // 文件项
-        let file_path = dst.join(rel);
-
-        // Zip Slip 校验：canonicalize 父目录，确保目标在 dst 内
-        if let Some(parent) = file_path.parent() {
-            std::fs::create_dir_all(parent)?;
-            let canonical_parent = parent.canonicalize()?;
-            if !canonical_parent.starts_with(&canonical_dst) {
-                return Err(std::io::Error::new(
-                    std::io::ErrorKind::PermissionDenied,
-                    format!("Zip Slip detected: {}", rel),
-                ));
-            }
-        }
-
-        let mut out = std::fs::File::create(&file_path)?;
-        std::io::copy(&mut file, &mut out)?;
-    }
-
-    Ok(())
+    crate::utils::archive::extract_zip_safely(archive, prefix, dst, |_| true)
+        .map_err(std::io::Error::other)
 }

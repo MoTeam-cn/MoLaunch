@@ -144,33 +144,6 @@ pub(super) fn extract_frpc_from_tar_gz(
 pub(super) fn extract_archive(archive_path: &Path, dst: &Path) -> Result<(), String> {
     let file = std::fs::File::open(archive_path).map_err(|e| format!("打开归档失败: {}", e))?;
     let mut archive = zip::ZipArchive::new(file).map_err(|e| format!("解析归档失败: {}", e))?;
-    let canonical_dst = dst.canonicalize().unwrap_or_else(|_| dst.to_path_buf());
-    for i in 0..archive.len() {
-        let mut entry = archive
-            .by_index(i)
-            .map_err(|e| format!("读取 ZIP 条目失败: {}", e))?;
-        let name = entry.name().to_string();
-        // 段级校验必须放在创建任何目录**之前**：目录条目与文件条目都要过，
-        // 否则 "../x/" 这类目录条目会在 dst 之外建出目录（此处不剥 prefix，条目名即相对路径）
-        crate::utils::path::ensure_safe_relative_path(&name)
-            .map_err(|e| format!("Zip Slip 检测: {} ({})", name, e))?;
-        if name.ends_with('/') {
-            std::fs::create_dir_all(dst.join(&name)).map_err(|e| format!("创建目录失败: {}", e))?;
-            continue;
-        }
-        let file_path = dst.join(&name);
-        if let Some(parent) = file_path.parent() {
-            std::fs::create_dir_all(parent).map_err(|e| format!("创建父目录失败: {}", e))?;
-            let canonical_parent = parent
-                .canonicalize()
-                .map_err(|e| format!("canonicalize 失败: {}", e))?;
-            if !canonical_parent.starts_with(&canonical_dst) {
-                return Err(format!("Zip Slip 检测: {}", name));
-            }
-        }
-        let mut out =
-            std::fs::File::create(&file_path).map_err(|e| format!("创建文件失败: {}", e))?;
-        std::io::copy(&mut entry, &mut out).map_err(|e| format!("写入文件失败: {}", e))?;
-    }
-    Ok(())
+    // 安全解压实现统一在 utils/archive.rs（段级校验 + canonicalize 兜底）
+    crate::utils::archive::extract_zip_safely(&mut archive, "", dst, |_| true)
 }

@@ -80,68 +80,18 @@ fn version_changed(new: &str, old: Option<&str>) -> bool {
     old.map(|v| v != new).unwrap_or(true)
 }
 
+/// 探测 ZIP 顶层前缀（实现统一在 utils/archive.rs）
 fn determine_zip_prefix(names: &[String]) -> Result<String, String> {
-    let mut roots = std::collections::HashSet::new();
-    let mut flat = false;
-    for name in names {
-        if name.contains('/') {
-            if let Some(root) = name.split('/').next().filter(|v| !v.is_empty()) {
-                roots.insert(root);
-            }
-        } else if !name.is_empty() {
-            flat = true;
-        }
-    }
-    if flat {
-        return Ok(String::new());
-    }
-    if roots.len() == 1 {
-        return Ok(format!("{}/", roots.into_iter().next().unwrap()));
-    }
-    Ok(String::new())
+    Ok(crate::utils::archive::determine_zip_prefix(names))
 }
 
+/// 安全解压（实现统一在 utils/archive.rs，此处保留薄封装以稳定调用点）
 fn extract_zip_safely<R: Read + std::io::Seek>(
     archive: &mut zip::ZipArchive<R>,
     prefix: &str,
     dst: &Path,
 ) -> Result<(), String> {
-    let canonical_dst = dst.canonicalize().unwrap_or_else(|_| dst.to_path_buf());
-    for i in 0..archive.len() {
-        let mut file = archive
-            .by_index(i)
-            .map_err(|e| format!("读取 ZIP 条目失败: {}", e))?;
-        let name = file.name().to_string();
-        if !name.starts_with(prefix) {
-            continue;
-        }
-        let rel = &name[prefix.len()..];
-        if rel.is_empty() {
-            continue;
-        }
-        // 段级校验必须放在创建任何目录**之前**：原先只有文件条目做 canonicalize 校验，
-        // 目录条目直接 create_dir_all 并 continue，可用 "../x/" 在 dst 之外建目录
-        crate::utils::path::ensure_safe_relative_path(rel)
-            .map_err(|e| format!("Zip Slip 检测: {} ({})", rel, e))?;
-        let path = dst.join(rel);
-        if rel.ends_with('/') {
-            std::fs::create_dir_all(path).map_err(|e| format!("创建目录失败: {}", e))?;
-            continue;
-        }
-        if let Some(parent) = path.parent() {
-            std::fs::create_dir_all(parent).map_err(|e| format!("创建父目录失败: {}", e))?;
-            if !parent
-                .canonicalize()
-                .map_err(|e| format!("canonicalize 失败: {}", e))?
-                .starts_with(&canonical_dst)
-            {
-                return Err(format!("Zip Slip 检测: {}", rel));
-            }
-        }
-        let mut out = std::fs::File::create(path).map_err(|e| format!("创建文件失败: {}", e))?;
-        std::io::copy(&mut file, &mut out).map_err(|e| format!("写入文件失败: {}", e))?;
-    }
-    Ok(())
+    crate::utils::archive::extract_zip_safely(archive, prefix, dst, |_| true)
 }
 
 #[cfg(test)]

@@ -3,6 +3,7 @@
 //! 包含跨业务的纯函数工具（markdown 表格解析、缓存访问等）。
 //! 业务模块应通过 `utils::cache*` 访问缓存，而非直接使用 `storage::cache*`。
 
+pub mod archive;
 pub mod cache;
 pub mod cache_app;
 pub mod cache_cleanup;
