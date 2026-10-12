@@ -171,10 +171,6 @@ pub(super) fn apply_launcher(
     }
 
     // 更新源："api"（云端公开端点）/ "github"（GitHub Releases）
-    if let Some(ref source) = patch.update_source {
-        log_info!("[Config] update_source = {}", source);
-        config.update_source = source.clone();
-    }
 }
 
 /// 实验性功能域：experimental_enabled

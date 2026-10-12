@@ -172,7 +172,6 @@ pub fn load_config() -> Result<Option<AppConfig>, String> {
         config.get_or("Log", "share_provider", &app_config.log_share_provider);
 
     // Update（更新源："api" 云端 / "github" GitHub Releases）
-    app_config.update_source = config.get_or("Update", "source", &app_config.update_source);
 
     // ExternalDownload
     app_config.external_download_dir = config

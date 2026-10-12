@@ -215,11 +215,8 @@ export function useOnlineAuthSlice() {
    * @returns 是否成功连接云端
    */
   async function initAuth(): Promise<boolean> {
-    // 未启用联机大厅：不与云端交互（后端 auth_init 同样会短路，这里直接跳过 IPC）
-    if (!lobbyEnabled.value) {
-      markCloudDisabled()
-      return false
-    }
+    // 设备注册/续期与「联机大厅」开关解耦：注册是基础能力，默认即发起。
+    // 联机大厅开关只控制联机功能本身（进入联机页仍需用户同意与云端交互）。
     initializing.value = true
     cloudError.value = null
     const result = await safeCall(

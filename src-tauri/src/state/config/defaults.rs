@@ -32,11 +32,6 @@ pub(crate) fn default_log_share_provider() -> String {
     "mclogs".to_string()
 }
 
-/// 默认更新源：MoLaunch 云端公开端点（无需设备注册/鉴权）
-pub(crate) fn default_update_source() -> String {
-    "api".to_string()
-}
-
 impl Default for AppConfig {
     fn default() -> Self {
         let game_dir = super::paths::get_default_game_dir();
@@ -93,7 +88,6 @@ impl Default for AppConfig {
                 use_dedicated_gpu: false,
             },
             log_share_provider: default_log_share_provider(),
-            update_source: default_update_source(),
             online: super::models::OnlineConfig::default(),
             tls: TlsConfig::default(),
         }

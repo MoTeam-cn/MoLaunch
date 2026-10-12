@@ -158,25 +158,20 @@ async function initApp() {
     await restorePage(lastPage ?? '')
   }
 
-  // 联机云端初始化（静默注册/登录/刷新 token）
-  // 仅在用户已启用联机大厅并同意与云端交互时发起；未启用时完全不与云端交互
+  // 设备注册/登录（静默注册/登录/刷新 token）
+  // 与「联机大厅」开关解耦：设备身份是基础能力（更新检查需 JWT 才能按设备灰度、
+  // 启动统计也依赖它），因此默认即注册；联机大厅开关只控制联机功能本身。
   await onlineStore.syncLobbyEnabledFromConfig()
-  if (onlineStore.lobbyEnabled) {
-    console.log('[Startup][Frontend] awaiting onlineStore.initAuth...')
-    const cloudOk = await onlineStore.initAuth()
-    console.log('[Startup][Frontend] initAuth done, cloudConnected =', cloudOk)
-    if (!cloudOk) {
-      // 云端连接失败，弹窗提示用户（联机按钮将自动禁用）
-      showError(
-        '云端连接失败',
-        '与云端 API 连接失败，联机功能可能不可用。',
-        `原因：${onlineStore.cloudError || '未知错误'}\n可在「设置 → 联机」页尝试重新连接。`,
-      )
-    }
-  } else {
-    // 未启用联机大厅：不发起任何云端请求（不静默注册、不续期 token）
-    onlineStore.markCloudDisabled()
-    console.log('[Startup][Frontend] online lobby disabled, skip cloud init')
+  console.log('[Startup][Frontend] awaiting onlineStore.initAuth...')
+  const cloudOk = await onlineStore.initAuth()
+  console.log('[Startup][Frontend] initAuth done, cloudConnected =', cloudOk)
+  if (!cloudOk && onlineStore.lobbyEnabled) {
+    // 云端连接失败且用户在用联机：弹窗提示（联机按钮将自动禁用）
+    showError(
+      '云端连接失败',
+      '与云端 API 连接失败，联机功能可能不可用。',
+      `原因：${onlineStore.cloudError || '未知错误'}\n可在「设置 → 联机」页尝试重新连接。`,
+    )
   }
 
   // 会话恢复后修正路由：

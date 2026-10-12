@@ -6,35 +6,33 @@
 
 ### Added
 
-- **更新检查签名接口（`/v3/updates/check`）**（[api_paths.rs](src-tauri/src/api_paths.rs) / [update_sign.rs](src-tauri/src/utils/update_sign.rs)（新增） / [check.rs](src-tauri/src/commands/system/updater/check.rs)）：
-  - 启动器改用**启动器自用**端点 `/v3/updates/check`：无需设备注册与 JWT，不再加载设备凭证、不再触发设备 token 续期。（`/v3/updates/manifest` 是 Tauri updater 插件专用端点，见 `tauri.conf.json` 的 `plugins.updater.endpoints`，启动器不得复用。）
-  - 签名走查询参数 `sign-lx`（签名方案版本）/ `sign-ts`（Unix 秒）/ `sign-v1`（64 位小写 hex HMAC-SHA256），待签串为固定字段元组，与 api-server `utils/update_sign.rs` 同协议。
-  - 密钥来源：编译期内嵌 K0（构建期环境变量 `MOLAUNCH_UPDATE_SIGN_KEY`）+ 服务端响应回带的 `sign_hint` 落盘 appdata。**轮换密钥无需发版**：老客户端靠服务端 soft 策略照常拿到更新，并在同一次响应里取回新密钥。
-  - 解析兼容 `data.manifest` 嵌套形态与 `data` 直出清单形态。
+- **更新检查改走需鉴权的 `/v1/updates/manifest/raw`**（[api_paths.rs](src-tauri/src/api_paths.rs) / [check.rs](src-tauri/src/commands/system/updater/check.rs)）：
+  - 端点从公开的 `/v3/updates/check` 换成**需设备 JWT** 的 `/v1/updates/manifest/raw`：服务端据此拿到 `device_pk`，**按设备灰度**（`sha256(device_pk)[0..8] % 100 < rollout_pct`）才成立。旧的公开端点取不到设备身份、无法灰度，已从 api-server 移除。
+  - 检查前先取有效设备凭证（过期自动续期），以 `Authorization: Bearer` 发送；**未注册或续期失败即无法检查更新**——这是刻意的，灰度与发布控制都在服务端，绕过鉴权等于绕过它们。
+  - 401/403 单独给出「设备凭证无效或已失效，请重新连接云端」的提示，便于用户定位；响应 `data` 直接就是清单（旧 `/v3` 端点会包一层 `manifest`），版本比较与下载地址白名单校验逻辑不变。
+  - 签名机制（内嵌 K0 + `sign_hint` 轮换）从更新检查**移到启动上报**复用，见下条。
 
-- **GitHub Releases 备用更新源**（[models.rs](src-tauri/src/state/config/models.rs) / [check.rs](src-tauri/src/commands/system/updater/check.rs) / [net.rs](src-tauri/src/utils/net.rs) / [AboutTab.vue](src/views/settings/more/AboutTab.vue)）：
-  - 新增配置项 `Update.source`（前端 `updateSource`，默认 `api`）：`api` = MoLaunch 云端，`github` = GitHub Releases。
-  - GitHub 源查询 `repos/MoTeam-cn/MoLaunch/releases/latest`：版本取 tag、更新日志取 release body、安装包按平台从 assets 中挑选（Windows 取便携版 `*_x64.exe` 并排除 `-setup.exe` 安装版；macOS 取 `*.app.tar.gz`；Linux 取 `*.AppImage`），未匹配到则报错引导手动下载。
-  - 新增 GitHub 下载域名白名单校验 `validate_github_download_url`；下载链路改为两源白名单取并集（`validate_update_download_url_any_source`），仍为严格 https + 域名白名单。
-  - 设置 → 更多 → 关于 新增「更新源」切换项。GitHub 源不含强制更新与灰度信息，`forceUpdate` 恒为 false、无签名。
+- **启动上报（设备活跃统计）**（[launch_ping.rs](src-tauri/src/commands/online/manager/launch_ping.rs)（新增） / [update_sign.rs](src-tauri/src/utils/update_sign.rs) / [auth_register_login.rs](src-tauri/src/commands/online/manager/auth_register_login.rs)）：
+  - 每次启动一次，在 `auth_init` 拿到有效凭证后由后台任务发送 `POST /v1/launch/ping`；**不阻塞启动、失败静默**（只记 debug 日志），统计绝不影响启动流程。
+  - 携带 `Authorization: Bearer`（JWT 提供 `device_pk`）与签名 `sign-lx` / `sign-ts` / `sign-v1`；待签串含 `device_pk` 与 `device_id`，同一签名换设备即失效。
+  - 上报内容只有 `device_id`（`mcsdk-*` 友好标识），IP 由服务端从连接取得、不在请求体里。
 
 - **红石内核运行时下载 + 本地缓存 + 兜底**（[kernel.rs](src-tauri/src/commands/redstone/kernel.rs)（新增） / [kernel_test.rs](src-tauri/src/commands/redstone/kernel_test.rs)（新增） / [resources.rs](src-tauri/src/resources.rs)）：
   - 官方对内核做**版本校验**（旧内核会被服务端直接拒绝），所以「编译期嵌入内核」必然周期性失效——对方每发一版启动器都得跟着发版。改为三级获取：AppData 缓存命中 → 运行时从 `hongshi.site/api/download/client?platform=&arch=` 下载并**原子写入缓存** → 下载失败（服务不可用或该平台未发布）回退应用内置兜底内核。
   - 下载内容按平台校验可执行文件魔数（PE / ELF / Mach-O），防止把 JSON/HTML 错误体当成内核写进缓存；先写 `.tmp` 再改名，避免下载中断留下半个文件被当作有效缓存；非 Windows 平台补可执行位。
   - 官方已停止提供 macOS 构建（下载页仍挂链接但实际 404），该平台**不再支持红石联机**，处理见下方 Changed。
 
-- **联机大厅开关：未启用时不与云端交互**（[OnlineLobbyCard.vue](src/components/settings/OnlineLobbyCard.vue) / [SettingsOnline.vue](src/views/settings/SettingsOnline.vue) / [App.vue](src/App.vue) / [authSlice.ts](src/stores/online/authSlice.ts) / [auth_register_login.rs](src-tauri/src/commands/online/manager/auth_register_login.rs)）：
+- **联机大厅开关：控制联机功能本身（设备注册已解耦）**（[OnlineLobbyCard.vue](src/components/settings/OnlineLobbyCard.vue) / [SettingsOnline.vue](src/views/settings/SettingsOnline.vue) / [App.vue](src/App.vue) / [authSlice.ts](src/stores/online/authSlice.ts) / [auth_register_login.rs](src-tauri/src/commands/online/manager/auth_register_login.rs)）：
   - 新增配置项 `Online.lobby_enabled`（前端 `onlineLobbyEnabled`），默认**关闭**；设置页「联机」新增「联机大厅」开关，开启前必须先确认与云端交互说明。
-  - 关闭时启动流程完全不与云端交互：不再静默注册设备、不再静默续期或重新登录 token。后端 `auth_init` 同步增加守卫，未启用时直接返回本地凭证快照（`disabled=true`），不发起任何网络请求。
+  - **设备注册与联机大厅开关解耦**：启动时始终静默注册设备/续期 token（更新检查需 JWT 才能按设备灰度、启动统计依赖设备身份）；联机大厅开关只控制联机功能本身，开启前仍需确认与云端交互说明。
   - FRP 使用独立的第三方凭证体系，不受该开关影响。
 
 ### Changed
 
-- **更新检查改为「主服务器优先 + 自动回退 GitHub」**（[check.rs](src-tauri/src/commands/system/updater/check.rs)）：
-  - 原先云端检查失败即整体失败；现在主服务器（`/v3/updates/check`）请求失败时**自动回退 GitHub Releases**，不再因云端不可用导致用户完全检查不到更新。
-  - 回退只在「主服务器不可用」类失败时触发：网络错误、请求超时（新增 **5 秒超时**）、5xx、响应 JSON 解析失败。**204/304 无更新与业务码 `code != 1` 是主服务器的明确答复，不回退**；TLS 证书异常（疑似中间人）与下载地址白名单校验失败同样不回退——回退会绕过这两项安全判断。
-  - `Update.source = github` 语义不变，仍是「强制只走 GitHub」的开关。
-  - 两源都失败时错误信息同时给出两侧原因，便于定位。
+- **移除 GitHub Releases 备用更新源与自动回退**（[check.rs](src-tauri/src/commands/system/updater/check.rs) / [models.rs](src-tauri/src/state/config/models.rs) / [net.rs](src-tauri/src/utils/net.rs) / [AboutTab.vue](src/views/settings/more/AboutTab.vue)）：
+  - 更新源统一为 MoLaunch 云端，删除 `Update.source` / `updateSource` 配置项（含 INI 读写、apply_config 补丁与快照字段）与「设置 → 更多 → 关于」的更新源切换项。
+  - 删除 `check_update_github` 与 GitHub Release 资源挑选逻辑；删除 GitHub 下载域名白名单 `validate_github_download_url` 与两源并集校验 `validate_update_download_url_any_source`，下载链路改回**单一官方 CDN 白名单**校验。
+  - 云端检查失败即失败，不再回退：回退会让未注册或被服务端限制的客户端绕开灰度与发布控制；错误信息直接给出原因。
 
 - **红石联机的平台支持改为实际探测，macOS 给出明确说明**（[kernel.rs](src-tauri/src/commands/redstone/kernel.rs) / [manager.rs](src-tauri/src/commands/redstone/manager.rs) / [resources.rs](src-tauri/src/resources.rs) / [platform.ts](src/utils/platform.ts)（新增） / [useRedStonePanel.ts](src/composables/useRedStonePanel.ts) / [redstone.ts](src/utils/api/redstone.ts) / [types/redstone.ts](src/types/redstone.ts) / [RedStoneCreatePanel.vue](src/components/online/RedStoneCreatePanel.vue) / [RedStoneKernelPanel.vue](src/components/online/RedStoneKernelPanel.vue)）：官方已停止提供 macOS 内核（下载页仍挂 `macos-amd64` / `macos-arm64` 链接但**实际 404**），删除仓库内残留的 macOS 内核二进制并去掉 macOS 嵌入分支。
   - **平台支持不写死**：新增 `kernel::probe_platform_support()`，判定顺序为「AppData 已有内核 → 编译期兜底存在 → HEAD 探测官方下载端点」。Windows/Linux 在前两步即返回，**不产生任何网络请求**；只有既无缓存又无内置兜底的平台（macOS）才真去探测官方端点。因此官方恢复 macOS 构建后**无需更新启动器即可自动恢复**——这也修正了此前「编译期写死 macOS 不支持」与「恢复后自动可用」文案自相矛盾的问题。
@@ -48,7 +46,7 @@
   - 隧道地址改为解析内核 stdout 的 `endpoint=` 字段（形如 `nj.hongshi.site:41269`），`redstone_status` 的 `server`/`port` 由该字段派生：进程已退出 → `closed`，进程在但尚未拿到地址 → `unknown`（前端保持「连接中」），拿到地址 → `open`。新增 `parse_endpoint` / `split_endpoint` 与 7 条回归用例。
   - 内核日志仍由内核写入工作目录 `logs/<YYYY-MM-DD>.log`，日志面板无需改动。
 
-- **更新检查不再依赖设备注册**（[check.rs](src-tauri/src/commands/system/updater/check.rs)）：移除 `load_creds_with_auto_refresh` 调用，检查更新与联机大厅开关彻底解耦；`force_update` / `min_version` / `rollout_pct` 等全量字段仍然保留（新端点返回完整清单，不再使用简化的插件端点）。
+- **更新检查重新依赖设备注册**（[check.rs](src-tauri/src/commands/system/updater/check.rs)）：恢复 `load_creds_with_auto_refresh` 调用——按设备灰度需要 `device_pk`，而它只能来自 JWT。
 （[Online.vue](src/views/Online.vue)）：未启用联机大厅时点击联机大厅/创建房间/加入房间，不再只弹「功能已封存」，而是就地询问是否启用（说明需与云端交互注册设备并续期令牌），确认后立即启用并继续进入该分类。红石联机与 FRP 不依赖云端，始终可用。
 - **联机封禁提示区分「未启用」与「连接失败」**（[Online.vue](src/views/Online.vue) / [TopNavLayout.vue](src/components/layout/TopNavLayout.vue) / [ApiServerCard.vue](src/components/settings/ApiServerCard.vue)）：未启用联机大厅时提示改为「需先启用联机大厅」，不再误报为云端连接失败；设置页「重新连接」按钮在未启用时禁用，`reconnect()` 直接返回且不发起 refresh 请求。
 - 配置读写链路新增 `Online.lobby_enabled`（[models.rs](src-tauri/src/state/config/models.rs) / [load.rs](src-tauri/src/config/load.rs) / [save.rs](src-tauri/src/config/save.rs) / [patch.rs](src-tauri/src/commands/system/apply_config/types/patch.rs) / [snapshot.rs](src-tauri/src/commands/system/apply_config/types/snapshot.rs) / [fields.rs](src-tauri/src/commands/system/apply_config/apply/fields.rs) / [config.ts](src/utils/api/config.ts) / [auth.ts](src/types/online/auth.ts)）。

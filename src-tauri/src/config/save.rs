@@ -126,7 +126,6 @@ pub fn save_config(config: &AppConfig) -> Result<(), String> {
     ini.set("Log", "share_provider", &config.log_share_provider);
 
     // Update（更新源）
-    ini.set("Update", "source", &config.update_source);
 
     // Proxy
     ini.set("Proxy", "mode", &config.proxy.mode);

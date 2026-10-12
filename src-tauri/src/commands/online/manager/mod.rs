@@ -8,6 +8,7 @@ mod easytier_download;
 pub(crate) mod easytier_install;
 mod lan_fake;
 mod lan_probe;
+mod launch_ping;
 mod signaling_manager;
 
 pub(crate) use dispatcher::{

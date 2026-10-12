@@ -2,16 +2,13 @@
 /**
  * 关于子页签：MoLaunch 介绍 + 实现原理 + 技术栈 + 检查更新入口
  */
-import { computed, ref, onMounted, defineAsyncComponent } from 'vue'
+import { computed, ref, defineAsyncComponent } from 'vue'
 const Card = defineAsyncComponent(() => import('@/components/common/Card.vue'))
-const Select = defineAsyncComponent(() => import('@/components/common/Select.vue'))
 const Button = defineAsyncComponent(() => import('@/components/common/Button.vue'))
 const Tag = defineAsyncComponent(() => import('@/components/common/Tag.vue'))
 const MoLaunchIntro = defineAsyncComponent(() => import('@/components/about/MoLaunchIntro.vue'))
 import { openLink } from '@/utils/aboutLogos'
 import { checkForUpdate } from '@/utils/updater'
-import { applyConfig, getConfigMap } from '@/utils/api/config'
-import { toastSuccess } from '@/utils/toast'
 import type { AboutData } from '@/utils/api/about'
 import logoMoLaunch from '@/assets/logo.svg'
 import {
@@ -37,21 +34,6 @@ const backendDeps = computed(() => props.aboutData?.backendDeps ?? [])
 // 检查更新按钮状态（仅按钮自身 loading，弹窗由 UpdateDialog 全局组件展示）
 const checking = ref(false)
 
-/** 更新源："api"（MoLaunch 云端公开端点，默认）/ "github"（GitHub Releases，备用） */
-const updateSource = ref('api')
-
-onMounted(async () => {
-  const cfg = await getConfigMap()
-  updateSource.value = cfg.updateSource || 'api'
-})
-
-/** 切换更新源：立即写入配置（两个源均无需设备注册，与联机大厅开关无关） */
-async function onUpdateSourceChange(value: string | number) {
-  const source = String(value)
-  await applyConfig({ updateSource: source })
-  updateSource.value = source
-  toastSuccess(source === 'github' ? '更新源已切换为 GitHub Releases' : '更新源已切换为 MoLaunch 云端')
-}
 
 async function onCheckUpdate() {
   if (checking.value) return
@@ -112,27 +94,6 @@ async function onCheckUpdate() {
         </div>
       </div>
 
-      <!-- 更新源（备用：GitHub Releases） -->
-      <div class="flex items-center justify-between gap-4 rounded-lg border border-gray-100 px-3 py-2">
-        <div class="min-w-0">
-          <p class="text-[12px] font-medium text-gray-700">更新源</p>
-          <p class="text-[11px] text-gray-400">
-            {{ updateSource === 'github'
-              ? '从 GitHub Releases 查询（备用；不含强制更新与灰度）'
-              : '从 MoLaunch 云端查询（默认；无需启用联机大厅）' }}
-          </p>
-        </div>
-        <div class="flex-none w-40">
-          <Select
-            :model-value="updateSource"
-            :options="[
-              { label: 'MoLaunch 云端', value: 'api' },
-              { label: 'GitHub Releases', value: 'github' },
-            ]"
-            @update:model-value="onUpdateSourceChange"
-          />
-        </div>
-      </div>
     </div>
   </Card>
 

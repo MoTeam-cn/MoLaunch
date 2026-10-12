@@ -182,25 +182,9 @@ fn register_auth_init(d: &mut Dispatcher) {
             // 加载本地凭证（None = 首次启动未注册）
             let existing = storage.load().await.unwrap_or(None);
 
-            // 联机大厅未启用：不发起任何云端请求（不静默注册、不续期 token、不重新登录）
-            let lobby_enabled = {
-                let config = state.config.lock().await;
-                config.online.lobby_enabled
-            };
-            if !lobby_enabled {
-                log_info!("[Online] auth_init: 联机大厅未启用，跳过云端交互");
-                let status = match existing {
-                    Some(ref creds) => super::build_device_status(creds, api_url),
-                    None => super::build_device_status(&Default::default(), api_url),
-                };
-                return serde_json::to_value(AuthInitResult {
-                    status,
-                    error: None,
-                    disabled: true,
-                })
-                .map_err(|e| e.to_string());
-            }
-
+            // 设备注册/续期与「联机大厅」开关**解耦**：设备身份是基础能力
+            // （更新检查需 JWT 才能按设备灰度、启动统计依赖它），因此默认即注册。
+            // 联机大厅开关只控制联机功能本身，进入联机页仍需用户同意与云端交互。
             // 检查凭证与服务端地址一致性：用户切换 api_server_url 后旧凭证对新域名无效
             let existing = match existing {
                 Some(ref creds)
@@ -290,6 +274,9 @@ fn register_auth_init(d: &mut Dispatcher) {
                     }
                 }
             };
+
+            // 设备凭证已就绪：后台发一次启动上报（每次启动一次，失败静默）
+            super::launch_ping::spawn(api_url.clone(), creds.clone());
 
             let status = super::build_device_status(&creds, api_url);
             serde_json::to_value(AuthInitResult {

@@ -128,6 +128,45 @@ pub fn build_sign_query(
     )
 }
 
+/// 构造启动上报待签串
+///
+/// 形如 POST 换行 /v1/launch/ping 换行 device_pk 换行 device_id 换行 timestamp 换行 lx。
+/// 必须与服务端 client_sign::build_ping_string_to_sign 逐字一致。
+pub fn build_ping_string_to_sign(
+    device_pk: &str,
+    device_id: &str,
+    timestamp: &str,
+    lx: &str,
+) -> String {
+    format!("POST\n/v1/launch/ping\n{device_pk}\n{device_id}\n{timestamp}\n{lx}")
+}
+
+/// 构造启动上报的签名 query 片段
+///
+/// 返回 `("&sign-lx=1&sign-ts=...&sign-v1=...", Some("1"))`；无可用密钥时返回空片段。
+pub fn build_ping_sign_query(device_pk: &str, device_id: &str) -> (String, Option<String>) {
+    let keys = load_keys();
+    // 取方案版本最高的密钥
+    let Some((lx, key)) = keys
+        .iter()
+        .max_by_key(|(lx, _)| lx.parse::<u32>().unwrap_or(0))
+        .map(|(lx, k)| (lx.clone(), k.clone()))
+    else {
+        return (String::new(), None);
+    };
+
+    let ts = now_unix().to_string();
+    let string_to_sign = build_ping_string_to_sign(device_pk, device_id, &ts, &lx);
+    let Some(sig) = sign_hex(&key, &string_to_sign) else {
+        return (String::new(), None);
+    };
+
+    (
+        format!("&sign-lx={lx}&sign-ts={ts}&sign-v1={sig}"),
+        Some(lx),
+    )
+}
+
 /// 保存服务端下发的密钥提示（与本地已有集合合并）
 ///
 /// `hint` 形如 `{"keys": {"2": "<hex>"}, "preferred_lx": "2"}`；结构不符时静默忽略。

@@ -118,45 +118,6 @@ pub fn validate_updater_download_url(raw: &str) -> Result<(), String> {
     Ok(())
 }
 
-/// GitHub Release 下载域名白名单（备用更新源）
-const GITHUB_DOWNLOAD_HOSTS: [&str; 4] = [
-    "github.com",
-    "objects.githubusercontent.com",
-    "github-releases.githubusercontent.com",
-    "release-assets.githubusercontent.com",
-];
-
-/// 校验 GitHub Release 下载 URL：仅 https + GitHub 域名白名单
-///
-/// 与 `validate_updater_download_url` 分离，避免为备用源放宽官方 CDN 白名单。
-pub fn validate_github_download_url(raw: &str) -> Result<(), String> {
-    validate_public_http_url(raw)?;
-    let url = Url::parse(raw).map_err(|_| format!("URL 非法: {}", raw))?;
-    if url.scheme() != "https" {
-        return Err(format!(
-            "GitHub 更新下载必须使用 HTTPS，收到: {}",
-            url.scheme()
-        ));
-    }
-    let host = url.host_str().unwrap_or_default().to_ascii_lowercase();
-    if !GITHUB_DOWNLOAD_HOSTS.contains(&host.as_str()) {
-        return Err(format!("GitHub 更新下载域名不在白名单内: {}", host));
-    }
-    Ok(())
-}
-
-/// 校验更新下载 URL：官方 CDN 或 GitHub Releases 域名白名单（两个源取并集）
-///
-/// 下载链路无法预先知道 manifest 来自哪个更新源（`AppConfig.update_source`），
-/// 因此两个白名单取并集；两者均为严格的 https + 域名白名单，不会放行任意域名。
-pub fn validate_update_download_url_any_source(raw: &str) -> Result<(), String> {
-    if validate_updater_download_url(raw).is_ok() || validate_github_download_url(raw).is_ok() {
-        Ok(())
-    } else {
-        Err(format!("更新下载域名不在允许的白名单内: {}", raw))
-    }
-}
-
 /// 脱敏 URL 用于日志：仅保留 scheme + host + path，去掉 query/fragment/userinfo
 ///
 /// 防止 query 中的 token 等敏感参数进入日志；解析失败时原样返回（不丢信息）。
@@ -206,25 +167,7 @@ pub async fn head_content_length(
 
 #[cfg(test)]
 mod tests {
-    use super::{
-        is_private_address, sanitize_url_for_log, validate_github_download_url,
-        validate_public_http_url,
-    };
-
-    #[test]
-    fn test_validate_github_download_url() {
-        assert!(validate_github_download_url(
-            "https://github.com/MoTeam-cn/MoLaunch/releases/download/v1.0.0/MoLaunch_1.0.0_x64.exe"
-        )
-        .is_ok());
-        assert!(validate_github_download_url("https://objects.githubusercontent.com/x").is_ok());
-        // 非 GitHub 域名（含官方 CDN）不属于备用源白名单
-        assert!(validate_github_download_url("https://download.mocdn.net/a.exe").is_err());
-        assert!(validate_github_download_url("https://evil.com/a.exe").is_err());
-        // 明文 http 与内网地址一律拒绝
-        assert!(validate_github_download_url("http://github.com/a.exe").is_err());
-        assert!(validate_github_download_url("https://127.0.0.1/a.exe").is_err());
-    }
+    use super::{is_private_address, sanitize_url_for_log, validate_public_http_url};
 
     #[test]
     fn test_is_private_address() {
