@@ -77,7 +77,7 @@ export interface ConfigSnapshot {
   developerMode: boolean
   // 联机（api-server 地址 / 公共 easytier 节点）
   onlineApiServerUrl: string
-  /** 是否启用联机大厅（与云端交互总开关；关闭时启动不发起任何云端请求） */
+  /** 是否启用联机大厅（仅控制联机功能；设备注册默认进行，不受此开关影响） */
   onlineLobbyEnabled: boolean
   /** 虚拟网络内设备名（房客侧 easytier hostname；留空使用默认 mo-launch-guest） */
   onlineNetworkIdentity: string
@@ -170,7 +170,7 @@ export interface ConfigPatch {
   developerMode?: boolean
   // 联机（api-server 地址，空字符串后端会忽略不更新）
   onlineApiServerUrl?: string
-  /** 是否启用联机大厅（与云端交互总开关） */
+  /** 是否启用联机大厅（仅控制联机功能） */
   onlineLobbyEnabled?: boolean
   /** 虚拟网络内设备名（房客侧 easytier hostname；空字符串清空回退默认 mo-launch-guest） */
   onlineNetworkIdentity?: string

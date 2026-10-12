@@ -21,7 +21,7 @@ onMounted(() => {
 
 <template>
   <div class="space-y-6">
-    <!-- 联机大厅开关（与云端交互总开关） -->
+    <!-- 联机大厅开关（仅控制联机功能） -->
     <OnlineLobbyCard />
 
     <!-- api-server 配置（自管理加载状态） -->

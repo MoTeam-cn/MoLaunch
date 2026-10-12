@@ -125,10 +125,10 @@ async function handleCategoryChange(id: string): Promise<void> {
       return
     }
     if (!onlineStore.lobbyEnabled) {
-      // 未启用联机大厅：就地询问是否启用（启用后才与云端交互），确认后继续进入该分类
+      // 未启用联机大厅：就地询问是否启用（启用后才可使用联机功能），确认后继续进入该分类
       const agreed = await showConfirmAsync(
         '需要启用联机大厅',
-        `「${sealed.label}」需要与云端交互（注册设备标识、签发并续期访问令牌）才能使用。\n是否现在启用？`,
+        `「${sealed.label}」需要使用云端服务（房间登记、信令与公开房间列表）才能使用。\n是否现在启用？`,
       )
       if (!agreed) return
       const enabled = await onlineStore.setLobbyEnabled(true)

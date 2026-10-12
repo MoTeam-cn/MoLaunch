@@ -44,10 +44,10 @@ export function useOnlineAuthSlice() {
   /** 云端连接错误信息（cloudConnected=false 时非空，用于弹窗提示） */
   const cloudError = ref<string | null>(null)
   /**
-   * 是否已启用联机大厅（与云端交互总开关）
+   * 是否已启用联机大厅（仅控制联机功能本身）
    *
-   * 为 false 时程序不与云端发生任何交互：启动不静默注册、不续期 token，
-   * 联机相关功能整体不可用。用户需在「设置 → 联机」页显式开启并同意。
+   * 为 false 时联机大厅与房间功能不可用。注意：设备注册与 token 续期**不受此开关影响**，
+   * 启动时默认进行（更新检查按设备灰度、活跃统计需要设备身份）。用户需在「设置 → 联机」页显式开启并同意。
    */
   const lobbyEnabled = ref(false)
   /**
@@ -110,7 +110,7 @@ export function useOnlineAuthSlice() {
     }, '[Online] sync api server url from config')
   }
 
-  /** 从后端配置同步联机大厅开关（启动流程据此决定是否与云端交互） */
+  /** 从后端配置同步联机大厅开关（决定联机功能是否可用） */
   async function syncLobbyEnabledFromConfig(): Promise<void> {
     await safeCall(async () => {
       const cfg = await getConfigMap()
@@ -259,7 +259,7 @@ export function useOnlineAuthSlice() {
    * @returns 是否重连成功
    */
   async function reconnect(): Promise<boolean> {
-    // 未启用联机大厅：不发起任何云端请求
+    // 未启用联机大厅：重连属于联机功能操作，先提示启用
     if (!lobbyEnabled.value) {
       markCloudDisabled()
       toastWarning('请先在「设置 → 联机」页启用联机大厅')
@@ -297,8 +297,8 @@ export function useOnlineAuthSlice() {
   /**
    * 设置联机大厅开关（设置页开关调用）
    *
-   * 开启：写入配置 → 立即执行一次启动认证（静默注册/续期）
-   * 关闭：写入配置 → 停止云端交互（不再续期，联机功能整体不可用）
+   * 开启：写入配置 → 联机功能可用
+   * 关闭：写入配置 → 联机功能整体不可用（设备注册与 token 续期不受影响）
    *
    * @returns 是否保存成功
    */
@@ -329,7 +329,7 @@ export function useOnlineAuthSlice() {
     cloudConnected,
     cloudError,
     initializing,
-    // 联机大厅开关（与云端交互总开关）
+    // 联机大厅开关（仅控制联机功能）
     lobbyEnabled,
     // 设备认证方法
     refreshStatus,
