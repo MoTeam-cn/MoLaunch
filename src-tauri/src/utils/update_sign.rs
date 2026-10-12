@@ -32,32 +32,6 @@ const EMBEDDED_SIGN_KEY: Option<&str> = option_env!("MOLAUNCH_UPDATE_SIGN_KEY");
 /// 本地密钥提示文件名（存于 appdata 的 `updater` 子目录）
 const HINT_FILE: &str = "update_sign_keys.json";
 
-/// 构造待签串（必须与 api-server 完全一致）
-///
-/// `GET\n{path}\n{target}\n{arch}\n{current_version}\n{channel}\n{ts}\n{lx}`
-#[allow(clippy::too_many_arguments)]
-pub fn build_string_to_sign(
-    method: &str,
-    path: &str,
-    target: &str,
-    arch: &str,
-    current_version: &str,
-    channel: &str,
-    timestamp: &str,
-    lx: &str,
-) -> String {
-    format!(
-        "{method}
-{path}
-{target}
-{arch}
-{current_version}
-{channel}
-{timestamp}
-{lx}"
-    )
-}
-
 /// 用 hex 密钥计算 HMAC-SHA256，返回 64 位小写 hex
 pub fn sign_hex(key_hex: &str, string_to_sign: &str) -> Option<String> {
     let key = decode_hex(key_hex)?;
@@ -84,48 +58,6 @@ pub fn load_keys() -> HashMap<String, String> {
         keys.insert(lx, key);
     }
     keys
-}
-
-/// 构造签名 query 片段与使用的方案版本
-///
-/// 返回 `("&sign-lx=1&sign-ts=...&sign-v1=...", Some("1"))`；
-/// 无可用密钥时返回 `(String::new(), None)`（不带签名）。
-pub fn build_sign_query(
-    path: &str,
-    target: &str,
-    arch: &str,
-    current_version: &str,
-    channel: &str,
-) -> (String, Option<String>) {
-    let keys = load_keys();
-    // 取方案版本最高的密钥
-    let Some((lx, key)) = keys
-        .iter()
-        .max_by_key(|(lx, _)| lx.parse::<u32>().unwrap_or(0))
-        .map(|(lx, k)| (lx.clone(), k.clone()))
-    else {
-        return (String::new(), None);
-    };
-
-    let ts = now_unix().to_string();
-    let string_to_sign = build_string_to_sign(
-        "GET",
-        path,
-        target,
-        arch,
-        current_version,
-        channel,
-        &ts,
-        &lx,
-    );
-    let Some(sig) = sign_hex(&key, &string_to_sign) else {
-        return (String::new(), None);
-    };
-
-    (
-        format!("&sign-lx={lx}&sign-ts={ts}&sign-v1={sig}"),
-        Some(lx),
-    )
 }
 
 /// 构造启动上报待签串
@@ -168,6 +100,9 @@ pub fn build_ping_sign_query(device_pk: &str, device_id: &str) -> (String, Optio
 }
 
 /// 保存服务端下发的密钥提示（与本地已有集合合并）
+///
+/// 当前无调用方：更新检查已不再回带 `sign_hint`。保留接收端是为了让
+/// 「服务端下发新密钥即完成轮换、无需发版」这条链路随时可用。
 ///
 /// `hint` 形如 `{"keys": {"2": "<hex>"}, "preferred_lx": "2"}`；结构不符时静默忽略。
 pub fn save_hint(hint: &serde_json::Value) {

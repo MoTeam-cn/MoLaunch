@@ -1,22 +1,20 @@
 //! update_sign 单元测试
 
-use super::{build_string_to_sign, sign_hex, SIGN_LX_HMAC_SHA256};
+use super::{build_ping_string_to_sign, sign_hex, SIGN_LX_HMAC_SHA256};
 
 #[test]
-fn test_build_string_to_sign_固定字段顺序() {
-    let s = build_string_to_sign(
-        "GET",
-        "/v3/updates/check",
-        "windows",
-        "x86_64",
-        "0.3.8-rc1",
-        "stable",
+fn test_build_ping_string_to_sign_与服务端逐字一致() {
+    // 期望串与 api-server 的 client_sign_test.rs 同名用例**逐字相同**：
+    // 两端任一侧改动协议都会让对应测试失败，从而挡住协议漂移。
+    let s = build_ping_string_to_sign(
+        "11111111-2222-3333-4444-555555555555",
+        "mcsdk-windows-0.3.8-rc1-molaunch",
         "1700000000",
         "1",
     );
     assert_eq!(
         s,
-        "GET\n/v3/updates/check\nwindows\nx86_64\n0.3.8-rc1\nstable\n1700000000\n1"
+        "POST\n/v1/launch/ping\n11111111-2222-3333-4444-555555555555\nmcsdk-windows-0.3.8-rc1-molaunch\n1700000000\n1"
     );
 }
 
