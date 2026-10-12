@@ -6,6 +6,7 @@ use tauri::AppHandle;
 use super::UpdateInfo;
 use crate::api_paths::UPDATES_CHECK;
 use crate::log_info;
+use crate::log_warn;
 use crate::state::AppState;
 
 /// GitHub Releases 仓库（备用更新源）
@@ -13,6 +14,22 @@ const GITHUB_REPO: &str = "MoTeam-cn/MoLaunch";
 
 /// 更新检查端点路径（参与签名，必须与 api-server 一致）
 const UPDATE_CHECK_PATH: &str = "/v3/updates/check";
+
+/// 主服务器检查更新的请求超时
+///
+/// 超时即回退 GitHub Releases，避免主服务器无响应时拖慢启动流程。
+const UPDATE_CHECK_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(5);
+
+/// 云端更新检查的失败分类，决定是否回退 GitHub Releases
+///
+/// - [`Self::Fallback`]：主服务器不可用或响应不可解析（网络错误 / 超时 / 5xx / 解析失败），
+///   可安全回退到 GitHub；
+/// - [`Self::Fatal`]：TLS 证书异常（疑似中间人）或明确的非 5xx 错误响应，
+///   回退会绕过这些判断，必须直接上报给用户。
+enum CloudCheckError {
+    Fallback(String),
+    Fatal(String),
+}
 
 /// 当前平台标识（用于 updater endpoint 的 target 参数）
 ///
@@ -113,7 +130,7 @@ fn is_version_newer(manifest: &str, current: &str) -> bool {
 pub async fn check_update(state: &AppState, _app: &AppHandle) -> Result<UpdateInfo, String> {
     let current_version = env!("CARGO_PKG_VERSION");
 
-    // 更新源分流：github 走 Releases，其余一律走云端业务端点
+    // 更新源分流：github = 强制只走 GitHub Releases，不走主服务器
     let update_source = {
         let config = state.config.lock().await;
         config.update_source.clone()
@@ -122,16 +139,42 @@ pub async fn check_update(state: &AppState, _app: &AppHandle) -> Result<UpdateIn
         return check_update_github(current_version).await;
     }
 
-    let target = platform_target();
-    let arch = std::env::consts::ARCH;
-
     // 1. 从配置读取 api_server_url（短锁，立即 clone 释放）
     let base_url = {
         let config = state.config.lock().await;
         config.online.api_server_url.clone()
     };
 
-    // 2. 构建 URL（base_url + 路径模板替换 + 签名参数，模板见 crate::api_paths::UPDATES_CHECK）
+    // 2. 主服务器优先；仅在「不可用」类失败时回退 GitHub Releases
+    match check_update_cloud(current_version, &base_url).await {
+        Ok(info) => Ok(info),
+        Err(CloudCheckError::Fatal(msg)) => Err(msg),
+        Err(CloudCheckError::Fallback(reason)) => {
+            log_warn!(
+                "[Updater] 主服务器检查失败（{}），回退 GitHub Releases",
+                reason
+            );
+            match check_update_github(current_version).await {
+                Ok(info) => Ok(info),
+                Err(gh_err) => Err(format!(
+                    "检查更新失败：主服务器不可用（{reason}），GitHub 回退也失败（{gh_err}）"
+                )),
+            }
+        }
+    }
+}
+
+/// 走主服务器业务端点检查更新（/v3/updates/check）
+///
+/// 失败按「能否安全回退 GitHub Releases」分类，见 [`CloudCheckError`]。
+async fn check_update_cloud(
+    current_version: &str,
+    base_url: &str,
+) -> Result<UpdateInfo, CloudCheckError> {
+    let target = platform_target();
+    let arch = std::env::consts::ARCH;
+
+    // 构建 URL（base_url + 路径模板替换 + 签名参数，模板见 crate::api_paths::UPDATES_CHECK）
     // channel 由当前版本后缀自动推导（alpha/beta/stable）；开发者模式可覆盖分支用于调试
     let channel = {
         let branch = crate::commands::system::developer::get_update_branch();
@@ -165,29 +208,47 @@ pub async fn check_update(state: &AppState, _app: &AppHandle) -> Result<UpdateIn
     );
 
     // 4. 构建请求（公开端点，不携带任何凭证）
+    //    5 秒超时：主服务器无响应时尽快转入 GitHub 回退，不拖慢启动
     let client = crate::http::get_client();
-    let response = client.get(&url).send().await.map_err(|e| {
-        if crate::http::is_tls_cert_error(&e) {
-            "检测到中间人攻击，已自动断开链接".to_string()
-        } else {
-            format!("检查更新失败: {e}")
-        }
-    })?;
+    let response = client
+        .get(&url)
+        .timeout(UPDATE_CHECK_TIMEOUT)
+        .send()
+        .await
+        .map_err(|e| {
+            if crate::http::is_tls_cert_error(&e) {
+                // TLS 证书异常疑似中间人，回退 GitHub 会绕过该判断，必须直接上报
+                CloudCheckError::Fatal("检测到中间人攻击，已自动断开链接".to_string())
+            } else if e.is_timeout() {
+                CloudCheckError::Fallback(format!(
+                    "请求超时（{} 秒）",
+                    UPDATE_CHECK_TIMEOUT.as_secs()
+                ))
+            } else {
+                CloudCheckError::Fallback(format!("网络错误: {e}"))
+            }
+        })?;
 
-    // 204/304 = 无更新
+    // 204/304 = 无更新（主服务器给出的明确答复，不回退）
     if response.status() == 204 || response.status() == 304 {
         log_info!("[Updater] 服务器返回 {}（无可用更新）", response.status());
         return Ok(UpdateInfo::default());
     }
 
     if !response.status().is_success() {
-        return Err(format!("检查更新失败: HTTP {}", response.status()));
+        let status = response.status();
+        // 5xx = 服务端故障，可回退；4xx 等明确答复不回退
+        return Err(if status.is_server_error() {
+            CloudCheckError::Fallback(format!("服务端错误 HTTP {status}"))
+        } else {
+            CloudCheckError::Fatal(format!("检查更新失败: HTTP {status}"))
+        });
     }
 
     let json: Value = response
         .json()
         .await
-        .map_err(|e| format!("解析更新信息失败: {e}"))?;
+        .map_err(|e| CloudCheckError::Fallback(format!("解析更新信息失败: {e}")))?;
 
     // UnifiedResponse 包装：{ code, msg, data }
     let data = match json.get("data") {
@@ -234,7 +295,8 @@ pub async fn check_update(state: &AppState, _app: &AppHandle) -> Result<UpdateIn
         .to_string();
     // 域名白名单校验（防 manifest 被篡改后指向任意地址）
     if !download_url.is_empty() {
-        crate::utils::net::validate_updater_download_url(&download_url)?;
+        crate::utils::net::validate_updater_download_url(&download_url)
+            .map_err(CloudCheckError::Fatal)?;
     }
 
     Ok(UpdateInfo {

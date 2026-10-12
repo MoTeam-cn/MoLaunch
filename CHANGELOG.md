@@ -30,6 +30,12 @@
 
 ### Changed
 
+- **更新检查改为「主服务器优先 + 自动回退 GitHub」**（[check.rs](src-tauri/src/commands/system/updater/check.rs)）：
+  - 原先云端检查失败即整体失败；现在主服务器（`/v3/updates/check`）请求失败时**自动回退 GitHub Releases**，不再因云端不可用导致用户完全检查不到更新。
+  - 回退只在「主服务器不可用」类失败时触发：网络错误、请求超时（新增 **5 秒超时**）、5xx、响应 JSON 解析失败。**204/304 无更新与业务码 `code != 1` 是主服务器的明确答复，不回退**；TLS 证书异常（疑似中间人）与下载地址白名单校验失败同样不回退——回退会绕过这两项安全判断。
+  - `Update.source = github` 语义不变，仍是「强制只走 GitHub」的开关。
+  - 两源都失败时错误信息同时给出两侧原因，便于定位。
+
 - **红石联机的平台支持改为实际探测，macOS 给出明确说明**（[kernel.rs](src-tauri/src/commands/redstone/kernel.rs) / [manager.rs](src-tauri/src/commands/redstone/manager.rs) / [resources.rs](src-tauri/src/resources.rs) / [platform.ts](src/utils/platform.ts)（新增） / [useRedStonePanel.ts](src/composables/useRedStonePanel.ts) / [redstone.ts](src/utils/api/redstone.ts) / [types/redstone.ts](src/types/redstone.ts) / [RedStoneCreatePanel.vue](src/components/online/RedStoneCreatePanel.vue) / [RedStoneKernelPanel.vue](src/components/online/RedStoneKernelPanel.vue)）：官方已停止提供 macOS 内核（下载页仍挂 `macos-amd64` / `macos-arm64` 链接但**实际 404**），删除仓库内残留的 macOS 内核二进制并去掉 macOS 嵌入分支。
   - **平台支持不写死**：新增 `kernel::probe_platform_support()`，判定顺序为「AppData 已有内核 → 编译期兜底存在 → HEAD 探测官方下载端点」。Windows/Linux 在前两步即返回，**不产生任何网络请求**；只有既无缓存又无内置兜底的平台（macOS）才真去探测官方端点。因此官方恢复 macOS 构建后**无需更新启动器即可自动恢复**——这也修正了此前「编译期写死 macOS 不支持」与「恢复后自动可用」文案自相矛盾的问题。
   - 探测结果在进程内缓存 10 分钟，新增 IPC `redstone_platform_support`（`force=true` 绕过缓存）；`ensure_kernel()` 移除编译期平台闸门，改由探测结果决定是否进入创建流程。
