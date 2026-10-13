@@ -2,6 +2,12 @@
 
 本项目所有重要变更均会记录在此文件中。格式参考 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/)。
 
+## [Unreleased]
+
+### 修复
+
+- **更新日志取 tag 的排序依据**（[vite.config.ts](vite.config.ts)）：`gitUpdateLog()` 原先用 `git tag --sort=-v:refname` 取「最新 tag / 上一 tag」，但版本排序对「带点后缀」与「数字后缀」的处理不同——实测 `v0.3.8-rc.3` 会被排到 `v0.3.8-rc1` **之后**，同一 patch 版本内混用两种写法会让「最新 tag」认成旧 tag，更新日志取到错误区间的 commit。改用 `--sort=-creatordate`（按提交/创建时间），与 tag 命名格式解耦。
+
 ## [0.3.8-rc2] - 2026-10-13
 
 ### 新增

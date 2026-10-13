@@ -26,6 +26,9 @@ function assetDir(fileName: string): string {
 /**
  * 基于 git 生成「本次更新」日志：取「上一 tag → 最新 tag」间的 commit（剥离 !c 标记），
  * `note:` 前缀的 commit 作为作者寄语单独提取；无 tag 时回退最近 20 条。git 不可用返回空。
+ *
+ * tag 取最新用 --sort=-creatordate 而非 -v:refname：版本排序对「带点后缀」与「数字后缀」
+ * 的处理不同，会把 v0.3.8-rc.3 排到 v0.3.8-rc1 之后，同 patch 版本内混用两种写法即取错 tag。
  */
 function gitUpdateLog(): { version: string; content: string; notes: string[] } {
   const run = (args: string[]): string[] => {
@@ -38,7 +41,7 @@ function gitUpdateLog(): { version: string; content: string; notes: string[] } {
       return []
     }
   }
-  const tags = run(['tag', '--sort=-v:refname'])
+  const tags = run(['tag', '--sort=-creatordate'])
   let logs: string[] = []
   let version = pkg.version
   if (tags.length === 0) {
