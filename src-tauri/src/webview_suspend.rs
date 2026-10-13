@@ -9,7 +9,7 @@ use crate::log_warn;
 use std::sync::atomic::{AtomicBool, Ordering};
 use tauri::WebviewWindow;
 use webview2_com::Microsoft::Web::WebView2::Win32::{ICoreWebView2Controller, ICoreWebView2_4};
-use windows_0_61::core::Interface;
+use windows_0_62::core::Interface;
 
 /// 主窗口当前是否处于 WebView2 挂起状态
 static SUSPENDED: AtomicBool = AtomicBool::new(false);

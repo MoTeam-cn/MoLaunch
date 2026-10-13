@@ -2,6 +2,12 @@
 
 本项目所有重要变更均会记录在此文件中。格式参考 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/)。
 
+## [Unreleased]
+
+### 修复
+
+- **`webview2-com` 跟齐 tauri 版本**（[Cargo.toml](src-tauri/Cargo.toml) / [Cargo.lock](src-tauri/Cargo.lock) / [webview_suspend.rs](src-tauri/src/webview_suspend.rs)）：直接依赖原先钉在 `webview2-com = "0.38"`，而 tauri 2.12 用的是 `0.39`——两者不统一时依赖图里会出现**两个 `webview2_com_sys`**，[webview_suspend.rs](src-tauri/src/webview_suspend.rs) 的 `try_resume(&platform_webview.controller())` 因形参 `&ICoreWebView2Controller` 与实参来自不同版本而报 E0308，**Windows 构建失败**。改为 `0.39`，配套的 `windows` 别名由 `windows_0_61` 升到 `windows_0_62`（`Interface` trait 的引入同步更新）。同时 `Cargo.lock` 纳入版本控制并与 npm 侧对齐（`tauri 2.12.3` ↔ `@tauri-apps/api 2.12.3`），避免 CI 每次全新解析导致版本漂移。
+
 ## [0.3.8-rc.3] - 2026-10-13
 
 ### 修复
