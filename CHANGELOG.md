@@ -2,7 +2,9 @@
 
 本项目所有重要变更均会记录在此文件中。格式参考 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/)。
 
-## [Unreleased]
+## [0.3.8-rc2] - 2026-10-13
+
+### 新增
 
 #### 启动公告
 
@@ -12,9 +14,6 @@
   - **已读记录只存本机** `localStorage`（键 `molaunch.readAnnouncements`，内容是公告 id 列表），不上报任何标识。`dismissible=true` 的公告在用户点「我知道了」后写入已读、之后不再弹出；`dismissible=false` 的**不写已读**，每次启动都提示，直到服务端下架——避免重要通知被一次性关掉，此时也不提供右上角关闭、遮罩关闭与 Esc 关闭。
   - 三种级别（`info` / `warning` / `important`）各有独立徽标配色与左侧色条；正文为 Markdown，经 `renderMarkdown` 消毒后渲染；`link_url` 非空时提供「查看详情」外链按钮。
   - 拉取失败、超时（5 秒）或响应非成功一律降级为空列表并只记 debug 日志：**公告拉不到不影响启动**。启动调用不 `await`，公告晚到不会拖慢启动。
-
-
-### 新增
 
 - **启动上报接收密钥轮换提示**（[launch_ping.rs](src-tauri/src/commands/online/manager/launch_ping.rs)）：响应 `data.sign_hint` 存在时并入本地密钥集合（[update_sign.rs](src-tauri/src/utils/update_sign.rs) 的 `save_hint`，此前无调用方），下次启动即用新密钥——服务端换签名密钥后老客户端自愈，无需强制升级。提示解析失败静默忽略，不影响本次上报是否算数。
 
