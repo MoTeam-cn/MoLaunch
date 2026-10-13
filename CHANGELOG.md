@@ -2,6 +2,11 @@
 
 本项目所有重要变更均会记录在此文件中。格式参考 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/)。
 
+## [Unreleased]
+
+### 修复
+
+- **预发布版本号带点与不带点混用时比较错误，`rc.4` 被判为低于 `rc2`**（[check.rs](src-tauri/src/commands/system/updater/check.rs) / [check_test.rs](src-tauri/src/commands/system/updater/check_test.rs)）：`is_version_newer` 把预发布串按 `.` 切成段后逐段比较，`rc.4` 被切成 `[Word("rc", None), Num(4)]`、`rc2` 被切成 `[Word("rc", Some(2))]`，**比较在第一段就分出胜负**（`None < Some(2)`），那个 `4` 从未参与比较，于是 `0.3.8-rc.4` 被判定低于 `0.3.8-rc2`。该函数是「是否提示更新」的唯一判据（[check.rs](src-tauri/src/commands/system/updater/check.rs) 的更新判定处），后果是 `rc1` / `rc2` 用户**永远收不到 `rc.4` 的更新提示**。改为**先把渠道词与其后的数字归一**（`rc.4` 与 `rc4` 等价、`beta.2` 与 `beta2` 等价），数字按数值比较（`rc.10 > rc.9`），渠道词之间按字典序（`alpha < beta < rc`）；同时容忍 `v` 前缀与 `+` 构建元数据，渠道词统一小写。新增 3 个用例覆盖带点写法的等价性、跨序号比较与 alpha / beta 先后。
 ## [0.3.8-rc.4] - 2026-10-13
 
 ### 修复

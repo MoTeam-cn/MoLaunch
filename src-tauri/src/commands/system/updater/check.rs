@@ -21,40 +21,76 @@ const UPDATE_CHECK_TIMEOUT: std::time::Duration = std::time::Duration::from_secs
 fn platform_target() -> &'static str {
     std::env::consts::OS
 }
-
-/// 语义化版本比较：manifest_version 高于 current_version 返回 true
-/// 支持 pre-release 段（rc/beta/alpha 等），如 0.3.5-rc7 > 0.3.5-rc6
+/// 判断 manifest 版本是否高于 current 版本
+///
+/// 支持 pre-release 段（rc/beta/alpha 等），如 0.3.5-rc7 > 0.3.5-rc6。
+/// **渠道词与其后的数字会先归一**：`rc.4` 与 `rc4` 等价、`beta.2` 与 `beta2` 等价，
+/// 数字按数值比较（`rc.10 > rc.9`）。历史版本号带点与不带点两种写法并存
+/// （`v0.3.8-rc1` 与 `v0.3.8-rc.3`），不归一会让 `rc2` 被判为高于 `rc.4`。
 fn is_version_newer(manifest: &str, current: &str) -> bool {
     use std::cmp::Ordering;
 
-    /// pre-release 标识符段：纯数字按数值，字母段按前缀+数字尾比较
-    enum PrePart {
-        Num(u64),
-        Word(String, Option<u64>),
+    /// 预发布标识符段：渠道词 + 可选数字
+    ///
+    /// `rc4` 与 `rc.4` 都归一为 `("rc", Some(4))`，从而落在同一把尺子上。
+    struct PreSegment {
+        word: String,
+        num: Option<u64>,
     }
 
-    impl PrePart {
-        fn new(s: &str) -> Self {
-            if let Ok(n) = s.parse() {
-                return Self::Num(n);
+    /// 预发布字符串切段并归一；纯数字段并入前一个尚无数字的段
+    fn parse_pre(raw: &str) -> Option<Vec<PreSegment>> {
+        let mut out: Vec<PreSegment> = Vec::new();
+        for seg in raw.split(['.', '-']).filter(|s| !s.is_empty()) {
+            if !seg.bytes().all(|b| b.is_ascii_alphanumeric()) {
+                return None;
             }
-            let digits_at = s.trim_end_matches(|c: char| c.is_ascii_digit()).len();
-            Self::Word(s[..digits_at].to_string(), s[digits_at..].parse().ok())
-        }
-
-        fn cmp(&self, other: &Self) -> Ordering {
-            match (self, other) {
-                (Self::Num(a), Self::Num(b)) => a.cmp(b),
-                (Self::Num(_), Self::Word(..)) => Ordering::Less,
-                (Self::Word(..), Self::Num(_)) => Ordering::Greater,
-                (Self::Word(a, an), Self::Word(b, bn)) => a.cmp(b).then_with(|| an.cmp(bn)),
+            if seg.bytes().all(|b| b.is_ascii_digit()) {
+                let value: u64 = seg.parse().ok()?;
+                match out.last_mut() {
+                    Some(last) if last.num.is_none() => last.num = Some(value),
+                    _ => out.push(PreSegment {
+                        word: String::new(),
+                        num: Some(value),
+                    }),
+                }
+                continue;
             }
+            let word_len = seg.trim_end_matches(|c: char| c.is_ascii_digit()).len();
+            let (word, digits) = seg.split_at(word_len);
+            out.push(PreSegment {
+                word: word.to_ascii_lowercase(),
+                num: digits.parse().ok(),
+            });
         }
+        Some(out)
     }
 
-    fn parse(s: &str) -> Option<(u64, u64, u64, Vec<PrePart>)> {
-        let s = s.trim_start_matches('v');
-        let (core, pre) = s.split_once('-').map_or((s, ""), |(c, p)| (c, p));
+    /// 逐段比较：先比词，再比数字；无数字视为小于有数字
+    fn cmp_pre(left: &[PreSegment], right: &[PreSegment]) -> Ordering {
+        for (a, b) in left.iter().zip(right) {
+            let ordering = a.word.cmp(&b.word).then_with(|| match (a.num, b.num) {
+                (Some(x), Some(y)) => x.cmp(&y),
+                (None, Some(_)) => Ordering::Less,
+                (Some(_), None) => Ordering::Greater,
+                (None, None) => Ordering::Equal,
+            });
+            if ordering != Ordering::Equal {
+                return ordering;
+            }
+        }
+        left.len().cmp(&right.len())
+    }
+
+    fn parse(s: &str) -> Option<(u64, u64, u64, Vec<PreSegment>)> {
+        let trimmed = s.trim();
+        let without_v = trimmed.strip_prefix('v').unwrap_or(trimmed);
+        let without_build = without_v
+            .split_once('+')
+            .map_or(without_v, |(head, _)| head);
+        let (core, pre) = without_build
+            .split_once('-')
+            .map_or((without_build, ""), |(c, p)| (c, p));
         let mut parts = core.split('.');
         let major = parts.next()?.parse().ok()?;
         let minor = parts.next()?.parse().ok()?;
@@ -62,19 +98,9 @@ fn is_version_newer(manifest: &str, current: &str) -> bool {
         let pre = if pre.is_empty() {
             Vec::new()
         } else {
-            pre.split('.').map(PrePart::new).collect()
+            parse_pre(pre)?
         };
         Some((major, minor, patch, pre))
-    }
-
-    fn cmp_pre(a: &[PrePart], b: &[PrePart]) -> Ordering {
-        for (x, y) in a.iter().zip(b) {
-            let o = x.cmp(y);
-            if o != Ordering::Equal {
-                return o;
-            }
-        }
-        a.len().cmp(&b.len())
     }
 
     match (parse(manifest), parse(current)) {

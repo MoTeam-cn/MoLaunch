@@ -42,6 +42,34 @@ fn v_前缀与多段pre() {
     assert!(is_version_newer("0.3.5-rc7.1", "0.3.5-rc7"));
 }
 
+#[test]
+fn 带点与不带点写法等价() {
+    assert!(!is_version_newer("0.3.8-rc.4", "0.3.8-rc4"));
+    assert!(!is_version_newer("0.3.8-rc4", "0.3.8-rc.4"));
+    assert!(!is_version_newer("0.3.8-beta.2", "0.3.8-beta2"));
+}
+
+#[test]
+fn 带点写法跨序号比较正确() {
+    assert!(is_version_newer("0.3.8-rc.4", "0.3.8-rc2"));
+    assert!(!is_version_newer("0.3.8-rc2", "0.3.8-rc.4"));
+    assert!(is_version_newer("0.3.8-rc.4", "0.3.8-rc1"));
+    assert!(is_version_newer("0.3.8-rc.4", "0.3.8-rc.3"));
+    assert!(is_version_newer("0.3.8-rc.10", "0.3.8-rc.9"));
+}
+
+#[test]
+fn beta_alpha_带点写法也按数值与先后判断() {
+    assert!(is_version_newer("0.3.8-beta.2", "0.3.8-beta1"));
+    assert!(is_version_newer("0.3.8-beta.2", "0.3.8-beta.1"));
+    assert!(is_version_newer("0.3.8-beta.10", "0.3.8-beta.9"));
+    assert!(is_version_newer("0.3.8-alpha.3", "0.3.8-alpha1"));
+    assert!(is_version_newer("0.3.8-beta.1", "0.3.8-alpha.9"));
+    assert!(!is_version_newer("0.3.8-alpha.3", "0.3.8-beta.1"));
+    assert!(is_version_newer("0.3.8-rc.1", "0.3.8-beta.9"));
+    assert!(is_version_newer("0.3.8", "0.3.8-rc.4"));
+}
+
 // ===== GitHub 备用更新源：资源挑选 =====
 
 #[test]
