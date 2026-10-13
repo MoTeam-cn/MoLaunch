@@ -155,6 +155,11 @@ jobs:
           # 留空时使用 Minecraft 官方 ID + 旧版端点。
           # GitHub Secrets 配置名：MOLAUNCH_MS_CLIENT_ID
           MOLAUNCH_MS_CLIENT_ID: ${{ secrets.MOLAUNCH_MS_CLIENT_ID }}
+          # 启动上报签名密钥（编译期注入，见 src-tauri/src/utils/update_sign.rs 的
+          # option_env!("MOLAUNCH_UPDATE_SIGN_KEY")）。必须与 api-server 的
+          # update_check.sign_keys 同值：不一致则 ping 全部 403；未注入则 ping 被静默跳过。
+          # GitHub Secrets 配置名：MOLAUNCH_UPDATE_SIGN_KEY
+          MOLAUNCH_UPDATE_SIGN_KEY: ${{ secrets.MOLAUNCH_UPDATE_SIGN_KEY }}
         with:
           tauriScript: npx tauri
           # Windows 优先使用 NSIS 安装包（而非 MSI），与 updater 协议一致
