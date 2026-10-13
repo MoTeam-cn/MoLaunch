@@ -6,6 +6,8 @@
 
 ### 修复
 
+- **提交 Cargo.lock 锁定依赖**（[.gitignore](.gitignore) / [Cargo.lock](src-tauri/Cargo.lock) / [Cargo.lock](src-tauri/updater/Cargo.lock)）：`src-tauri/Cargo.lock` 此前被 gitignore 排除、未进版本控制，CI 每次构建全新解析依赖——registry 上 `tauri` 等依赖升级后，依赖图里出现两个 `webview2_com_sys` 版本，[webview_suspend.rs](src-tauri/src/webview_suspend.rs) 的 `try_resume(&platform_webview.controller())` 因形参与实参来自不同版本而报 E0308，**Windows 构建直接失败、发布无法产出产物**（v0.3.8-rc2 即因此未能发布）。改为跟踪 lockfile，构建依赖集合可复现。
+
 - **更新日志取 tag 的排序依据**（[vite.config.ts](vite.config.ts)）：`gitUpdateLog()` 原先用 `git tag --sort=-v:refname` 取「最新 tag / 上一 tag」，但版本排序对「带点后缀」与「数字后缀」的处理不同——实测 `v0.3.8-rc.3` 会被排到 `v0.3.8-rc1` **之后**，同一 patch 版本内混用两种写法会让「最新 tag」认成旧 tag，更新日志取到错误区间的 commit。改用 `--sort=-creatordate`（按提交/创建时间），与 tag 命名格式解耦。
 
 ## [0.3.8-rc2] - 2026-10-13
