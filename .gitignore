@@ -10,6 +10,8 @@ pnpm-workspace.yaml
 dist/
 debug/
 target/
+# 本地构建临时目录（火绒会拦第三方 exe 写系统 %TEMP%，构建时把 TEMP 指到这里）
+.tmpbuild/
 
 # IDE
 .vscode/
