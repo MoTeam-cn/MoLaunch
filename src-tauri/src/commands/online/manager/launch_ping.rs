@@ -57,5 +57,13 @@ async fn send(base_url: &str, creds: &DeviceCredentials) -> Result<(), String> {
     if !resp.status().is_success() {
         return Err(format!("HTTP {}", resp.status()));
     }
+
+    // 响应可能回带密钥轮换提示：与本地已有集合合并，下次启动即用新密钥。
+    // 解析失败静默忽略——提示只是优化，不影响本次上报是否算数。
+    if let Ok(json) = resp.json::<serde_json::Value>().await {
+        if let Some(hint) = json.get("data").and_then(|d| d.get("sign_hint")) {
+            crate::utils::update_sign::save_hint(hint);
+        }
+    }
     Ok(())
 }

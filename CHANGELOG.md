@@ -4,6 +4,10 @@
 
 ## [Unreleased]
 
+### 新增
+
+- **启动上报接收密钥轮换提示**（[launch_ping.rs](src-tauri/src/commands/online/manager/launch_ping.rs)）：响应 `data.sign_hint` 存在时并入本地密钥集合（[update_sign.rs](src-tauri/src/utils/update_sign.rs) 的 `save_hint`，此前无调用方），下次启动即用新密钥——服务端换签名密钥后老客户端自愈，无需强制升级。提示解析失败静默忽略，不影响本次上报是否算数。
+
 ### Added
 
 - **更新检查改走需鉴权的 `/v1/updates/manifest/raw`**（[api_paths.rs](src-tauri/src/api_paths.rs) / [check.rs](src-tauri/src/commands/system/updater/check.rs)）：

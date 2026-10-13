@@ -101,8 +101,8 @@ pub fn build_ping_sign_query(device_pk: &str, device_id: &str) -> (String, Optio
 
 /// 保存服务端下发的密钥提示（与本地已有集合合并）
 ///
-/// 当前无调用方：更新检查已不再回带 `sign_hint`。保留接收端是为了让
-/// 「服务端下发新密钥即完成轮换、无需发版」这条链路随时可用。
+/// 由 `commands::online::manager::launch_ping` 在收到响应后调用：
+/// 服务端在 `data.sign_hint` 里回带比本地更新的密钥时并入本地集合。
 ///
 /// `hint` 形如 `{"keys": {"2": "<hex>"}, "preferred_lx": "2"}`；结构不符时静默忽略。
 pub fn save_hint(hint: &serde_json::Value) {
