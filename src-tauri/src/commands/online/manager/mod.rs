@@ -1,5 +1,6 @@
 //! 联机模块统一分发逻辑（online_manager 的命令层实现）
 
+mod announcement;
 mod auth_actions;
 mod auth_register_login;
 mod dispatcher;

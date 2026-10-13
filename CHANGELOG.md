@@ -4,6 +4,16 @@
 
 ## [Unreleased]
 
+#### 启动公告
+
+- **公告展示**（[AnnouncementDialog.vue](src/components/announcement/AnnouncementDialog.vue) / [announcement.ts](src/utils/announcement.ts) / [announcement.ts](src/utils/api/announcement.ts) / [announcement.rs](src-tauri/src/commands/online/manager/announcement.rs) 均为新增，接线见 [App.vue](src/App.vue)）：
+  - 启动时拉取 `GET /v1/announcements?channel=&version=`（公开接口，服务端已豁免 JWT），只弹出**本机未读**的公告。
+  - **由 Rust 侧发起**：WebView 的 origin 不在服务端 CORS 白名单内，前端直接 `fetch` 会被浏览器拦掉。通道与版本在后端推导，与更新检查同一套口径（开发者模式可覆盖分支）。
+  - **已读记录只存本机** `localStorage`（键 `molaunch.readAnnouncements`，内容是公告 id 列表），不上报任何标识。`dismissible=true` 的公告在用户点「我知道了」后写入已读、之后不再弹出；`dismissible=false` 的**不写已读**，每次启动都提示，直到服务端下架——避免重要通知被一次性关掉，此时也不提供右上角关闭、遮罩关闭与 Esc 关闭。
+  - 三种级别（`info` / `warning` / `important`）各有独立徽标配色与左侧色条；正文为 Markdown，经 `renderMarkdown` 消毒后渲染；`link_url` 非空时提供「查看详情」外链按钮。
+  - 拉取失败、超时（5 秒）或响应非成功一律降级为空列表并只记 debug 日志：**公告拉不到不影响启动**。启动调用不 `await`，公告晚到不会拖慢启动。
+
+
 ### 新增
 
 - **启动上报接收密钥轮换提示**（[launch_ping.rs](src-tauri/src/commands/online/manager/launch_ping.rs)）：响应 `data.sign_hint` 存在时并入本地密钥集合（[update_sign.rs](src-tauri/src/utils/update_sign.rs) 的 `save_hint`，此前无调用方），下次启动即用新密钥——服务端换签名密钥后老客户端自愈，无需强制升级。提示解析失败静默忽略，不影响本次上报是否算数。

@@ -17,6 +17,9 @@ const DownloadPanel = defineAsyncComponent(() => import('@/components/common/Dow
 const DragOverlay = defineAsyncComponent(() => import('@/components/common/DragOverlay.vue'))
 const UpdateDialog = defineAsyncComponent(() => import('@/components/about/UpdateDialog.vue'))
 const UpdateLogDialog = defineAsyncComponent(() => import('@/components/about/UpdateLogDialog.vue'))
+const AnnouncementDialog = defineAsyncComponent(
+  () => import('@/components/announcement/AnnouncementDialog.vue'),
+)
 const Watermark = defineAsyncComponent(() => import('@/components/common/Watermark.vue'))
 import { useSdkStore } from '@/stores/sdk'
 import { useAuthStore } from '@/stores/auth'
@@ -32,6 +35,7 @@ import { setToastRef } from '@/utils/toast'
 import { notifyFrontendReady } from '@/utils/splash'
 import { initAutoCheck } from '@/utils/updater'
 import { maybeShowUpdateLog } from '@/utils/updateLog'
+import { maybeShowAnnouncements } from '@/utils/announcement'
 import {
   consumeRelaunchSnapshot,
   setReconnectPassword,
@@ -189,6 +193,9 @@ async function initApp() {
   await javaPromise
   // 启动「本次更新日志」弹窗：版本升级后展示一次（无记录/回退/同版本不弹）
   maybeShowUpdateLog()
+  // 启动公告：拉取当前生效公告，仅弹出本机未读过的（已读记录见 utils/announcement.ts）
+  // 不 await：公告晚到无所谓，不该拖慢启动
+  void maybeShowAnnouncements()
   console.log('[Startup][Frontend] initApp fully done @', new Date().toISOString())
 }
 
@@ -242,6 +249,7 @@ async function restorePage(savedPath: string): Promise<void> {
   <Toast ref="toastRef" />
   <UpdateDialog />
   <UpdateLogDialog />
+  <AnnouncementDialog />
   <!-- 测试版水印：仅在测试版构建（package.json version 含 beta/alpha/rc/canary 后缀）时渲染 -->
   <Watermark />
   <!-- 会话恢复期间的加载遮罩 -->
