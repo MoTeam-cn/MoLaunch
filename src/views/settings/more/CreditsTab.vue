@@ -2,6 +2,8 @@
 /**
  * 鸣谢子页签：特别鸣谢 + 法律信息 + 许可与版权声明
  *
+ * 法律信息中的「素材来源与版权投诉」由子组件 AssetComplianceSection 提供。
+ *
  * 开发者模式隐藏触发：法律信息 → 版权声明中「MoTeam」字段连续点击 7 次
  * （3 秒内完成）。无任何视觉提示，防止普通用户随意触发。已解锁后点击无效。
  */
@@ -9,6 +11,9 @@ import { ref, computed, onMounted, defineAsyncComponent } from 'vue'
 const Card = defineAsyncComponent(() => import('@/components/common/Card.vue'))
 const CollapsibleCard = defineAsyncComponent(() => import('@/components/common/CollapsibleCard.vue'))
 const Button = defineAsyncComponent(() => import('@/components/common/Button.vue'))
+const AssetComplianceSection = defineAsyncComponent(
+  () => import('./AssetComplianceSection.vue'),
+)
 import { resolveLogo, openLink } from '@/utils/aboutLogos'
 import type { AboutData } from '@/utils/api/about'
 import { unlockDeveloperMode, isDeveloperUnlocked } from '@/utils/api/developer'
@@ -218,6 +223,9 @@ onMounted(async () => {
           Minecraft 是 Mojang Synergies AB 的商标。
         </p>
       </div>
+
+      <!-- 素材来源与版权投诉 -->
+      <AssetComplianceSection />
 
       <!-- 特别说明 -->
       <div>

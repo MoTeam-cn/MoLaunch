@@ -113,6 +113,10 @@
 | winreg | winreg contributors | MIT License | https://docs.rs/winreg | https://github.com/gentoo90/winreg-rs/blob/master/LICENSE |
 | libc | libc contributors | MIT / Apache-2.0 | https://docs.rs/libc | https://github.com/rust-lang/libc/blob/master/LICENSE-MIT |
 | Minecraft Default 字体（Minecraft 官方默认像素字体） | 字体源数据版权归 Mojang Studios（Minecraft 游戏资产）；TTF 由 tryashtar/minecraft-ttf 从游戏字体资源自动生成 | 游戏资产按 Minecraft EULA 使用；生成仓库未提供独立 LICENSE | https://github.com/tryashtar/minecraft-ttf | https://github.com/tryashtar/minecraft-ttf/releases |
+| Minecraft 游戏纹理（配方 / 物品 / 方块图标） | 纹理像素版权归 Mojang Studios（Minecraft 游戏资产）；图集由官方客户端 jar 与 PrismarineJS/minecraft-assets 汇总生成 | 游戏资产按 Minecraft EULA 使用；上游仓库代码为 MIT License | https://github.com/PrismarineJS/minecraft-assets | https://www.minecraft.net/en-us/eula |
+| Minecraft 默认皮肤（Steve / Alex 等 9 款） | 版权归 Mojang Studios（Minecraft 游戏资产） | 游戏资产按 Minecraft EULA 使用 | https://www.minecraft.net | https://www.minecraft.net/en-us/eula |
+| Minecraft 语言文件（zh_cn 物品名称） | 版权归 Mojang Studios（Minecraft 游戏资产） | 游戏资产按 Minecraft EULA 使用 | https://www.minecraft.net | https://www.minecraft.net/en-us/eula |
+| 种子地图结构图标 | 版权归原制作方（第三方种子地图站点）；MoLaunch 不主张任何权利 | 如权利人提出异议将立即移除或替换，详见项目根目录 NOTICE.md | https://minecraftsearch.com | https://github.com/MoTeam-cn/MoLaunch/blob/main/NOTICE.md |
 | Unifont（CJK 子集，Unifont-16.0.04） | Copyright (c) 1998-2025 Roman Czyborra、Paul Hardy 等 unifoundry 贡献者 | GNU GPL v2+ with Font Embedding Exception | https://unifoundry.com | https://unifoundry.com/LICENSE.txt |
 | easytier-core | EasyTier Contributors | Apache-2.0 | https://github.com/EasyTier/EasyTier | https://github.com/EasyTier/EasyTier/blob/main/LICENSE |
 | Scaffolding-MC | Copyright (c) 2025 Scaffolding-MC Contributors | 仓库未提供开源许可证（MoLaunch 为基于协议规范的独立实现） | https://github.com/Scaffolding-MC/Scaffolding-MC | https://github.com/Scaffolding-MC/Scaffolding-MC |

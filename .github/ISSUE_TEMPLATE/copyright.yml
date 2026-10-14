@@ -1,0 +1,80 @@
+name: 版权投诉
+description: 素材权利人举报本项目使用其素材，或请求移除 / 替换相关内容
+title: "[copyright] "
+body:
+  - type: markdown
+    attributes:
+      value: |
+        本模板供**素材权利人及其代理人**使用，请先阅读项目根目录的 NOTICE.md。
+
+        我们承诺：收到有效通知后 **48 小时内确认**；经核实确有不当时，**7 天内在下一个版本中移除或替换**；情况紧急时可直接下线相关资源，无需等待版本发布。
+
+        也可直接邮件联系：**support@moteam.top**
+
+  - type: input
+    id: claimant
+    attributes:
+      label: 权利人 / 代理人
+      description: 您的姓名，或您所代表的组织名称
+    validations:
+      required: true
+
+  - type: input
+    id: contact
+    attributes:
+      label: 联系方式
+      description: 邮箱或其他可用联系方式
+    validations:
+      required: true
+
+  - type: input
+    id: work
+    attributes:
+      label: 涉及的作品
+      description: 您主张权利的素材名称
+    validations:
+      required: true
+
+  - type: textarea
+    id: location
+    attributes:
+      label: 在本项目中的位置
+      description: 文件路径、界面入口或截图；不确定时可留空，我们会协助定位
+    validations:
+      required: false
+
+  - type: textarea
+    id: basis
+    attributes:
+      label: 权利依据
+      description: 版权登记、原始发布地址或其他能证明权利归属的材料
+    validations:
+      required: true
+
+  - type: dropdown
+    id: demand
+    attributes:
+      label: 诉求
+      options:
+        - 移除相关素材
+        - 替换为其他素材
+        - 补充署名或来源说明
+        - 其他（请在下方补充说明）
+    validations:
+      required: true
+
+  - type: textarea
+    id: extra
+    attributes:
+      label: 补充说明
+      description: 其他需要告知我们的信息
+    validations:
+      required: false
+
+  - type: checkboxes
+    id: goodfaith
+    attributes:
+      label: 确认
+      options:
+        - label: 我确认以上信息真实，且我是相关素材的权利人或其授权代理人
+          required: true

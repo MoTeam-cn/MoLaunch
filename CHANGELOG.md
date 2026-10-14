@@ -6,7 +6,18 @@
 
 ### 新增
 
+#### 素材来源与版权投诉
+
+- **新增素材来源说明与版权投诉通道**（[AssetComplianceSection.vue](src/views/settings/more/AssetComplianceSection.vue) 新增 / [CreditsTab.vue](src/views/settings/more/CreditsTab.vue) 接入 / [NOTICE.md](NOTICE.md) 新增 / [copyright.yml](.github/ISSUE_TEMPLATE/copyright.yml) 新增 / [LICENSE](LICENSE) / [licenses.txt](src-tauri/resources/about/licenses.txt)）：
+  - 「设置 → 更多 → 鸣谢 → 法律信息」新增「素材来源与版权投诉」区块：说明内置游戏纹理、皮肤、结构图标与字体的来源与权利归属，并提供投诉邮箱（一键复制）与 GitHub 结构化投诉模板入口。
+  - 公示响应承诺：收到有效通知后 48 小时内确认，经核实确有不当时 7 天内在下一版本移除或替换；紧急情况可直接下线资源，无需等待发版。
+  - 新增根目录 [NOTICE.md](NOTICE.md) 作为素材来源与权利声明的权威副本；[LICENSE](LICENSE) 第四节补充第三方游戏资产的权利归属与投诉条款（`src-tauri/resources/LICENSE.txt` 为构建期自动同步副本）。
+
 - **《用户协议》支持官网远程版本推送**（[user_agreement.rs](src-tauri/src/commands/online/manager/user_agreement.rs) / [mod.rs](src-tauri/src/commands/online/manager/mod.rs) / [dispatcher.rs](src-tauri/src/commands/online/manager/dispatcher.rs) / [userAgreement.ts](src/utils/userAgreement.ts)）：`fetchRemoteUserAgreementConfig()` 此前是返回 null 的占位实现，现接入官网构建产物 `/agreement.json`——官网在协议正文变更时自动自增版本号，启动器启动时拉取该清单，远端 `version` 高于本机已同意版本即弹出强制弹窗要求重新阅读同意。拉取放在 **Rust 侧**（新增 action `user_agreement_fetch`），与 `announcement_list` 同一模式：WebView 的 origin（`http://tauri.localhost`）不在官网跨域白名单内，前端直接 `fetch` 会被浏览器拦掉，放 Rust 侧则官网无需配置任何 CORS 响应头。请求带 `?ts=` 时间戳查询参数——`/agreement.json` 是固定路径、文件名不带内容哈希，CDN 可能缓存旧版本，查询串参与缓存键可确保取到最新协议。失败一律回退本地默认配置（`USER_AGREEMENT_VERSION` 由 1 提升到 2，与官网当前协议版本对齐），**不阻塞启动**；前端另加两道字段校验（版本号为正数、要点列表非空），避免脏数据把门禁卡死。
+
+### 变更
+
+- **修正配方资源来源标注**（[sources.json](src/utils/recipe-generator/assets/sources.json) / [generate.mjs](scripts/generate-recipe-assets/generate.mjs) / [resources.ts](src/utils/recipe-generator/resources.ts)）：原先统一标注为「MIT 许可 / Mojang 官方数据源」，但 MIT 仅覆盖上游仓库（PrismarineJS/minecraft-data、PrismarineJS/minecraft-assets、destruc7i0n/crafting）的**代码**，并不覆盖其中的纹理像素与语言文件——这些内容的版权归 Mojang Studios。现改为分项标注：代码与数据表标 MIT，纹理、皮肤、语言文件标为 Minecraft 游戏资产并注明权利归属；生成脚本同步修改，避免重新生成时回退。
 
 ## [0.3.8-rc.5] - 2026-10-13
 
