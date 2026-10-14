@@ -15,6 +15,16 @@
 
 - **《用户协议》支持官网远程版本推送**（[user_agreement.rs](src-tauri/src/commands/online/manager/user_agreement.rs) / [mod.rs](src-tauri/src/commands/online/manager/mod.rs) / [dispatcher.rs](src-tauri/src/commands/online/manager/dispatcher.rs) / [userAgreement.ts](src/utils/userAgreement.ts)）：`fetchRemoteUserAgreementConfig()` 此前是返回 null 的占位实现，现接入官网构建产物 `/agreement.json`——官网在协议正文变更时自动自增版本号，启动器启动时拉取该清单，远端 `version` 高于本机已同意版本即弹出强制弹窗要求重新阅读同意。拉取放在 **Rust 侧**（新增 action `user_agreement_fetch`），与 `announcement_list` 同一模式：WebView 的 origin（`http://tauri.localhost`）不在官网跨域白名单内，前端直接 `fetch` 会被浏览器拦掉，放 Rust 侧则官网无需配置任何 CORS 响应头。请求带 `?ts=` 时间戳查询参数——`/agreement.json` 是固定路径、文件名不带内容哈希，CDN 可能缓存旧版本，查询串参与缓存键可确保取到最新协议。失败一律回退本地默认配置（`USER_AGREEMENT_VERSION` 由 1 提升到 2，与官网当前协议版本对齐），**不阻塞启动**；前端另加两道字段校验（版本号为正数、要点列表非空），避免脏数据把门禁卡死。
 
+### 修复
+
+- **修复 CI 依赖安全审计失败（`rustls` 4 项安全公告）**（[Cargo.lock](src-tauri/Cargo.lock)）：RustSec 于 2026-10-14 新收录 4 项针对 `rustls 0.23.45` 的公告，CI 的「Security audit (cargo)」步骤因此失败——
+  - RUSTSEC-2026-0346（中危）：客户端会话值的 `Debug` 实现会泄露 TLS 会话密钥；
+  - RUSTSEC-2026-0347（低危）：ECH 被拒绝后仍向外部服务器发送已缓冲的应用数据；
+  - RUSTSEC-2026-0348（低危）：Brotli 证书解压可在认证前分配至多 1 GiB 内存；
+  - RUSTSEC-2026-0349（低危）：未认证的 ServerHello 可将后续连接降级为经典密钥交换。
+
+  四者均由 `rustls 0.23.46` 修复。`rustls` 由 `0.23.45` 升至 `0.23.46`（该版本依赖集与前一版完全一致，仅版本号与校验和变化）；本地以 cargo-audit 0.22.0 配合 RustSec advisory-db 复核，结果由「4 vulnerabilities found」变为 0 项。
+
 ### 变更
 
 - **修正配方资源来源标注**（[sources.json](src/utils/recipe-generator/assets/sources.json) / [generate.mjs](scripts/generate-recipe-assets/generate.mjs) / [resources.ts](src/utils/recipe-generator/resources.ts)）：原先统一标注为「MIT 许可 / Mojang 官方数据源」，但 MIT 仅覆盖上游仓库（PrismarineJS/minecraft-data、PrismarineJS/minecraft-assets、destruc7i0n/crafting）的**代码**，并不覆盖其中的纹理像素与语言文件——这些内容的版权归 Mojang Studios。现改为分项标注：代码与数据表标 MIT，纹理、皮肤、语言文件标为 Minecraft 游戏资产并注明权利归属；生成脚本同步修改，避免重新生成时回退。
