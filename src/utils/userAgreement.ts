@@ -3,15 +3,16 @@
  *
  * - 系统存储记录 userAgreed / userAgreedVersion（Windows 注册表 / 其他系统全局共用文件）
  * - 启动时若未同意，或已同意版本低于当前协议版本，则弹出强制弹窗，同意后方可继续使用
- * - 文案 / 版本 / 外链支持远程下发：`fetchRemoteUserAgreementConfig` 当前返回 null（未启用），
- *   后续 apiServer 就绪后接入即可覆盖本地默认，无需改动触发链路
+ * - 文案 / 版本 / 外链支持远程下发：`fetchRemoteUserAgreementConfig` 拉官网 /agreement.json
+ *   （经 Rust 侧 user_agreement_fetch 绕开 WebView CORS），失败回退本地默认
  */
 
 import { ref } from 'vue'
 import { applyConfig, getConfigMap } from '@/utils/api/config'
+import { onlineManager } from '@/utils/api/online-manager'
 
 /** 本地默认《用户协议》版本号（协议内容每次有实质更新时自增，触发用户重新同意） */
-export const USER_AGREEMENT_VERSION = 1
+export const USER_AGREEMENT_VERSION = 2
 
 /** 可远程下发的《用户协议》配置（本地默认 + 后续 apiServer 覆盖） */
 export interface UserAgreementRemoteConfig {
@@ -60,14 +61,33 @@ const DEFAULT_USER_AGREEMENT_CONFIG: UserAgreementRemoteConfig = {
   confirmText: '同意并继续',
 }
 
+/** 后端 user_agreement_fetch 响应 */
+interface UserAgreementFetchResponse {
+  success: boolean
+  config?: Partial<UserAgreementRemoteConfig> | null
+  error: string
+}
+
 /**
- * 拉取 apiServer 下发的《用户协议》配置（预留，尚未接入）
+ * 拉取官网下发的《用户协议》配置
  *
- * 当前返回 null 表示使用本地默认配置；后续 apiServer 就绪后在此实现拉取并返回
- * 完整配置对象（或 Partial 合并进默认值），触发链路无需改动。
+ * 由 Rust 侧发起（online_manager 的 user_agreement_fetch），绕开 WebView CORS。
+ * 返回 null 表示使用本地默认配置：网络失败、响应非成功、或字段非法都回退，
+ * 不阻塞启动。字段与官网 src/logic/agreement.ts 的 AgreementManifest 一一对应。
  */
-export async function fetchRemoteUserAgreementConfig(): Promise<UserAgreementRemoteConfig | null> {
-  return null
+export async function fetchRemoteUserAgreementConfig(): Promise<Partial<UserAgreementRemoteConfig> | null> {
+  try {
+    const resp = await onlineManager<UserAgreementFetchResponse>('user_agreement_fetch')
+    const cfg = resp?.config
+    if (!resp?.success || !cfg) return null
+    // 只接受能安全驱动门禁的清单：版本号为正数、要点列表非空。
+    // 否则宁可回退本地默认，也不要用脏数据把门禁卡死。
+    if (typeof cfg.version !== 'number' || !Number.isFinite(cfg.version) || cfg.version <= 0) return null
+    if (!Array.isArray(cfg.sections) || cfg.sections.length === 0) return null
+    return cfg
+  } catch {
+    return null
+  }
 }
 
 /** 合并远程配置：返回最终生效配置（未下发时回退本地默认） */

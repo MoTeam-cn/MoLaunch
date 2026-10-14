@@ -243,6 +243,8 @@ static DISPATCHER: Lazy<Dispatcher> = Lazy::new(|| {
     lan_fake::register_lan_fake_actions(&mut d);
     // 公告拉取：announcement_list（GET /v1/announcements，公开接口）
     super::announcement::register(&mut d);
+    // 《用户协议》远程配置：user_agreement_fetch（GET 官网 /agreement.json，公开接口）
+    super::user_agreement::register(&mut d);
     // MC 局域网端口探测：lan_port_probe（监听发现广播解析 [AD]port[/AD]）
     lan_probe::register_lan_probe_actions(&mut d);
 
