@@ -4,9 +4,16 @@
 
 ## [Unreleased]
 
+### 新增
+
+- **《用户协议》支持官网远程版本推送**（[user_agreement.rs](src-tauri/src/commands/online/manager/user_agreement.rs) / [mod.rs](src-tauri/src/commands/online/manager/mod.rs) / [dispatcher.rs](src-tauri/src/commands/online/manager/dispatcher.rs) / [userAgreement.ts](src/utils/userAgreement.ts)）：`fetchRemoteUserAgreementConfig()` 此前是返回 null 的占位实现，现接入官网构建产物 `/agreement.json`——官网在协议正文变更时自动自增版本号，启动器启动时拉取该清单，远端 `version` 高于本机已同意版本即弹出强制弹窗要求重新阅读同意。拉取放在 **Rust 侧**（新增 action `user_agreement_fetch`），与 `announcement_list` 同一模式：WebView 的 origin（`http://tauri.localhost`）不在官网跨域白名单内，前端直接 `fetch` 会被浏览器拦掉，放 Rust 侧则官网无需配置任何 CORS 响应头。请求带 `?ts=` 时间戳查询参数——`/agreement.json` 是固定路径、文件名不带内容哈希，CDN 可能缓存旧版本，查询串参与缓存键可确保取到最新协议。失败一律回退本地默认配置（`USER_AGREEMENT_VERSION` 由 1 提升到 2，与官网当前协议版本对齐），**不阻塞启动**；前端另加两道字段校验（版本号为正数、要点列表非空），避免脏数据把门禁卡死。
+
+## [0.3.8-rc.5] - 2026-10-13
+
 ### 修复
 
 - **预发布版本号带点与不带点混用时比较错误，`rc.4` 被判为低于 `rc2`**（[check.rs](src-tauri/src/commands/system/updater/check.rs) / [check_test.rs](src-tauri/src/commands/system/updater/check_test.rs)）：`is_version_newer` 把预发布串按 `.` 切成段后逐段比较，`rc.4` 被切成 `[Word("rc", None), Num(4)]`、`rc2` 被切成 `[Word("rc", Some(2))]`，**比较在第一段就分出胜负**（`None < Some(2)`），那个 `4` 从未参与比较，于是 `0.3.8-rc.4` 被判定低于 `0.3.8-rc2`。该函数是「是否提示更新」的唯一判据（[check.rs](src-tauri/src/commands/system/updater/check.rs) 的更新判定处），后果是 `rc1` / `rc2` 用户**永远收不到 `rc.4` 的更新提示**。改为**先把渠道词与其后的数字归一**（`rc.4` 与 `rc4` 等价、`beta.2` 与 `beta2` 等价），数字按数值比较（`rc.10 > rc.9`），渠道词之间按字典序（`alpha < beta < rc`）；同时容忍 `v` 前缀与 `+` 构建元数据，渠道词统一小写。新增 3 个用例覆盖带点写法的等价性、跨序号比较与 alpha / beta 先后。
+
 ## [0.3.8-rc.4] - 2026-10-13
 
 ### 修复
