@@ -1,7 +1,8 @@
 /**
  * 合成配方生成器 - 资源加载
  *
- * 内置数据（MIT 许可）由 scripts/generate-recipe-assets 生成：
+ * 数据表（MIT 许可）与纹理图集由 scripts/generate-recipe-assets 生成，
+ * 其中纹理像素版权归 Mojang Studios（Minecraft 游戏资产），见 NOTICE.md：
  * - assets/items/<version>.json：物品表（id/name/zh/texture）
  * - assets/tags/<version>.json：原版标签（tagId -> 物品 ID 列表）
  * - assets/texture-atlas.png + .json：纹理图集与坐标布局
