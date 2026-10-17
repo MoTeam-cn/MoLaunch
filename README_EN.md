@@ -27,6 +27,9 @@ A modern, cross-platform Minecraft Java Edition launcher.
 > [!IMPORTANT]
 > This project is developed independently by individuals. To save effort, a significant amount of it was written with AI assistance (Vibe Coding), so the results may not always be perfect. We appreciate your understanding.
 
+> [!WARNING]
+> In the current Release builds, macOS and Linux have not been tested on real hardware. If you encounter any issues after downloading and installing, please let us know promptly and we will fix them as soon as possible.
+
 ## Introduction
 
 MoLaunch is a Minecraft Java Edition launcher that provides a complete set of game management capabilities—downloading, installing, launching, and online multiplayer—built on **Tauri 2 + Vue 3 + Rust**, with a suite of practical in-game tools built in.
