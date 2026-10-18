@@ -8,9 +8,72 @@ import type { InitMsg } from './types'
 /** Emscripten 胶水代码（?raw 构建期内联，来源固定为仓库产物，不接收运行时输入） */
 import cubiomesGlueCode from '@/assets/seedmap/cubiomes.js?raw'
 
+/**
+ * cubiomes Emscripten 导出对象（只声明本项目实际调用的成员）
+ *
+ * 成员名与签名来自 assets/seedmap/cubiomes.js 胶水代码与 cubiomes_wrapper.c。
+ */
+interface CubiomesModule {
+  HEAPU8: Uint8Array
+  HEAP32: Int32Array
+  _malloc(size: number): number
+  _free(ptr: number): void
+  _cubiomes_init_biome_colors(): void
+  _cubiomes_get_all_biome_colors(): number
+  _cubiomes_get_biome_data_pointer(): number
+  _cubiomes_get_biome_data_size(): number
+  _cubiomes_get_height_grid_dims(): number
+  _cubiomes_get_height_data_pointer(): number
+  _cubiomes_is_slime_chunk(seedPtr: number, chunkX: number, chunkZ: number): number
+  _cubiomes_get_region_size(structureId: number, mcVersion: number): number
+  _cubiomes_get_structure_pos(
+    structureId: number, seedPtr: number, mcVersion: number,
+    regionX: number, regionZ: number, outXPtr: number, outZPtr: number,
+  ): number
+  _cubiomes_is_viable(
+    structureId: number, seedPtr: number, mcVersion: number, dimension: number,
+    largeBiomes: number, x: number, z: number,
+  ): number
+  _cubiomes_estimate_spawn(
+    seedPtr: number, mcVersion: number, largeBiomes: number,
+    outXPtr: number, outZPtr: number,
+  ): void
+  _cubiomes_find_strongholds(
+    seedPtr: number, mcVersion: number, maxCount: number, bufPtr: number, bufLen: number,
+  ): number
+  _cubiomes_get_biome_at_point(
+    seedPtr: number, mcVersion: number, dimension: number, largeBiomes: number,
+    scale: number, x: number, y: number, z: number,
+  ): number
+  _cubiomes_gen_biomes_static(
+    seedPtr: number, mcVersion: number, dimension: number, largeBiomes: number,
+    scale: number, rangeX: number, rangeZ: number, sx: number, sz: number,
+  ): number
+  _cubiomes_gen_biomes_with_height_static(
+    seedPtr: number, mcVersion: number, dimension: number, largeBiomes: number,
+    scale: number, rangeX: number, rangeZ: number, sx: number, sz: number, y: number,
+  ): number
+  _cubiomes_find_ravines(
+    seedPtr: number, mcVersion: number, dimension: number,
+    startChunkX: number, startChunkZ: number, numX: number, numZ: number,
+    canyonType: number, megaThreshold: number, bufPtr: number, bufLen: number,
+  ): number
+  _cubiomes_find_nether_fossils(
+    seedPtr: number, mcVersion: number,
+    startChunkX: number, startChunkZ: number, numX: number, numZ: number,
+    bufPtr: number, bufLen: number,
+  ): number
+  _cubiomes_find_fossils(
+    seedPtr: number, mcVersion: number, dimension: number,
+    startChunkX: number, startChunkZ: number, numX: number, numZ: number,
+    diamondMode: number, bufPtr: number, bufLen: number,
+  ): number
+}
+
 /** 共享 WASM 单例状态（render / structure-search 经此访问 Module） */
-export const wasm = {
-  module: null as any,
+export const wasm: { module: CubiomesModule; ready: boolean } = {
+  // initModule() 完成前实际为 null，调用方须先经 checkModule() 校验（既有契约）
+  module: undefined as unknown as CubiomesModule,
   ready: false,
 }
 
@@ -105,8 +168,8 @@ export async function initModule(msg: InitMsg): Promise<void> {
 
   wasm.module = await factory({
     locateFile: () => msg.wasmUrl,
-    instantiateWasm: (imports: WebAssembly.Imports, cb: (inst: WebAssembly.Instance) => any) => {
-      return new Promise<any>((resolve, reject) => {
+    instantiateWasm: (imports: WebAssembly.Imports, cb: (inst: WebAssembly.Instance) => unknown) => {
+      return new Promise<unknown>((resolve, reject) => {
         WebAssembly.instantiate(wasmBinary, imports).then(r => {
           const exports = cb(r.instance)
           resolve(exports)

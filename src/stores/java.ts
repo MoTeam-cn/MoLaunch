@@ -17,7 +17,7 @@ export const useJavaStore = defineStore('java', () => {
     try {
       const config = await tauri.getConfigMap()
       return config.javaPath ?? null
-    } catch (e) {
+    } catch {
       return null
     }
   }

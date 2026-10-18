@@ -225,7 +225,11 @@ export function useSeedMap() {
 
   async function copyCoord(x: number, z: number): Promise<void> {
     const text = formatCoord(x, z), ok = await copyToClipboard(text)
-    ok ? toastSuccess('已复制: ' + text) : toastError('复制失败')
+    if (ok) {
+      toastSuccess('已复制: ' + text)
+    } else {
+      toastError('复制失败')
+    }
   }
 
   // ===== 版本/维度/大型群系变化 =====

@@ -81,7 +81,7 @@ document.addEventListener('DOMContentLoaded', () => {
     try {
       const invoke = window.__TAURI?.core?.invoke
       if (invoke) await invoke('frontend_ready')
-    } catch (_) { /* 浏览器预览 */ }
+    } catch { /* 浏览器预览 */ }
   }, 4600)
 
   // 窗口拖拽：整个页面即拖拽区。捕获阶段拦截（先于 Tauri 注入脚本执行并阻止其重复触发），

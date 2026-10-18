@@ -38,7 +38,7 @@ export function useSkinOperations(options: UseSkinOperationsOptions) {
 
   async function loadInfo() {
     const dev = import.meta.env.DEV
-    dev && console.log('[SkinManager] loadInfo started, loginType:', loginType.value)
+    if (dev) console.log('[SkinManager] loadInfo started, loginType:', loginType.value)
     state.loading.value = true
     state.skinUrl.value = null
     state.capeUrl.value = null
@@ -67,7 +67,7 @@ export function useSkinOperations(options: UseSkinOperationsOptions) {
         // 披风保持 null，不顶默认披风（披风不是必需品）
         state.capeUrl.value = data.cape_url
         state.variant.value = data.skin_model === 'slim' ? 'slim' : 'classic'
-        dev && console.log('[SkinManager] authlib skin info loaded:', data, 'usingDefault:', state.authlibUsingDefaultSkin.value)
+        if (dev) console.log('[SkinManager] authlib skin info loaded:', data, 'usingDefault:', state.authlibUsingDefaultSkin.value)
       } catch (e) {
         console.error('[SkinManager] authlibGetSkinInfo failed:', e)
         toastError(`获取皮肤信息失败: ${e}`)
@@ -95,25 +95,25 @@ export function useSkinOperations(options: UseSkinOperationsOptions) {
       }
       state.info.value = null
       state.loading.value = false
-      dev && console.log('[SkinManager] offline account, using skin:', state.selectedLocalSkin.value)
+      if (dev) console.log('[SkinManager] offline account, using skin:', state.selectedLocalSkin.value)
       return
     }
 
     // 微软账号：从后端获取最新皮肤/披风信息（后端操作成功后会自动刷新 profile_json）
     try {
       state.info.value = await getSkinCapeInfo()
-      dev && console.log('[SkinManager] getSkinCapeInfo ok:', state.info.value)
+      if (dev) console.log('[SkinManager] getSkinCapeInfo ok:', state.info.value)
     } catch (e) {
       console.error('[SkinManager] getSkinCapeInfo failed:', e)
       toastError(`获取皮肤信息失败: ${e}`)
     }
     const skinResult = await safeCall(() => getSkinUrl(), '[SkinManager] getSkinUrl')
     state.skinUrl.value = skinResult?.url ?? null
-    dev && console.log('[SkinManager] getSkinUrl ok:', skinResult?.cached ? 'cached' : 'remote')
+    if (dev) console.log('[SkinManager] getSkinUrl ok:', skinResult?.cached ? 'cached' : 'remote')
     try {
       const result = await getCapeUrl()
       state.capeUrl.value = result?.url ?? null
-      dev && console.log('[SkinManager] getCapeUrl ok:', result ? (result.cached ? 'cached' : 'remote') : 'no cape')
+      if (dev) console.log('[SkinManager] getCapeUrl ok:', result ? (result.cached ? 'cached' : 'remote') : 'no cape')
     } catch (e) {
       console.warn('[SkinManager] getCapeUrl failed:', e)
       state.capeUrl.value = null
@@ -121,7 +121,7 @@ export function useSkinOperations(options: UseSkinOperationsOptions) {
     state.variant.value = state.activeSkin.value?.variant === 'slim' ? 'slim' : 'classic'
 
     state.loading.value = false
-    dev && console.log('[SkinManager] loadInfo done, skinUrl:', state.skinUrl.value ? 'has url' : 'null')
+    if (dev) console.log('[SkinManager] loadInfo done, skinUrl:', state.skinUrl.value ? 'has url' : 'null')
   }
 
   const actions = useSkinActions({

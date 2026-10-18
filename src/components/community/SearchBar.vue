@@ -42,7 +42,7 @@ watch(
   async (rt) => {
     try {
       categories.value = await getCategoryTags(rt)
-    } catch (e) {
+    } catch {
       categories.value = []
       toastError('分类标签加载失败，请检查网络')
     }

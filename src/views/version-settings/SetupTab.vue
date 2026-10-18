@@ -62,7 +62,7 @@ async function savePersonalField(field: string, value: string, name: string) {
     const update = { [field]: value } as tauri.PersonalizationUpdate
     await tauri.updateVersionPersonalization(selectedId.value, update)
     if (personalization.value) {
-      (personalization.value as any)[field] = value
+      (personalization.value as unknown as Record<string, unknown>)[field] = value
     }
     toastSuccess(`${name}已保存`)
   } catch (e) { toastError('保存失败：' + String(e)) }
@@ -84,7 +84,7 @@ async function saveAdvanceSwitch(field: string, value: boolean, name: string) {
     const update = { [field]: value } as tauri.PersonalizationUpdate
     await tauri.updateVersionPersonalization(selectedId.value, update)
     if (personalization.value) {
-      (personalization.value as any)[field] = value
+      (personalization.value as unknown as Record<string, unknown>)[field] = value
     }
     toastSuccess(`${name}已保存`)
   } catch (e) { toastError('保存失败：' + String(e)) }

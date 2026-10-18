@@ -29,6 +29,18 @@
 
 - **修复 CI 依赖安全审计失败**（[audit.toml](.cargo/audit.toml)）：RustSec 新收录 RUSTSEC-2026-0367 / 0368 / 0369（`zip 4.6.1` 的 `extract()` 系列：SUID/SGID 位保留、符号链接越界写、经符号链接施加权限），CI 的「Security audit (cargo)」步骤因此失败。三条公告的触发点全部落在 `ZipArchive::extract()` / `ZipStreamReader::extract()` 的自动落盘路径，而本项目从不调用 `extract`——统一走 `extract_zip_safely` 逐条 `by_index` 自写普通文件（跳过 symlink 条目、`ensure_safe_relative_path` 防 Zip Slip、不应用 `unix_mode`），触发面不可达；修复版本为 `zip 9.0.0`，而 `tauri-plugin-updater` 2.13.3 / 2.14.0 仍锁定 `zip ^4`（Windows 更新包解压），依赖图无法整体升到 9。按既有「已验证无法通过依赖升级消除」的处置方式加入 ignore 并注明复查条件。
 
+### 重构
+
+#### 清理前端 lint 告警
+
+- **清理 32 条前端 ESLint 告警**（[splash.js](public/splash.js) / [Select.vue](src/components/common/Select.vue) / [SkinModel3D.vue](src/components/common/SkinModel3D.vue) / [SubTabBar.vue](src/components/common/SubTabBar.vue) / [SearchBar.vue](src/components/community/SearchBar.vue) / [AdvanceFieldsPanel.vue](src/components/version-settings/AdvanceFieldsPanel.vue) / [useRedStonePanel.ts](src/composables/useRedStonePanel.ts) / [useSkinOperations.ts](src/composables/useSkinOperations.ts) / [SystemMonitorPanel.vue](src/plugins/system-monitor/SystemMonitorPanel.vue) / [java.ts](src/stores/java.ts) / [redstone.ts](src/types/redstone.ts) / [checkTauriEnv.ts](src/utils/checkTauriEnv.ts) / [generatorWorker.ts](src/utils/seedmap/generatorWorker.ts) / [wasm-bindings.ts](src/utils/seedmap/wasm-bindings.ts) / [workerPool.ts](src/utils/seedmap/workerPool.ts) / [Versions.vue](src/views/Versions.vue) / [RecipeSlotHotspot.vue](src/views/tools/creation/recipe-generator/RecipeSlotHotspot.vue) / [useSeedMap.ts](src/views/tools/data/useSeedMap.ts) / [SetupTab.vue](src/views/version-settings/SetupTab.vue) / [vite-env.d.ts](src/vite-env.d.ts)）：
+  - 类型收紧：`wasm-bindings.ts` 的 Emscripten 导出对象由 `any` 改为按实际调用成员声明的 `CubiomesModule` 接口；`Versions.vue` / `SubTabBar.vue` 的图标由 `any` 改为 Vue `Component`；`workerPool.ts` 的 `JobResolver<any>` 改为 `JobResolver<unknown>`；`vite-env.d.ts` 的 SFC 垫片由 `DefineComponent<{}, {}, any>` 改为 `DefineComponent<object, object, unknown>`；`checkTauriEnv.ts` 改用 `'__TAURI_INTERNALS__' in window`；`generatorWorker.ts` 的 `self.postMessage` 按 Worker 作用域最小结构收窄。
+  - 无副作用表达式：`useSkinOperations.ts` 7 处 `dev && console.log(...)` 改为 `if (dev) ...`；`useSeedMap.ts` 的三元表达式副作用改为 `if / else`。
+  - 未使用变量：5 处 `catch (e)` 改为可选捕获绑定（splash.js、SearchBar.vue、useRedStonePanel.ts、SystemMonitorPanel.vue、java.ts）。
+  - 组件 Props：`SkinModel3D.vue` 的 `skinUrl`、`RecipeSlotHotspot.vue` 的 `display` / `barrierDisplay` 声明为可选，与 `withDefaults` 默认值一致。
+  - 空接口：`redstone.ts` 的 `RedStoneStopResult` 改为 `Record<string, never>`。
+  - `Select.vue` 的选项索引签名保留 `any`（6 个调用方的 `#option` 插槽依赖附加字段），补注释与 `eslint-disable-next-line` 说明取舍。
+
 ### 变更
 
 - **修正配方资源来源标注**（[sources.json](src/utils/recipe-generator/assets/sources.json) / [generate.mjs](scripts/generate-recipe-assets/generate.mjs) / [resources.ts](src/utils/recipe-generator/resources.ts)）：原先统一标注为「MIT 许可 / Mojang 官方数据源」，但 MIT 仅覆盖上游仓库（PrismarineJS/minecraft-data、PrismarineJS/minecraft-assets、destruc7i0n/crafting）的**代码**，并不覆盖其中的纹理像素与语言文件——这些内容的版权归 Mojang Studios。现改为分项标注：代码与数据表标 MIT，纹理、皮肤、语言文件标为 Minecraft 游戏资产并注明权利归属；生成脚本同步修改，避免重新生成时回退。

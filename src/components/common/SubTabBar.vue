@@ -12,12 +12,13 @@
  * <SubTabBar v-model="activeTab" :tabs="tabs" sticky />
  */
 import { ref, nextTick, watch, onMounted } from 'vue'
+import type { Component } from 'vue'
 import { useTabPersistence } from '@/composables/useTabPersistence'
 
 interface Tab {
   id: string
   label: string
-  icon?: any
+  icon?: Component
 }
 
 interface Props {

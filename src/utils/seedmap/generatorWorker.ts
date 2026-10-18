@@ -15,8 +15,13 @@ import { findStructures, findSpecials, findBiomeAtPoint } from './structure-sear
 const queue: MainToWorkerMsg[] = []
 let draining = false
 
+/** Worker 作用域（tsconfig 未启用 webworker lib，按最小结构收窄） */
+const workerScope = self as unknown as {
+  postMessage: (message: WorkerToMainMsg, transfer: Transferable[]) => void
+}
+
 function post(msg: WorkerToMainMsg, transfer: Transferable[] = []) {
-  ;(self as any).postMessage(msg, transfer)
+  workerScope.postMessage(msg, transfer)
 }
 
 function postError(jobId: string, err: unknown) {

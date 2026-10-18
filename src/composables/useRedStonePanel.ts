@@ -401,7 +401,7 @@ export function useRedStonePanel() {
       errorMessage.value = ''
       pollStart = Date.now()
       startPolling()
-    } catch (e) {
+    } catch {
       phase.value = 'idle'
     }
   }

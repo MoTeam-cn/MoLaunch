@@ -7,7 +7,7 @@
 
 /** 检测当前是否运行在 Tauri WebView 环境中 */
 export function isTauriEnv(): boolean {
-  return !!(window as any).__TAURI_INTERNALS__
+  return '__TAURI_INTERNALS__' in window
 }
 
 /**

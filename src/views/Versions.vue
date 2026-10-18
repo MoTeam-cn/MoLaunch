@@ -1,6 +1,7 @@
 <script setup lang="ts">
 /** 下载页面 */
 import { ref, computed, watch, onMounted, onUnmounted, defineAsyncComponent } from 'vue'
+import type { Component } from 'vue'
 import { useVersionStore } from '@/stores/version'
 import { useVersionSettings } from '@/composables/useVersionSettings'
 import { backToTopEnabled } from '@/composables/useFloatingButtonState'
@@ -36,7 +37,7 @@ const activeCategory = ref('vanilla')
 const selectedVersion = ref<string | null>(null)
 
 // 官方下载分类（仅保留原版游戏；模组加载器/整合包已由社区资源替代）
-const communityCategories: { id: string; type: ResourceType; label: string; icon: any }[] = [
+const communityCategories: { id: string; type: ResourceType; label: string; icon: Component }[] = [
   { id: 'community:Mod', type: 'Mod', label: 'Mod', icon: PuzzlePieceIcon },
   { id: 'community:ModPack', type: 'ModPack', label: '整合包', icon: ArchiveBoxIcon },
   { id: 'community:ResourcePack', type: 'ResourcePack', label: '资源包', icon: SwatchIcon },

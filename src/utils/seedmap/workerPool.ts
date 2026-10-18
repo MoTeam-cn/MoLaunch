@@ -24,7 +24,7 @@ interface WorkerHandle {
   terminated: boolean
   seedReady: boolean
   /** pending 任务 Map<jobId, resolver> */
-  pending: Map<string, JobResolver<any>>
+  pending: Map<string, JobResolver<unknown>>
   /** prepare_seed 任务的 resolver/rejecter（无 jobId，单独存放） */
   seedResolve: (() => void) | null
   seedReject: ((err: Error) => void) | null

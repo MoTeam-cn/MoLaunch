@@ -57,7 +57,7 @@ async function savePersonalField(field: AdvanceField['field'], value: string, na
     const update = { [field]: value } as tauri.PersonalizationUpdate
     await tauri.updateVersionPersonalization(selectedId.value, update)
     if (personalization.value) {
-      (personalization.value as any)[field] = value
+      personalization.value[field] = value
     }
     toastSuccess(`${name}已保存`)
   } catch (e) { toastError('保存失败：' + String(e)) }

@@ -45,8 +45,8 @@ export interface RedStoneStatusResult {
   created: string | null
 }
 
-/** `redstone_stop` 返回 */
-export interface RedStoneStopResult {}
+/** `redstone_stop` 返回（后端无业务字段，仅表示操作完成） */
+export type RedStoneStopResult = Record<string, never>
 
 /** 日志文件条目（`redstone_log_files` 返回项，日志路径 `<temp>/MoLaunch/hongshi/logs/`） */
 export interface RedStoneLogFileInfo {

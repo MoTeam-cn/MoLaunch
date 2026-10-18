@@ -25,7 +25,7 @@ import {
 
 const props = withDefaults(defineProps<{
   /** 皮肤 PNG dataURL（data:image/png;base64,...） */
-  skinUrl: string | null
+  skinUrl?: string | null
   /** 披风 PNG dataURL，null 表示无披风 */
   capeUrl?: string | null
   /** 皮肤模型：'classic' Steve | 'slim' Alex（skinview3d 也会自动检测） */

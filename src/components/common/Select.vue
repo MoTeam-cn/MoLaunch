@@ -22,6 +22,9 @@ import { ref, computed, onMounted, onUnmounted } from 'vue'
 interface SelectOption {
   label: string
   value: string | number
+  // 使用方可附加任意字段（图标、副标题、延迟等），经 #option 插槽透出；
+  // 泛型化需 6 个调用方模板逐个收窄，收益低于成本，故保留这一处显式 any。
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   [key: string]: any
 }
 

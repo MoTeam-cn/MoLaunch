@@ -115,7 +115,7 @@ onMounted(() => {
     try {
       memory.value = await pluginSdk.getSystemMemory()
       runningPid.value = await pluginSdk.getRunningGamePid()
-    } catch (e) {
+    } catch {
       // 轮询失败静默
     }
   }, 3000)

@@ -14,10 +14,10 @@ withDefaults(
   defineProps<{
     slotId: RecipeSlot
     box: RecipeLayoutSlotBox
-    display: Display | null
+    display?: Display | null
     disabled: boolean
     editing: boolean
-    barrierDisplay: Display | null
+    barrierDisplay?: Display | null
     atlasUrl: string
     atlas: AtlasLayout
     iconSize: number
