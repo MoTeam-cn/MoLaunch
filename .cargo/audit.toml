@@ -5,6 +5,7 @@
 # - proc-macro-error（2024-0370）：glib-macros 升级消除依赖后移除
 # - unic-*（2025-0075/0080/0081/0098/0100）：urlpattern 升级后移除
 # - rsa（2023-0071）：上游发布修复版本后移除
+# - zip（2026-0367/0368/0369）：tauri-plugin-updater 解除 zip ^4 锁定后可升 9.0.0 后移除
 
 # RUSTSEC-2023-0071 rsa 0.9.10（Marvin Attack）：项目仅用 RsaPublicKey 做公钥
 # OAEP 加密（minecraft/online/crypto.rs），从不加载私钥，攻击面不可达；Patched n/a。
@@ -18,6 +19,12 @@
 # RUSTSEC-2024-0370 proc-macro-error 1.0.4：glib-macros 引入，无维护、无更新版本。
 # RUSTSEC-2025-0075/0080/0081/0098/0100 unic-* 0.9.0（char-property/char-range/common/
 # ucd-ident/ucd-version）：tauri-utils 2.9.3 锁定 urlpattern 0.3.0 引入，均无更新版本。
+# RUSTSEC-2026-0367/0368/0369 zip 4.6.1：三条均只在 ZipArchive::extract() /
+# ZipStreamReader::extract() 的自动落盘路径上触发（SUID/SGID 位保留、符号链接越界写、
+# 经符号链接施加权限）。本项目从不调用 extract，统一走 utils::archive::extract_zip_safely
+# 逐条 by_index 自写普通文件：跳过 symlink 条目、ensure_safe_relative_path 防 Zip Slip、
+# 不应用 unix_mode，触发面不可达。修复版本为 zip 9.0.0，而 tauri-plugin-updater
+# 2.13.3 / 2.14.0 仍锁 zip ^4（Windows 更新包解压），依赖图无法整体升到 9；待其放开后移除。
 [advisories]
 ignore = [
     "RUSTSEC-2023-0071",
@@ -39,4 +46,7 @@ ignore = [
     "RUSTSEC-2025-0081",
     "RUSTSEC-2025-0098",
     "RUSTSEC-2025-0100",
+    "RUSTSEC-2026-0367",
+    "RUSTSEC-2026-0368",
+    "RUSTSEC-2026-0369",
 ]

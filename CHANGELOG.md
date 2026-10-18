@@ -25,6 +25,10 @@
 
   四者均由 `rustls 0.23.46` 修复。`rustls` 由 `0.23.45` 升至 `0.23.46`（该版本依赖集与前一版完全一致，仅版本号与校验和变化）；本地以 cargo-audit 0.22.0 配合 RustSec advisory-db 复核，结果由「4 vulnerabilities found」变为 0 项。
 
+#### 修复 CI 依赖安全审计失败（zip 符号链接与权限类公告）
+
+- **修复 CI 依赖安全审计失败**（[audit.toml](.cargo/audit.toml)）：RustSec 新收录 RUSTSEC-2026-0367 / 0368 / 0369（`zip 4.6.1` 的 `extract()` 系列：SUID/SGID 位保留、符号链接越界写、经符号链接施加权限），CI 的「Security audit (cargo)」步骤因此失败。三条公告的触发点全部落在 `ZipArchive::extract()` / `ZipStreamReader::extract()` 的自动落盘路径，而本项目从不调用 `extract`——统一走 `extract_zip_safely` 逐条 `by_index` 自写普通文件（跳过 symlink 条目、`ensure_safe_relative_path` 防 Zip Slip、不应用 `unix_mode`），触发面不可达；修复版本为 `zip 9.0.0`，而 `tauri-plugin-updater` 2.13.3 / 2.14.0 仍锁定 `zip ^4`（Windows 更新包解压），依赖图无法整体升到 9。按既有「已验证无法通过依赖升级消除」的处置方式加入 ignore 并注明复查条件。
+
 ### 变更
 
 - **修正配方资源来源标注**（[sources.json](src/utils/recipe-generator/assets/sources.json) / [generate.mjs](scripts/generate-recipe-assets/generate.mjs) / [resources.ts](src/utils/recipe-generator/resources.ts)）：原先统一标注为「MIT 许可 / Mojang 官方数据源」，但 MIT 仅覆盖上游仓库（PrismarineJS/minecraft-data、PrismarineJS/minecraft-assets、destruc7i0n/crafting）的**代码**，并不覆盖其中的纹理像素与语言文件——这些内容的版权归 Mojang Studios。现改为分项标注：代码与数据表标 MIT，纹理、皮肤、语言文件标为 Minecraft 游戏资产并注明权利归属；生成脚本同步修改，避免重新生成时回退。
