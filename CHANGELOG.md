@@ -29,6 +29,12 @@
 
 - **修正配方资源来源标注**（[sources.json](src/utils/recipe-generator/assets/sources.json) / [generate.mjs](scripts/generate-recipe-assets/generate.mjs) / [resources.ts](src/utils/recipe-generator/resources.ts)）：原先统一标注为「MIT 许可 / Mojang 官方数据源」，但 MIT 仅覆盖上游仓库（PrismarineJS/minecraft-data、PrismarineJS/minecraft-assets、destruc7i0n/crafting）的**代码**，并不覆盖其中的纹理像素与语言文件——这些内容的版权归 Mojang Studios。现改为分项标注：代码与数据表标 MIT，纹理、皮肤、语言文件标为 Minecraft 游戏资产并注明权利归属；生成脚本同步修改，避免重新生成时回退。
 
+### 移除
+
+#### 移除 Modrinth CDN 直连开关
+
+- **移除 Modrinth CDN 直连开关**（[cdn.rs](src-tauri/src/minecraft/sources/cdn.rs) / [constants.rs](src-tauri/src/minecraft/sources/constants.rs) / [mod.rs](src-tauri/src/minecraft/sources/mod.rs) / [models.rs](src-tauri/src/state/config/models.rs) / [defaults.rs](src-tauri/src/state/config/defaults.rs) / [load.rs](src-tauri/src/config/load.rs) / [save.rs](src-tauri/src/config/save.rs) / [patch.rs](src-tauri/src/commands/system/apply_config/types/patch.rs) / [snapshot.rs](src-tauri/src/commands/system/apply_config/types/snapshot.rs) / [entry.rs](src-tauri/src/commands/system/apply_config/types/entry.rs) / [fields.rs](src-tauri/src/commands/system/apply_config/apply/fields.rs) / [config.ts](src/utils/api/config.ts) / [ExperimentalTab.vue](src/views/settings/developer/ExperimentalTab.vue) / [config.ini](src-tauri/resources/defaults/config.ini)）：Modrinth 已不再把 `cdn.modrinth.com` 302 跳转到 `cdn-alt.modrinth.com`，所有下载请求直接落在 `cdn.modrinth.com`，该开关的规避前提已消失，保留只会让用户在两个等价域名间做无意义选择。删除 `rewrite_mr_cdn` 函数、`MR_CDN_RAW` 常量与 `modrinth_cdn_raw_enabled` 配置项（含 INI 读写、apply_config 补丁/快照、前端类型与开发者页开关行）；CDN 镜像替换逻辑本身不变（`cdn.modrinth.com` → `cdn-modrinth.mocdn.net` 仍由 source 策略控制）。旧配置文件中的同名键不再读取，下次保存配置时自然淘汰。
+
 ## [0.3.8-rc.5] - 2026-10-13
 
 ### 修复

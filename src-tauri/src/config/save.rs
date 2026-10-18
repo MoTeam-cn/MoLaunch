@@ -82,15 +82,6 @@ pub fn save_config(config: &AppConfig) -> Result<(), String> {
         "mirror_mode",
         &config.download.mirror_mode.to_string(),
     );
-    ini.set(
-        "Download",
-        "modrinth_cdn_raw_enabled",
-        if config.download.modrinth_cdn_raw_enabled {
-            "true"
-        } else {
-            "false"
-        },
-    );
 
     // Mirror
     if let Some(ref url) = config.download.mirror_url {

@@ -30,9 +30,6 @@ pub struct DownloadSnapshot {
     pub max_threads: u32,
     #[serde(rename = "chunkCount")]
     pub chunk_count: u32,
-    /// Modrinth CDN 直连开关（开发者模式可见，默认 false）
-    #[serde(rename = "modrinthCdnRawEnabled")]
-    pub modrinth_cdn_raw_enabled: bool,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]

@@ -95,10 +95,6 @@ pub(super) fn apply_download(config: &mut crate::state::AppConfig, patch: &Confi
         log_info!("[Config] mirror_url = {:?}", url_opt);
         config.download.mirror_url = url_opt.clone();
     }
-    if let Some(v) = patch.download.modrinth_cdn_raw_enabled {
-        log_info!("[Config] modrinth_cdn_raw_enabled = {}", v);
-        config.download.modrinth_cdn_raw_enabled = v;
-    }
 }
 
 /// 内存域：memory.mode（auto 联动清零）/ memory.min / memory.max

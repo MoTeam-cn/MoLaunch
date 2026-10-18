@@ -25,8 +25,6 @@ pub struct DownloadConfig {
     pub mirror_url_meta: Option<String>,
     pub mirror_url_download: Option<String>,
     pub mirror_mode: u32,
-    #[serde(default)]
-    pub modrinth_cdn_raw_enabled: bool,
 }
 
 /// 内存配置

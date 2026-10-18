@@ -83,10 +83,6 @@ pub fn load_config() -> Result<Option<AppConfig>, String> {
     if let Some(mode) = config.get("Download", "mirror_mode") {
         app_config.download.mirror_mode = mode.parse().unwrap_or(app_config.download.mirror_mode);
     }
-    app_config.download.modrinth_cdn_raw_enabled = config
-        .get("Download", "modrinth_cdn_raw_enabled")
-        .as_deref()
-        == Some("true");
 
     // Mirror
     app_config.download.mirror_url = config.get("Mirror", "url");

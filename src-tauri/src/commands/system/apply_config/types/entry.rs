@@ -69,7 +69,6 @@ pub fn build_snapshot(
             max_speed: config.download.max_speed,
             max_threads: config.download.max_threads,
             chunk_count: config.download.chunk_count,
-            modrinth_cdn_raw_enabled: config.download.modrinth_cdn_raw_enabled,
         },
         memory: MemorySnapshot {
             mode: config.memory.mode.clone(),

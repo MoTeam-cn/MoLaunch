@@ -11,7 +11,6 @@ mod paths;
 // 公开 API re-export（外部调用方通过 sources::xxx 访问）
 pub use cdn::{
     authlib_injector_meta_url_mirror, authlib_injector_meta_url_official, cdn_urls, replace_cdn,
-    rewrite_mr_cdn,
 };
 pub use constants::{
     AUTHLIB_INJECTOR_BMCLAPI, AUTHLIB_INJECTOR_LATEST_PATH, AUTHLIB_INJECTOR_OFFICIAL,

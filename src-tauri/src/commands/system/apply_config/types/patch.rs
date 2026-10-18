@@ -31,9 +31,6 @@ pub struct DownloadPatch {
     /// 双层 Option：外层 Some 表示"要更新此字段"，内层 None 表示"清空"
     #[serde(rename = "mirrorUrl")]
     pub mirror_url: Option<Option<String>>,
-    /// Modrinth CDN 直连开关（开发者模式可见，默认 false）
-    #[serde(rename = "modrinthCdnRawEnabled")]
-    pub modrinth_cdn_raw_enabled: Option<bool>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]

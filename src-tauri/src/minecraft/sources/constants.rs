@@ -62,14 +62,8 @@ pub const LIBRARY_REPLACEMENTS: &[(&str, &str)] = &[(
 
 // ── 社区资源 CDN 镜像（CurseForge + Modrinth 统一由 source 策略控制）──
 
-/// Modrinth CDN 原始域名（官方 CDN，对中国大陆用户会跳转到慢速 cdn-alt）
+/// Modrinth CDN 官方域名
 pub(super) const MR_CDN_OFFICIAL: &str = "https://cdn.modrinth.com";
-
-/// Modrinth CDN 直连域名（绕过 cdn-alt 跳转，速度更快）
-/// 路径结构与官方 CDN 完全一致，仅替换域名即可
-/// 示例：https://cdn.modrinth.com/data/xxx/versions/yyy/zzz.mrpack
-///    → https://cdn-raw.modrinth.com/data/xxx/versions/yyy/zzz.mrpack
-pub(super) const MR_CDN_RAW: &str = "https://cdn-raw.modrinth.com";
 
 /// Modrinth 自建 CDN 镜像域名（mocdn.net）
 /// 路径结构与官方 CDN 完全一致，仅替换域名即可
@@ -91,5 +85,5 @@ pub const AUTHLIB_INJECTOR_BMCLAPI: &str =
 /// CurseForge CDN 官方域名列表
 pub const CF_CDN_DOMAINS: &[&str] = &["https://edge.forgecdn.net", "https://media.forgecdn.net"];
 
-/// Modrinth CDN 官方域名列表（含原始域名和直连域名，均需镜像替换）
-pub const MR_CDN_DOMAINS: &[&str] = &[MR_CDN_OFFICIAL, MR_CDN_RAW];
+/// Modrinth CDN 官方域名列表（均需镜像替换）
+pub const MR_CDN_DOMAINS: &[&str] = &[MR_CDN_OFFICIAL];
