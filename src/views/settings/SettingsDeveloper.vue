@@ -4,7 +4,7 @@
  *
  * 顶部子菜单分为：实验性功能 / DevTools / 证书与安全 / 日志 / 存储 / 系统信息 / 深链接 /
  * IPC 调试器 / 启动参数预览，九个子页签已拆分到 ./developer/ 目录：
- * - 实验性功能：Modrinth CDN 直连 → ExperimentalTab
+ * - 实验性功能：更新检测分支切换 → ExperimentalTab
  * - DevTools：WebView2 开发者工具调出/关闭 + 测试版水印隐藏解锁 → DevToolsTab
  * - 证书与安全：TLS 信任源 + 忽略 TLS + 自定义证书管理 → CertsTab
  * - 日志：HTTP 请求日志 + 应用日志 → LogsTab

@@ -30,8 +30,6 @@ export interface ConfigSnapshot {
   maxDownloadSpeed: number
   maxDownloadThreads: number
   chunkCount: number
-  /** Modrinth CDN 直连开关（开发者模式可见，默认 false） */
-  modrinthCdnRawEnabled: boolean
   // 内存
   memoryMode: string
   minMemory: number
@@ -124,8 +122,6 @@ export interface ConfigPatch {
   maxDownloadThreads?: number
   chunkCount?: number
   mirrorUrl?: string | null                               // null 表示清空
-  /** Modrinth CDN 直连开关（开发者模式可见，默认 false） */
-  modrinthCdnRawEnabled?: boolean
   // 内存
   memoryMode?: string                                      // "auto" / "custom"
   minMemory?: number
