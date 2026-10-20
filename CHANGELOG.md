@@ -18,6 +18,10 @@
 
 - **修复 FRP 日志提取的隧道访问链接在首个点处被截断**（[frp-tunnel-link.ts](src/utils/frp-tunnel-link.ts) / [frp-tunnel-link.test.ts](src/utils/__tests__/frp-tunnel-link.test.ts) 新增）：原实现用 `[^\s,.;，。；]*` 匹配链接，字符类把 `.` 一并排除，厂商日志里的 `http://qwq.i-cdn.xyz` 被截成 `http://qwq`，面板底部与复制按钮拿到的都是残缺地址。改为「协议链接整体匹配 + 只在结果尾部剥离句读标点」，域名、端口、路径、查询参数完整保留；中文厂商提示语改为先定位 `您可通过` 再在其后取链接，同时支持 `http://host`（无端口）与裸 `host:port` 两种形态。另在匹配前剥离 ANSI 颜色码与 `<client/control.go:198>` 这类源码位置，避免把源码文件名当成访问地址。新增 9 个单测覆盖上述场景。
 
+#### 联机大厅开关：封存项改为引导开启，后端补开关守卫
+
+- **未启用联机大厅时不再就地开启开关**（[Online.vue](src/views/Online.vue)）：此前点击封存的「联机大厅 / 搭桥联机」会弹确认框并当场把开关打开，看起来仍是一次点击就能进；现改为只提示「请先在设置 → 联机页开启」并询问是否前往设置页，取消则停留在原分类。
+- **后端补开关同源守卫**（[registry.rs](src-tauri/src/commands/online/manager/signaling_manager/registry.rs) / [room_actions.rs](src-tauri/src/commands/online/manager/signaling_manager/room_actions.rs) / [lobby_actions.rs](src-tauri/src/commands/online/manager/signaling_manager/lobby_actions.rs)）：新增 `require_lobby_enabled`，`room_create` / `room_join` / `lobby_list_packages` / `lobby_list_rooms` 在 `online.lobby_enabled = false` 时直接返回统一错误文案，旧版客户端或绕过 UI 直接调用 IPC 同样被拒；`room_close` / `room_heartbeat` / `room_get` 不拦，避免关闭开关后卡在房间内无法退出。
 #### 修复 Windows 便携版更新器弹出控制台窗口
 
 - **修复自动更新时弹出黑色控制台窗口**（[main.rs](src-tauri/updater/src/main.rs) / [platform.rs](src-tauri/updater/src/platform.rs) / [exec.rs](src-tauri/src/minecraft/system/shell/exec.rs)）：
