@@ -60,6 +60,15 @@ static DISPATCHER: Lazy<Dispatcher> = Lazy::new(|| {
         }),
     );
 
+    // 地区判定（机器环境 + 网络出口）：前端下载页据此动态限制中国大陆地区的下载入口
+    d.register(
+        "get_region_info",
+        handler!(_state, _app, _params, {
+            let r = crate::utils::region::detect().await;
+            serde_json::to_value(r).map_err(|e| e.to_string())
+        }),
+    );
+
     d.register(
         "get_project_license",
         handler!(_state, _app, _params, {

@@ -64,6 +64,8 @@ static DISPATCHER: Lazy<Dispatcher> = Lazy::new(|| {
         handler!(state, app, params, {
             let p: VersionIdParams =
                 serde_json::from_value(params).map_err(|e| format!("参数解析失败: {}", e))?;
+            // 地区限制：中国大陆机器 + 中国大陆网络出口时拒绝下载游戏本体
+            crate::utils::region::ensure_download_allowed().await?;
             download::download_version(&app, &state, p.version_id).await?;
             Ok(serde_json::Value::Null)
         }),
@@ -73,6 +75,8 @@ static DISPATCHER: Lazy<Dispatcher> = Lazy::new(|| {
         handler!(state, app, params, {
             let p: InstallMergedParams =
                 serde_json::from_value(params).map_err(|e| format!("参数解析失败: {}", e))?;
+            // 地区限制：中国大陆机器 + 中国大陆网络出口时拒绝安装游戏本体
+            crate::utils::region::ensure_download_allowed().await?;
             install::install_merged(
                 &app,
                 &state,

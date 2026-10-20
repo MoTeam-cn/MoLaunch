@@ -195,6 +195,9 @@ pub fn run() {
                 migrations::crypto_v3::migrate(&migrate_sdk).await;
             });
 
+            // 地区判定预热：中国大陆机器在后台先判定网络出口，避免首次打开下载页时等待
+            utils::region::prefetch();
+
             // 创建系统托盘（右键菜单：打开主页面 / 检查更新 / 退出）
             if let Err(e) = tray::setup_tray(app.handle()) {
                 log_error!("[Tray] 托盘创建失败: {}", e);

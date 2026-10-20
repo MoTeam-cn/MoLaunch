@@ -20,6 +20,7 @@ pub mod markdown_table;
 pub mod net;
 pub mod path;
 pub mod probe;
+pub mod region;
 pub mod sdk_crypto;
 pub mod sqlite;
 pub mod update_sign;
