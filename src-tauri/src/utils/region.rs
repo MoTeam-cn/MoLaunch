@@ -1,17 +1,20 @@
-//! 中国大陆地区判定：机器环境层 + 网络出口层。
+//! 下载限制判定：地区检测（机器环境层 + 网络出口层）+ 官网下发的策略清单。
 //!
-//! 机器层同步判定（UTC+8 时区 + 系统区域/GeoID），命中后再按网络出口国家确认；
-//! 网络层请求失败按"受限"处理（fail-closed），结果进程内缓存并在启动时预热。
+//! 判定顺序：策略总开关 → 地区检测开关 → 受限地区列表 → 网络出口国家。
+//! 策略由 `utils::download_policy` 从官网拉取（拉取失败按不限制处理，fail-open）；
+//! 网络出口判定失败按「受限」处理（fail-closed），结果进程内缓存并在启动时预热。
 
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::time::Duration;
 
 use once_cell::sync::Lazy;
 use serde::{Deserialize, Serialize};
 
+use super::download_policy::{self, DownloadPolicy, PolicyNotice};
 use crate::{log_info, log_warn};
 
-/// 中国大陆下载限制提示（后端拒绝与前端展示共用同一句文案）
-pub const RESTRICTED_MESSAGE: &str =
+/// 策略未下发提示文案时的兜底（后端拒绝下载时使用）
+pub const FALLBACK_NOTICE_TEXT: &str =
     "受最近某事件影响，MoLaunch 启动器暂不向中国用户提供 MC 下载功能，恕我无能为力... qwq...";
 
 /// 中国大陆 UTC 偏移（秒）
@@ -30,18 +33,27 @@ const WINDOWS_CHINA_GEO_NATION: u32 = 45;
 pub struct RegionInfo {
     /// 机器环境是否位于中国大陆（时区 + 系统区域）
     pub is_china_mainland_machine: bool,
-    /// 网络出口是否位于中国大陆（仅机器层命中时判定）
+    /// 网络出口是否位于中国大陆
     pub is_china_mainland_network: bool,
     /// 网络出口国家代码（未知为 None）
     pub country_code: Option<String>,
-    /// 是否命中下载限制（机器层与网络层同时命中）
+    /// 最终是否禁用下载（已扣除开发者模式临时绕过）
     pub is_restricted: bool,
+    /// 当前策略的受限地区列表（归一化后）
+    pub blocked_regions: Vec<String>,
+    /// 官网下发的提示文案
+    pub notice: PolicyNotice,
+    /// 策略是否允许开发者模式绕过
+    pub allow_developer_mode_bypass: bool,
+    /// 启动器当前是否处于开发者模式
+    pub developer_mode: bool,
+    /// 是否已通过开发者模式临时关闭限制（仅本次运行有效）
+    pub bypassed: bool,
 }
 
 /// 网络层判定结果（进程内缓存）
 #[derive(Debug, Clone)]
 struct NetworkVerdict {
-    restricted: bool,
     country_code: Option<String>,
 }
 
@@ -52,51 +64,120 @@ static MACHINE_IS_CHINA_MAINLAND: Lazy<bool> = Lazy::new(check_machine_is_china_
 static NETWORK_VERDICT: Lazy<tokio::sync::Mutex<Option<NetworkVerdict>>> =
     Lazy::new(|| tokio::sync::Mutex::new(None));
 
+/// 开发者模式临时关闭限制（仅内存，重启后按清单重新生效）
+static BYPASS: AtomicBool = AtomicBool::new(false);
+
 /// 机器环境是否位于中国大陆
 pub fn is_china_mainland_machine() -> bool {
     *MACHINE_IS_CHINA_MAINLAND
 }
 
-/// 完整地区判定（含网络层；非中国大陆机器直接短路，不发网络请求）
+/// 完整地区判定（含网络层；不需要检测地区时不发起任何网络请求）
 pub async fn detect() -> RegionInfo {
-    if !is_china_mainland_machine() {
+    let policy = download_policy::current().await;
+    let blocked_regions = policy.blocked_regions();
+    let developer_mode = developer_mode_enabled();
+    let allow_bypass = policy.download.allow_developer_mode_bypass;
+    let bypassed = allow_bypass && BYPASS.load(Ordering::Relaxed);
+    let machine = is_china_mainland_machine();
+
+    // 总开关关闭 / 地区检测关闭 / 受限地区为空 → 不检测、不禁用
+    if !policy.region_check_active() {
+        return RegionInfo {
+            is_china_mainland_machine: machine,
+            is_china_mainland_network: false,
+            country_code: None,
+            is_restricted: false,
+            blocked_regions,
+            notice: policy.notice,
+            allow_developer_mode_bypass: allow_bypass,
+            developer_mode,
+            bypassed,
+        };
+    }
+
+    // 机器层快路径：受限地区只有 CN 且本机不是中国大陆环境 → 直接放行（不发请求）
+    if only_china_blocked(&blocked_regions) && !machine {
         return RegionInfo {
             is_china_mainland_machine: false,
             is_china_mainland_network: false,
             country_code: None,
             is_restricted: false,
+            blocked_regions,
+            notice: policy.notice,
+            allow_developer_mode_bypass: allow_bypass,
+            developer_mode,
+            bypassed,
         };
     }
 
     let verdict = network_verdict().await;
+    let country_code = verdict.country_code;
+    let in_blocked_region = restricted_by_country(&policy, country_code.as_deref());
+    let restricted = in_blocked_region && policy.download.disabled_for_blocked_regions && !bypassed;
+    let is_china_network = country_code
+        .as_deref()
+        .map(|code| code.eq_ignore_ascii_case("CN"))
+        .unwrap_or(false);
+
     RegionInfo {
-        is_china_mainland_machine: true,
-        is_china_mainland_network: verdict.restricted,
-        country_code: verdict.country_code,
-        is_restricted: verdict.restricted,
+        is_china_mainland_machine: machine,
+        is_china_mainland_network: is_china_network,
+        country_code,
+        is_restricted: restricted,
+        blocked_regions,
+        notice: policy.notice,
+        allow_developer_mode_bypass: allow_bypass,
+        developer_mode,
+        bypassed,
     }
 }
 
-/// 下载类操作守卫：命中限制时返回统一错误文案
+/// 下载类操作守卫：命中限制时返回官网下发的提示文案
 pub async fn ensure_download_allowed() -> Result<(), String> {
-    if detect().await.is_restricted {
-        Err(RESTRICTED_MESSAGE.to_string())
+    let info = detect().await;
+    if !info.is_restricted {
+        return Ok(());
+    }
+    if info.notice.text.trim().is_empty() {
+        Err(FALLBACK_NOTICE_TEXT.to_string())
     } else {
-        Ok(())
+        Err(info.notice.text)
     }
 }
 
-/// 启动预热：中国大陆机器在后台先判定网络出口，避免首次打开下载页阻塞
-pub fn prefetch() {
-    if !is_china_mainland_machine() {
-        return;
+/// 开发者模式临时关闭/恢复下载限制
+///
+/// 仅当策略允许（`allowDeveloperModeBypass`）且启动器处于开发者模式时可用；
+/// 状态只存内存，重启后按清单重新生效。
+pub async fn set_bypass(enabled: bool) -> Result<RegionInfo, String> {
+    let policy = download_policy::current().await;
+    if enabled {
+        if !policy.download.allow_developer_mode_bypass {
+            return Err("当前下载策略不允许开发者模式绕过限制".to_string());
+        }
+        if !developer_mode_enabled() {
+            return Err("需要先开启开发者模式才能临时关闭下载限制".to_string());
+        }
     }
+    BYPASS.store(enabled, Ordering::Relaxed);
+    log_info!(
+        "[Region] 开发者模式临时{}下载限制",
+        if enabled { "关闭" } else { "恢复" }
+    );
+    Ok(detect().await)
+}
+
+/// 启动预热：先拉取策略，再按策略判定网络出口，避免首次打开下载页阻塞
+pub fn prefetch() {
     tauri::async_runtime::spawn(async {
+        download_policy::refresh_with_cache().await;
         let info = detect().await;
         log_info!(
-            "[Region] 启动预判完成: country={:?}, restricted={}",
+            "[Region] 启动预判完成: country={:?}, restricted={}, blocked={:?}",
             info.country_code,
-            info.is_restricted
+            info.is_restricted,
+            info.blocked_regions
         );
     });
 }
@@ -119,39 +200,38 @@ struct IpInfoResponse {
     country: Option<String>,
 }
 
-/// 请求网络出口地区；任何失败都按受限处理（fail-closed）
+/// 请求网络出口地区；失败时 country 为 None（由判定方按 fail-closed 处理）
 async fn fetch_network_verdict() -> NetworkVerdict {
     log_info!("[Region] 正在判定网络出口地区");
     let client = match reqwest::Client::builder().timeout(NETWORK_TIMEOUT).build() {
         Ok(client) => client,
         Err(e) => {
-            log_warn!("[Region] 判定客户端创建失败，按受限处理: {}", e);
-            return restricted_verdict();
+            log_warn!("[Region] 判定客户端创建失败: {}", e);
+            return NetworkVerdict { country_code: None };
         }
     };
 
     let response = match client.get(IPINFO_URL).send().await {
         Ok(response) => response,
         Err(e) => {
-            log_warn!("[Region] 网络出口判定失败，按受限处理: {}", e);
-            return restricted_verdict();
+            log_warn!("[Region] 网络出口判定失败: {}", e);
+            return NetworkVerdict { country_code: None };
         }
     };
 
-    // 限流（429）等非成功状态拿不到国家信息，按受限处理
     if !response.status().is_success() {
         log_warn!(
             "[Region] 网络出口判定返回状态 {}，按受限处理",
             response.status()
         );
-        return restricted_verdict();
+        return NetworkVerdict { country_code: None };
     }
 
     let body: IpInfoResponse = match response.json().await {
         Ok(body) => body,
         Err(e) => {
-            log_warn!("[Region] 网络出口响应解析失败，按受限处理: {}", e);
-            return restricted_verdict();
+            log_warn!("[Region] 网络出口响应解析失败: {}", e);
+            return NetworkVerdict { country_code: None };
         }
     };
 
@@ -160,33 +240,29 @@ async fn fetch_network_verdict() -> NetworkVerdict {
         .as_deref()
         .map(|code| code.trim().to_uppercase())
         .filter(|code| !code.is_empty());
-    let restricted = restricted_from_body(country_code.as_deref());
-    log_info!(
-        "[Region] 网络出口判定完成: country={:?}, restricted={}",
-        country_code,
-        restricted
-    );
-
-    NetworkVerdict {
-        restricted,
-        country_code,
-    }
+    log_info!("[Region] 网络出口判定完成: country={:?}", country_code);
+    NetworkVerdict { country_code }
 }
 
-/// 受限兜底结果（网络判定不可用）
-fn restricted_verdict() -> NetworkVerdict {
-    NetworkVerdict {
-        restricted: true,
-        country_code: None,
-    }
+/// 受限地区是否只有中国大陆（此时可用机器层短路，避免非中国大陆机器发起 IP 请求）
+fn only_china_blocked(blocked_regions: &[String]) -> bool {
+    !blocked_regions.is_empty()
+        && blocked_regions
+            .iter()
+            .all(|region| region.eq_ignore_ascii_case("CN"))
 }
 
-/// 按接口返回值判定是否受限：只有明确拿到非 CN 国家才放行，缺失一律按受限处理
-fn restricted_from_body(country_code: Option<&str>) -> bool {
+/// 出口国家是否落在受限地区列表内；拿不到国家按受限处理（fail-closed）
+fn restricted_by_country(policy: &DownloadPolicy, country_code: Option<&str>) -> bool {
     match country_code {
-        Some(code) => code.eq_ignore_ascii_case("CN"),
+        Some(code) => policy.blocks_region(code),
         None => true,
     }
+}
+
+/// 启动器是否处于开发者模式（注册表 DeveloperMode）
+fn developer_mode_enabled() -> bool {
+    crate::commands::system::developer::is_developer_mode_enabled()
 }
 
 /// 机器层判定：UTC+8 时区 + 系统区域为中国大陆

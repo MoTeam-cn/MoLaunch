@@ -12,6 +12,7 @@ pub mod cache_temp;
 pub mod client_type;
 pub mod datetime;
 pub mod dispatcher;
+pub mod download_policy;
 pub mod format;
 pub mod fs;
 pub mod github_download;

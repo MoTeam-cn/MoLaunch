@@ -53,6 +53,14 @@ pub fn is_developer_unlocked() -> bool {
     reg_get_bool(KEY_DEV_UNLOCKED).unwrap_or(false)
 }
 
+/// 查询开发者模式是否已开启（注册表 `DeveloperMode`）
+///
+/// 与 `is_developer_unlocked` 不同：本函数只看「开关是否打开」，
+/// 供需要开发者模式能力的功能（如临时绕过下载限制）使用。
+pub fn is_developer_mode_enabled() -> bool {
+    reg_get_bool(KEY_DEV_MODE).unwrap_or(false)
+}
+
 /// 解锁开发者模式（写入注册表 `DeveloperUnlocked=true`）
 ///
 /// 调用后「高阶配置」页将显示开发者模式开关卡片。

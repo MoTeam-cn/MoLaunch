@@ -44,6 +44,13 @@ struct RemoveCustomCertParams {
     filename: String,
 }
 
+/// 开发者模式临时关闭下载限制的参数
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct DownloadBypassParams {
+    enabled: bool,
+}
+
 static DISPATCHER: Lazy<Dispatcher> = Lazy::new(|| {
     let mut d = Dispatcher::new();
     config::register(&mut d);
@@ -65,6 +72,17 @@ static DISPATCHER: Lazy<Dispatcher> = Lazy::new(|| {
         "get_region_info",
         handler!(_state, _app, _params, {
             let r = crate::utils::region::detect().await;
+            serde_json::to_value(r).map_err(|e| e.to_string())
+        }),
+    );
+
+    // 开发者模式临时关闭下载限制（仅当策略允许且开发者模式开启时生效，重启后失效）
+    d.register(
+        "set_download_restriction_bypass",
+        handler!(_state, _app, params, {
+            let p: DownloadBypassParams =
+                serde_json::from_value(params).map_err(|e| format!("参数解析失败: {}", e))?;
+            let r = crate::utils::region::set_bypass(p.enabled).await?;
             serde_json::to_value(r).map_err(|e| e.to_string())
         }),
     );
