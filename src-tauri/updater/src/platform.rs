@@ -51,7 +51,10 @@ fn try_move_replace(src: &Path, dst: &Path) -> bool {
 }
 
 pub fn launch_new_exe(exe_path: &Path) -> Result<(), String> {
+    use std::os::windows::process::CommandExt;
+
     Command::new(exe_path)
+        .creation_flags(0x0800_0000) // CREATE_NO_WINDOW：不新建/继承控制台窗口
         .spawn()
         .map_err(|e| format!("启动新 exe 失败: {e}"))?;
     Ok(())

@@ -50,10 +50,15 @@ pub fn run_executable_output(
 /// 不适用：需要同步等待输出（用 `run_executable_output`）。
 pub fn run_detached(program: &str, args: &[String]) -> Result<(), String> {
     log_info!("[Shell] run_detached: {} {}", program, args.join(" "));
-    std::process::Command::new(program)
-        .args(args)
-        .spawn()
-        .map_err(|e| shell_err(program, e))?;
+    let mut cmd = std::process::Command::new(program);
+    cmd.args(args);
+    #[cfg(target_os = "windows")]
+    {
+        use std::os::windows::process::CommandExt;
+        // 分离运行的可执行文件（如 updater.exe）不应弹出控制台窗口
+        cmd.creation_flags(0x08000000); // CREATE_NO_WINDOW
+    }
+    cmd.spawn().map_err(|e| shell_err(program, e))?;
     Ok(())
 }
 

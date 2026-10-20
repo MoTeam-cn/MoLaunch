@@ -1,3 +1,6 @@
+// Windows 便携版更新器：GUI 子系统，被主程序拉起时不分配控制台窗口（运行日志写文件）
+#![cfg_attr(all(windows, not(debug_assertions)), windows_subsystem = "windows")]
+
 mod args;
 mod log;
 mod platform;
