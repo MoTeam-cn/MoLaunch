@@ -5,7 +5,8 @@ import type { Component } from 'vue'
 import { useVersionStore } from '@/stores/version'
 import { useVersionSettings } from '@/composables/useVersionSettings'
 import { backToTopEnabled } from '@/composables/useFloatingButtonState'
-import { showError } from '@/utils/modal'
+import { showError, showModal } from '@/utils/modal'
+import { toastError, toastSuccess } from '@/utils/toast'
 import { formatTimestamp } from '@/utils/format'
 const Tooltip = defineAsyncComponent(() => import('@/components/common/Tooltip.vue'))
 const Button = defineAsyncComponent(() => import('@/components/common/Button.vue'))
@@ -28,8 +29,10 @@ import type { ResourceType } from '@/types/community'
 const versionStore = useVersionStore()
 const { resolveVersionIconWithLogo: resolveVersionIcon } = useVersionSettings()
 
-// 地区判定：中国大陆机器 + 中国大陆网络出口时，整页下载入口替换为限制说明
-const { isRestricted, loadRegionInfo } = useRegion()
+// 地区判定：受限地区（官网下发）+ 网络出口命中时，整页下载入口替换为限制说明
+const {
+  isRestricted, loadRegionInfo, notice, noticeShown, markNoticeShown, bypassed, setBypass,
+} = useRegion()
 
 const {
   installedVersions, installedVersionTypes, installedVersionLogos,
@@ -68,9 +71,36 @@ const headerTitle = computed(() => {
     : '原版游戏'
 })
 const headerSubtitle = computed(() => {
-  if (isRestricted.value) return '受最近某事件影响，暂不提供游戏下载'
+  if (isRestricted.value) return notice.value?.title.trim() || '暂不提供游戏下载'
   return communityResourceType.value ? '从 CurseForge 和 Modrinth 搜索并安装' : 'Minecraft Java Edition 官方版本'
 })
+
+/**
+ * 展示官网下发的下载限制提示（每次运行只弹一次）
+ *
+ * 按官网约定：点击确认只关闭提示，不解除下载限制。
+ */
+function showRestrictionNotice() {
+  if (noticeShown.value) return
+  const n = notice.value
+  markNoticeShown()
+  showModal({
+    type: 'info',
+    title: n?.title.trim() || '下载功能说明',
+    message: n?.text.trim() || '当前地区暂不提供 Minecraft 下载功能。',
+    confirmText: n?.confirmText.trim() || '我知道了',
+  })
+}
+
+/** 恢复下载限制（开发者模式临时关闭后的一键回退） */
+async function handleRestoreRestriction() {
+  try {
+    await setBypass(false)
+    toastSuccess('已恢复下载限制')
+  } catch (e) {
+    toastError('恢复失败：' + String(e))
+  }
+}
 
 function getVersionIcon(id: string, type: string): string {
   const logo = installedVersionLogos.value[id]
@@ -130,6 +160,7 @@ onMounted(async () => {
   // 命中限制时不再拉取版本清单（避免无意义的元数据请求）
   if (isRestricted.value) {
     loading.value = false
+    showRestrictionNotice()
     return
   }
   // 有缓存就不显示 loading
@@ -177,8 +208,19 @@ onMounted(async () => {
         </Tooltip>
       </div>
 
+      <!-- 开发者模式临时关闭限制：提示当前状态并提供一键恢复 -->
+      <div
+        v-if="bypassed"
+        class="px-6 py-2 bg-amber-50 border-b border-amber-200 flex items-center justify-between shrink-0"
+      >
+        <span class="text-xs text-amber-700">
+          开发者模式已临时关闭下载限制，重启启动器后按官网策略重新生效。
+        </span>
+        <Button type="ghost" size="small" @click="handleRestoreRestriction">恢复限制</Button>
+      </div>
+
       <div class="flex-1 overflow-hidden">
-        <!-- 地区限制：中国大陆机器 + 中国大陆网络出口时，替换整页下载内容 -->
+        <!-- 地区限制：受限地区（官网下发）+ 网络出口命中时，替换整页下载内容 -->
         <RegionRestrictedPanel v-if="isRestricted" />
 
         <transition v-else name="slide-right" mode="out-in">

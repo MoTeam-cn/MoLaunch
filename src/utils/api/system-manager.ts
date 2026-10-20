@@ -83,6 +83,7 @@ export const SYSTEM_ACTIONS = {
   UNREGISTER_DEEPLINK: 'unregister_deeplink',
   // region（1 个）—— 地区判定（中国大陆下载限制），机器环境 + 网络出口双层
   GET_REGION_INFO: 'get_region_info',
+  SET_DOWNLOAD_RESTRICTION_BYPASS: 'set_download_restriction_bypass',
 } as const
 
 /** action 名称类型 */

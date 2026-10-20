@@ -61,6 +61,16 @@ export async function getRegionInfo(): Promise<RegionInfo> {
   return systemManager<RegionInfo>(SYSTEM_ACTIONS.GET_REGION_INFO)
 }
 
+/**
+ * 开发者模式临时关闭 / 恢复下载限制
+ *
+ * 仅当官网策略允许（allowDeveloperModeBypass）且启动器处于开发者模式时生效；
+ * 状态只存内存，重启后按清单重新生效。
+ */
+export async function setDownloadRestrictionBypass(enabled: boolean): Promise<RegionInfo> {
+  return systemManager<RegionInfo>(SYSTEM_ACTIONS.SET_DOWNLOAD_RESTRICTION_BYPASS, { enabled })
+}
+
 /** 获取系统内存信息 */
 export async function getSystemMemory(): Promise<{ total: number; used: number; available: number; usage_percent: number }> {
   return systemManager(SYSTEM_ACTIONS.GET_SYSTEM_MEMORY)
