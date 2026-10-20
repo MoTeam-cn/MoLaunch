@@ -6,6 +6,14 @@
 
 ### 新增
 
+#### 中国大陆地区下载限制（按地区动态控制）
+
+- **按地区动态控制游戏下载入口**（[region.rs](src-tauri/src/utils/region.rs) 新增 / [region_test.rs](src-tauri/src/utils/region_test.rs) 新增 / [mod.rs](src-tauri/src/utils/mod.rs) / [dispatcher.rs](src-tauri/src/commands/system/manager/dispatcher.rs) / [lib.rs](src-tauri/src/lib.rs) / [install_manager.rs](src-tauri/src/commands/version/install_manager.rs) / [region.ts](src/types/region.ts) 新增 / [useRegion.ts](src/composables/useRegion.ts) 新增 / [system-manager.ts](src/utils/api/system-manager.ts) / [system.ts](src/utils/api/system.ts) / [RegionRestrictedPanel.vue](src/components/downloads/RegionRestrictedPanel.vue) 新增 / [Versions.vue](src/views/Versions.vue)）：
+  - 双层判定：**机器层**同步判定（UTC+8 时区 + 系统区域；Windows 读注册表 `LocaleName` 与 `Geo\Nation`，Unix 读 `TZ` / `LANG`），命中后再由**网络层**请求 `ipinfo.io/json` 确认出口国家（响应只有 `country` 字段，缺失或非 2xx 状态按受限处理）；非中国大陆机器直接短路，不产生额外网络请求。网络判定失败按**受限**处理（fail-closed），结果进程内缓存并在启动时预热（`setup` 钩子内 `region::prefetch()`），避免首次打开下载页时等待。
+  - 前端新增 `get_region_info` action 与 `useRegion` 模块级单例（并发调用共享同一次 IPC）：下载页 `/apps/versions`（原版游戏 + 社区资源）命中限制时以说明面板替换内容区并停止拉取版本清单，面板提供「前往官方网站」入口；已安装版本的启动、Mod / 资源包等本地管理功能不受影响。
+  - 后端在 `download_version` / `install_merged` 两个游戏本体下载入口加同源守卫，命中限制时返回统一文案，避免绕过 UI 直接调用 IPC。
+  - 限制说明文案统一为「受最近某事件影响，MoLaunch 启动器暂不向中国用户提供 MC 下载功能，恕我无能为力... qwq...」，前端面板与后端守卫共用（后端常量 `RESTRICTED_MESSAGE`）。
+
 #### 素材来源与版权投诉
 
 - **新增素材来源说明与版权投诉通道**（[AssetComplianceSection.vue](src/views/settings/more/AssetComplianceSection.vue) 新增 / [CreditsTab.vue](src/views/settings/more/CreditsTab.vue) 接入 / [NOTICE.md](NOTICE.md) 新增 / [copyright.yml](.github/ISSUE_TEMPLATE/copyright.yml) 新增 / [LICENSE](LICENSE) / [licenses.txt](src-tauri/resources/about/licenses.txt)）：
