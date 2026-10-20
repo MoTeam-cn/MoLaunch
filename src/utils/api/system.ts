@@ -4,6 +4,7 @@
  */
 
 import type { RawDownloadProgress } from '@/types/download'
+import type { RegionInfo } from '@/types/region'
 import { SYSTEM_ACTIONS, systemManager } from './system-manager'
 import { VERSION_PROGRESS_ACTIONS, versionProgressManager } from './version-progress-manager'
 
@@ -48,6 +49,16 @@ export async function writeTextFile(path: string, content: string): Promise<void
  */
 export async function setGameDir(gameDir: string): Promise<void> {
   return systemManager<void>(SYSTEM_ACTIONS.SET_GAME_DIR, { gameDir })
+}
+
+/**
+ * 获取地区判定结果（机器环境 + 网络出口，后端进程内缓存）
+ *
+ * 用于中国大陆地区下载限制：机器层命中后后端才判定网络出口，
+ * 非中国大陆机器直接返回不受限，不产生额外网络请求。
+ */
+export async function getRegionInfo(): Promise<RegionInfo> {
+  return systemManager<RegionInfo>(SYSTEM_ACTIONS.GET_REGION_INFO)
 }
 
 /** 获取系统内存信息 */

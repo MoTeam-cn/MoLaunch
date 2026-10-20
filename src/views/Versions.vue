@@ -11,6 +11,7 @@ const Tooltip = defineAsyncComponent(() => import('@/components/common/Tooltip.v
 const Button = defineAsyncComponent(() => import('@/components/common/Button.vue'))
 const NavSidebar = defineAsyncComponent(() => import('@/components/common/NavSidebar.vue'))
 const LoaderSelect = defineAsyncComponent(() => import('./LoaderSelect.vue'))
+const RegionRestrictedPanel = defineAsyncComponent(() => import('@/components/downloads/RegionRestrictedPanel.vue'))
 const VersionSection = defineAsyncComponent(() => import('@/components/version/VersionSection.vue'))
 const Community = defineAsyncComponent(() => import('./Community.vue'))
 import {
@@ -21,10 +22,14 @@ import {
 } from '@heroicons/vue/24/outline'
 import { resolveVersionIcon as resolveIconByType } from '@/composables/useVersionMeta'
 import { useVersionInstallActions, type InstallOptions } from '@/composables/useVersionInstallActions'
+import { useRegion } from '@/composables/useRegion'
 import type { ResourceType } from '@/types/community'
 
 const versionStore = useVersionStore()
 const { resolveVersionIconWithLogo: resolveVersionIcon } = useVersionSettings()
+
+// 地区判定：中国大陆机器 + 中国大陆网络出口时，整页下载入口替换为限制说明
+const { isRestricted, loadRegionInfo } = useRegion()
 
 const {
   installedVersions, installedVersionTypes, installedVersionLogos,
@@ -56,14 +61,16 @@ const communityResourceType = computed<ResourceType | null>(() =>
     ? activeCategory.value.slice('community:'.length) as ResourceType : null
 )
 
-const headerTitle = computed(() =>
-  communityResourceType.value
+const headerTitle = computed(() => {
+  if (isRestricted.value) return '游戏下载'
+  return communityResourceType.value
     ? communityCategories.find(c => c.id === activeCategory.value)?.label || '社区资源'
     : '原版游戏'
-)
-const headerSubtitle = computed(() =>
-  communityResourceType.value ? '从 CurseForge 和 Modrinth 搜索并安装' : 'Minecraft Java Edition 官方版本'
-)
+})
+const headerSubtitle = computed(() => {
+  if (isRestricted.value) return '受最近某事件影响，暂不提供游戏下载'
+  return communityResourceType.value ? '从 CurseForge 和 Modrinth 搜索并安装' : 'Minecraft Java Edition 官方版本'
+})
 
 function getVersionIcon(id: string, type: string): string {
   const logo = installedVersionLogos.value[id]
@@ -117,9 +124,17 @@ onUnmounted(() => {
 })
 
 onMounted(async () => {
+  // 地区判定期间先显示加载态，避免空白列表闪烁
+  loading.value = true
+  await loadRegionInfo()
+  // 命中限制时不再拉取版本清单（避免无意义的元数据请求）
+  if (isRestricted.value) {
+    loading.value = false
+    return
+  }
   // 有缓存就不显示 loading
-  if (versionStore.versions.length === 0) {
-    loading.value = true
+  if (versionStore.versions.length > 0) {
+    loading.value = false
   }
   try {
     // 仅拉取版本清单，不扫描本地已安装版本（原版下载列表不依赖 installedVersions）
@@ -154,8 +169,8 @@ onMounted(async () => {
           <Button
             type="ghost"
             size="small"
-            :disabled="!!selectedVersion || activeCategory !== 'vanilla'"
-            @click="!selectedVersion && activeCategory === 'vanilla' && handleRefresh()"
+            :disabled="isRestricted || !!selectedVersion || activeCategory !== 'vanilla'"
+            @click="!isRestricted && !selectedVersion && activeCategory === 'vanilla' && handleRefresh()"
           >
             <template #icon><ArrowPathIcon class="w-4 h-4" /></template>
           </Button>
@@ -163,7 +178,10 @@ onMounted(async () => {
       </div>
 
       <div class="flex-1 overflow-hidden">
-        <transition name="slide-right" mode="out-in">
+        <!-- 地区限制：中国大陆机器 + 中国大陆网络出口时，替换整页下载内容 -->
+        <RegionRestrictedPanel v-if="isRestricted" />
+
+        <transition v-else name="slide-right" mode="out-in">
           <LoaderSelect
             v-if="selectedVersion"
             :key="'loader-' + selectedVersion"
