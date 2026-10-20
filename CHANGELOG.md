@@ -18,6 +18,14 @@
 
 - **修复 FRP 日志提取的隧道访问链接在首个点处被截断**（[frp-tunnel-link.ts](src/utils/frp-tunnel-link.ts) / [frp-tunnel-link.test.ts](src/utils/__tests__/frp-tunnel-link.test.ts) 新增）：原实现用 `[^\s,.;，。；]*` 匹配链接，字符类把 `.` 一并排除，厂商日志里的 `http://qwq.i-cdn.xyz` 被截成 `http://qwq`，面板底部与复制按钮拿到的都是残缺地址。改为「协议链接整体匹配 + 只在结果尾部剥离句读标点」，域名、端口、路径、查询参数完整保留；中文厂商提示语改为先定位 `您可通过` 再在其后取链接，同时支持 `http://host`（无端口）与裸 `host:port` 两种形态。另在匹配前剥离 ANSI 颜色码与 `<client/control.go:198>` 这类源码位置，避免把源码文件名当成访问地址。新增 9 个单测覆盖上述场景。
 
+#### 修复 Windows 便携版更新器弹出控制台窗口
+
+- **修复自动更新时弹出黑色控制台窗口**（[main.rs](src-tauri/updater/src/main.rs) / [platform.rs](src-tauri/updater/src/platform.rs) / [exec.rs](src-tauri/src/minecraft/system/shell/exec.rs)）：
+  - 现象：便携版更新（下载完成后退出替换、或退出时应用待安装更新）会短暂弹出一个黑窗，用户看到的是控制台宿主而非启动器。
+  - 根因有两层：① 更新器是独立 Cargo 项目 `src-tauri/updater`，此前没有声明 Windows 子系统，`molaunch_updater.exe` 被编译成**控制台子系统**程序，GUI 主程序 `spawn` 它时系统会分配一个控制台窗口；② 主程序统一用的 `run_detached` 也没有传 `CREATE_NO_WINDOW`。
+  - 修复：更新器 release 构建加上 `#![cfg_attr(all(windows, not(debug_assertions)), windows_subsystem = "windows")]`，改为 GUI 子系统（其运行日志本就写 `%APPDATA%/.Molaunch/updater/updater.log`，不依赖控制台输出）；同时主程序 `run_detached` 与更新器启动新版本的 `launch_new_exe` 统一补 `CREATE_NO_WINDOW`（0x08000000），即使子进程仍是控制台程序也不会再显示窗口。
+  - `updater.exe` 由 release 流水线重新编译后嵌入主程序，改动随下次发版生效；调试构建保留控制台便于排查。
+
 ### 变更
 
 #### 下载限制改由官网下发的策略清单控制
