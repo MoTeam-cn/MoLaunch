@@ -47,7 +47,11 @@
   line-height: 1.5715;
   white-space: nowrap;
   border-radius: 2px;
-  border: 1px solid transparent;
+  /* 只声明宽度与样式，颜色交给各变体（btn-outline 等）自己设置。
+     Tailwind 4 会把基类 .btn 排到 .btn-* 之后，此处若写 border 简写，
+     会把变体已声明的 border-color 覆盖回 transparent，导致描边按钮丢边框。 */
+  border-width: 1px;
+  border-style: solid;
   cursor: pointer;
   user-select: none;
   outline: none;

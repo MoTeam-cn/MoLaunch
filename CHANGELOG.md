@@ -6,6 +6,10 @@
 
 ### 修复
 
+#### 修复描边按钮丢失边框
+
+- **修复 `outline` 类型按钮在全站丢失边框**（[main.css](src/assets/styles/main.css)）：Tailwind 4 迁移（`09013b4d`）把按钮样式改写为 `@utility` 后，自定义类的输出顺序不再跟随源码 —— 实测基类 `.btn` 被排到 `.btn-primary` / `.btn-outline` 等变体**之后**。于是 `.btn` 里的 `border: 1px solid transparent` 简写覆盖了 `.btn-outline` 已声明的 `border-color: var(--color-primary-500)`，边框被刷回透明；`color` 不受影响，所以描边按钮只剩一行主色文字，看起来像纯文本、完全看不出可点（联机页房间类型的未选中项、创建面板的「选择端口」「高级设置」等 116 处 `type="outline"` 全部命中）。改为基类只声明 `border-width` / `border-style`、颜色交给各变体自行设置，边框恢复；`primary` / `secondary` / `ghost` / `text` 本来就把 `border-color` 设为 `transparent`，行为不变。
+
 #### 修复 FRP 日志访问链接被截断
 
 - **修复 FRP 日志提取的隧道访问链接在首个点处被截断**（[frp-tunnel-link.ts](src/utils/frp-tunnel-link.ts) / [frp-tunnel-link.test.ts](src/utils/__tests__/frp-tunnel-link.test.ts) 新增）：原实现用 `[^\s,.;，。；]*` 匹配链接，字符类把 `.` 一并排除，厂商日志里的 `http://qwq.i-cdn.xyz` 被截成 `http://qwq`，面板底部与复制按钮拿到的都是残缺地址。改为「协议链接整体匹配 + 只在结果尾部剥离句读标点」，域名、端口、路径、查询参数完整保留；中文厂商提示语改为先定位 `您可通过` 再在其后取链接，同时支持 `http://host`（无端口）与裸 `host:port` 两种形态。另在匹配前剥离 ANSI 颜色码与 `<client/control.go:198>` 这类源码位置，避免把源码文件名当成访问地址。新增 9 个单测覆盖上述场景。
