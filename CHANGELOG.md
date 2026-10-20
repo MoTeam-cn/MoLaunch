@@ -4,6 +4,12 @@
 
 ## [Unreleased]
 
+### 修复
+
+#### 修复 FRP 日志访问链接被截断
+
+- **修复 FRP 日志提取的隧道访问链接在首个点处被截断**（[frp-tunnel-link.ts](src/utils/frp-tunnel-link.ts) / [frp-tunnel-link.test.ts](src/utils/__tests__/frp-tunnel-link.test.ts) 新增）：原实现用 `[^\s,.;，。；]*` 匹配链接，字符类把 `.` 一并排除，厂商日志里的 `http://qwq.i-cdn.xyz` 被截成 `http://qwq`，面板底部与复制按钮拿到的都是残缺地址。改为「协议链接整体匹配 + 只在结果尾部剥离句读标点」，域名、端口、路径、查询参数完整保留；中文厂商提示语改为先定位 `您可通过` 再在其后取链接，同时支持 `http://host`（无端口）与裸 `host:port` 两种形态。另在匹配前剥离 ANSI 颜色码与 `<client/control.go:198>` 这类源码位置，避免把源码文件名当成访问地址。新增 9 个单测覆盖上述场景。
+
 ## [0.3.8] - 2026-10-20
 
 ### 新增
