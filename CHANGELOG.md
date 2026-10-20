@@ -4,43 +4,6 @@
 
 ## [Unreleased]
 
-### 修复
-
-#### 修复未启用联机大厅时联机分类仍可用
-
-- **修复关闭「启用联机大厅（与云端交互）」后联机大厅与搭桥联机仍可正常进入**（[useOnlineNav.ts](src/composables/useOnlineNav.ts) / [Online.vue](src/views/Online.vue)）：该开关此前只写入配置，联机页的就绪判定只看「已注册 + 已登录」；而 `auth_init` 出于「设备注册是基础能力、与开关解耦」的设计恒返回 `disabled: false`，所以开关关闭后 `cloudConnected` 仍为 `true`，分类不封存，搭桥联机的创建 / 加入房间完全不受影响。现在 `lobbyEnabled = false` 时「联机大厅」与「搭桥联机」（含创建 / 加入 / 房间详情子项）统一封存，新增封禁原因 `lobby`，点击提示「需要启用联机大厅」并可当场开启；侧边栏状态徽章显示「未启用」；开关关闭时强制停留在「设备」分类，避免停在房间面板或经 URL `?tab=create` 恢复后内容区仍渲染 RoomManager。初始化期间不按「未启用」封存，避免启动瞬间侧边栏闪烁。设备注册与令牌续期、红石联机、FRP 不受影响（与开关说明一致）。
-
-#### 修复描边按钮丢失边框
-
-- **修复 `outline` 类型按钮在全站丢失边框**（[main.css](src/assets/styles/main.css)）：Tailwind 4 迁移（`09013b4d`）把按钮样式改写为 `@utility` 后，自定义类的输出顺序不再跟随源码 —— 实测基类 `.btn` 被排到 `.btn-primary` / `.btn-outline` 等变体**之后**。于是 `.btn` 里的 `border: 1px solid transparent` 简写覆盖了 `.btn-outline` 已声明的 `border-color: var(--color-primary-500)`，边框被刷回透明；`color` 不受影响，所以描边按钮只剩一行主色文字，看起来像纯文本、完全看不出可点（联机页房间类型的未选中项、创建面板的「选择端口」「高级设置」等 116 处 `type="outline"` 全部命中）。改为基类只声明 `border-width` / `border-style`、颜色交给各变体自行设置，边框恢复；`primary` / `secondary` / `ghost` / `text` 本来就把 `border-color` 设为 `transparent`，行为不变。
-
-#### 修复 FRP 日志访问链接被截断
-
-- **修复 FRP 日志提取的隧道访问链接在首个点处被截断**（[frp-tunnel-link.ts](src/utils/frp-tunnel-link.ts) / [frp-tunnel-link.test.ts](src/utils/__tests__/frp-tunnel-link.test.ts) 新增）：原实现用 `[^\s,.;，。；]*` 匹配链接，字符类把 `.` 一并排除，厂商日志里的 `http://qwq.i-cdn.xyz` 被截成 `http://qwq`，面板底部与复制按钮拿到的都是残缺地址。改为「协议链接整体匹配 + 只在结果尾部剥离句读标点」，域名、端口、路径、查询参数完整保留；中文厂商提示语改为先定位 `您可通过` 再在其后取链接，同时支持 `http://host`（无端口）与裸 `host:port` 两种形态。另在匹配前剥离 ANSI 颜色码与 `<client/control.go:198>` 这类源码位置，避免把源码文件名当成访问地址。新增 9 个单测覆盖上述场景。
-
-#### 联机大厅开关：封存项改为引导开启，后端补开关守卫
-
-- **未启用联机大厅时不再就地开启开关**（[Online.vue](src/views/Online.vue)）：此前点击封存的「联机大厅 / 搭桥联机」会弹确认框并当场把开关打开，看起来仍是一次点击就能进；现改为只提示「请先在设置 → 联机页开启」并询问是否前往设置页，取消则停留在原分类。
-- **后端补开关同源守卫**（[registry.rs](src-tauri/src/commands/online/manager/signaling_manager/registry.rs) / [room_actions.rs](src-tauri/src/commands/online/manager/signaling_manager/room_actions.rs) / [lobby_actions.rs](src-tauri/src/commands/online/manager/signaling_manager/lobby_actions.rs)）：新增 `require_lobby_enabled`，`room_create` / `room_join` / `lobby_list_packages` / `lobby_list_rooms` 在 `online.lobby_enabled = false` 时直接返回统一错误文案，旧版客户端或绕过 UI 直接调用 IPC 同样被拒；`room_close` / `room_heartbeat` / `room_get` 不拦，避免关闭开关后卡在房间内无法退出。
-#### 修复 Windows 便携版更新器弹出控制台窗口
-
-- **修复自动更新时弹出黑色控制台窗口**（[main.rs](src-tauri/updater/src/main.rs) / [platform.rs](src-tauri/updater/src/platform.rs) / [exec.rs](src-tauri/src/minecraft/system/shell/exec.rs)）：
-  - 现象：便携版更新（下载完成后退出替换、或退出时应用待安装更新）会短暂弹出一个黑窗，用户看到的是控制台宿主而非启动器。
-  - 根因有两层：① 更新器是独立 Cargo 项目 `src-tauri/updater`，此前没有声明 Windows 子系统，`molaunch_updater.exe` 被编译成**控制台子系统**程序，GUI 主程序 `spawn` 它时系统会分配一个控制台窗口；② 主程序统一用的 `run_detached` 也没有传 `CREATE_NO_WINDOW`。
-  - 修复：更新器 release 构建加上 `#![cfg_attr(all(windows, not(debug_assertions)), windows_subsystem = "windows")]`，改为 GUI 子系统（其运行日志本就写 `%APPDATA%/.Molaunch/updater/updater.log`，不依赖控制台输出）；同时主程序 `run_detached` 与更新器启动新版本的 `launch_new_exe` 统一补 `CREATE_NO_WINDOW`（0x08000000），即使子进程仍是控制台程序也不会再显示窗口。
-  - `updater.exe` 由 release 流水线重新编译后嵌入主程序，改动随下次发版生效；调试构建保留控制台便于排查。
-
-### 变更
-
-#### 下载限制改由官网下发的策略清单控制
-
-- **受限地区、下载禁用开关与提示文案改为读取官网 `/download-policy.json`**（[download_policy.rs](src-tauri/src/utils/download_policy.rs) 新增 / [download_policy_test.rs](src-tauri/src/utils/download_policy_test.rs) 新增 / [region.rs](src-tauri/src/utils/region.rs) / [region_test.rs](src-tauri/src/utils/region_test.rs) / [mod.rs](src-tauri/src/utils/mod.rs) / [dispatcher.rs](src-tauri/src/commands/system/manager/dispatcher.rs) / [developer.rs](src-tauri/src/commands/system/developer.rs) / [region.ts](src/types/region.ts) / [useRegion.ts](src/composables/useRegion.ts) / [system-manager.ts](src/utils/api/system-manager.ts) / [system.ts](src/utils/api/system.ts) / [RegionRestrictedPanel.vue](src/components/downloads/RegionRestrictedPanel.vue) / [Versions.vue](src/views/Versions.vue)）：
-  - 启动后后台拉取一次清单（带 `?t=<epoch_ms>` 绕开 CDN 缓存、5 秒超时、Rust 侧请求绕开 WebView CORS），缓存到应用数据目录 `download-policy.json`；拉取失败沿用上次缓存，无缓存按「不限制」处理（fail-open），不阻塞启动。清单所有字段带 `#[serde(default)]` 且忽略未知字段，官网后续加字段不会导致解析失败。
-  - 判定顺序改为「总开关 `enabled` → `regionCheck.enabled` → 受限地区列表 → 网络出口国家」：受限地区由写死的 `CN` 改为读 `regionCheck.blockedRegions`（空数组即不限制），命中且 `download.disabledForBlockedRegions` 为 true 才禁用下载；受限地区只含 `CN` 时仍保留「非中国大陆机器不发 IP 请求」的短路，地区检测沿用既有实现，不额外请求 IP 服务。
-  - 提示文案（标题 / 正文 / 确认按钮）改为读 `notice.title` / `notice.text` / `notice.confirmText`：进入下载页时按官网约定弹一次提示（点击确认只关闭提示、不解除限制，本次运行只弹一次），限制面板标题与正文、页头副标题同步使用远程文案。
-  - 新增 `download.allowDeveloperModeBypass`：仅当清单允许且启动器处于开发者模式时，限制面板才出现「临时关闭限制」入口（二次确认，状态只存内存、重启后按清单重新生效），页面顶部同时显示临时关闭状态条与「恢复限制」按钮；字段缺失或为 false 一律按不可绕过处理。
-  - 后端 `ensure_download_allowed()` 的拒绝文案改用清单 `notice.text`（清单未下发时回退原静态文案），下载入口守卫行为不变。
-
 ## [0.3.8] - 2026-10-20
 
 ### 新增
@@ -76,6 +39,31 @@
 
 - **修复 CI 依赖安全审计失败**（[audit.toml](.cargo/audit.toml)）：RustSec 新收录 RUSTSEC-2026-0367 / 0368 / 0369（`zip 4.6.1` 的 `extract()` 系列：SUID/SGID 位保留、符号链接越界写、经符号链接施加权限），CI 的「Security audit (cargo)」步骤因此失败。三条公告的触发点全部落在 `ZipArchive::extract()` / `ZipStreamReader::extract()` 的自动落盘路径，而本项目从不调用 `extract`——统一走 `extract_zip_safely` 逐条 `by_index` 自写普通文件（跳过 symlink 条目、`ensure_safe_relative_path` 防 Zip Slip、不应用 `unix_mode`），触发面不可达；修复版本为 `zip 9.0.0`，而 `tauri-plugin-updater` 2.13.3 / 2.14.0 仍锁定 `zip ^4`（Windows 更新包解压），依赖图无法整体升到 9。按既有「已验证无法通过依赖升级消除」的处置方式加入 ignore 并注明复查条件。
 
+#### 修复未启用联机大厅时联机分类仍可用
+
+- **修复关闭「启用联机大厅（与云端交互）」后联机大厅与搭桥联机仍可正常进入**（[useOnlineNav.ts](src/composables/useOnlineNav.ts) / [Online.vue](src/views/Online.vue)）：该开关此前只写入配置，联机页的就绪判定只看「已注册 + 已登录」；而 `auth_init` 出于「设备注册是基础能力、与开关解耦」的设计恒返回 `disabled: false`，所以开关关闭后 `cloudConnected` 仍为 `true`，分类不封存，搭桥联机的创建 / 加入房间完全不受影响。现在 `lobbyEnabled = false` 时「联机大厅」与「搭桥联机」（含创建 / 加入 / 房间详情子项）统一封存，新增封禁原因 `lobby`，点击提示「需要启用联机大厅」并可当场开启；侧边栏状态徽章显示「未启用」；开关关闭时强制停留在「设备」分类，避免停在房间面板或经 URL `?tab=create` 恢复后内容区仍渲染 RoomManager。初始化期间不按「未启用」封存，避免启动瞬间侧边栏闪烁。设备注册与令牌续期、红石联机、FRP 不受影响（与开关说明一致）。
+
+#### 修复描边按钮丢失边框
+
+- **修复 `outline` 类型按钮在全站丢失边框**（[main.css](src/assets/styles/main.css)）：Tailwind 4 迁移（`09013b4d`）把按钮样式改写为 `@utility` 后，自定义类的输出顺序不再跟随源码 —— 实测基类 `.btn` 被排到 `.btn-primary` / `.btn-outline` 等变体**之后**。于是 `.btn` 里的 `border: 1px solid transparent` 简写覆盖了 `.btn-outline` 已声明的 `border-color: var(--color-primary-500)`，边框被刷回透明；`color` 不受影响，所以描边按钮只剩一行主色文字，看起来像纯文本、完全看不出可点（联机页房间类型的未选中项、创建面板的「选择端口」「高级设置」等 116 处 `type="outline"` 全部命中）。改为基类只声明 `border-width` / `border-style`、颜色交给各变体自行设置，边框恢复；`primary` / `secondary` / `ghost` / `text` 本来就把 `border-color` 设为 `transparent`，行为不变。
+
+#### 修复 FRP 日志访问链接被截断
+
+- **修复 FRP 日志提取的隧道访问链接在首个点处被截断**（[frp-tunnel-link.ts](src/utils/frp-tunnel-link.ts) / [frp-tunnel-link.test.ts](src/utils/__tests__/frp-tunnel-link.test.ts) 新增）：原实现用 `[^\s,.;，。；]*` 匹配链接，字符类把 `.` 一并排除，厂商日志里的 `http://qwq.i-cdn.xyz` 被截成 `http://qwq`，面板底部与复制按钮拿到的都是残缺地址。改为「协议链接整体匹配 + 只在结果尾部剥离句读标点」，域名、端口、路径、查询参数完整保留；中文厂商提示语改为先定位 `您可通过` 再在其后取链接，同时支持 `http://host`（无端口）与裸 `host:port` 两种形态。另在匹配前剥离 ANSI 颜色码与 `<client/control.go:198>` 这类源码位置，避免把源码文件名当成访问地址。新增 9 个单测覆盖上述场景。
+
+#### 联机大厅开关：封存项改为引导开启，后端补开关守卫
+
+- **未启用联机大厅时不再就地开启开关**（[Online.vue](src/views/Online.vue)）：此前点击封存的「联机大厅 / 搭桥联机」会弹确认框并当场把开关打开，看起来仍是一次点击就能进；现改为只提示「请先在设置 → 联机页开启」并询问是否前往设置页，取消则停留在原分类。
+- **后端补开关同源守卫**（[registry.rs](src-tauri/src/commands/online/manager/signaling_manager/registry.rs) / [room_actions.rs](src-tauri/src/commands/online/manager/signaling_manager/room_actions.rs) / [lobby_actions.rs](src-tauri/src/commands/online/manager/signaling_manager/lobby_actions.rs)）：新增 `require_lobby_enabled`，`room_create` / `room_join` / `lobby_list_packages` / `lobby_list_rooms` 在 `online.lobby_enabled = false` 时直接返回统一错误文案，旧版客户端或绕过 UI 直接调用 IPC 同样被拒；`room_close` / `room_heartbeat` / `room_get` 不拦，避免关闭开关后卡在房间内无法退出。
+
+#### 修复 Windows 便携版更新器弹出控制台窗口
+
+- **修复自动更新时弹出黑色控制台窗口**（[main.rs](src-tauri/updater/src/main.rs) / [platform.rs](src-tauri/updater/src/platform.rs) / [exec.rs](src-tauri/src/minecraft/system/shell/exec.rs)）：
+  - 现象：便携版更新（下载完成后退出替换、或退出时应用待安装更新）会短暂弹出一个黑窗，用户看到的是控制台宿主而非启动器。
+  - 根因有两层：① 更新器是独立 Cargo 项目 `src-tauri/updater`，此前没有声明 Windows 子系统，`molaunch_updater.exe` 被编译成**控制台子系统**程序，GUI 主程序 `spawn` 它时系统会分配一个控制台窗口；② 主程序统一用的 `run_detached` 也没有传 `CREATE_NO_WINDOW`。
+  - 修复：更新器 release 构建加上 `#![cfg_attr(all(windows, not(debug_assertions)), windows_subsystem = "windows")]`，改为 GUI 子系统（其运行日志本就写 `%APPDATA%/.Molaunch/updater/updater.log`，不依赖控制台输出）；同时主程序 `run_detached` 与更新器启动新版本的 `launch_new_exe` 统一补 `CREATE_NO_WINDOW`（0x08000000），即使子进程仍是控制台程序也不会再显示窗口。
+  - `updater.exe` 由 release 流水线重新编译后嵌入主程序，改动随下次发版生效；调试构建保留控制台便于排查。
+
 ### 重构
 
 #### 清理前端 lint 告警
@@ -91,6 +79,15 @@
 ### 变更
 
 - **修正配方资源来源标注**（[sources.json](src/utils/recipe-generator/assets/sources.json) / [generate.mjs](scripts/generate-recipe-assets/generate.mjs) / [resources.ts](src/utils/recipe-generator/resources.ts)）：原先统一标注为「MIT 许可 / Mojang 官方数据源」，但 MIT 仅覆盖上游仓库（PrismarineJS/minecraft-data、PrismarineJS/minecraft-assets、destruc7i0n/crafting）的**代码**，并不覆盖其中的纹理像素与语言文件——这些内容的版权归 Mojang Studios。现改为分项标注：代码与数据表标 MIT，纹理、皮肤、语言文件标为 Minecraft 游戏资产并注明权利归属；生成脚本同步修改，避免重新生成时回退。
+
+#### 下载限制改由官网下发的策略清单控制
+
+- **受限地区、下载禁用开关与提示文案改为读取官网 `/download-policy.json`**（[download_policy.rs](src-tauri/src/utils/download_policy.rs) 新增 / [download_policy_test.rs](src-tauri/src/utils/download_policy_test.rs) 新增 / [region.rs](src-tauri/src/utils/region.rs) / [region_test.rs](src-tauri/src/utils/region_test.rs) / [mod.rs](src-tauri/src/utils/mod.rs) / [dispatcher.rs](src-tauri/src/commands/system/manager/dispatcher.rs) / [developer.rs](src-tauri/src/commands/system/developer.rs) / [region.ts](src/types/region.ts) / [useRegion.ts](src/composables/useRegion.ts) / [system-manager.ts](src/utils/api/system-manager.ts) / [system.ts](src/utils/api/system.ts) / [RegionRestrictedPanel.vue](src/components/downloads/RegionRestrictedPanel.vue) / [Versions.vue](src/views/Versions.vue)）：
+  - 启动后后台拉取一次清单（带 `?t=<epoch_ms>` 绕开 CDN 缓存、5 秒超时、Rust 侧请求绕开 WebView CORS），缓存到应用数据目录 `download-policy.json`；拉取失败沿用上次缓存，无缓存按「不限制」处理（fail-open），不阻塞启动。清单所有字段带 `#[serde(default)]` 且忽略未知字段，官网后续加字段不会导致解析失败。
+  - 判定顺序改为「总开关 `enabled` → `regionCheck.enabled` → 受限地区列表 → 网络出口国家」：受限地区由写死的 `CN` 改为读 `regionCheck.blockedRegions`（空数组即不限制），命中且 `download.disabledForBlockedRegions` 为 true 才禁用下载；受限地区只含 `CN` 时仍保留「非中国大陆机器不发 IP 请求」的短路，地区检测沿用既有实现，不额外请求 IP 服务。
+  - 提示文案（标题 / 正文 / 确认按钮）改为读 `notice.title` / `notice.text` / `notice.confirmText`：进入下载页时按官网约定弹一次提示（点击确认只关闭提示、不解除限制，本次运行只弹一次），限制面板标题与正文、页头副标题同步使用远程文案。
+  - 新增 `download.allowDeveloperModeBypass`：仅当清单允许且启动器处于开发者模式时，限制面板才出现「临时关闭限制」入口（二次确认，状态只存内存、重启后按清单重新生效），页面顶部同时显示临时关闭状态条与「恢复限制」按钮；字段缺失或为 false 一律按不可绕过处理。
+  - 后端 `ensure_download_allowed()` 的拒绝文案改用清单 `notice.text`（清单未下发时回退原静态文案），下载入口守卫行为不变。
 
 ### 移除
 
