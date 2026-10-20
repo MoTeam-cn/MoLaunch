@@ -17,6 +17,7 @@ fn register_list_lobby_packages(d: &mut Dispatcher) {
     d.register(
         "lobby_list_packages",
         handler!(state, _app, _params, {
+            super::require_lobby_enabled(&state).await?;
             let creds = super::load_creds(&state).await?;
             let client = super::make_client(&state).await;
             log_debug!("[Online] lobby_list_packages");
@@ -37,6 +38,7 @@ fn register_list_lobby_rooms(d: &mut Dispatcher) {
         "lobby_list_rooms",
         handler!(state, _app, params, {
             let p: LobbyListParams = serde_json::from_value(params).unwrap_or_default();
+            super::require_lobby_enabled(&state).await?;
             let creds = super::load_creds(&state).await?;
             let client = super::make_client(&state).await;
             log_debug!("[Online] lobby_list_rooms: package_id={:?}", p.package_id);

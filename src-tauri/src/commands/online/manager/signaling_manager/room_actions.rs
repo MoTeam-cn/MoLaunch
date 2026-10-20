@@ -23,6 +23,7 @@ fn register_create_room(d: &mut Dispatcher) {
     d.register("room_create", handler!(state, _app, params, {
         let p: CreateRoomParams = serde_json::from_value(params)
             .map_err(|e| format!("参数解析失败: {}", e))?;
+        super::require_lobby_enabled(&state).await?;
         let creds = super::load_creds(&state).await?;
         let client = super::make_client(&state).await;
         log_info!(
@@ -80,6 +81,7 @@ fn register_join_room(d: &mut Dispatcher) {
         handler!(state, _app, params, {
             let p: JoinRoomParams =
                 serde_json::from_value(params).map_err(|e| format!("参数解析失败: {}", e))?;
+            super::require_lobby_enabled(&state).await?;
             let creds = super::load_creds(&state).await?;
             let client = super::make_client(&state).await;
             log_info!(

@@ -109,7 +109,7 @@ function goTutorial() {
  * 侧边栏分类切换处理器
  *
  * 'tutorial' 是动作项（跳转到设置-教程页），不切换 activeCategory；
- * 封禁态分类（云端离线时的房间/大厅）点击后弹窗告知原因，不切换；
+ * 封禁态分类点击后只弹窗告知原因（未启用联机大厅时引导去设置页），不切换；
  * 其余分类直接赋值。
  */
 async function handleCategoryChange(id: string): Promise<void> {
@@ -124,25 +124,24 @@ async function handleCategoryChange(id: string): Promise<void> {
       install.promptMissing(sealed.label)
       return
     }
-    if (!onlineStore.lobbyEnabled) {
-      // 未启用联机大厅：就地询问是否启用（启用后才可使用联机功能），确认后继续进入该分类
-      const agreed = await showConfirmAsync(
+    if (sealed.reason === 'lobby') {
+      // 未启用联机大厅：只提示并引导到设置页，不就地开启开关
+      const go = await showConfirmAsync(
         '需要启用联机大厅',
-        `「${sealed.label}」需要使用云端服务（房间登记、信令与公开房间列表）才能使用。\n是否现在启用？`,
+        `「${sealed.label}」需要使用云端服务（房间登记、信令与公开房间列表）。\n请先在「设置 → 联机」页开启「启用联机大厅（与云端交互）」。\n是否前往设置页？`,
       )
-      if (!agreed) return
-      const enabled = await onlineStore.setLobbyEnabled(true)
-      if (!enabled) return
-    } else if (!onlineStore.cloudConnected) {
+      if (go) goSettings()
+      return
+    }
+    if (!onlineStore.cloudConnected) {
       showWarning(
         '功能已封存',
         `「${sealed.label}」需要连接云端服务，当前云端连接失败，暂不可用。`,
         onlineStore.cloudError ?? undefined,
       )
       return
-    } else {
-      return
     }
+    return
   }
   activeCategory.value = id as OnlineCategoryId
 }
