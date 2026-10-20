@@ -6,6 +6,10 @@
 
 ### 修复
 
+#### 修复未启用联机大厅时联机分类仍可用
+
+- **修复关闭「启用联机大厅（与云端交互）」后联机大厅与搭桥联机仍可正常进入**（[useOnlineNav.ts](src/composables/useOnlineNav.ts) / [Online.vue](src/views/Online.vue)）：该开关此前只写入配置，联机页的就绪判定只看「已注册 + 已登录」；而 `auth_init` 出于「设备注册是基础能力、与开关解耦」的设计恒返回 `disabled: false`，所以开关关闭后 `cloudConnected` 仍为 `true`，分类不封存，搭桥联机的创建 / 加入房间完全不受影响。现在 `lobbyEnabled = false` 时「联机大厅」与「搭桥联机」（含创建 / 加入 / 房间详情子项）统一封存，新增封禁原因 `lobby`，点击提示「需要启用联机大厅」并可当场开启；侧边栏状态徽章显示「未启用」；开关关闭时强制停留在「设备」分类，避免停在房间面板或经 URL `?tab=create` 恢复后内容区仍渲染 RoomManager。初始化期间不按「未启用」封存，避免启动瞬间侧边栏闪烁。设备注册与令牌续期、红石联机、FRP 不受影响（与开关说明一致）。
+
 #### 修复描边按钮丢失边框
 
 - **修复 `outline` 类型按钮在全站丢失边框**（[main.css](src/assets/styles/main.css)）：Tailwind 4 迁移（`09013b4d`）把按钮样式改写为 `@utility` 后，自定义类的输出顺序不再跟随源码 —— 实测基类 `.btn` 被排到 `.btn-primary` / `.btn-outline` 等变体**之后**。于是 `.btn` 里的 `border: 1px solid transparent` 简写覆盖了 `.btn-outline` 已声明的 `border-color: var(--color-primary-500)`，边框被刷回透明；`color` 不受影响，所以描边按钮只剩一行主色文字，看起来像纯文本、完全看不出可点（联机页房间类型的未选中项、创建面板的「选择端口」「高级设置」等 116 处 `type="outline"` 全部命中）。改为基类只声明 `border-width` / `border-style`、颜色交给各变体自行设置，边框恢复；`primary` / `secondary` / `ghost` / `text` 本来就把 `border-color` 设为 `transparent`，行为不变。

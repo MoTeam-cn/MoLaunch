@@ -42,8 +42,8 @@ export interface NavCategory {
   disabled?: boolean
   /** 封禁态：灰色置灰但点击仍会触发，由 Online.vue 拦截弹窗告知原因 */
   sealed?: boolean
-  /** 封禁原因：cloud=云端离线，kernel=easytier 内核缺失（默认 cloud） */
-  sealedReason?: 'cloud' | 'kernel'
+  /** 封禁原因：cloud=云端离线，kernel=easytier 内核缺失，lobby=未启用联机大厅（默认 cloud） */
+  sealedReason?: 'cloud' | 'kernel' | 'lobby'
 }
 
 /** Online 页激活分类 ID 联合类型（tutorial 为侧边栏动作项，不会真正成为激活态） */
@@ -180,6 +180,26 @@ export function useOnlineNav(
    * 已就绪时「搭桥联机」展开子菜单：创建/加入房间在房间中置灰，房间详情未在房间置灰。
    */
   const categories = computed<NavCategory[]>(() => {
+    // 未启用联机大厅：大厅与房间（搭桥联机）整体封存，设备 / 红石 / FRP 不受影响。
+    // 放在云端判定之前：开关关闭时即便云端可达，功能也不可用，提示应指向「启用开关」。
+    if (!onlineStore.initializing && !onlineStore.lobbyEnabled) {
+      return [
+        deviceCategory,
+        { ...lobbyCategory, sealed: true, sealedReason: 'lobby' },
+        {
+          ...roomCategory,
+          sealed: true,
+          sealedReason: 'lobby',
+          children: roomCategory.children!.map((child) => ({
+            ...child,
+            sealed: true,
+            sealedReason: 'lobby',
+          })),
+        },
+        redstoneCategory,
+        frpCategory,
+      ]
+    }
     const offline = !onlineStore.cloudConnected && !onlineStore.initializing
     if (offline) {
       return [
@@ -218,6 +238,9 @@ export function useOnlineNav(
 
   /** 状态徽章文案与颜色 */
   const badge = computed(() => {
+    if (!onlineStore.initializing && !onlineStore.lobbyEnabled) {
+      return { text: '未启用', dotClass: 'bg-gray-400', wrapClass: 'bg-gray-100 text-gray-600' }
+    }
     if (!onlineStore.cloudConnected && !onlineStore.initializing) {
       return { text: '云端离线', dotClass: 'bg-red-400', wrapClass: 'bg-red-50 text-red-600' }
     }
@@ -264,8 +287,8 @@ export function useOnlineNav(
    * 时 categories 已就绪，完整恢复所有合法 tab。
    */
   watch(isReady, (ready) => {
-    // 云端离线：强制停留「设备」，避免自动切到被封禁的分类
-    if (!onlineStore.cloudConnected) {
+    // 未启用联机大厅 / 云端离线：强制停留「设备」，避免自动切到被封禁的分类
+    if (!onlineStore.lobbyEnabled || !onlineStore.cloudConnected) {
       if (activeCategory.value !== 'device') activeCategory.value = 'device'
       return
     }
@@ -310,6 +333,19 @@ export function useOnlineNav(
     () => onlineStore.cloudConnected,
     (connected) => {
       if (!connected && !onlineStore.initializing && activeCategory.value !== 'device') {
+        activeCategory.value = 'device'
+      }
+    },
+  )
+
+  /**
+   * 联机大厅开关关闭：大厅/搭桥联机封存，强制切回「设备」，
+   * 避免停在被封禁分类（或 URL ?tab= 恢复）时内容区仍渲染 RoomManager/Lobby
+   */
+  watch(
+    () => onlineStore.lobbyEnabled,
+    (enabled) => {
+      if (!enabled && activeCategory.value !== 'device') {
         activeCategory.value = 'device'
       }
     },

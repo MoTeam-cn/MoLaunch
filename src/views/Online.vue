@@ -53,8 +53,8 @@ const { categories, badge, activeDesc, activeLabel } = useOnlineNav(activeCatego
 const install = useEasyTierInstall()
 
 /** 当前分类中处于封禁态的 id → { 名称, 原因 } 映射，用于点击时弹窗告知原因 */
-const sealedCategories = computed<Record<string, { label: string; reason: 'cloud' | 'kernel' }>>(() => {
-  const map: Record<string, { label: string; reason: 'cloud' | 'kernel' }> = {}
+const sealedCategories = computed<Record<string, { label: string; reason: 'cloud' | 'kernel' | 'lobby' }>>(() => {
+  const map: Record<string, { label: string; reason: 'cloud' | 'kernel' | 'lobby' }> = {}
   for (const cat of categories.value) {
     if (cat.sealed) map[cat.id] = { label: cat.label, reason: cat.sealedReason ?? 'cloud' }
     for (const child of cat.children ?? []) {
