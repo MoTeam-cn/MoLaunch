@@ -9,7 +9,7 @@ mod params;
 mod registry;
 mod room_actions;
 
-use registry::{load_creds, make_client};
+use registry::{load_creds, make_client, require_lobby_enabled};
 
 pub use params::*;
 pub use registry::register_signaling_actions;
