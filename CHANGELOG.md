@@ -6,6 +6,31 @@
 
 ### 新增
 
+#### 检查更新支持切换更新源（云端 / GitHub / 自动）
+
+- **新增 GitHub 静态清单通道**（[github.rs](src-tauri/src/commands/system/updater/github.rs) 新增 / [github_test.rs](src-tauri/src/commands/system/updater/github_test.rs) 新增 / [api_paths.rs](src-tauri/src/api_paths.rs)）：读取 Release 里的 `latest.json` 资产，按通道取条目、按平台取下载地址与签名，**不需要设备凭证**。稳定通道用 `releases/latest/download/latest.json`；beta / alpha 用滚动 tag（`channel-beta` / `channel-alpha`）下的同名资产。清单结构：`channels.<channel>.{version, notes, force_update, platforms.<os-arch>.{url, signature}}`，通道缺失时回退 `stable`。
+- **更新源可切换**（[developer.rs](src-tauri/src/commands/system/developer.rs) / [manager/developer.rs](src-tauri/src/commands/system/manager/developer.rs) / [check.rs](src-tauri/src/commands/system/updater/check.rs) / [mod.rs](src-tauri/src/commands/system/updater/mod.rs)）：开发者中心新增「检查更新源」，取值 `api`（默认，云端需鉴权清单、按设备灰度）/ `github`（静态清单、免凭证）/ `auto`（云端优先，失败或未注册时降级 GitHub）。检查逻辑拆为 `check_update` 分发 + `check_api`（原云端流程）+ `check_github`。
+- **开发者中心新增下拉**（[ExperimentalTab.vue](src/views/settings/developer/ExperimentalTab.vue) / [developer.ts](src/utils/api/developer.ts) / [system-manager.ts](src/utils/api/system-manager.ts)）：与「更新检测分支」并列，切换后立即生效并写入注册表 `UpdateSource`，撤销开发者模式时重置为 `api`。
+
+### 变更
+
+#### 更新下载域名白名单放行 GitHub 分发链路
+
+- **白名单扩至 4 项**（[net.rs](src-tauri/src/utils/net.rs)）：在官方 API / CDN 之外放行 `github.com` 与 `objects.githubusercontent.com`——Release 资产下载会 302 到后者，不放行会导致 GitHub 通道取到清单却下不了包。
+
+#### 联机大厅开关文案对齐实际行为
+
+- **明确开关只管网关功能**（[OnlineLobbyCard.vue](src/components/settings/OnlineLobbyCard.vue)）：标题由「启用联机大厅（与云端交互）」改为「启用联机大厅（房间与搭桥）」，确认弹窗与卡片说明逐条列出不受开关影响的基础联网项（设备标识注册与续期、启动上报、更新检查、公告拉取、FRP 服务器列表），避免被读成「关闭即不联网」。行为未变。
+- **内置《用户协议》补充基础联网说明**（[userAgreement.ts](src/utils/userAgreement.ts)）：新增一条要点说明启动时的设备标识注册、启动上报、更新检查与公告拉取；协议版本 `2` → `3`，已同意的用户会重新收到同意弹窗。
+
+### 修复
+
+#### 修复更新检查单元测试未被编译
+
+- **恢复测试模块声明**（[check.rs](src-tauri/src/commands/system/updater/check.rs) / [check_test.rs](src-tauri/src/commands/system/updater/check_test.rs)）：`check_test.rs` 此前既没有 `#[cfg(test)] mod check_test;` 声明，又引用了早已删除的 `pick_github_asset`，等于从未参与编译。现补上声明并移除失效用例，保留全部版本比较用例。
+
+### 新增
+
 #### 外观支持动态主色档位
 
 - **主色阶可沿色相路径连续流动**（[useAccentDynamics.ts](src/composables/useAccentDynamics.ts) 新增 / [AccentDynamicsSection.vue](src/views/settings/personal/AccentDynamicsSection.vue) 新增 / [AppearanceSection.vue](src/views/settings/personal/AppearanceSection.vue) / [App.vue](src/App.vue)）：档位表以内部编号 + 密文展示名存放，运行期还原，沿色相路径对 50~950 档主色阶做连续插值后写入 CSS 变量，菜单栏、按钮、选中态等全部主色区域同步流动；未选定档位时不启动定时器，完全走静态主色。所选档位记在本地（`molaunch.ui.accentProfile`），启动时自动恢复；切回「跟随主题色」即还原 `settings.primaryColor`。
