@@ -16,6 +16,15 @@ impl LaunchPipeline {
     ) -> Result<LaunchResult, LaunchError> {
         use tokio::process::Command;
 
+        // 启动前自检：`-cp` 这类必须带取值的选项后面必须是真实取值。
+        // 否则 JVM 会弹出原生错误框（Error: -cp requires class path specification），
+        // 启动器侧拿不到任何可读信息，用户只能看到一句 Java 报错。
+        validate_jvm_args(&args.jvm_args).map_err(|message| LaunchError {
+            stage: LaunchStage::LaunchProcess,
+            message,
+            is_user_facing: true,
+        })?;
+
         let mut cmd = Command::new(java_path);
 
         for arg in &args.jvm_args {
@@ -226,3 +235,32 @@ impl LaunchPipeline {
         })
     }
 }
+
+/// 必须带取值的 JVM 选项
+const VALUE_REQUIRED_OPTIONS: [&str; 3] = ["-cp", "-classpath", "--class-path"];
+
+/// 校验 JVM 参数里需要取值的选项后确实跟着有效取值
+///
+/// 空取值、或以 `-` 开头的取值都视为异常：JVM 会把这类参数当成缺失取值，
+/// 直接抛出 `-cp requires class path specification` 之类的原生错误。
+fn validate_jvm_args(jvm_args: &[String]) -> Result<(), String> {
+    for (index, arg) in jvm_args.iter().enumerate() {
+        if !VALUE_REQUIRED_OPTIONS.contains(&arg.as_str()) {
+            continue;
+        }
+        match jvm_args.get(index + 1) {
+            Some(next) if !next.trim().is_empty() && !next.starts_with('-') => {}
+            _ => {
+                return Err(format!(
+                    "启动参数异常：{} 缺少 classpath 取值，请重新安装该版本后再试",
+                    arg
+                ));
+            }
+        }
+    }
+    Ok(())
+}
+
+#[cfg(test)]
+#[path = "process_spawn_test.rs"]
+mod process_spawn_test;

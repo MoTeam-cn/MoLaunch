@@ -107,8 +107,22 @@ pub(super) fn add_lua_args(args: &mut Vec<String>, json: &serde_json::Value, dis
     crate::log_info!("[Launch] 使用 LUA：{}", use_lua);
 }
 
+/// 判断是否为 classpath 选项（其取值由本模块统一注入）
+fn is_classpath_option(value: &str) -> bool {
+    matches!(value, "-cp" | "-classpath" | "--class-path")
+}
+
 /// 解析版本 JSON 的 arguments.jvm（必需 JVM 参数）
-/// 跳过 ${classpath} 和 ${natives_directory}（由调用方单独处理）
+///
+/// 版本 JSON 里 classpath 与 natives 相关条目一律不采用，由本模块统一注入：
+/// - `-cp` / `-classpath` / `--class-path` 及其后的 `${classpath}` 占位值整体丢弃。
+///   原实现只丢弃占位值、保留裸 `-cp`，最终参数里会出现 `-cp -cp <真实 classpath>`，
+///   JVM 会把第二个 `-cp` 当成 classpath、把真实 classpath 当成主类；
+///   若 classpath 为空或经启动包装器重组，则会退化成裸 `-cp`，直接弹出
+///   「Error: -cp requires class path specification」这类 JVM 原生错误框。
+/// - 含 `${natives_directory}` 的条目丢弃：natives 目录与 `-Djava.library.path` 由本模块设置，
+///   且新版 JSON 使用 `${natives_directory}/java` 之类的子目录布局，与本项目解压布局不一致。
+/// - 其余占位符就地替换，避免 `${launcher_name}` 这类字面量泄漏进 JVM 参数。
 pub(super) fn add_json_jvm_args(
     args: &mut Vec<String>,
     json: &serde_json::Value,
@@ -117,62 +131,80 @@ pub(super) fn add_json_jvm_args(
 ) {
     let libraries_dir = game_dir.join("libraries");
     // 保留 PathBuf 原生分隔符：Windows 上是 `\`，Unix 上是 `/`
-    // JVM 在所有平台上都接受原生分隔符，无需强制替换
-    // （原代码 `.replace('/', "\\")` 在 macOS/Linux 上会生成带反斜杠的非法路径）
     let libraries_dir_str = libraries_dir.to_string_lossy().to_string();
-    if let Some(jvm_args_json) = json["arguments"]["jvm"].as_array() {
-        for arg in jvm_args_json {
-            let (value, rules) = if let Some(s) = arg.as_str() {
-                (s.to_string(), None)
-            } else if let Some(obj) = arg.as_object() {
-                let value = obj.get("value").and_then(|v| {
-                    if let Some(s) = v.as_str() {
-                        Some(s.to_string())
-                    } else if let Some(arr) = v.as_array() {
-                        Some(
-                            arr.iter()
-                                .filter_map(|v| v.as_str().map(|s| s.to_string()))
-                                .collect::<Vec<_>>()
-                                .join(" "),
-                        )
-                    } else {
-                        None
-                    }
-                });
-                let rules = obj.get("rules").and_then(|r| r.as_array()).cloned();
-                match value {
-                    Some(v) => (v, rules),
-                    None => continue,
+    let classpath_separator = if cfg!(target_os = "windows") {
+        ";"
+    } else {
+        ":"
+    };
+
+    let Some(jvm_args_json) = json["arguments"]["jvm"].as_array() else {
+        return;
+    };
+
+    // 上一个被丢弃的是 classpath 选项时，紧随其后的 `${classpath}` 占位值也要一起丢
+    let mut drop_next_classpath_value = false;
+
+    for arg in jvm_args_json {
+        let (value, rules) = if let Some(s) = arg.as_str() {
+            (s.to_string(), None)
+        } else if let Some(obj) = arg.as_object() {
+            let value = obj.get("value").and_then(|v| {
+                if let Some(s) = v.as_str() {
+                    Some(s.to_string())
+                } else {
+                    v.as_array().map(|arr| {
+                        arr.iter()
+                            .filter_map(|v| v.as_str().map(|s| s.to_string()))
+                            .collect::<Vec<_>>()
+                            .join(" ")
+                    })
                 }
-            } else {
-                continue;
-            };
+            });
+            let rules = obj.get("rules").and_then(|r| r.as_array()).cloned();
+            match value {
+                Some(v) => (v, rules),
+                None => continue,
+            }
+        } else {
+            continue;
+        };
 
-            if !crate::minecraft::version::libraries::check_rules(&rules) {
+        if !crate::minecraft::version::libraries::check_rules(&rules) {
+            continue;
+        }
+
+        if drop_next_classpath_value {
+            drop_next_classpath_value = false;
+            if value.contains("${classpath}") {
                 continue;
             }
+        }
 
-            if value.contains("${classpath}") || value.contains("${natives_directory}") {
-                continue;
-            }
+        if is_classpath_option(value.trim()) {
+            drop_next_classpath_value = true;
+            continue;
+        }
 
-            // classpath 分隔符：Windows 用 `;`，Unix 系（macOS/Linux）用 `:`
-            // 原代码硬编码 `;` 会导致 macOS/Linux 上 JVM 无法解析 classpath
-            let classpath_separator = if cfg!(target_os = "windows") {
-                ";"
-            } else {
-                ":"
-            };
-            let value = value
-                .replace("${library_directory}", &libraries_dir_str)
-                .replace("${classpath_separator}", classpath_separator)
-                .replace("${version_name}", version_id);
+        if value.contains("${classpath}")
+            || value.contains("${natives_directory}")
+            || value.trim_start().starts_with("-Djava.library.path=")
+        {
+            continue;
+        }
 
+        let value = value
+            .replace("${library_directory}", &libraries_dir_str)
+            .replace("${classpath_separator}", classpath_separator)
+            .replace("${version_name}", version_id)
+            .replace("${launcher_name}", "molaunch")
+            .replace("${launcher_version}", env!("CARGO_PKG_VERSION"));
+
+        if !value.trim().is_empty() {
             args.push(value);
         }
     }
 }
-
 /// JLW（Java Launch Wrapper）
 /// - 仅当未禁用、非 GBK 编码、路径非纯 ASCII 时触发（仅在该环境下才会触发 JDK-8272352 Bug）
 /// - 若用户自定义参数含 -javaagent 则禁用 JLW（冲突会导致崩溃）
@@ -282,3 +314,7 @@ pub(crate) fn build_jvm_args(
 
     Ok(args)
 }
+
+#[cfg(test)]
+#[path = "build_test.rs"]
+mod build_test;

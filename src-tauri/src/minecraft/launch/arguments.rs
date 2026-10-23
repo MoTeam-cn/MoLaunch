@@ -49,6 +49,14 @@ pub fn build_launch_arguments(
         .to_string();
 
     let classpath = build_classpath(game_dir, &json)?;
+    // 空 classpath 会把裸 `-cp` 传给 JVM，用户只会看到 Java 原生错误框
+    // （Error: -cp requires class path specification），这里提前给出可读原因。
+    if classpath.is_empty() {
+        return Err(anyhow::anyhow!(
+            "版本 {} 的库文件缺失（classpath 为空），请在版本列表重新安装该版本后再启动",
+            version_id
+        ));
+    }
     let assets_dir = game_dir.join("assets").to_string_lossy().to_string();
     let asset_index = json["assetIndex"]["id"]
         .as_str()
