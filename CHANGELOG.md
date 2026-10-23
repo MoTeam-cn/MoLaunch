@@ -6,6 +6,18 @@
 
 ### 修复
 
+#### 公告改为定时轮询，并在窗口回到前台时弹出
+
+- **轮询与焦点补弹**（[announcement.ts](src/utils/announcement.ts) / [App.vue](src/App.vue)）：启动立即拉一次，之后每 10 分钟拉一次；拉到未读公告时若窗口不在前台（`document.hasFocus()` 为假或页面隐藏），先暂存到内存队列，等 `focus` / `visibilitychange` 回到前台再弹，避免公告弹在后台被错过。焦点事件同时做 60 秒去抖补拉，长时间挂后台切回来也能拿到新公告。关闭弹窗后会自动补弹暂存的公告。
+- **层级修正**（[Drawer.vue](src/components/common/Drawer.vue) / [MessageDrawer.vue](src/components/common/MessageDrawer.vue)）：`Drawer` 新增 `zIndex` 属性（默认 1000）；确认类消息抽屉提高到 1200，公告弹窗里点链接弹出的「是否在系统浏览器打开」不再被公告抽屉盖住。
+
+#### 日志分析的思考过程改为流式显示
+
+- **后端转发推理增量**（[analyze.rs](src-tauri/src/commands/experimental/manager/analyze.rs)）：`on_reasoning_delta` 原先是个空闭包，思考模型的 `reasoning_content` 增量被直接丢弃，前端只能等正文一次性到达；现在按 `ai-analyze-stream` 的 `reasoning` 字段实时推送（与 AI 对话的 `ai-chat-stream` 同一口径）。
+- **前端默认展开思考过程**（[AiLogAnalyzer.vue](src/components/experimental/AiLogAnalyzer.vue)）：发起分析时自动展开「思考过程」折叠面板，推理文本随流增长并自动滚到底部，不再需要用户手动点开。
+
+### 修复
+
 #### 更新包已下载完成后不再重复下载，直接重启安装
 
 - **后端新增待安装状态查询**（[install_windows.rs](src-tauri/src/commands/system/updater/install_windows.rs) / [api.rs](src-tauri/src/commands/system/updater/api.rs) / [updater.rs](src-tauri/src/commands/system/manager/updater.rs)）：后台预下载时把版本号写入 `%APPDATA%/.Molaunch/last.version`，新增 `pending_update_status` action 返回「是否已有可直接安装的包 + 已下载版本号」，判定条件与 `apply_pending_update` 的 `last.exe` + `last.sig` 配对校验同源。
