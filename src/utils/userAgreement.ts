@@ -12,7 +12,7 @@ import { applyConfig, getConfigMap } from '@/utils/api/config'
 import { onlineManager } from '@/utils/api/online-manager'
 
 /** 本地默认《用户协议》版本号（协议内容每次有实质更新时自增，触发用户重新同意） */
-export const USER_AGREEMENT_VERSION = 2
+export const USER_AGREEMENT_VERSION = 3
 
 /** 可远程下发的《用户协议》配置（本地默认 + 后续 apiServer 覆盖） */
 export interface UserAgreementRemoteConfig {
@@ -51,6 +51,7 @@ const DEFAULT_USER_AGREEMENT_CONFIG: UserAgreementRemoteConfig = {
     '账号与使用：请您遵循当地法律法规，不得利用本软件从事任何违法、侵权或危害网络安全的行为；使用第三方账号登录时，请同时遵守对应平台的规则。',
     '软件与内容：本软件及授权内容的许可以项目仓库最新 LICENSE 为准，第三方内容受其各自许可约束，可在「设置 → 更多 → 许可协议」查看版本说明。',
     '隐私与数据：本软件的云端、联机、AI 等功能可能涉及数据外发，具体处理方式见《隐私声明》与对应功能说明；请妥善管理并控制您主动上传的内容。',
+    '基础联网项：为完成版本分发与可用性统计，启动器启动时会注册设备标识、上报一次启动事件、检查更新并拉取公告；联机大厅、FRP 等功能需另行开启，可在设置页查看说明。',
     '服务与变更：本协议可能随版本更新调整，更新后以您再次明确同意为准；完整条款与最新版本以官网《服务条款》《隐私政策》为准。',
   ],
   termsUrl: 'https://molaunch.moiu.cn/terms',
