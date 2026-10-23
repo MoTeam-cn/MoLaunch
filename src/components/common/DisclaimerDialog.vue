@@ -1,5 +1,6 @@
 <template>
   <Drawer
+    :z-index="1200"
     :visible="visible"
     placement="right"
     :width="520"
