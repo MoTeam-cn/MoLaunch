@@ -47,6 +47,31 @@
 - **默认不带 `!c`**：`!c` 仅在需要跳过本次推送触发的 CI 构建时附加
 - `note:` 前缀的提交表示「作者的话」，会展示在更新日志弹窗顶部（详见开发规范 2.5 节）
 
+## 发布与通道 tag
+
+发布由 tag 驱动：推送 `v*` 标签后，`version-sync.yml` 先把仓库内版本号文件同步到标签版本并提交，
+再以 `workflow_call` 激活 `release.yml`；**不要**手工改完版本号再打 tag 之外的额外操作。
+
+一次发版产出两条分发链路：
+
+- **云端通道**：安装包推 S3 并在 api-server 注册版本，启动器默认按此检查更新（需设备凭证、可按设备灰度）。
+- **GitHub 通道**：产物附加到 GitHub Release 供手动下载，同时由 `release.yml` 的 `Generate update manifest` 步骤
+  生成 `latest.json`（`scripts/generate-update-manifest.cjs`），供启动器「检查更新源 = GitHub」时读取。
+
+`latest.json` 要点：
+
+- 结构为 `channels.<通道>.{version, notes, force_update, platforms.<平台>.{url, signature}}`，通道取 `stable` / `beta` / `alpha`；
+- Windows 平台指向**便携版**（`MoLaunch_<ver>_x64.exe`），不是 NSIS 安装包——自更新要替换主程序本体；
+- `signature` 取自随包的 `.sig`，缺失时该字段省略（不会阻断发版，但该平台无法校验更新包）；
+- `force_update` 默认 `false`，需要强制更新时在发版任务里置 `FORCE_UPDATE=true`。
+
+**滚动通道 tag**（`channel-beta` / `channel-alpha`）：
+
+- 预发布发版时，清单会被额外推到 `channel-<通道>` 的专用 Release，因为 GitHub 没有「最新预发布」的固定路径；
+- 该 Release 标记 `prerelease` 且 `make_latest: false`，永远不会被 `/releases/latest` 命中，stable 通道仍由正式 Release 提供；
+- **不要删除这两个 tag / Release**，否则对应通道的 GitHub 更新源会 404；
+- 它们不是版本节点：`git describe` 计算上一个 tag 时已用 `--exclude='channel-*'` 排除，手动查历史时也请忽略。
+
 ## 环境要求
 
 - 前端：Node.js + npm
