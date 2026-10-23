@@ -6,6 +6,22 @@
 
 ### 修复
 
+#### AI 请求失败时直接显示服务端给出的原因
+
+- **统一解析错误响应体**（[error_body.rs](src-tauri/src/ai_core/client/error_body.rs) 新增）：兼容 `{"error":{"message":…}}`、`{"error":"…"}`、`{"error":[…]}`、`{"errors":[…]}`、`{"message":…}` 等形态，递归抽取可读文本，多段用「；」连接，非 JSON 时回退为压缩空白后的原文，超长截断到 300 字。
+- **所有调用方共用同一文案**（[chat.rs](src-tauri/src/ai_core/client/chat.rs) / [stream.rs](src-tauri/src/ai_core/client/stream.rs)）：对话、JSON 模式、模型列表、流式请求的 HTTP 错误统一为「AI 服务返回 HTTP <状态码>: <服务端原因>」，不再把整段原始 JSON 抛给用户；前端 `e.to_string()` 即可展示具体原因。
+- **流内错误不再静默**（[stream.rs](src-tauri/src/ai_core/client/stream.rs)）：部分服务在流式响应中途以 `data: {"error": …}` 返回限流/余额/审核错误，此前会被当成普通增量忽略、最终只表现为「AI 响应为空」；现在立即中止并报出真实原因。
+- **补充解析测试**（[error_body_test.rs](src-tauri/src/ai_core/client/error_body_test.rs) 新增）：覆盖 message 字段、error 字符串、error 数组、errors 数组、非 JSON 回退、空响应、超长截断、文案拼接 8 种情况。
+
+### 变更
+
+#### 对话框统一提到普通抽屉之上
+
+- **`Drawer` 层级可配**（[Drawer.vue](src/components/common/Drawer.vue)）：新增 `zIndex` 属性（默认 1000，内联到根节点），同类抽屉叠放时由调用方指定更高层级，不再依赖挂载顺序。
+- **对话框层统一 1200**（[MessageDrawer.vue](src/components/common/MessageDrawer.vue) / [CrashDialog.vue](src/components/common/CrashDialog.vue) / [HintDialog.vue](src/components/common/HintDialog.vue) / [DisclaimerDialog.vue](src/components/common/DisclaimerDialog.vue) / [AskUserDialog.vue](src/components/experimental/AskUserDialog.vue) / [UpdateLogDialog.vue](src/components/about/UpdateLogDialog.vue)）：确认、崩溃、提示、协议、追问、更新日志等对话框不再被后挂载的抽屉（公告、更新、设置等）遮挡。
+
+### 修复
+
 #### 公告改为定时轮询，并在窗口回到前台时弹出
 
 - **轮询与焦点补弹**（[announcement.ts](src/utils/announcement.ts) / [App.vue](src/App.vue)）：启动立即拉一次，之后每 10 分钟拉一次；拉到未读公告时若窗口不在前台（`document.hasFocus()` 为假或页面隐藏），先暂存到内存队列，等 `focus` / `visibilitychange` 回到前台再弹，避免公告弹在后台被错过。焦点事件同时做 60 秒去抖补拉，长时间挂后台切回来也能拿到新公告。关闭弹窗后会自动补弹暂存的公告。
