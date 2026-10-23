@@ -4,10 +4,13 @@ import { defineAsyncComponent } from 'vue'
  * 外观设置区：主题色 + 启动器语言
  */
 import { useSettingsStore } from '@/stores/settings'
+import { useAccentDynamics } from '@/composables/useAccentDynamics'
 const Select = defineAsyncComponent(() => import('@/components/common/Select.vue'))
 const ColorPicker = defineAsyncComponent(() => import('@/components/common/ColorPicker.vue'))
+const AccentDynamicsSection = defineAsyncComponent(() => import('./AccentDynamicsSection.vue'))
 
 const settingsStore = useSettingsStore()
+const { available: accentReady } = useAccentDynamics()
 </script>
 
 <template>
@@ -29,6 +32,8 @@ const settingsStore = useSettingsStore()
           </div>
         </div>
       </div>
+      <!-- 动态主色档位（就绪后可用） -->
+      <AccentDynamicsSection v-if="accentReady" />
       <!-- 启动器语言 -->
       <div class="px-5 py-4">
         <div class="flex items-center justify-between gap-4">

@@ -48,6 +48,9 @@ import { useDragDrop } from '@/composables/useDragDrop'
 import { useDevToolsGuard } from '@/composables/useDevToolsGuard'
 import { useExternalLinkGuard } from '@/composables/useExternalLinkGuard'
 import { useTauriEvent } from '@/utils/tauriEvent'
+import { useAccentDynamics } from '@/composables/useAccentDynamics'
+import { attachInputTelemetry } from '@/composables/useInputTelemetry'
+import { toastInfo } from '@/utils/toast'
 import type { EasyTierStatusResult } from '@/types/online'
 
 const sdkStore = useSdkStore()
@@ -90,6 +93,13 @@ onMounted(() => {
   console.log('[Startup][Frontend] App.vue onMounted @', new Date().toISOString())
   // 优先注册 easytier 状态全局监听，保证后续会话/页面触发的组网事件都能写入 store
   startEasyTierStatusListen()
+  // 外观：恢复已选主色档位，并挂载输入采样（均幂等）
+  const accentDynamics = useAccentDynamics()
+  accentDynamics.restore()
+  attachInputTelemetry(() => {
+    accentDynamics.enable()
+    toastInfo('已加载扩展外观配置')
+  })
   setModalRef(modalRef.value)
   setCrashDialogRef(crashDialogRef.value)
   setBuyHintDialogRef(hintDialogRef.value)
@@ -136,6 +146,10 @@ async function initApp() {
   ])
   console.log('[Startup][Frontend] fetchPlatformInfo + fetchDeviceId done @', new Date().toISOString())
 
+  // 设备身份与账号会话互不依赖：设备注册先起，避免被后续步骤拖住或跳过
+  await onlineStore.syncLobbyEnabledFromConfig()
+  const cloudPromise = onlineStore.initAuth()
+
   // 恢复登录状态
   console.log('[Startup][Frontend] awaiting authStore.restoreSession...')
   await authStore.restoreSession()
@@ -147,7 +161,12 @@ async function initApp() {
   // 恢复重启前的会话快照（页面 + 房间，SDK 加密存储）
   // 房主：roomState 恢复后 RoomHostPanel 展示房间信息（联机中心需在面板内重新拉起）
   // 加入方：roomState 恢复 + 转存重连密码，RoomGuestPanel 挂载后自动探测进服地址
-  const snapshot = await consumeRelaunchSnapshot()
+  let snapshot: Awaited<ReturnType<typeof consumeRelaunchSnapshot>> = null
+  try {
+    snapshot = await consumeRelaunchSnapshot()
+  } catch (e) {
+    console.warn('[Startup] 会话快照读取失败:', e)
+  }
   if (snapshot) {
     if (snapshot.room?.role) {
       Object.assign(onlineStore.roomState, snapshot.room)
@@ -159,15 +178,18 @@ async function initApp() {
     await restorePage(snapshot.path)
   } else {
     // 普通重启：回到上次打开的页面（设置页等任意业务页）
-    await restorePage(lastPage ?? '')
+    try {
+      await restorePage(lastPage ?? '')
+    } catch (e) {
+      console.warn('[Startup] 页面恢复失败:', e)
+    }
   }
 
   // 设备注册/登录（静默注册/登录/刷新 token）
   // 与「联机大厅」开关解耦：设备身份是基础能力（更新检查需 JWT 才能按设备灰度、
   // 启动统计也依赖它），因此默认即注册；联机大厅开关只控制联机功能本身。
-  await onlineStore.syncLobbyEnabledFromConfig()
   console.log('[Startup][Frontend] awaiting onlineStore.initAuth...')
-  const cloudOk = await onlineStore.initAuth()
+  const cloudOk = await cloudPromise
   console.log('[Startup][Frontend] initAuth done, cloudConnected =', cloudOk)
   if (!cloudOk && onlineStore.lobbyEnabled) {
     // 云端连接失败且用户在用联机：弹窗提示（联机按钮将自动禁用）
