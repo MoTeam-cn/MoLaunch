@@ -8,6 +8,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::handler;
 use crate::log_debug;
+use crate::log_warn;
 use crate::utils::dispatcher::Dispatcher;
 
 /// 公告拉取超时
@@ -109,15 +110,14 @@ async fn fetch(state: &crate::state::AppState) -> AnnouncementListResponse {
         return AnnouncementListResponse::failed("服务端返回非成功状态");
     }
 
-    let announcements = json
-        .get("data")
-        .and_then(|d| d.as_array())
-        .map(|arr| {
-            arr.iter()
-                .filter_map(|v| serde_json::from_value(v.clone()).ok())
-                .collect()
-        })
-        .unwrap_or_default();
+    let announcements = match extract_items(&json) {
+        Some(list) => list,
+        None => {
+            log_warn!("[Announcement] 响应结构异常：data 既不是数组，也没有 items 字段");
+            return AnnouncementListResponse::failed("响应结构异常");
+        }
+    };
+    log_debug!("[Announcement] 拉到 {} 条公告", announcements.len());
 
     AnnouncementListResponse {
         success: true,
@@ -125,3 +125,28 @@ async fn fetch(state: &crate::state::AppState) -> AnnouncementListResponse {
         error: String::new(),
     }
 }
+
+/// 从响应中取出公告数组
+///
+/// 服务端 `GET /v1/announcements` 的 data 是 `{ items: [...] }`，
+/// 这里同时兼容 data 直接为数组的形态，避免服务端包一层就静默丢光公告。
+/// 单条解析失败只跳过该条并记 warn，不再静默吞掉整份列表。
+fn extract_items(json: &serde_json::Value) -> Option<Vec<PublicAnnouncement>> {
+    let data = json.get("data")?;
+    let arr = data
+        .get("items")
+        .and_then(|i| i.as_array())
+        .or_else(|| data.as_array())?;
+    let mut out = Vec::with_capacity(arr.len());
+    for (idx, item) in arr.iter().enumerate() {
+        match serde_json::from_value::<PublicAnnouncement>(item.clone()) {
+            Ok(a) => out.push(a),
+            Err(e) => log_warn!("[Announcement] 第 {} 条解析失败（已跳过）: {}", idx + 1, e),
+        }
+    }
+    Some(out)
+}
+
+#[cfg(test)]
+#[path = "announcement_test.rs"]
+mod announcement_test;
