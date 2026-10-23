@@ -146,4 +146,5 @@ pub(super) async fn check_github(
 }
 
 #[cfg(test)]
+#[path = "github_test.rs"]
 mod github_test;

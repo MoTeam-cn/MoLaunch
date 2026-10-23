@@ -291,4 +291,5 @@ async fn check_api(
 }
 
 #[cfg(test)]
+#[path = "check_test.rs"]
 mod check_test;
