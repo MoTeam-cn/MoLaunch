@@ -35,7 +35,7 @@ import { setToastRef } from '@/utils/toast'
 import { notifyFrontendReady } from '@/utils/splash'
 import { initAutoCheck } from '@/utils/updater'
 import { maybeShowUpdateLog } from '@/utils/updateLog'
-import { maybeShowAnnouncements } from '@/utils/announcement'
+import { initAnnouncements } from '@/utils/announcement'
 import {
   consumeRelaunchSnapshot,
   setReconnectPassword,
@@ -215,9 +215,10 @@ async function initApp() {
   await javaPromise
   // 启动「本次更新日志」弹窗：版本升级后展示一次（无记录/回退/同版本不弹）
   maybeShowUpdateLog()
-  // 启动公告：拉取当前生效公告，仅弹出本机未读过的（已读记录见 utils/announcement.ts）
+  // 启动公告：立即拉一次，之后每 10 分钟拉一次；拉到未读公告时若窗口不在前台，
+  // 先暂存，等用户把焦点切回启动器再弹（见 utils/announcement.ts）
   // 不 await：公告晚到无所谓，不该拖慢启动
-  void maybeShowAnnouncements()
+  initAnnouncements()
   console.log('[Startup][Frontend] initApp fully done @', new Date().toISOString())
 }
 

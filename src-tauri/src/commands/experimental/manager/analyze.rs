@@ -109,6 +109,7 @@ pub(super) async fn ai_analyze_log(
     let step_seen_cell = std::sync::Arc::new(std::sync::Mutex::new(0u32));
 
     let app_delta = app.clone();
+    let app_reasoning = app.clone();
     let content_capture = content_cell.clone();
     let line_buf_capture = line_buf_cell.clone();
     let step_seen_capture = step_seen_cell.clone();
@@ -128,7 +129,10 @@ pub(super) async fn ai_analyze_log(
                 }
             }
         }),
-        on_reasoning_delta: Box::new(|_delta: &str| {}),
+        // 思考模型的推理增量：实时转发给前端「思考过程」面板（此前直接丢弃，只能等正文一次性出来）
+        on_reasoning_delta: Box::new(move |delta: &str| {
+            let _ = app_reasoning.emit("ai-analyze-stream", json!({ "reasoning": delta }));
+        }),
         on_tool_delta: Box::new(|_delta: &crate::ai_core::client::StreamToolDelta| {}),
         on_done: Box::new(|_usage: &StreamUsage| {}),
     };

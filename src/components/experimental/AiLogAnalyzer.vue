@@ -88,7 +88,8 @@ watch(
 
 async function runAnalyze(text?: string) {
   const source = typeof text === 'string' && text.trim() ? text : pendingText.value
-  reasoningExpanded.value = false
+  // 默认展开思考过程：推理是流式到达的，收起状态会让用户以为「思考日志不显示」
+  reasoningExpanded.value = true
   await startAnalyze(source)
 }
 </script>

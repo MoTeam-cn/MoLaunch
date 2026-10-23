@@ -192,6 +192,7 @@ defineExpose({
     :width="520"
     render-in-place
     popup-container="#app-content"
+    :z-index="1200"
     @update:visible="handleVisibleChange"
     @close="onDrawerClose"
   >

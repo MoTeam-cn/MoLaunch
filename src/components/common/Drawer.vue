@@ -59,6 +59,8 @@ interface Props {
   renderInPlace?: boolean
   /** 挂载容器（选择器或元素），默认 body；render-in-place 时建议传内容区容器（如 #app-content） */
   popupContainer?: string | HTMLElement
+  /** 层级（默认 1000）；同类抽屉叠放时由调用方指定更高值，避免互相遮挡 */
+  zIndex?: number
 }
 
 const props = withDefaults(defineProps<Props>(), {
@@ -75,6 +77,7 @@ const props = withDefaults(defineProps<Props>(), {
   unmountOnClose: false,
   undoMs: 0,
   popupContainer: 'body',
+  zIndex: 1000,
 })
 
 const emit = defineEmits<{
@@ -220,6 +223,7 @@ const panelStyle = computed(() => {
       v-show="visible || mounted"
       data-inner-scroll
       class="drawer-root"
+      :style="{ zIndex }"
       :class="[
         `drawer-placement-${placement}`,
         { 'drawer-root--maskless': !mask },
