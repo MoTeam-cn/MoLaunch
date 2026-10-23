@@ -11,12 +11,14 @@
 - **新增 GitHub 静态清单通道**（[github.rs](src-tauri/src/commands/system/updater/github.rs) 新增 / [github_test.rs](src-tauri/src/commands/system/updater/github_test.rs) 新增 / [api_paths.rs](src-tauri/src/api_paths.rs)）：读取 Release 里的 `latest.json` 资产，按通道取条目、按平台取下载地址与签名，**不需要设备凭证**。稳定通道用 `releases/latest/download/latest.json`；beta / alpha 用滚动 tag（`channel-beta` / `channel-alpha`）下的同名资产。清单结构：`channels.<channel>.{version, notes, force_update, platforms.<os-arch>.{url, signature}}`，通道缺失时回退 `stable`。
 - **更新源可切换**（[developer.rs](src-tauri/src/commands/system/developer.rs) / [manager/developer.rs](src-tauri/src/commands/system/manager/developer.rs) / [check.rs](src-tauri/src/commands/system/updater/check.rs) / [mod.rs](src-tauri/src/commands/system/updater/mod.rs)）：开发者中心新增「检查更新源」，取值 `api`（默认，云端需鉴权清单、按设备灰度）/ `github`（静态清单、免凭证）/ `auto`（云端优先，失败或未注册时降级 GitHub）。检查逻辑拆为 `check_update` 分发 + `check_api`（原云端流程）+ `check_github`。
 - **开发者中心新增下拉**（[ExperimentalTab.vue](src/views/settings/developer/ExperimentalTab.vue) / [developer.ts](src/utils/api/developer.ts) / [system-manager.ts](src/utils/api/system-manager.ts)）：与「更新检测分支」并列，切换后立即生效并写入注册表 `UpdateSource`，撤销开发者模式时重置为 `api`。
+- **发布流水线自动生成 GitHub 清单**（[generate-update-manifest.cjs](scripts/generate-update-manifest.cjs) 新增 / [release.yml](.github/workflows/release.yml)）：发版时扫描 release job 下载的三平台产物，按版本后缀推导通道（rc/beta → beta，alpha/dev → alpha，无后缀 → stable），从随包 `.sig` 读取签名，生成 `latest.json` 并随 Release 资产一并上传。预发布版本额外把清单推到滚动 tag（`channel-beta` / `channel-alpha`）的专用 Release，标记 `prerelease` 且 `make_latest: false`，确保它不会被 `/releases/latest` 命中、也不会抢占 stable 通道。
 
 ### 变更
 
 #### 更新下载域名白名单放行 GitHub 分发链路
 
 - **白名单扩至 4 项**（[net.rs](src-tauri/src/utils/net.rs)）：在官方 API / CDN 之外放行 `github.com` 与 `objects.githubusercontent.com`——Release 资产下载会 302 到后者，不放行会导致 GitHub 通道取到清单却下不了包。
+- **发布日志区间排除滚动通道 tag**（[release.yml](.github/workflows/release.yml)）：`git describe` 计算上一个 tag 时加 `--exclude='channel-*'`，避免承载 `latest.json` 的滚动 tag 被当作版本节点，导致更新日志区间错位。
 
 #### 联机大厅开关文案对齐实际行为
 
