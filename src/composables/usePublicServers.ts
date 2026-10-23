@@ -4,11 +4,19 @@
  * 从 TunnelCreateForm.vue 抽离，避免组件超 300 行约束。
  * 列表接口直接返回完整连接信息（token/地址/端口），选择服务器后回填表单。
  * form 由调用方传入（reactive 对象），composable 直接写入填充结果。
+ *
+ * 公共服务器列表属于云端联机能力，受「启用联机大厅（房间与搭桥）」开关约束：
+ * 开关关闭时前端先提示、不发起请求；后端 `lobby_gate` 做同源兜底。
  */
 import { computed, ref } from 'vue'
 import { listPublicServers } from '@/utils/api/frp-manager'
-import { toastError } from '@/utils/toast'
+import { toastError, toastWarning } from '@/utils/toast'
+import { useOnlineStore } from '@/stores/online'
 import type { PublicFrpServer } from '@/types/frp'
+
+/** 联机大厅未开启时的提示（与后端 lobby_gate 文案口径一致） */
+const LOBBY_DISABLED_HINT =
+  '公共服务器列表需要云端联机能力：请先在「设置 → 联机」页开启「启用联机大厅（房间与搭桥）」'
 
 /** 官方公共服务器不分配远程端口，客户端为 frpc 随机生成一个。 */
 function pickRemotePort(): number {
@@ -35,6 +43,7 @@ interface PublicServerFormTarget {
 }
 
 export function usePublicServers(form: PublicServerFormTarget) {
+  const onlineStore = useOnlineStore()
   const publicServers = ref<PublicFrpServer[]>([])
   const publicServersLoading = ref(false)
   const publicServerOptions = computed(() =>
@@ -46,11 +55,18 @@ export function usePublicServers(form: PublicServerFormTarget) {
 
   async function loadPublicServers() {
     if (publicServers.value.length > 0 || publicServersLoading.value) return
+    // 联机大厅关闭时不发起请求，直接给出去哪里开启的指引
+    if (!onlineStore.lobbyEnabled) {
+      toastWarning(LOBBY_DISABLED_HINT)
+      return
+    }
     publicServersLoading.value = true
     try {
       publicServers.value = await listPublicServers()
     } catch (e) {
-      toastError('加载公共服务器列表失败：' + e)
+      const msg = String(e)
+      // 后端守卫的文案已包含操作指引，原样透出避免叠加前缀
+      toastError(msg.includes('联机大厅未启用') ? msg : '加载公共服务器列表失败：' + msg)
     } finally {
       publicServersLoading.value = false
     }

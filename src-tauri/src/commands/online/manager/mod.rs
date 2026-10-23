@@ -10,6 +10,7 @@ pub(crate) mod easytier_install;
 mod lan_fake;
 mod lan_probe;
 mod launch_ping;
+mod lobby_gate;
 mod signaling_manager;
 mod user_agreement;
 
@@ -22,3 +23,4 @@ pub use dispatcher::{
     ServerTimeInfo,
 };
 pub use lan_fake::LanFakeServer;
+pub use lobby_gate::require_lobby_enabled;

@@ -2,6 +2,9 @@
 //!
 //! 仅含列出服务器。列表接口直接返回完整连接信息（公共 token + 地址端口），
 //! 客户端无需再走分配/释放/续期链路。
+//!
+//! 列表属于云端联机能力，受「启用联机大厅（房间与搭桥）」开关约束：关闭时后端直接拒绝，
+//! 与大厅/房间的信令守卫同源（`lobby_gate`）。
 
 use crate::handler;
 use crate::log_debug;
@@ -34,6 +37,7 @@ pub fn register(d: &mut Dispatcher) {
     d.register(
         "list_public_servers",
         handler!(state, _app, _params, {
+            crate::commands::online::manager::require_lobby_enabled(&state).await?;
             let creds = load_creds(&state).await?;
             let client = make_client(&state).await;
             log_debug!("[Frp] list_public_servers");

@@ -24,29 +24,8 @@ pub(super) async fn make_client(state: &AppState) -> OnlineClient {
     OnlineClient::new(&base_url)
 }
 
-/// 联机大厅关闭时的统一拒绝文案（与前端封存提示口径一致）
-pub(super) const LOBBY_DISABLED_MESSAGE: &str =
-    "联机大厅未启用：请先在「设置 → 联机」页开启「启用联机大厅（与云端交互）」后再使用";
-
-/// 联机大厅开关是否开启（配置项 `online.lobby_enabled`）
-pub(super) async fn is_lobby_enabled(state: &AppState) -> bool {
-    state.config.lock().await.online.lobby_enabled
-}
-
-/// 需要云端联机能力的 action 守卫：开关关闭时直接拒绝
-///
-/// 前端已对大厅/房间分类封存，这里做同源兜底——旧版客户端或直接调用 IPC
-/// 也必须受开关约束。只拦「创建 / 加入 / 大厅浏览」；`room_close` /
-/// `room_heartbeat` / `room_get` 不拦，避免关闭开关后卡在房间内无法退出。
-pub(super) async fn require_lobby_enabled(state: &AppState) -> Result<(), String> {
-    if is_lobby_enabled(state).await {
-        Ok(())
-    } else {
-        log_warn!("[Online] 联机大厅未启用，已拒绝房间/大厅操作");
-        Err(LOBBY_DISABLED_MESSAGE.to_string())
-    }
-}
-
+/// 联机大厅开关守卫（实现收敛在 online::manager::lobby_gate，房间与 FRP 共用）
+pub(super) use crate::commands::online::manager::require_lobby_enabled;
 /// 注册全部信令 action 到 dispatcher
 pub fn register_signaling_actions(d: &mut Dispatcher) {
     super::room_actions::register(d);
