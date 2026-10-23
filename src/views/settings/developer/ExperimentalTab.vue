@@ -2,10 +2,17 @@
 /**
  * 开发者 - 实验性功能子页签
  *
- * 包含更新检测分支切换。
+ * 包含更新检测分支与检查更新源切换。
  */
 import { ref, onMounted, defineAsyncComponent } from 'vue'
-import { getUpdateBranch, setUpdateBranch, type UpdateBranch } from '@/utils/api/developer'
+import {
+  getUpdateBranch,
+  setUpdateBranch,
+  getUpdateSource,
+  setUpdateSource,
+  type UpdateBranch,
+  type UpdateSource,
+} from '@/utils/api/developer'
 import { getCurrentChannel, getVersionInfo } from '@/utils/version'
 import { toastError, toastInfo } from '@/utils/toast'
 import { safeCall } from '@/utils/async'
@@ -47,10 +54,34 @@ async function onUpdateBranchChange(v: string | number) {
   }
 }
 
+// ==================== 检查更新源 ====================
+const sourceLabels: Record<string, string> = {
+  api: '云端（默认）',
+  github: 'GitHub Releases',
+  auto: '自动（云端优先）',
+}
+
+const sourceOptions = Object.entries(sourceLabels).map(([value, label]) => ({ label, value }))
+
+const updateSource = ref<UpdateSource>('api')
+
+async function onUpdateSourceChange(v: string | number) {
+  const source = String(v) as UpdateSource
+  try {
+    await setUpdateSource(source)
+    updateSource.value = source
+    toastInfo(`检查更新源已切换为 ${sourceLabels[source]}`)
+  } catch (e) {
+    toastError('切换检查更新源失败：' + e)
+    updateSource.value = await getUpdateSource()
+  }
+}
+
 onMounted(async () => {
   await safeCall(
     async () => {
       updateBranch.value = await getUpdateBranch()
+      updateSource.value = await getUpdateSource()
     },
     'load developer config',
     () => toastError('加载开发者配置失败'),
@@ -82,6 +113,31 @@ onMounted(async () => {
         <p class="text-xs text-gray-400 mt-2">
           当前版本 {{ versionInfo.raw }}（自动推导 {{ derivedBranch() }} 分支）；
           {{ updateBranch === 'auto' ? '更新检测分支跟随版本自动推导' : `已切换到 ${branchLabels[updateBranch]} 分支` }}
+        </p>
+      </div>
+      <!-- 检查更新源 -->
+      <div class="px-5 py-4">
+        <div class="flex items-center justify-between gap-4">
+          <div class="min-w-0">
+            <p class="text-sm font-medium text-gray-900">检查更新源</p>
+            <p class="text-xs text-gray-500 mt-0.5">
+              云端通道按设备灰度、需要设备凭证；GitHub 通道读取 Release 里的静态清单，不需要凭证
+            </p>
+          </div>
+          <div class="flex-none w-40">
+            <Select
+              :model-value="updateSource"
+              :options="sourceOptions"
+              @update:model-value="onUpdateSourceChange"
+            />
+          </div>
+        </div>
+        <p class="text-xs text-gray-400 mt-2">
+          {{
+            updateSource === 'auto'
+              ? '云端优先，失败时自动降级到 GitHub 清单'
+              : `当前使用 ${sourceLabels[updateSource]} 检查更新`
+          }}
         </p>
       </div>
     </div>

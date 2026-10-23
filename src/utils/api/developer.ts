@@ -138,6 +138,25 @@ export async function setUpdateBranch(branch: UpdateBranch): Promise<void> {
   return systemManager<void>(SYSTEM_ACTIONS.SET_UPDATE_BRANCH, { branch })
 }
 
+// ==================== 检查更新源 ====================
+//
+// 云端（api）为主通道：需设备凭证，服务端按设备灰度。
+// GitHub 走 Release 里的静态 latest.json，不需要凭证；auto 为云端优先、失败降级。
+// set 需开发者模式已开启（后端 require_dev_mode 校验）。
+
+/** 检查更新源取值 */
+export type UpdateSource = 'api' | 'github' | 'auto'
+
+/** 获取检查更新源覆盖 */
+export async function getUpdateSource(): Promise<UpdateSource> {
+  return systemManager<UpdateSource>(SYSTEM_ACTIONS.GET_UPDATE_SOURCE)
+}
+
+/** 设置检查更新源覆盖 */
+export async function setUpdateSource(source: UpdateSource): Promise<void> {
+  return systemManager<void>(SYSTEM_ACTIONS.SET_UPDATE_SOURCE, { source })
+}
+
 // ==================== 缓存统计 ====================
 
 /** 单个缓存子目录的统计信息 */

@@ -52,6 +52,9 @@ export const SYSTEM_ACTIONS = {
   // 更新检测分支覆盖（set 需开发者模式已开启，后端 require_dev_mode 校验）
   GET_UPDATE_BRANCH: 'get_update_branch',
   SET_UPDATE_BRANCH: 'set_update_branch',
+  // 检查更新源覆盖（api / github / auto，set 同样需开发者模式）
+  GET_UPDATE_SOURCE: 'get_update_source',
+  SET_UPDATE_SOURCE: 'set_update_source',
   // devtools（3 个）—— 调出/关闭/查询 WebView2 开发者工具
   // 后端 require_dev_mode() 校验 DeveloperUnlocked && DeveloperMode，普通用户无法触发
   OPEN_DEVTOOLS: 'open_devtools',
