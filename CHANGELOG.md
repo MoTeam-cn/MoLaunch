@@ -4,6 +4,16 @@
 
 ## [Unreleased]
 
+### 修复
+
+#### 更新包已下载完成后不再重复下载，直接重启安装
+
+- **后端新增待安装状态查询**（[install_windows.rs](src-tauri/src/commands/system/updater/install_windows.rs) / [api.rs](src-tauri/src/commands/system/updater/api.rs) / [updater.rs](src-tauri/src/commands/system/manager/updater.rs)）：后台预下载时把版本号写入 `%APPDATA%/.Molaunch/last.version`，新增 `pending_update_status` action 返回「是否已有可直接安装的包 + 已下载版本号」，判定条件与 `apply_pending_update` 的 `last.exe` + `last.sig` 配对校验同源。
+- **应用待安装更新支持立即重启**（同上）：`apply_pending_update` 新增 `relaunch` 参数——`true` 时不传 `--no-relaunch`，updater.exe 替换完成后自动拉起新版本；退出时的静默替换行为不变。
+- **前端新增「已下载待重启」状态**（[check.ts](src/utils/updater/check.ts) / [pending.ts](src/utils/updater/pending.ts) / [state.ts](src/utils/updater/state.ts) / [install.ts](src/utils/updater/install.ts)）：检查更新命中且后台包已就绪时直接进入 `ready` 状态；后台静默下载完成时若抽屉正开着同一版本，也同步切到 `ready`，按钮由「立即更新」变为「立即重启」。
+- **更新抽屉展示与按钮**（[UpdateDialog.vue](src/components/about/UpdateDialog.vue)）：`ready` 状态标题改为「更新已就绪」，展示版本号与「重启会关闭当前游戏与下载任务」提示，底部主按钮为「立即重启」（调用 `restartToApplyUpdate`，不重新下载），失效时回退为可更新状态并提示重新下载。
+- **action 常量补齐**（[system-manager.ts](src/utils/api/system-manager.ts)）：新增 `PENDING_UPDATE_STATUS`。
+
 ## [0.3.10] - 2026-10-23
 
 ### 修复
