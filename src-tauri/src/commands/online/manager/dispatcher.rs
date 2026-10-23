@@ -8,6 +8,7 @@ use tauri::AppHandle;
 use super::{auth_actions, auth_register_login, lan_fake, lan_probe, signaling_manager};
 use crate::log_error;
 use crate::log_info;
+use crate::log_warn;
 use crate::minecraft::online::auth::{
     build_login_request, build_refresh_request, finalize_credentials_with_login,
     finalize_credentials_with_refresh,
@@ -177,6 +178,30 @@ pub async fn load_creds_with_auto_refresh(state: &AppState) -> Result<DeviceCred
 
     log_info!("[Online] access token 已过期，尝试 refresh 续期");
     refresh_credentials(state, creds).await
+}
+
+/// 取可用设备凭证；本地无凭证时先补一次静默注册
+///
+/// 供「启动注册未完成就要用凭证」的调用方使用（如检查更新）：
+/// 先按常规流程加载并续期，失败且确认本地确实没有凭证时才注册，
+/// 避免把网络类失败误判成未注册而反复重建设备身份。
+pub async fn ensure_credentials(state: &AppState) -> Result<DeviceCredentials, String> {
+    match load_creds_with_auto_refresh(state).await {
+        Ok(creds) => Ok(creds),
+        Err(err) => {
+            let storage = make_storage(state);
+            let existing = storage.load().await.unwrap_or(None);
+            let missing = match existing {
+                Some(ref creds) => !creds.is_registered(),
+                None => true,
+            };
+            if !missing {
+                return Err(err);
+            }
+            log_warn!("[Online] 设备凭证缺失，按需补注册: {}", err);
+            super::auth_register_login::silent_register(state).await
+        }
+    }
 }
 
 /// 用本地密钥重新登录（ECDH + AES-GCM），刷新 access_token + refresh_token

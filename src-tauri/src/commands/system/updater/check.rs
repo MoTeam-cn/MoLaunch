@@ -135,11 +135,13 @@ pub async fn check_update(state: &AppState, _app: &AppHandle) -> Result<UpdateIn
 
     // 1. 服务端地址与设备凭证（凭证过期时由 load_creds_with_auto_refresh 自动续期）
     let base_url = crate::commands::online::manager::read_api_server_url(state).await;
-    let creds = crate::commands::online::manager::load_creds_with_auto_refresh(state)
+    // 凭证缺失时先补一次静默注册：首次启动的注册可能尚未完成或曾经失败，
+    // 这里按需补齐，避免用户首次点「检查更新」就撞上「未注册」。
+    let creds = crate::commands::online::manager::ensure_credentials(state)
         .await
         .map_err(|e| format!("检查更新失败：{e}"))?;
     if creds.device_token.is_empty() {
-        return Err("检查更新失败：本地未持有设备凭证，请先在「设置 → 联机」连接云端".to_string());
+        return Err("检查更新失败：设备凭证为空，请稍后重试".to_string());
     }
 
     // 2. 通道：由当前版本后缀推导（alpha/beta/stable），开发者模式可覆盖分支用于调试

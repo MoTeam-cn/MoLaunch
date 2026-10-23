@@ -202,43 +202,8 @@ fn register_auth_init(d: &mut Dispatcher) {
 
             let creds = match existing {
                 None => {
-                    // 首次启动：静默注册
                     log_info!("[Online] auth_init: 本地无凭证，开始静默注册");
-                    let kp = OnlineKeyPair::generate();
-                    let device_id = generate_device_id();
-
-                    let client = super::make_client(&state).await;
-                    let server_rsa_pem = client.fetch_server_rsa_pem().await.map_err(|e| {
-                        log_error!("[Online] auth_init: 获取云端 RSA 公钥失败: {}", e);
-                        e.to_string()
-                    })?;
-
-                    let (req, mut new_creds) =
-                        build_register_request(&kp, &device_id, &server_rsa_pem).map_err(|e| {
-                            log_error!("[Online] auth_init: 构造注册请求失败: {}", e);
-                            format!("构造注册请求失败: {}", e)
-                        })?;
-
-                    let resp = client.register(&req).await.map_err(|e| {
-                        log_error!("[Online] auth_init: 注册请求失败: {}", e);
-                        format!("注册请求失败: {}", e)
-                    })?;
-                    let data = resp.data.ok_or_else(|| {
-                        log_error!("[Online] auth_init: 注册失败: msg={}", resp.msg);
-                        format!("注册失败: {}", resp.msg)
-                    })?;
-
-                    new_creds = finalize_credentials_with_register(new_creds, &data);
-                    new_creds.api_server_url = api_url.clone();
-                    storage.save(&new_creds).await.map_err(|e| {
-                        log_error!("[Online] auth_init: 持久化设备凭证失败: {}", e);
-                        e.to_string()
-                    })?;
-                    log_info!(
-                        "[Online] auth_init: 静默注册成功: device_pk={}",
-                        new_creds.device_pk
-                    );
-                    new_creds
+                    silent_register(&state).await?
                 }
                 Some(creds) if !creds.is_registered() => {
                     // 凭证存在但不完整（异常状态），拒绝静默操作，前端引导手动处理
@@ -287,4 +252,47 @@ fn register_auth_init(d: &mut Dispatcher) {
             .map_err(|e| e.to_string())
         }),
     );
+}
+
+// 静默注册设备并持久化凭证
+//
+// 首次启动、凭证缺失（含检查更新等按需触发的场景）统一走这里，
+// 成功后返回完整凭证，失败返回可直接展示给用户的错误信息。
+pub(crate) async fn silent_register(
+    state: &crate::state::AppState,
+) -> Result<crate::minecraft::online::storage::DeviceCredentials, String> {
+    let api_url = super::read_api_server_url(state).await;
+    let storage = super::make_storage(state);
+    let kp = OnlineKeyPair::generate();
+    let device_id = generate_device_id();
+
+    let client = super::make_client(state).await;
+    let server_rsa_pem = client.fetch_server_rsa_pem().await.map_err(|e| {
+        log_error!("[Online] 静默注册: 获取云端 RSA 公钥失败: {}", e);
+        e.to_string()
+    })?;
+
+    let (req, mut creds) =
+        build_register_request(&kp, &device_id, &server_rsa_pem).map_err(|e| {
+            log_error!("[Online] 静默注册: 构造注册请求失败: {}", e);
+            format!("构造注册请求失败: {}", e)
+        })?;
+
+    let resp = client.register(&req).await.map_err(|e| {
+        log_error!("[Online] 静默注册: 注册请求失败: {}", e);
+        format!("注册请求失败: {}", e)
+    })?;
+    let data = resp.data.ok_or_else(|| {
+        log_error!("[Online] 静默注册: 注册失败: msg={}", resp.msg);
+        format!("注册失败: {}", resp.msg)
+    })?;
+
+    creds = finalize_credentials_with_register(creds, &data);
+    creds.api_server_url = api_url;
+    storage.save(&creds).await.map_err(|e| {
+        log_error!("[Online] 静默注册: 持久化设备凭证失败: {}", e);
+        e.to_string()
+    })?;
+    log_info!("[Online] 静默注册成功: device_pk={}", creds.device_pk);
+    Ok(creds)
 }

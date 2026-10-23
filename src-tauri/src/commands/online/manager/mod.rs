@@ -18,6 +18,7 @@ pub(crate) use dispatcher::{
     refresh_credentials,
 };
 pub use dispatcher::{
-    dispatch, load_creds_with_auto_refresh, AuthInitResult, DeviceStatus, ServerTimeInfo,
+    dispatch, ensure_credentials, load_creds_with_auto_refresh, AuthInitResult, DeviceStatus,
+    ServerTimeInfo,
 };
 pub use lan_fake::LanFakeServer;
