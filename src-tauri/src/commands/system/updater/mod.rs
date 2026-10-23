@@ -5,6 +5,7 @@
 
 mod api;
 mod check;
+mod github;
 #[cfg(not(target_os = "windows"))]
 mod install_unix;
 #[cfg(target_os = "windows")]

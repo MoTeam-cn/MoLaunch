@@ -102,7 +102,15 @@ pub fn validate_public_http_url(raw: &str) -> Result<(), String> {
 }
 
 /// updater 下载 URL 白名单域名（防 SSRF/防 manifest 篡改）
-const UPDATER_ALLOWED_HOSTS: [&str; 2] = ["api.molaunch.moiu.cn", "download.mocdn.net"];
+///
+/// 除官方 API / CDN 外，放行 GitHub 分发链路：清单与资产走 github.com，
+/// Release 资产下载会 302 到 objects.githubusercontent.com（安装包本体）。
+const UPDATER_ALLOWED_HOSTS: [&str; 4] = [
+    "api.molaunch.moiu.cn",
+    "download.mocdn.net",
+    "github.com",
+    "objects.githubusercontent.com",
+];
 
 /// 校验 updater 下载 URL：协议 http/https + 域名白名单
 ///

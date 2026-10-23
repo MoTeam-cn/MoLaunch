@@ -1,8 +1,8 @@
 //! 检查更新：构造 URL、发起请求、解析 manifest、版本比较
 //!
-//! 走**需鉴权**的 `GET /v1/updates/manifest/raw`：JWT 提供 `device_pk`，
-//! 服务端据此做按设备灰度。**不再有 GitHub Releases 回退**——灰度与发布控制
-//! 都在服务端，回退等于让未注册或被限制的客户端绕开它们。
+//! 主通道走**需鉴权**的 `GET /v1/updates/manifest/raw`：JWT 提供 `device_pk`，
+//! 服务端据此做按设备灰度。开发者中心可把检查更新源切到 GitHub 清单
+//! （`latest.json` 静态资产，见 `github` 模块），或设为 auto 在云端失败时降级。
 
 use serde_json::Value;
 use tauri::AppHandle;
@@ -10,6 +10,7 @@ use tauri::AppHandle;
 use super::UpdateInfo;
 use crate::api_paths::UPDATES_CHECK;
 use crate::log_info;
+use crate::log_warn;
 use crate::state::AppState;
 
 /// 更新检查的请求超时
@@ -27,7 +28,7 @@ fn platform_target() -> &'static str {
 /// **渠道词与其后的数字会先归一**：`rc.4` 与 `rc4` 等价、`beta.2` 与 `beta2` 等价，
 /// 数字按数值比较（`rc.10 > rc.9`）。历史版本号带点与不带点两种写法并存
 /// （`v0.3.8-rc1` 与 `v0.3.8-rc.3`），不归一会让 `rc2` 被判为高于 `rc.4`。
-fn is_version_newer(manifest: &str, current: &str) -> bool {
+pub(super) fn is_version_newer(manifest: &str, current: &str) -> bool {
     use std::cmp::Ordering;
 
     /// 预发布标识符段：渠道词 + 可选数字
@@ -122,45 +123,63 @@ fn is_version_newer(manifest: &str, current: &str) -> bool {
     }
 }
 
-/// 检查更新（所有平台统一入口）
+/// 检查更新（统一入口）
 ///
-/// **鉴权**：先取有效设备凭证（过期自动续期），以 `Authorization: Bearer` 调用
-/// `/v1/updates/manifest/raw`。未注册或续期失败即无法检查更新——这是刻意的，
-/// 灰度与发布控制都在服务端，绕过鉴权就等于绕过它们。
-///
-/// **base_url**：从 `AppConfig.online.api_server_url` 读取（继承联机设置），不硬编码。
-/// macOS/Linux 下载安装仍转发到官方 plugin（`download_and_install_unix`）。
+/// 更新源由开发者中心「检查更新源」决定：
+/// - `api`（默认）：云端需鉴权清单，服务端按设备灰度；
+/// - `github`：Release 里的静态 latest.json，不需要设备凭证；
+/// - `auto`：云端优先，失败（含未注册、网络异常）降级到 GitHub 清单。
 pub async fn check_update(state: &AppState, _app: &AppHandle) -> Result<UpdateInfo, String> {
     let current_version = env!("CARGO_PKG_VERSION");
+    let channel = resolve_channel(current_version);
+    match crate::commands::system::developer::get_update_source().as_str() {
+        "github" => super::github::check_github(&channel, current_version).await,
+        "auto" => match check_api(state, current_version, &channel).await {
+            Ok(info) => Ok(info),
+            Err(err) => {
+                log_warn!("[Updater] 云端更新通道失败，降级 GitHub 清单: {}", err);
+                super::github::check_github(&channel, current_version)
+                    .await
+                    .map_err(|gh| format!("{}；GitHub 备用源亦失败：{}", err, gh))
+            }
+        },
+        _ => check_api(state, current_version, &channel).await,
+    }
+}
 
-    // 1. 服务端地址与设备凭证（凭证过期时由 load_creds_with_auto_refresh 自动续期）
+/// 更新通道：由当前版本后缀推导（alpha/beta/stable），开发者模式可覆盖用于调试
+fn resolve_channel(current_version: &str) -> String {
+    let branch = crate::commands::system::developer::get_update_branch();
+    if branch == "auto" {
+        crate::utils::client_type::channel_name(current_version).to_string()
+    } else {
+        branch
+    }
+}
+
+/// 云端通道检查（需设备 JWT，服务端按设备灰度）
+async fn check_api(
+    state: &AppState,
+    current_version: &str,
+    channel: &str,
+) -> Result<UpdateInfo, String> {
+    // 1. 服务端地址与设备凭证（凭证过期时自动续期）
     let base_url = crate::commands::online::manager::read_api_server_url(state).await;
     // 凭证缺失时先补一次静默注册：首次启动的注册可能尚未完成或曾经失败，
     // 这里按需补齐，避免用户首次点「检查更新」就撞上「未注册」。
     let creds = crate::commands::online::manager::ensure_credentials(state)
         .await
-        .map_err(|e| format!("检查更新失败：{e}"))?;
+        .map_err(|e| format!("检查更新失败：{}", e))?;
     if creds.device_token.is_empty() {
         return Err("检查更新失败：设备凭证为空，请稍后重试".to_string());
     }
-
-    // 2. 通道：由当前版本后缀推导（alpha/beta/stable），开发者模式可覆盖分支用于调试
-    let channel = {
-        let branch = crate::commands::system::developer::get_update_branch();
-        if branch == "auto" {
-            crate::utils::client_type::channel_name(current_version).to_string()
-        } else {
-            branch
-        }
-    };
-
     let target = platform_target();
     let arch = std::env::consts::ARCH;
     let path = UPDATES_CHECK
         .replace("{{target}}", target)
         .replace("{{arch}}", arch)
         .replace("{{current_version}}", current_version)
-        .replace("{{channel}}", &channel);
+        .replace("{{channel}}", channel);
     let url = format!("{}{}", base_url.trim_end_matches('/'), path);
 
     log_info!(
@@ -270,3 +289,6 @@ pub async fn check_update(state: &AppState, _app: &AppHandle) -> Result<UpdateIn
             .to_string(),
     })
 }
+
+#[cfg(test)]
+mod check_test;

@@ -30,6 +30,22 @@ pub const TIME: &str = "/v3/time";
 /// （见 tauri.conf.json 的 plugins.updater.endpoints），启动器不得复用。
 pub const UPDATES_CHECK: &str = "/v1/updates/manifest/raw?target={{target}}&arch={{arch}}&current_version={{current_version}}&channel={{channel}}";
 
+// ===== GitHub 备用更新清单（静态 latest.json 资产） =====
+
+/// 稳定通道清单：指向最新**正式** Release 的 latest.json 资产
+///
+/// 发版时把 latest.json 作为 Release 资产上传；该路径由 GitHub 维护，
+/// 永远解析到最近一个非预发布 Release，无需额外 token。
+pub const GITHUB_MANIFEST_STABLE: &str =
+    "https://github.com/MoTeam-cn/MoLaunch/releases/latest/download/latest.json";
+
+/// beta / alpha 通道清单：滚动 tag（channel-beta / channel-alpha）下的同名资产
+///
+/// GitHub 没有「最新预发布」的固定路径，因此按通道各维护一个滚动 tag，
+/// 发版时覆盖上传 latest.json；调用方负责替换通道占位符。
+pub const GITHUB_MANIFEST_CHANNEL: &str =
+    "https://github.com/MoTeam-cn/MoLaunch/releases/download/channel-{{channel}}/latest.json";
+
 // ===== v1 FRP =====
 
 /// 公共 frps 服务器列表（GET，直接返回完整连接信息）

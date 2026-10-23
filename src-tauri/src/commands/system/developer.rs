@@ -35,6 +35,12 @@ pub const KEY_UPDATE_BRANCH: &str = "UpdateBranch";
 /// 更新检测分支合法取值
 const UPDATE_BRANCHES: [&str; 4] = ["auto", "stable", "beta", "alpha"];
 
+/// 注册表键名：检查更新源覆盖（api/github/auto，auto=云端优先、失败降级 GitHub）
+pub const KEY_UPDATE_SOURCE: &str = "UpdateSource";
+
+/// 检查更新源合法取值
+const UPDATE_SOURCES: [&str; 3] = ["api", "github", "auto"];
+
 /// DevTools 打开状态（全局原子标志）
 ///
 /// WebView2 不提供查询 DevTools 是否打开的 API，Tauri 的
@@ -88,6 +94,7 @@ pub fn lock_developer_mode(app: &AppHandle) -> Result<(), String> {
     reg_set_bool(KEY_DEV_MODE, false)?;
     reg_set_bool(KEY_IGNORE_TLS, false)?;
     reg_set_str(KEY_UPDATE_BRANCH, "auto")?;
+    reg_set_str(KEY_UPDATE_SOURCE, "api")?;
     reg_set_bool(KEY_DEV_UNLOCKED, false)?;
     log_info!("[Developer] 开发者模式已撤销解锁");
     Ok(())
@@ -129,6 +136,27 @@ pub fn set_update_branch(branch: &str) -> Result<(), String> {
         return Err(format!("不支持的更新分支: {}", branch));
     }
     reg_set_str(KEY_UPDATE_BRANCH, &branch)
+}
+
+/// 读取检查更新源覆盖（`api` 云端 / `github` GitHub 清单 / `auto` 云端优先失败降级）
+pub fn get_update_source() -> String {
+    reg_get_str(KEY_UPDATE_SOURCE)
+        .filter(|s| UPDATE_SOURCES.contains(&s.as_str()))
+        .unwrap_or_else(|| "api".to_string())
+}
+
+/// 设置检查更新源覆盖（需开发者模式已开启）
+///
+/// `api` 走云端需鉴权清单（按设备灰度）；`github` 走 Release 里的静态
+/// latest.json（不需要设备凭证）；`auto` 先云端，失败再降级 GitHub。
+pub fn set_update_source(source: &str) -> Result<(), String> {
+    require_dev_mode()?;
+    let source = source.trim().to_lowercase();
+    if !UPDATE_SOURCES.contains(&source.as_str()) {
+        return Err(format!("不支持的检查更新源: {}", source));
+    }
+    log_info!("[Developer] 检查更新源切换为 {}", source);
+    reg_set_str(KEY_UPDATE_SOURCE, &source)
 }
 
 /// 存储目录信息
