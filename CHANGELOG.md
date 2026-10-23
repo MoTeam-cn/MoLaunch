@@ -4,6 +4,8 @@
 
 ## [Unreleased]
 
+## [0.3.10-rc.1] - 2026-10-23
+
 ### 修复
 
 #### 修复新版游戏启动时报「Error: -cp requires class path specification」
