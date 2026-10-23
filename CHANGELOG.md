@@ -4,6 +4,15 @@
 
 ## [Unreleased]
 
+### 变更
+
+#### 公共 FRP 服务器列表纳入联机大厅开关
+
+- **后端守卫收敛到统一入口**（[lobby_gate.rs](src-tauri/src/commands/online/manager/lobby_gate.rs) 新增 / [mod.rs](src-tauri/src/commands/online/manager/mod.rs) / [registry.rs](src-tauri/src/commands/online/manager/signaling_manager/registry.rs)）：把原先只服务信令的 `require_lobby_enabled` 抽成 `online::manager::lobby_gate`，房间/大厅与 FRP 公共服务器共用同一份开关判断与拒绝文案，避免两处各写一份。
+- **列表接口受开关约束**（[public_server_actions.rs](src-tauri/src/commands/frp/manager/public_server_actions.rs)）：`list_public_servers` 在取凭证前先过 `require_lobby_enabled`，开关关闭时直接返回「联机大厅未启用：请先在「设置 → 联机」页开启「启用联机大厅（房间与搭桥）」后再使用」，不再静默打云端。
+- **前端同步提示**（[usePublicServers.ts](src/composables/usePublicServers.ts)）：开关关闭时不发起请求，直接提示去哪里开启；后端拒绝文案原样透出，避免叠加「加载失败」前缀。
+- **拒绝文案对齐当前开关标题**（同上）：此前文案写的是旧标题「启用联机大厅（与云端交互）」，改为「启用联机大厅（房间与搭桥）」。
+
 ## [0.3.10-rc.1] - 2026-10-23
 
 ### 修复
