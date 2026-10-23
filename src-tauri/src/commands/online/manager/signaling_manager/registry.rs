@@ -1,6 +1,5 @@
 //! 信令 action 注册入口 + 共享辅助（凭证加载 / 客户端创建）
 
-use crate::log_warn;
 use crate::minecraft::online::client::OnlineClient;
 use crate::state::AppState;
 use crate::utils::dispatcher::Dispatcher;
@@ -26,6 +25,7 @@ pub(super) async fn make_client(state: &AppState) -> OnlineClient {
 
 /// 联机大厅开关守卫（实现收敛在 online::manager::lobby_gate，房间与 FRP 共用）
 pub(super) use crate::commands::online::manager::require_lobby_enabled;
+
 /// 注册全部信令 action 到 dispatcher
 pub fn register_signaling_actions(d: &mut Dispatcher) {
     super::room_actions::register(d);
