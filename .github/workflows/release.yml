@@ -81,7 +81,9 @@ jobs:
         run: |
           VERSION_TAG="v${{ steps.version.outputs.VERSION }}"
           CUR_SHA=$(git rev-parse "${VERSION_TAG}^{commit}" 2>/dev/null || git rev-parse HEAD)
-          PREV_TAG=$(git describe --tags --abbrev=0 "${CUR_SHA}^" 2>/dev/null || echo "")
+          # 排除滚动通道 tag（channel-beta / channel-alpha，仅承载 latest.json），
+          # 否则提交区间会以清单发布点为准，更新日志错位
+          PREV_TAG=$(git describe --tags --abbrev=0 --exclude='channel-*' "${CUR_SHA}^" 2>/dev/null || echo "")
           REPO_URL="${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}"
           NOTES_FILE="${RUNNER_TEMP}/release-notes.txt"
           {
@@ -398,7 +400,7 @@ jobs:
       - name: Get previous tag
         id: prev_tag
         run: |
-          PREV_TAG=$(git describe --tags --abbrev=0 HEAD^ 2>/dev/null || echo "")
+          PREV_TAG=$(git describe --tags --abbrev=0 --exclude='channel-*' HEAD^ 2>/dev/null || echo "")
           echo "PREV_TAG=$PREV_TAG" >> $GITHUB_OUTPUT
           echo "Previous tag: $PREV_TAG"
 
@@ -415,6 +417,26 @@ jobs:
             "${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}" \
             "${GITHUB_REPOSITORY}" \
             "$(git rev-parse HEAD)"
+
+      # 生成 GitHub 更新源清单（latest.json）：启动器「检查更新源 = GitHub」时读取该资产。
+      # 清单里的下载地址按 Release 资产的固定命名推导，签名取自随包的 .sig。
+      - name: Generate update manifest
+        id: manifest
+        shell: bash
+        env:
+          NOTES: ${{ steps.changelog.outputs.NOTES }}
+          FEATURES: ${{ steps.changelog.outputs.FEATURES }}
+          FIXES: ${{ steps.changelog.outputs.FIXES }}
+          OTHERS: ${{ steps.changelog.outputs.OTHERS }}
+        run: |
+          printf '%s\n\n%s\n\n%s\n\n%s\n' "$NOTES" "$FEATURES" "$FIXES" "$OTHERS" > "$RUNNER_TEMP/latest-notes.md"
+          CHANNEL=$(node scripts/generate-update-manifest.cjs \
+            "${{ steps.get_version.outputs.VERSION }}" \
+            "${{ github.repository }}" \
+            "artifacts" \
+            "artifacts/latest.json" \
+            "$RUNNER_TEMP/latest-notes.md")
+          echo "channel=$CHANNEL" >> $GITHUB_OUTPUT
 
       - name: Create Release
         uses: softprops/action-gh-release@v3
@@ -447,7 +469,28 @@ jobs:
             artifacts/macos/*.sig
             artifacts/linux/*.AppImage
             artifacts/linux/*.sig
+            artifacts/latest.json
           draft: false
           prerelease: ${{ steps.prerelease.outputs.IS_PRERELEASE }}
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      # 预发布版本额外把清单推到滚动 tag（channel-beta / channel-alpha）：
+      # GitHub 没有「最新预发布」的固定路径，非 stable 通道只能靠固定 tag 承载。
+      # 标记 prerelease 且 make_latest=false，确保它永远不会被 /releases/latest 命中，
+      # stable 通道仍由正式 Release 里的 latest.json 提供。
+      - name: Publish rolling channel manifest
+        if: steps.prerelease.outputs.IS_PRERELEASE == 'true'
+        uses: softprops/action-gh-release@v3
+        with:
+          tag_name: channel-${{ steps.manifest.outputs.channel }}
+          name: MoLaunch 通道清单（${{ steps.manifest.outputs.channel }}）
+          body: |
+            该 Release 仅承载 ${{ steps.manifest.outputs.channel }} 通道的更新清单（latest.json），
+            随每次预发布自动覆盖，不是可安装版本，请勿下载。
+          files: artifacts/latest.json
+          draft: false
+          prerelease: true
+          make_latest: 'false'
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
