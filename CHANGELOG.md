@@ -4,6 +4,14 @@
 
 ## [Unreleased]
 
+### 修复
+
+#### 修复启动时公告不弹窗
+
+- **响应结构按服务端实际形态解析**（[announcement.rs](src-tauri/src/commands/online/manager/announcement.rs)）：`GET /v1/announcements` 的 `data` 是 `{ items: [...] }` 而非数组，旧实现按数组取不到值，静默降级成空列表并返回 `success: true`，导致接口有公告、启动器却不弹窗。现按 `data.items` 取，并兼容 `data` 直接为数组的形态。
+- **解析失败不再静默**（同上）：结构异常时记 warn 并返回失败响应；单条字段缺失只跳过该条并记 warn，不再整份丢弃。
+- **补充解析测试**（[announcement_test.rs](src-tauri/src/commands/online/manager/announcement_test.rs) 新增）：覆盖 items 包裹、data 直数组、结构异常、单条残缺、空列表五种情况。
+
 ### 变更
 
 #### 公共 FRP 服务器列表纳入联机大厅开关
