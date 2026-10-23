@@ -4,6 +4,21 @@
 
 ## [Unreleased]
 
+### 新增
+
+#### 外观支持动态主色档位
+
+- **主色阶可沿色相路径连续流动**（[useAccentDynamics.ts](src/composables/useAccentDynamics.ts) 新增 / [AccentDynamicsSection.vue](src/views/settings/personal/AccentDynamicsSection.vue) 新增 / [AppearanceSection.vue](src/views/settings/personal/AppearanceSection.vue) / [App.vue](src/App.vue)）：档位表以内部编号 + 密文展示名存放，运行期还原，沿色相路径对 50~950 档主色阶做连续插值后写入 CSS 变量，菜单栏、按钮、选中态等全部主色区域同步流动；未选定档位时不启动定时器，完全走静态主色。所选档位记在本地（`molaunch.ui.accentProfile`），启动时自动恢复；切回「跟随主题色」即还原 `settings.primaryColor`。
+- **输入序列采样**（[useInputTelemetry.ts](src/composables/useInputTelemetry.ts) 新增）：采样窗口内的按键折叠为 32 位校验值，命中预设值时回调；焦点位于输入框 / 文本域 / 下拉框或可编辑元素时不采样，避免干扰正常输入。
+
+### 修复
+
+#### 修复首次启动未完成设备注册导致检查更新报「未注册」
+
+- **设备注册改为可复用、可补齐**（[auth_register_login.rs](src-tauri/src/commands/online/manager/auth_register_login.rs) / [dispatcher.rs](src-tauri/src/commands/online/manager/dispatcher.rs) / [mod.rs](src-tauri/src/commands/online/manager/mod.rs)）：抽出 `silent_register()` 供 `auth_init` 首次启动分支与按需补注册共用；新增 `ensure_credentials()`——先按常规流程加载并续期，仅在确认本地确实没有凭证时才补一次静默注册，网络类失败不会被误判成「未注册」而反复重建设备身份。
+- **检查更新不再撞「设备未注册」**（[check.rs](src-tauri/src/commands/system/updater/check.rs)）：改用 `ensure_credentials()`，首次启动注册尚未完成或曾失败时按需补齐后再取清单；凭证为空时的提示改为「设备凭证为空，请稍后重试」。
+- **启动链路不再阻塞或跳过设备注册**（[App.vue](src/App.vue)）：设备注册与会话恢复并行启动（原先串行且排在快照恢复之后），快照读取与页面恢复补异常保护，避免中途抛错导致注册整段被跳过；登录态与云端连接结果仍在会话恢复后统一处理。
+
 ## [0.3.8] - 2026-10-20
 
 ### 新增
