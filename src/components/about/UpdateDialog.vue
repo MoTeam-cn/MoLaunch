@@ -6,6 +6,7 @@
  * - `checking`：检查中 loading
  * - `available`：发现新版本，展示版本号 + 更新日志（时间线）+ 按钮（立即更新 / 稍后）
  * - `downloading`：下载进度条
+ * - `ready`：更新包已下载完成，展示「立即重启」直接安装（不再重复下载）
  * - `installing`：安装中 loading（即将重启）
  * - `error`：错误信息
  *
@@ -35,10 +36,16 @@ import {
   checkForUpdate,
   downloadAndInstall,
   closeDialog,
+  restartToApplyUpdate,
 } from '@/utils/updater'
 
 /** 是否显示弹窗（仅当 showDialog=true 时渲染） */
 const visible = computed(() => updateState.showDialog)
+
+/** 抽屉标题：已下载待重启时改为「更新已就绪」 */
+const titleText = computed(() =>
+  updateState.status === 'ready' ? '更新已就绪' : '发现新版本',
+)
 
 /** 作者的话：优先解析服务端 notes 中的 `note:` 行，无则回退构建时 git note（与启动弹窗同源） */
 const notes = computed(() => {
@@ -96,6 +103,11 @@ function onUpdate() {
   downloadAndInstall()
 }
 
+/** 立即重启：更新包已下载完成，直接替换并拉起新版本 */
+function onRestart() {
+  restartToApplyUpdate()
+}
+
 /** 稍后（仅非强制更新可用） */
 function onLater() {
   if (!canClose.value) return
@@ -123,7 +135,7 @@ function onRetry() {
     <template #title>
       <div class="flex items-center gap-2">
         <ArrowPathIcon class="h-5 w-5 text-primary-500" />
-        <span>发现新版本</span>
+        <span>{{ titleText }}</span>
       </div>
     </template>
 
@@ -195,6 +207,15 @@ function onRetry() {
         <p v-if="progressPct !== null" class="text-right text-xs text-gray-400">{{ progressPct }}%</p>
       </div>
 
+      <!-- 已下载待重启 -->
+      <div v-else-if="updateState.status === 'ready'" class="flex flex-col items-center gap-3">
+        <CheckCircleIcon class="h-8 w-8 text-green-500" />
+        <p class="text-sm font-medium text-gray-800">v{{ updateState.version }} 已下载完成</p>
+        <p class="text-center text-xs text-gray-500">
+          重启后自动完成安装。重启会关闭当前游戏与进行中的下载任务。
+        </p>
+      </div>
+
       <!-- 安装中 -->
       <div v-else-if="updateState.status === 'installing'" class="flex flex-col items-center gap-3">
         <div class="h-7 w-7 animate-spin rounded-full border-[3px] border-primary-200 border-t-primary-500" />
@@ -222,7 +243,11 @@ function onRetry() {
     <!-- 底部按钮：available / error 状态显示，其余状态无按钮 -->
     <template #footer>
       <div
-        v-if="updateState.status === 'available' || updateState.status === 'error'"
+        v-if="
+          updateState.status === 'available' ||
+          updateState.status === 'ready' ||
+          updateState.status === 'error'
+        "
         class="flex justify-end gap-2"
       >
         <template v-if="updateState.status === 'available'">
@@ -244,6 +269,10 @@ function onRetry() {
               立即更新
             </Button>
           </Tooltip>
+        </template>
+        <template v-else-if="updateState.status === 'ready'">
+          <Button v-if="canClose" type="ghost" size="small" @click="onLater">稍后</Button>
+          <Button type="primary" size="small" @click="onRestart">立即重启</Button>
         </template>
         <template v-else>
           <Button v-if="canClose" type="ghost" size="small" @click="closeDialog">关闭</Button>

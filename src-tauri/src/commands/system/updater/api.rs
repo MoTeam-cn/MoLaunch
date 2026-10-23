@@ -31,6 +31,19 @@ pub struct UpdateInfo {
     pub signature: String,
 }
 
+/// 待安装更新状态（`pending_update_status` 返回）
+///
+/// `ready = true` 表示 `%APPDATA%/.Molaunch/last.exe` 已下载完成且签名配对，
+/// 前端可直接重启安装，无需重新下载。
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+#[serde(rename_all = "camelCase")]
+pub struct PendingUpdateStatus {
+    /// 是否已有可直接安装的更新包
+    pub ready: bool,
+    /// 已预下载的版本号（旧版本残留导致无法确定时为空串）
+    pub version: String,
+}
+
 /// 下载并安装更新（平台内部分流）
 ///
 /// - **Windows**：复用通用 DownloadManager 下载 + 启动 updater.exe 子进程
@@ -87,21 +100,42 @@ pub async fn download_update_to_appdata(
 ///
 /// 前端在窗口 close 事件中调用此命令，返回 true 则让主程序退出由 updater.exe 接管。
 ///
+/// `relaunch = true` 用于更新抽屉里的「立即重启」：替换完成后由 updater.exe 自动拉起新版本；
+/// `false` 为退出时静默替换（替换后不重启，下次启动即为新版本）。
+///
 /// **平台差异**：仅 Windows 便携版支持退出时延迟替换；macOS / Linux 由官方 plugin
 /// 在 `download_and_install_update` 内同步完成下载安装，无退出时替换流程，
 /// 调用此命令仅记录 INFO 日志后返回 `Ok(false)`，前端应直接退出主程序。
-pub async fn apply_pending_update(app: &AppHandle) -> Result<bool, String> {
+pub async fn apply_pending_update(app: &AppHandle, relaunch: bool) -> Result<bool, String> {
     #[cfg(target_os = "windows")]
     {
-        super::install_windows::apply_pending_update_impl(app).await
+        super::install_windows::apply_pending_update_impl(app, relaunch).await
     }
 
     #[cfg(not(target_os = "windows"))]
     {
-        let _ = app;
+        let _ = (app, relaunch);
         log_info!(
             "[Updater] apply_pending_update 在 macOS/Linux 上由 tauri-plugin-updater 接管，无退出时替换"
         );
         Ok(false)
+    }
+}
+
+/// 查询是否已有预下载完成、可直接重启安装的更新包
+///
+/// Windows：检查 `last.exe` + `last.sig` 是否配对（与 `apply_pending_update` 同源校验），
+/// 并返回 `last.version` 里记录的版本号，供前端确认它就是当前发现的新版本。
+/// macOS / Linux：官方 plugin 在 `download_and_install_update` 内同步完成安装，
+/// 不存在「已下载待重启」的中间态，恒定返回 `ready = false`。
+pub async fn pending_update_status() -> Result<PendingUpdateStatus, String> {
+    #[cfg(target_os = "windows")]
+    {
+        Ok(super::install_windows::pending_update_status_impl())
+    }
+
+    #[cfg(not(target_os = "windows"))]
+    {
+        Ok(PendingUpdateStatus::default())
     }
 }

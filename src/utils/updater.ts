@@ -7,4 +7,9 @@
 export type { UpdateState, UpdateStatus } from './updater/state'
 export { updateState } from './updater/state'
 export { checkForUpdate, initAutoCheck } from './updater/check'
-export { applyPendingUpdate, closeDialog, downloadAndInstall } from './updater/install'
+export {
+  applyPendingUpdate,
+  closeDialog,
+  downloadAndInstall,
+  restartToApplyUpdate,
+} from './updater/install'

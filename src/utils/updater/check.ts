@@ -1,5 +1,6 @@
 import { systemManager, SYSTEM_ACTIONS } from '@/utils/api/system-manager'
 import { toastError, toastInfo } from '@/utils/toast'
+import { fetchPendingUpdateStatus } from './pending'
 import { updateState, updaterFlags, type UpdateInfo } from './state'
 
 /** 检测当前是否 Windows 平台（用于区分自实现 updater 与官方 plugin 流程） */
@@ -38,6 +39,14 @@ export async function checkForUpdate(opts: { silent?: boolean } = {}): Promise<v
       updateState.error = ''
       updateState.showDialog = true
       updaterFlags.pendingUpdate = info
+
+      // Windows 后台静默下载已经完成同一版本时，直接进入「已下载待重启」：
+      // 用户点开抽屉再点一次按钮不该重新下载一遍，而应直接重启安装
+      const pending = await fetchPendingUpdateStatus()
+      if (pending?.ready && (!pending.version || pending.version === info.version)) {
+        updaterFlags.appdataDownloadedVersion = info.version
+        updateState.status = 'ready'
+      }
     } else {
       updateState.status = 'no-update'
       updateState.showDialog = false
@@ -139,6 +148,14 @@ async function silentCheckAndDownload(): Promise<void> {
         // 更新状态供 UI 展示（如有更新提示组件）
         updateState.version = info.version
         updateState.notes = info.notes ?? ''
+        // 抽屉正开着且就是这个版本：同步切到「待重启」，避免按钮仍停留在「立即更新」
+        if (
+          updateState.showDialog &&
+          updateState.version === info.version &&
+          (updateState.status === 'available' || updateState.status === 'checking')
+        ) {
+          updateState.status = 'ready'
+        }
       }
     }
   } catch (e) {

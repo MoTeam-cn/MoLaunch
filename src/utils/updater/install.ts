@@ -1,3 +1,4 @@
+import { invoke } from '@tauri-apps/api/core'
 import { systemManager, SYSTEM_ACTIONS } from '@/utils/api/system-manager'
 import { toastError } from '@/utils/toast'
 import { updateState, updaterFlags } from './state'
@@ -37,6 +38,47 @@ export async function downloadAndInstall(): Promise<void> {
     updateState.error = String(e)
     console.error('[Updater] downloadAndInstall error:', e)
     toastError(`更新失败：${String(e)}`)
+  } finally {
+    updaterFlags.installing = false
+  }
+}
+
+/**
+ * 立即重启以应用已下载的更新（更新抽屉「立即重启」按钮）
+ *
+ * 与 `downloadAndInstall` 的区别：更新包已经在后台下载到 `%APPDATA%/.Molaunch/last.exe`，
+ * 这里只让后端启动 updater.exe 完成替换（`relaunch: true` → 替换后自动拉起新版本），
+ * 不再重新下载。返回 false 说明待安装包已失效（被清理或版本不符），退回可更新状态。
+ */
+export async function restartToApplyUpdate(): Promise<void> {
+  if (updaterFlags.installing) return
+  updaterFlags.installing = true
+
+  updateState.status = 'installing'
+  updateState.error = ''
+
+  try {
+    const applied = await systemManager<boolean>(SYSTEM_ACTIONS.APPLY_PENDING_UPDATE, {
+      relaunch: true,
+    })
+
+    if (!applied) {
+      updateState.status = 'available'
+      toastError('更新包已失效，请重新下载')
+      return
+    }
+
+    updateState.status = 'done'
+    // 主程序退出后由 updater.exe 完成替换并拉起新版本
+    await invoke('request_exit').catch((e) => {
+      console.error('[Updater] request_exit failed:', e)
+      window.close()
+    })
+  } catch (e) {
+    updateState.status = 'error'
+    updateState.error = String(e)
+    console.error('[Updater] restartToApplyUpdate error:', e)
+    toastError(`重启失败：${String(e)}`)
   } finally {
     updaterFlags.installing = false
   }

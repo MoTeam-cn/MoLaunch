@@ -19,5 +19,8 @@ pub(super) const PROGRESS_EVENT: &str = "update-download-progress";
 #[cfg(not(target_os = "windows"))]
 pub(super) const PROGRESS_THROTTLE_BYTES: u64 = 256 * 1024;
 
-pub use api::{apply_pending_update, download_and_install, download_update_to_appdata, UpdateInfo};
+pub use api::{
+    apply_pending_update, download_and_install, download_update_to_appdata, pending_update_status,
+    PendingUpdateStatus, UpdateInfo,
+};
 pub use check::check_update;

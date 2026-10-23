@@ -115,6 +115,18 @@ pub(super) fn last_signature_path() -> Result<std::path::PathBuf, String> {
         .join("last.sig"))
 }
 
+/// 获取 last.version 路径（%APPDATA%/.Molaunch/last.version，记录已预下载的版本号）
+///
+/// 与 last.exe 一起写入，供 `pending_update_status` 判断预下载的包是否就是当前
+/// 发现的新版本，避免旧版本残留的 last.exe 被误当成可用更新。
+#[cfg(target_os = "windows")]
+pub(super) fn last_version_path() -> Result<std::path::PathBuf, String> {
+    let appdata = std::env::var("APPDATA").map_err(|_| "APPDATA 环境变量未设置".to_string())?;
+    Ok(std::path::PathBuf::from(appdata)
+        .join(".Molaunch")
+        .join("last.version"))
+}
+
 /// 后台静默下载新版本到 `%APPDATA%/.Molaunch/last.exe`
 ///
 /// 前端定时检查发现新版本后调用此命令，将安装包下载到 appdata。
@@ -157,6 +169,12 @@ pub(super) async fn download_update_to_appdata_impl(
         return Err(format!("写入 last.sig 失败: {e}"));
     }
 
+    // 记录版本号：pending_update_status 据此判断预下载的包是否对应当前发现的新版本
+    let last_version = last_version_path()?;
+    if let Err(e) = std::fs::write(&last_version, info.version.as_bytes()) {
+        log_warn!("[Updater] 写入 last.version 失败（不影响待安装包使用）: {e}");
+    }
+
     log_info!(
         "[Updater] 后台下载完成: {} ({} bytes)",
         last_exe.display(),
@@ -174,7 +192,10 @@ pub(super) async fn download_update_to_appdata_impl(
 ///
 /// 前端在窗口 close 事件中调用此命令，返回 true 则让主程序退出由 updater.exe 接管。
 #[cfg(target_os = "windows")]
-pub(super) async fn apply_pending_update_impl(_app: &AppHandle) -> Result<bool, String> {
+pub(super) async fn apply_pending_update_impl(
+    _app: &AppHandle,
+    relaunch: bool,
+) -> Result<bool, String> {
     let last_exe = last_exe_path()?;
     if !last_exe.exists() {
         log_info!("[Updater] 无待安装更新（last.exe 不存在），正常退出");
@@ -208,22 +229,25 @@ pub(super) async fn apply_pending_update_impl(_app: &AppHandle) -> Result<bool, 
         pid
     );
 
-    crate::minecraft::system::shell::run_detached(
-        &updater_path.to_string_lossy(),
-        &[
-            "--old-exe".to_string(),
-            current_exe.to_string_lossy().into_owned(),
-            "--new-exe".to_string(),
-            last_exe.to_string_lossy().into_owned(),
-            "--pid".to_string(),
-            pid.to_string(),
-            "--signature".to_string(),
-            signature.clone(),
-            // 静默更新：用户已退出程序，替换后不重启，下次用户启动即为新版本
-            "--no-relaunch".to_string(),
-        ],
-    )
-    .map_err(|e| format!("启动 updater.exe 失败: {e}"))?;
+    let mut args = vec![
+        "--old-exe".to_string(),
+        current_exe.to_string_lossy().into_owned(),
+        "--new-exe".to_string(),
+        last_exe.to_string_lossy().into_owned(),
+        "--pid".to_string(),
+        pid.to_string(),
+        "--signature".to_string(),
+        signature.clone(),
+    ];
+    if !relaunch {
+        // 退出时静默替换：用户已退出程序，替换后不重启，下次启动即为新版本
+        args.push("--no-relaunch".to_string());
+    } else {
+        log_info!("[Updater] 用户在更新抽屉内选择立即重启，替换后自动拉起新版本");
+    }
+
+    crate::minecraft::system::shell::run_detached(&updater_path.to_string_lossy(), &args)
+        .map_err(|e| format!("启动 updater.exe 失败: {e}"))?;
 
     Ok(true)
 }
@@ -280,4 +304,52 @@ async fn download_with_manager(
         );
     }
     Ok(result.downloaded)
+}
+
+/// 查询是否已有预下载完成、可直接重启安装的更新包
+///
+/// 判定条件：last.exe 存在且 last.sig 非空（与 `apply_pending_update` 的校验同源）。
+/// last.version 存在时一并返回，供前端确认这个包就是当前发现的新版本；
+/// 旧版本残留（无 last.version）时返回空版本号，由前端按「就绪」处理。
+#[cfg(target_os = "windows")]
+pub(super) fn pending_update_status_impl() -> super::PendingUpdateStatus {
+    let last_exe = match last_exe_path() {
+        Ok(p) => p,
+        Err(e) => {
+            log_warn!("[Updater] 查询待安装更新失败: {}", e);
+            return super::PendingUpdateStatus::default();
+        }
+    };
+    if !last_exe.exists() {
+        return super::PendingUpdateStatus::default();
+    }
+
+    let last_sig = match last_signature_path() {
+        Ok(p) => p,
+        Err(_) => return super::PendingUpdateStatus::default(),
+    };
+    let signature_ok = std::fs::read_to_string(&last_sig)
+        .map(|s| !s.trim().is_empty())
+        .unwrap_or(false);
+    if !signature_ok {
+        // 签名缺失说明预下载不完整（下载中断或旧版本残留），清理后按无更新处理
+        log_warn!("[Updater] last.sig 缺失或为空，清理不完整的待安装更新");
+        let _ = std::fs::remove_file(&last_exe);
+        let _ = std::fs::remove_file(&last_sig);
+        if let Ok(version_path) = last_version_path() {
+            let _ = std::fs::remove_file(version_path);
+        }
+        return super::PendingUpdateStatus::default();
+    }
+
+    let version = last_version_path()
+        .ok()
+        .and_then(|p| std::fs::read_to_string(p).ok())
+        .map(|s| s.trim().to_string())
+        .unwrap_or_default();
+
+    super::PendingUpdateStatus {
+        ready: true,
+        version,
+    }
 }

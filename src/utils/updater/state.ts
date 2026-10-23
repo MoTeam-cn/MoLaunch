@@ -6,9 +6,18 @@ export type UpdateStatus =
   | 'available'
   | 'no-update'
   | 'downloading'
+  | 'ready'
   | 'installing'
   | 'done'
   | 'error'
+
+/** 待安装更新状态（与 Rust `PendingUpdateStatus` 结构对应） */
+export interface PendingUpdateStatus {
+  /** 是否已有可直接重启安装的更新包 */
+  ready: boolean
+  /** 已预下载的版本号（无法确定时为空串） */
+  version: string
+}
 
 /** 后端返回的更新信息（与 Rust `UpdateInfo` 结构对应） */
 export interface UpdateInfo {
