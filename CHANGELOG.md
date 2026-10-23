@@ -4,6 +4,23 @@
 
 ## [Unreleased]
 
+### 修复
+
+#### 修复新版游戏启动时报「Error: -cp requires class path specification」
+
+- **丢弃版本 JSON 里的 classpath 选项**（[build.rs](src-tauri/src/minecraft/launch/jvm_args/build.rs)）：原实现只丢弃 `${classpath}` 占位值、保留裸 `-cp`，最终参数会变成 `-cp -cp <真实 classpath>`，JVM 把第二个 `-cp` 当 classpath、把真实 classpath 当主类；classpath 为空或经启动包装器重组时会退化成裸 `-cp`，直接弹 JVM 原生错误框。现在 `-cp` / `-classpath` / `--class-path` 与其后的占位值整体丢弃。
+- **补齐 `${launcher_name}` / `${launcher_version}` 替换**（同上）：这两个占位符此前原样泄漏进 JVM 参数（`-Dminecraft.launcher.brand=${launcher_name}`）。
+- **classpath 为空时给出可读错误**（[arguments.rs](src-tauri/src/minecraft/launch/arguments.rs)）：不再把空串传给 `-cp`，而是提示「库文件缺失，请重新安装该版本」。
+- **启动前参数自检**（[process_spawn.rs](src-tauri/src/minecraft/launch/pipeline/process_spawn.rs)）：`-cp` 等必须带取值的选项若后面没有有效取值，返回中文可读错误，不再让用户面对 Java 原生对话框；新增 [process_spawn_test.rs](src-tauri/src/minecraft/launch/pipeline/process_spawn_test.rs) 与 [build_test.rs](src-tauri/src/minecraft/launch/jvm_args/build_test.rs) 覆盖上述规则。
+
+### 变更
+
+#### 依赖安全升级
+
+- **前端**（[package.json](package.json) / [package-lock.json](package-lock.json)）：`dompurify` 升至 `^3.4.17`（修复 3 条 DOMPurify 绕过公告，其中 1 条 critical），`vitest` 升至 `^4.1.12`（修复 `@vitest/mocker` 的 mock 注入与 Windows 反斜杠穿越）。
+- **后端**（[Cargo.lock](src-tauri/Cargo.lock)）：`tokio` 1.54.1、`rustls-webpki` 0.103.16、`webpki-roots` / `webpki-root-certs` 1.0.11，覆盖 interval 竞态与根证书信任、证书校验等 4 条公告。
+- **审计忽略项显式化**（[ci.yml](.github/workflows/ci.yml)）：`hashbrown`（borsh 路径未使用）、`rsa`（上游无修复版本）、`zip`（Windows 无 SUID 语义，升级需重写解压调用）三类公告在 cargo audit 步骤显式 ignore，并逐条注明原因，避免长期把 CI 顶红。
+
 ## [0.3.9] - 2026-10-23
 
 ### 新增
