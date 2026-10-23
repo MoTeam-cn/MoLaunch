@@ -54,11 +54,9 @@ pub async fn chat_completions_stream(
         let status = resp.status().as_u16();
         if !(200..300).contains(&status) {
             let text = resp.text().await.unwrap_or_default();
-            return Err(anyhow::anyhow!(
-                "AI 服务返回 HTTP {}: {}",
-                status,
-                text.trim()
-            ));
+            return Err(anyhow::anyhow!(super::error_body::http_error_message(
+                status, &text
+            )));
         }
         Ok::<(u16, reqwest::Response), anyhow::Error>((status, resp))
     })
@@ -77,6 +75,7 @@ pub async fn chat_completions_stream(
                     return Ok(result.finish(true));
                 }
                 SseEvent::Json(parsed) => {
+                    ensure_no_stream_error(&parsed)?;
                     if let Some(done) = result.apply(&parsed) {
                         return Ok(done);
                     }
@@ -92,6 +91,7 @@ pub async fn chat_completions_stream(
                 return Ok(result.finish(true));
             }
             SseEvent::Json(parsed) => {
+                ensure_no_stream_error(&parsed)?;
                 if let Some(done) = result.apply(&parsed) {
                     return Ok(done);
                 }
@@ -104,4 +104,21 @@ pub async fn chat_completions_stream(
     super::chat::finalize_tool_calls(&mut result.tool_calls);
     (callbacks.on_done)(&result.usage);
     Ok(result.finish(true))
+}
+
+/// SSE 数据块里带 `error` 时立即报错
+///
+/// 部分服务在流式响应中途以 `data: {"error": {...}}` 返回错误（限流、余额不足、
+/// 内容审核等），此前这类块会被当成普通增量忽略，最终表现为「AI 响应为空」，
+/// 用户看不到真实原因。
+fn ensure_no_stream_error(parsed: &serde_json::Value) -> anyhow::Result<()> {
+    if parsed.get("error").is_none() {
+        return Ok(());
+    }
+    let raw = parsed.to_string();
+    Err(anyhow::anyhow!(
+        "AI 服务返回错误: {}",
+        super::error_body::extract_error_message(&raw)
+            .unwrap_or_else(|| "服务端未返回错误详情".to_string())
+    ))
 }

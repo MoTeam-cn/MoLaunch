@@ -2,6 +2,7 @@
 
 mod accumulator;
 pub(crate) mod chat;
+mod error_body;
 mod sse;
 mod stream;
 mod tokens;

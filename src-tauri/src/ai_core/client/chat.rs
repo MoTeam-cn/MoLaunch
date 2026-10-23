@@ -89,11 +89,9 @@ async fn chat_inner(
     .await?;
 
     if !(200..300).contains(&status) {
-        return Err(anyhow::anyhow!(
-            "AI 服务返回 HTTP {}: {}",
-            status,
-            text.trim()
-        ));
+        return Err(anyhow::anyhow!(super::error_body::http_error_message(
+            status, &text
+        )));
     }
 
     let parsed: ChatResponse =
@@ -131,11 +129,9 @@ pub async fn list_models(config: &AiConfig) -> anyhow::Result<Vec<String>> {
     .await?;
 
     if !(200..300).contains(&status) {
-        return Err(anyhow::anyhow!(
-            "AI 服务返回 HTTP {}: {}",
-            status,
-            text.trim()
-        ));
+        return Err(anyhow::anyhow!(super::error_body::http_error_message(
+            status, &text
+        )));
     }
 
     let parsed: ModelsResponse =
@@ -182,11 +178,9 @@ pub async fn chat_completions(
     .await?;
 
     if !(200..300).contains(&status) {
-        return Err(anyhow::anyhow!(
-            "AI 服务返回 HTTP {}: {}",
-            status,
-            text.trim()
-        ));
+        return Err(anyhow::anyhow!(super::error_body::http_error_message(
+            status, &text
+        )));
     }
 
     let parsed: ChatCompletionsResponse =
