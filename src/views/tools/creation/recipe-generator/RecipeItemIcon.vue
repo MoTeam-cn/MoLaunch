@@ -45,7 +45,7 @@ const backgroundStyle = computed(() => {
   </Tooltip>
 </template>
 
-<style scoped>
+<style lang="scss" scoped>
 .recipe-item-icon {
   position: relative;
   display: inline-flex;

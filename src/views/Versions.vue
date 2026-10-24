@@ -266,7 +266,7 @@ onMounted(async () => {
   </div>
 </template>
 
-<style scoped>
+<style lang="scss" scoped>
 .slide-right-enter-active { transition: transform 0.3s ease-out, opacity 0.2s ease-out; }
 .slide-right-leave-active { transition: transform 0.2s ease-in, opacity 0.15s ease-in; }
 .slide-right-enter-from { transform: translateX(100%); opacity: 0; }

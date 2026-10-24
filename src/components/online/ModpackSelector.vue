@@ -196,7 +196,7 @@ watch(
   </div>
 </template>
 
-<style scoped>
+<style lang="scss" scoped>
 /* 提示框 fade-in 动画（避免突然蹦出显得僵硬） */
 .modpack-fade-in {
   animation: modpack-fade-in 0.3s ease-out;

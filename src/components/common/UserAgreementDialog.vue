@@ -167,7 +167,7 @@ function openDoc(url: string) {
 defineExpose({ showAgreement })
 </script>
 
-<style scoped>
+<style lang="scss" scoped>
 .agreement-fade-enter-active,
 .agreement-fade-leave-active {
   transition: opacity 0.2s ease;

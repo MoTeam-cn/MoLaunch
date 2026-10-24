@@ -143,7 +143,7 @@ const showMeteor = computed(() => props.meteor && percent.value >= 66)
   </div>
 </template>
 
-<style scoped>
+<style lang="scss" scoped>
 .slider-root {
   position: relative;
   display: inline-flex;

@@ -290,7 +290,7 @@ async function restorePage(savedPath: string): Promise<void> {
   </Teleport>
 </template>
 
-<style>
+<style lang="scss">
 /* 加载遮罩过渡（isRestoring） */
 .fade-enter-active,
 .fade-leave-active {

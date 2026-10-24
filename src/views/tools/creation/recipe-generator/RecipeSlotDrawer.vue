@@ -161,7 +161,7 @@ function moveEditing(direction: 'up' | 'down' | 'left' | 'right') {
   </Drawer>
 </template>
 
-<style scoped>
+<style lang="scss" scoped>
 .recipe-drawer-palette {
   display: flex;
   flex-direction: column;

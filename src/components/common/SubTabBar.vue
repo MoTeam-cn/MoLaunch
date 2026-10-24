@@ -117,7 +117,7 @@ onMounted(updateIndicator)
   </div>
 </template>
 
-<style scoped>
+<style lang="scss" scoped>
 /* 细滚动条：默认隐藏，鼠标悬停在子菜单区域时显示（JS 控制，避免 CSS :hover 在滚动条上的怪异行为） */
 .sub-tab-bar::-webkit-scrollbar {
   height: 4px;

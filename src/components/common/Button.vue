@@ -127,7 +127,7 @@ const sizeClass = computed(() => {
   </button>
 </template>
 
-<style scoped>
+<style lang="scss" scoped>
 /* 按钮基础样式已在全局 main.css 中定义（.btn / .btn-primary 等）
    这里只补充尺寸和特殊状态 */
 

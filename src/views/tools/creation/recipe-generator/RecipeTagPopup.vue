@@ -107,7 +107,7 @@ onBeforeUnmount(() => {
   </div>
 </template>
 
-<style scoped>
+<style lang="scss" scoped>
 .recipe-tag-popup {
   position: fixed;
   z-index: 1100;

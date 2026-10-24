@@ -283,4 +283,4 @@ const panelStyle = computed(() => {
   </teleport>
 </template>
 
-<style scoped src="./Drawer.css"></style>
+<style lang="scss" scoped src="./Drawer.scss"></style>

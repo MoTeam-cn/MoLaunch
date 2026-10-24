@@ -1,0 +1,39 @@
+/*
+  基础排版与全局滚动条
+
+  @reference 让本文件能使用 Tailwind 的 @apply（Tailwind v4 要求每个使用 @apply 的
+  独立 CSS 文件声明主题引用；main.scss 是 Tailwind 入口）。
+*/
+@reference './main.scss';
+  html, body {
+    @apply antialiased;
+    overflow: hidden;
+    height: 100%;
+    margin: 0;
+  }
+
+  body {
+    @apply text-gray-900;
+    /* 主内容区背景：主题色 100 档 25% 透明度叠加白底，呈现淡色调
+     * 跟随主题色变化（原硬编码 #e0ecff） */
+    background-color: rgb(var(--color-primary-rgb-100) / 0.25);
+  }
+
+/* Scrollbar 样式 */
+/* Scrollbar 样式 */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  @apply bg-gray-100;
+}
+
+::-webkit-scrollbar-thumb {
+  @apply bg-gray-300 rounded-full;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  @apply bg-gray-400;
+}

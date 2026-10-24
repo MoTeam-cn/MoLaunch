@@ -113,7 +113,7 @@ function toggleDetail(i: number) {
   </div>
 </template>
 
-<style scoped>
+<style lang="scss" scoped>
 /* 左侧虚线贯穿所有节点 */
 .tool-timeline {
   list-style: none;

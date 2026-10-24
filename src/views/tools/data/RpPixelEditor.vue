@@ -295,7 +295,7 @@ onBeforeUnmount(() => {
   </div>
 </template>
 
-<style scoped>
+<style lang="scss" scoped>
 .image-pixelated {
   image-rendering: pixelated;
   background-image:

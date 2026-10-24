@@ -172,7 +172,7 @@ onMounted(async () => {
   </div>
 </template>
 
-<style scoped>
+<style lang="scss" scoped>
 .view-fade-enter-active,
 .view-fade-leave-active {
   transition: opacity 0.25s ease, transform 0.25s ease;

@@ -42,7 +42,7 @@ const renderColor = computed(
   </span>
 </template>
 
-<style scoped>
+<style lang="scss" scoped>
 /* 内联彩色 SVG：铺满容器（覆盖源文件 width/height="1em"） */
 .model-icon-raw :deep(svg) {
   width: 100%;

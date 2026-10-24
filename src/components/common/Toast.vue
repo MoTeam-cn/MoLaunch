@@ -153,7 +153,7 @@ defineExpose({
   </teleport>
 </template>
 
-<style scoped>
+<style lang="scss" scoped>
 .toast-container {
   position: fixed;
   left: 0;

@@ -73,7 +73,7 @@ function goToDownloads() {
   </transition>
 </template>
 
-<style scoped>
+<style lang="scss" scoped>
 .download-panel-btn {
   position: fixed;
   right: 24px;

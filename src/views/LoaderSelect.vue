@@ -252,7 +252,7 @@ onMounted(() => {
   </div>
 </template>
 
-<style scoped>
+<style lang="scss" scoped>
 .animate-slide-in {
   animation: slide-in 0.3s ease-out;
 }

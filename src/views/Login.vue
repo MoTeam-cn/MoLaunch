@@ -233,7 +233,7 @@ function openOfficialSite() {
   </div>
 </template>
 
-<style scoped>
+<style lang="scss" scoped>
 /**
  * 登录方式 Tab 切换动画
  *

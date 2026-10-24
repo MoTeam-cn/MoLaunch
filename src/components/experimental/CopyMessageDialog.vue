@@ -104,7 +104,7 @@ async function copyMarkdown() {
   </Teleport>
 </template>
 
-<style scoped>
+<style lang="scss" scoped>
 /* 遮罩淡入淡出 */
 .dialog-enter-active,
 .dialog-leave-active {

@@ -243,7 +243,7 @@ watch(
   </div>
 </template>
 
-<style scoped>
+<style lang="scss" scoped>
 /* 输入框底部为右下角发送按钮留出空间 */
 :deep(.textarea-inner) {
   padding-bottom: 2rem;

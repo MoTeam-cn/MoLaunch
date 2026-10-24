@@ -110,7 +110,7 @@ function onChange(e: Event) {
   </label>
 </template>
 
-<style scoped>
+<style lang="scss" scoped>
 /* 容器：inline-flex，左侧 7px padding 让 icon-hover 背景居中 */
 .checkbox {
   position: relative;

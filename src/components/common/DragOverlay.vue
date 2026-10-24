@@ -55,7 +55,7 @@ const borderColor = computed(() => {
   </Transition>
 </template>
 
-<style scoped>
+<style lang="scss" scoped>
 .drag-overlay-enter-active,
 .drag-overlay-leave-active {
   transition: opacity 0.15s ease;

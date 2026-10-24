@@ -230,7 +230,7 @@ onBeforeUnmount(stop)
   </div>
 </template>
 
-<style scoped>
+<style lang="scss" scoped>
 .image-pixelated {
   image-rendering: pixelated;
 }

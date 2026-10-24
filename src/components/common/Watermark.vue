@@ -129,7 +129,7 @@ const svgMetadata = computed(() => {
   </Teleport>
 </template>
 
-<style scoped>
+<style lang="scss" scoped>
 .watermark-overlay {
   position: fixed;
   inset: 0;

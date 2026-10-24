@@ -1,0 +1,63 @@
+/*
+  全局过渡与关键帧动画
+*/
+/* 动画 */
+.fade-enter-active,
+.fade-leave-active {
+  transition: opacity 0.3s ease;
+}
+
+.fade-enter-from,
+.fade-leave-to {
+  opacity: 0;
+}
+
+.slide-enter-active,
+.slide-leave-active {
+  transition: transform 0.3s ease;
+}
+
+.slide-enter-from {
+  transform: translateX(-100%);
+}
+
+.slide-leave-to {
+  transform: translateX(100%);
+}
+
+/* 下载进度条扫动动画 */
+@keyframes sweep {
+  0% { transform: translateX(-100%); }
+  50% { transform: translateX(233%); }
+  100% { transform: translateX(-100%); }
+}
+.animate-sweep {
+  animation: sweep 1.5s ease-in-out infinite;
+}
+
+/* 进度条流星扫光（token 进度条 / 日志分析进度条复用）
+   Codex 风格紫色流星：头部亮紫 + 渐隐尾巴 + 紫色光晕，从左到右往复扫过 */
+@keyframes progress-sweep {
+  0% { transform: translateX(-100%); }
+  100% { transform: translateX(350%); }
+}
+.progress-sweep {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 0;
+  width: 30%;
+  border-radius: 9999px;
+  background: linear-gradient(
+    90deg,
+    transparent,
+    rgba(139, 92, 246, 0.35) 40%,
+    rgba(167, 139, 250, 0.9) 85%,
+    #c4b5fd
+  );
+  box-shadow:
+    0 0 6px 1px rgba(139, 92, 246, 0.35),
+    0 0 16px 3px rgba(167, 139, 250, 0.45);
+  animation: progress-sweep 2s linear infinite;
+  pointer-events: none;
+}

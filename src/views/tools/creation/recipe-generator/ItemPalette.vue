@@ -93,7 +93,7 @@ function pick(item: AssetItem) {
   </div>
 </template>
 
-<style scoped>
+<style lang="scss" scoped>
 .item-palette {
   display: flex;
   flex-direction: column;

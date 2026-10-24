@@ -168,7 +168,7 @@ function clearCloseTimer() {
   </div>
 </template>
 
-<style scoped>
+<style lang="scss" scoped>
 .recipe-slots-editor {
   display: flex;
   flex-direction: column;

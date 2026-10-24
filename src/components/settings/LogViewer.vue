@@ -174,7 +174,7 @@ const logLines = computed<LogLine[]>(() => {
   </CollapsibleCard>
 </template>
 
-<style scoped>
+<style lang="scss" scoped>
 /* 日志列表容器：双向滚动（纵向 + 横向） */
 .log-viewer .log-list {
   max-height: 360px;

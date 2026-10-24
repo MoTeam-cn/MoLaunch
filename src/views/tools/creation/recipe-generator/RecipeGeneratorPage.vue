@@ -257,7 +257,7 @@ async function exportPack() {
   </div>
 </template>
 
-<style scoped>
+<style lang="scss" scoped>
 .recipe-generator-page {
   display: flex;
   flex-direction: column;

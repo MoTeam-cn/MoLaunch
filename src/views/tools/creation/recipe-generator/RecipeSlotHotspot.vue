@@ -81,7 +81,7 @@ function slotBoxStyle(box: RecipeLayoutSlotBox) {
   </div>
 </template>
 
-<style scoped>
+<style lang="scss" scoped>
 .recipe-layout-hotspot {
   position: absolute;
   display: flex;

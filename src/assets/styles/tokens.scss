@@ -1,0 +1,42 @@
+/*
+  设计变量（CSS 自定义属性）
+
+  --color-primary-{n} / --color-primary-rgb-{n} 由 settingsStore.applyPrimaryColor()
+  在运行时覆盖，主题色切换即时生效。
+*/
+  :root {
+    /* 默认主色：Arco 蓝 #165dff
+     * 运行时由 settingsStore.primaryColor 通过 applyPrimaryColor() 覆盖
+     * - --color-primary-{n}：HEX 值，供 var(--color-primary-500) 等直接使用
+     * - --color-primary-rgb-{n}：空格分隔 RGB，供 Tailwind rgb(var(...) / <alpha>) 使用
+     */
+    --color-primary-50:  #eff2ff;
+    --color-primary-100: #dde5ff;
+    --color-primary-200: #bcd0ff;
+    --color-primary-300: #8cb0ff;
+    --color-primary-400: #5688ff;
+    --color-primary-500: #165dff;
+    --color-primary-600: #0e42d2;
+    --color-primary-700: #0a3aae;
+    --color-primary-800: #0a3290;
+    --color-primary-900: #0b2b75;
+    --color-primary-950: #071a4d;
+
+    --color-primary-rgb-50:  239 242 255;
+    --color-primary-rgb-100: 221 229 255;
+    --color-primary-rgb-200: 188 208 255;
+    --color-primary-rgb-300: 140 176 255;
+    --color-primary-rgb-400: 86 136 255;
+    --color-primary-rgb-500: 22 93 255;
+    --color-primary-rgb-600: 14 66 210;
+    --color-primary-rgb-700: 10 58 174;
+    --color-primary-rgb-800: 10 50 144;
+    --color-primary-rgb-900: 11 43 117;
+    --color-primary-rgb-950: 7 26 77;
+
+    /* 兼容旧变量：空格分隔 RGB */
+    --color-primary: var(--color-primary-rgb-500);
+    --color-success: 16 185 129;
+    --color-warning: 245 158 11;
+    --color-error: 239 68 68;
+  }

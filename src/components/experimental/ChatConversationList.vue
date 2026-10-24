@@ -190,7 +190,7 @@ onBeforeUnmount(() => {
   </aside>
 </template>
 
-<style scoped>
+<style lang="scss" scoped>
 /* 会话列表项增删/移动过渡：新建、删除、切换时列表平滑变化 */
 .conv-enter-active,
 .conv-leave-active {

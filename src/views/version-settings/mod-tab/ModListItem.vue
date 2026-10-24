@@ -214,7 +214,7 @@ function handleClick(e: MouseEvent) {
   </li>
 </template>
 
-<style scoped>
+<style lang="scss" scoped>
 /* 选中指示条弹性动画：先冲过头再回弹
    使用 transform scaleY 而非 height，避免 height auto 无法动画的问题 */
 .animate-check-pop {

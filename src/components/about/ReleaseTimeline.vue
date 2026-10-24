@@ -48,7 +48,7 @@ function toggleCollapsed(index: number): void {
   </div>
 </template>
 
-<style scoped>
+<style lang="scss" scoped>
 .release-timeline {
   list-style: none;
   margin: 0;

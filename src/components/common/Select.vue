@@ -241,4 +241,4 @@ onUnmounted(() => {
   </div>
 </template>
 
-<style scoped src="./Select.css"></style>
+<style lang="scss" scoped src="./Select.scss"></style>

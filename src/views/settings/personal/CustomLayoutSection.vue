@@ -143,7 +143,7 @@ const {
   </div>
 </template>
 
-<style scoped>
+<style lang="scss" scoped>
 /* 代码编辑器：等宽字体 + 小字号，对齐原原生 textarea 的代码输入体验 */
 .custom-layout-editor :deep(.textarea-inner) {
   font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;

@@ -136,7 +136,7 @@ onUnmounted(() => {
   </Transition>
 </template>
 
-<style scoped>
+<style lang="scss" scoped>
 .back-to-top-btn {
   position: fixed;
   bottom: 24px;

@@ -88,7 +88,7 @@ function pick(id: string) {
   </div>
 </template>
 
-<style scoped>
+<style lang="scss" scoped>
 .tag-palette {
   display: flex;
   flex-direction: column;

@@ -186,7 +186,7 @@ onUnmounted(() => {
   </div>
 </template>
 
-<style scoped>
+<style lang="scss" scoped>
 .skin-3d-container :deep(canvas) {
   display: block;
   image-rendering: pixelated;

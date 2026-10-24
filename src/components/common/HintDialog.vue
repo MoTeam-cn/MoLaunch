@@ -239,7 +239,7 @@ function goStar() {
 defineExpose({ showBuy, showStar })
 </script>
 
-<style scoped>
+<style lang="scss" scoped>
 .hint-pages-wrapper {
   overflow: hidden;
 }

@@ -283,7 +283,7 @@ function onRetry() {
   </Drawer>
 </template>
 
-<style scoped>
+<style lang="scss" scoped>
 .markdown-body :deep(p) {
   margin: 0.125rem 0;
 }

@@ -158,7 +158,7 @@ defineExpose({ checkArrows })
   </div>
 </template>
 
-<style scoped>
+<style lang="scss" scoped>
 /*
  * 滚动条平滑淡入方案：
  * - 滚动条高度始终 6px（不变，避免 height 0→6 瞬变）

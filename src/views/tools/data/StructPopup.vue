@@ -96,7 +96,7 @@ async function onCopyTp() {
   </div>
 </template>
 
-<style scoped>
+<style lang="scss" scoped>
 .struct-popup {
   background: white;
   border-radius: 6px;

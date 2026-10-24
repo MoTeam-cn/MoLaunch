@@ -249,7 +249,7 @@ function saveEdit() {
   </div>
 </template>
 
-<style scoped>
+<style lang="scss" scoped>
 /* 流式生成光标 */
 .stream-caret {
   display: inline-block;

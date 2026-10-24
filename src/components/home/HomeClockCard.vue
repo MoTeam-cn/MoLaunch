@@ -116,7 +116,7 @@ const {
   </div>
 </template>
 
-<style scoped>
+<style lang="scss" scoped>
 /* 翻页动画：向上滑动 + 淡入淡出 */
 .card-flip-enter-active,
 .card-flip-leave-active {

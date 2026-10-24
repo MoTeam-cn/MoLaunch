@@ -286,7 +286,7 @@ const isCancelled = computed(() => phase.value === 'cancelled')
   </Drawer>
 </template>
 
-<style scoped>
+<style lang="scss" scoped>
 :deep(.drawer-body) {
   display: flex;
   flex-direction: column;

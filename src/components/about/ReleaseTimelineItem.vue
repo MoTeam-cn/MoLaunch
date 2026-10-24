@@ -62,7 +62,7 @@ const emit = defineEmits<{
   </li>
 </template>
 
-<style scoped>
+<style lang="scss" scoped>
 .timeline-item { position: relative; padding-left: 1.375rem; padding-bottom: 0.875rem; }
 .timeline-item::before { content: ''; position: absolute; left: 0.25rem; top: 1rem; bottom: 0; width: 1px; background-color: #e5e6eb; }
 .timeline-item:last-child { padding-bottom: 1.25rem; }

@@ -108,7 +108,7 @@ onMounted(async () => {
   </div>
 </template>
 
-<style scoped>
+<style lang="scss" scoped>
 /* 引号加粗内容：加粗 + 字距，让「产品名 / 术语」与正文区分开（v-html 内容需用 :deep 命中） */
 :deep(.license-markdown strong) {
   font-weight: 700;

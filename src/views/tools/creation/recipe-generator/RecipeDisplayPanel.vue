@@ -79,7 +79,7 @@ const emit = defineEmits<{
   </section>
 </template>
 
-<style scoped>
+<style lang="scss" scoped>
 .recipe-panel {
   border: 1px solid #e5e6eb;
   border-radius: 8px;

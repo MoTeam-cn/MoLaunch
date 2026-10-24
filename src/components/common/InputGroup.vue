@@ -37,7 +37,7 @@ const gridColumns = computed(() => props.ratio.map(r => `${r}fr`).join(' '))
   </div>
 </template>
 
-<style scoped>
+<style lang="scss" scoped>
 .input-group {
   display: grid;
   align-items: center;

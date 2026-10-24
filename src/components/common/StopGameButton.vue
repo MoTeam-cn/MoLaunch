@@ -48,7 +48,7 @@ onUnmounted(() => { stopGameVisible.value = false })
   </Transition>
 </template>
 
-<style scoped>
+<style lang="scss" scoped>
 /* fixed 定位在 Tooltip 根元素（trigger），确保 tooltip 位置基准正确 */
 .stop-game-trigger {
   position: fixed;

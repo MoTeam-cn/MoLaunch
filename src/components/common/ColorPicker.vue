@@ -265,4 +265,4 @@ onUnmounted(() => {
   </div>
 </template>
 
-<style scoped src="./ColorPicker.css"></style>
+<style lang="scss" scoped src="./ColorPicker.scss"></style>

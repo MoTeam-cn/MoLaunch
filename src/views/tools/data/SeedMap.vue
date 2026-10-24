@@ -174,7 +174,7 @@ function handleLoadFromSave(payload: { seed: string; mcVersion: number; worldNam
   </section>
 </template>
 
-<style scoped>
+<style lang="scss" scoped>
 /* OL canvas 渲染时保持像素清晰（nearest neighbor），避免群系边界模糊 */
 :deep(.ol-viewport canvas) {
   image-rendering: pixelated;

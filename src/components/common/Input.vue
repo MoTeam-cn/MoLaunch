@@ -221,4 +221,4 @@ defineExpose({
   </span>
 </template>
 
-<style scoped src="./Input.css"></style>
+<style lang="scss" scoped src="./Input.scss"></style>

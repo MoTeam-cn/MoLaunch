@@ -236,7 +236,7 @@ onUnmounted(() => {
   </div>
 </template>
 
-<style scoped>
+<style lang="scss" scoped>
 .tooltip-trigger {
   display: inline-flex;
 }
@@ -246,7 +246,7 @@ onUnmounted(() => {
 }
 </style>
 
-<style>
+<style lang="scss">
 .tooltip-body {
   position: relative;
   padding: 6px 12px;
