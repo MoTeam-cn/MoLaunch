@@ -13,7 +13,9 @@ import { useRouter } from 'vue-router'
 import { useVersionStore } from '@/stores/version'
 import { showConfirm } from '@/utils/modal'
 import { toastInfo, toastError, toastWarning } from '@/utils/toast'
-import { pauseDownload, resumeDownload, cancelDownload, getDownloadProgress, isDownloading } from '@/utils/tauri'
+import { pauseDownload, resumeDownload, cancelDownload } from '@/utils/tauri'
+import { restoreDownloadFromBackend } from '@/composables/useDownloadPageRestore'
+import { decideIdleAction } from '@/utils/downloadPageGuard'
 const DownloadStatsPanel = defineAsyncComponent(() => import('./downloads/DownloadStatsPanel.vue'))
 const TaskGroupCard = defineAsyncComponent(() => import('@/components/downloads/TaskGroupCard.vue'))
 import { safeCall } from '@/utils/async'
@@ -31,56 +33,18 @@ const checking = ref(true)
 onMounted(async () => {
   const maxRetries = 6 // 最多重试 6 次，每次 500ms，共 3 秒
   for (let attempt = 0; attempt < maxRetries; attempt++) {
-    const success = await safeCall(async () => {
-      const active = await isDownloading()
-      if (active) {
-        // 有下载任务，恢复状态
-        const raw = await getDownloadProgress()
-        if (raw && raw.stages && raw.stages.length > 0) {
-          versionStore.startDownload(raw.version_name || '')
-          let weightedProgress = 0
-          let totalWeight = 0
-          for (const s of raw.stages) {
-            totalWeight += s.weight
-            weightedProgress += s.progress * s.weight
-          }
-          const percentage = totalWeight > 0
-            ? Math.min(100, parseFloat(((weightedProgress / totalWeight) * 100).toFixed(1)))
-            : 0
-          const isPaused = raw.stages.some((s) => s.is_paused === true)
-          versionStore.updateProgress({
-            stages: raw.stages.map((s) => ({
-              name: s.name,
-              progress: s.progress,
-              weight: s.weight,
-              status: s.status,
-              bytes_downloaded: s.bytes_downloaded,
-              bytes_total: s.bytes_total,
-              files_downloaded: s.files_downloaded || 0,
-              files_total: s.files_total || 0,
-              group: s.group ?? null,
-            })),
-            current_stage_index: raw.current_stage_index ?? 0,
-            global_speed: raw.global_speed ?? 0,
-            global_bytes_downloaded: raw.global_bytes_downloaded ?? 0,
-            global_bytes_total: raw.global_bytes_total ?? 0,
-            percentage,
-            isPaused,
-          })
-        }
-        checking.value = false
-        return true // 成功恢复，不需要返回
-      }
-      return false
-    }, 'check download state')
-    if (success === true) return
-    // 等待 500ms 后重试
+    if (await restoreDownloadFromBackend()) {
+      checking.value = false
+      return
+    }
     if (attempt < maxRetries - 1) {
       await new Promise(resolve => setTimeout(resolve, 500))
     }
   }
-  // 重试完毕仍无任务，显示暂无任务极简画面，1.5 秒后返回上一页
   checking.value = false
+  // 重试完毕仍无任务：退回前再问一次后端（加载器安装/后处理阶段可能刚起步）
+  const backendActive = await restoreDownloadFromBackend()
+  if (decideIdleAction({ backendActive, storeActive: versionStore.downloading }) === 'stay') return
   toastWarning('未检测到下载任务，已返回')
   await new Promise(resolve => setTimeout(resolve, 1500))
   router.back()
@@ -88,11 +52,21 @@ onMounted(async () => {
 
 const hasActiveDownload = computed(() => versionStore.downloading)
 
-// 下载完成/取消后自动返回上一页（hasActiveDownload 从 true 变为 false 时触发）
-watch(hasActiveDownload, (active, wasActive) => {
-  if (!active && wasActive) {
+// 下载完成后自动返回上一页（hasActiveDownload 从 true 变为 false 时触发）
+//
+// 注意：整合安装是「本体下载 → 加载器安装（Fabric/Forge）→ 后处理」多段流程，
+// 本体下载批次收尾时后端会短暂广播面板隐藏，前端状态会先熄灭。此时若直接退回，
+// 就会出现「页面退出了但还在装」的错觉。因此熄灭后必须再问一次后端：
+// 后端仍在跑就恢复进度并留在页面上，只有前后端都确认结束才退回。
+watch(hasActiveDownload, async (active, wasActive) => {
+  if (active || !wasActive) return
+  if (cancelledByUser.value) {
     router.back()
+    return
   }
+  const backendActive = await restoreDownloadFromBackend()
+  if (decideIdleAction({ backendActive, storeActive: versionStore.downloading }) === 'stay') return
+  router.back()
 })
 const progress = computed(() => versionStore.downloadProgress)
 const isPaused = computed(() => progress.value?.isPaused ?? false)
@@ -152,6 +126,8 @@ const currentStageName = computed(() => {
 // 按钮状态
 const togglingPause = ref(false)
 const cancelling = ref(false)
+// 用户主动取消后不再做「后台仍在跑」的恢复判定，直接返回
+const cancelledByUser = ref(false)
 
 async function handleTogglePause() {
   if (togglingPause.value) return
@@ -184,6 +160,7 @@ function handleCancel() {
       if (ok === undefined) return
       toastInfo('下载已取消')
       // 确保取消后立即触发返回（避免轮询已停止时卡在空白页）
+      cancelledByUser.value = true
       versionStore.finishDownload()
     },
   )
