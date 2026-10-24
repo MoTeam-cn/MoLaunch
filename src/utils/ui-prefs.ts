@@ -52,8 +52,23 @@ export function systemPrefersReducedMotion(): boolean {
   return typeof window !== 'undefined' && !!window.matchMedia?.('(prefers-reduced-motion: reduce)').matches
 }
 
-/** 把偏好应用到 <html>：data-theme / data-density / data-reduce-motion 与背景 CSS 变量 */
-export function applyUiPrefs(prefs: UiPrefs): void {
+/**
+ * 地址能否直接写进 CSS `url()`
+ *
+ * 只有 http(s) / data: / blob: 可以；裸本地路径（如 D:\\Pics\\a.png）WebView 加载不了，
+ * 需要先由后端读成 data URL。
+ */
+export function isDirectImageUrl(raw: string): boolean {
+  return /^(https?:|data:|blob:)/i.test(raw.trim())
+}
+
+/**
+ * 把偏好应用到 <html>：data-theme / data-density / data-reduce-motion 与背景 CSS 变量
+ *
+ * `backgroundImageUrl` 是已经可直接交给 CSS 的地址（http(s) / data: / blob:）；
+ * 本地路径需先由后端转成 data URL，未解析完成时传空串，避免写入非法 url() 导致整条声明失效。
+ */
+export function applyUiPrefs(prefs: UiPrefs, backgroundImageUrl?: string): void {
   const root = document.documentElement
   const appearance = resolveAppearance(prefs.appearance)
   root.dataset.theme = appearance
@@ -62,9 +77,12 @@ export function applyUiPrefs(prefs: UiPrefs): void {
   root.dataset.reduceMotion = prefs.reduceMotion || systemPrefersReducedMotion() ? 'true' : 'false'
 
   const { background } = prefs
-  const hasImage = !!background.image
+  const rawImage = (backgroundImageUrl ?? prefs.background.image).trim()
+  // 只有 http(s) / data: / blob: 能直接写进 url()；裸本地路径由 store 异步解析
+  const cssImage = isDirectImageUrl(rawImage) ? rawImage : ''
+  const hasImage = !!cssImage
   root.dataset.hasBackground = hasImage ? 'true' : 'false'
-  root.style.setProperty('--ui-bg-image', hasImage ? `url("${background.image}")` : 'none')
+  root.style.setProperty('--ui-bg-image', hasImage ? `url("${cssImage}")` : 'none')
   root.style.setProperty('--ui-bg-blur', `${background.blur}px`)
   root.style.setProperty('--ui-bg-mask', `${background.mask / 100}`)
   root.style.setProperty('--ui-bg-size', background.fill === 'repeat' ? 'auto' : background.fill)

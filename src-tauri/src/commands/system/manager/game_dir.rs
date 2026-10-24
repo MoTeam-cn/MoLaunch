@@ -31,6 +31,12 @@ struct SetGameDirParams {
     game_dir: String,
 }
 
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct ReadImageDataUrlParams {
+    path: String,
+}
+
 /// 注册 game_dir 域 action
 pub(super) fn register(d: &mut Dispatcher) {
     d.register(
@@ -97,6 +103,15 @@ pub(super) fn register(d: &mut Dispatcher) {
                 serde_json::from_value(params).map_err(|e| format!("参数解析失败: {}", e))?;
             crate::commands::system::game_dir::set_game_dir(&state, p.game_dir).await?;
             Ok(serde_json::Value::Null)
+        }),
+    );
+    d.register(
+        "read_image_data_url",
+        handler!(_state, _app, params, {
+            let p: ReadImageDataUrlParams =
+                serde_json::from_value(params).map_err(|e| format!("参数解析失败: {}", e))?;
+            let r = crate::commands::system::game_dir::read_image_data_url(p.path).await?;
+            serde_json::to_value(r).map_err(|e| e.to_string())
         }),
     );
 }

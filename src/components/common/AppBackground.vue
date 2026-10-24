@@ -10,7 +10,7 @@ import { computed } from 'vue'
 import { useUiPrefsStore } from '@/stores/ui-prefs'
 
 const uiStore = useUiPrefsStore()
-const visible = computed(() => uiStore.hasBackground)
+const visible = computed(() => uiStore.hasVisibleBackground)
 </script>
 
 <template>

@@ -41,6 +41,16 @@ export async function writeTextFile(path: string, content: string): Promise<void
 }
 
 /**
+ * 把本地图片读成 data URL
+ *
+ * WebView 无法直接加载本地路径（CSP 只放行 data: / blob:），
+ * 自定义背景图等场景需由后端读取并编码。
+ */
+export async function readImageDataUrl(path: string): Promise<string> {
+  return systemManager<string>(SYSTEM_ACTIONS.READ_IMAGE_DATA_URL, { path })
+}
+
+/**
  * 更新游戏目录
  *
  * 通过 `system_manager` 的 `set_game_dir` action 调用。

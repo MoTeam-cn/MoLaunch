@@ -42,7 +42,7 @@ async function chooseImage() {
       <!-- 图片地址 -->
       <div class="px-5 py-4 space-y-2">
         <p class="text-sm font-medium text-gray-900">自定义背景图</p>
-        <p class="text-xs text-gray-500">支持本地图片路径或 http(s) 地址，留空则使用纯色背景</p>
+        <p class="text-xs text-gray-500">支持本地图片路径（如 D:\\Pictures\\bg.png）或 http(s) 地址，留空则使用纯色背景</p>
         <div class="flex items-center gap-2">
           <Input
             :model-value="uiStore.background.image"

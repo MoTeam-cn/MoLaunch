@@ -153,3 +153,57 @@ pub async fn set_game_dir(state: &AppState, game_dir: String) -> Result<(), Stri
 pub async fn get_system_memory() -> Result<crate::minecraft::system::SystemMemory, String> {
     Ok(crate::minecraft::system::get_system_memory())
 }
+
+/// 单张图片允许的最大字节数（自定义背景图）
+const MAX_IMAGE_BYTES: u64 = 16 * 1024 * 1024;
+
+/// 把本地图片读成 data URL
+///
+/// WebView 不能直接加载 `file://` 或裸 Windows 路径，CSP 也只放行 `data:` / `blob:`，
+/// 因此由后端读取并编码成 `data:image/*;base64,...` 交给前端写进 CSS 变量。
+pub async fn read_image_data_url(path: String) -> Result<String, String> {
+    let raw = path.trim().to_string();
+    if raw.is_empty() {
+        return Err("图片路径不能为空".to_string());
+    }
+    if raw.contains('\0') {
+        return Err("图片路径包含非法字符".to_string());
+    }
+    let file = Path::new(&raw);
+    let ext = file
+        .extension()
+        .and_then(|e| e.to_str())
+        .unwrap_or("")
+        .to_ascii_lowercase();
+    let mime = match ext.as_str() {
+        "png" => "image/png",
+        "jpg" | "jpeg" => "image/jpeg",
+        "webp" => "image/webp",
+        "bmp" => "image/bmp",
+        "gif" => "image/gif",
+        other => {
+            let shown = if other.is_empty() { "未知" } else { other };
+            return Err(format!("不支持的图片格式：{}", shown));
+        }
+    };
+    let meta = tokio::fs::metadata(file)
+        .await
+        .map_err(|e| format!("读取图片信息失败：{}", e))?;
+    if !meta.is_file() {
+        return Err("指定路径不是文件".to_string());
+    }
+    if meta.len() > MAX_IMAGE_BYTES {
+        return Err(format!(
+            "图片过大（{} MB），请控制在 {} MB 以内",
+            meta.len() / 1024 / 1024,
+            MAX_IMAGE_BYTES / 1024 / 1024
+        ));
+    }
+    let bytes = tokio::fs::read(file)
+        .await
+        .map_err(|e| format!("读取图片失败：{}", e))?;
+    use base64::Engine as _;
+    let encoded = base64::engine::general_purpose::STANDARD.encode(&bytes);
+    log_info!("读取本地图片成功: {} ({} 字节)", raw, bytes.len());
+    Ok(format!("data:{};base64,{}", mime, encoded))
+}
