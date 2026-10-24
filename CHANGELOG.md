@@ -4,6 +4,28 @@
 
 ## [Unreleased]
 
+### 新增
+
+#### 启动失败时自动切换 Java 重试
+
+- **自动换 Java 重试**（[execute.rs](src-tauri/src/minecraft/launch/pipeline/execute.rs) / [java_check.rs](src-tauri/src/minecraft/launch/pipeline/java_check.rs)）：启动因 Java 版本不兼容失败（`UnsupportedClassVersionError`、`Could not create the Java Virtual Machine`、`JNI error` 等）时，自动排除该 Java 重新选择并再试一次，只重试一次避免死循环；`custom` / `folder` 模式（用户手动指定）不自动替换。`detect_java` 拆出 `detect_java_excluding` 支持排除列表。
+- **切换提示**（[launch.ts](src/stores/launch.ts)）：新增 `launch-java-switch` 事件，重试前 toast 提示「检测到 Java 版本不兼容，正在自动切换其它 Java 重试…」。
+
+#### Java 版本过新提示
+
+- **规则与提示**（[rules.rs](src-tauri/src/minecraft/java_selector/rules.rs) / [java_check.rs](src-tauri/src/minecraft/launch/pipeline/java_check.rs)）：Java ≥ 25 且游戏为 1.x 系列时给出非阻断提示（Java 25 起收紧原生访问限制，旧版 LWJGL 与加载器 ASM 未必适配），通过 `launch-java-warning` 事件推到前端 toast。
+
+### 修复
+
+#### Java 候选路径降权，避免选到系统转发目录
+
+- **优先级判定**（[priority.rs](src-tauri/src/minecraft/java/search/priority.rs) 新增）：`system32` / `javapath_target_` / `javatmp` 等系统转发路径与含符号链接的路径**降权**（排在候选末尾而不是排除，用户机器上可能只有这一个），[platform.rs](src-tauri/src/minecraft/java/search/platform.rs) 收集候选时打标并稳定排序，[version.rs](src-tauri/src/minecraft/java/search/version.rs) 排序时降权项最后。
+- **网络驱动器跳过**（[platform.rs](src-tauri/src/minecraft/java/search/platform.rs)）：驱动器探测超过 400ms 视为网络驱动器 / 无响应设备并跳过，避免已断开的映射盘拖慢 Java 扫描。
+
+#### Java 7 及更早版本补永久代参数
+
+- **PermGen 参数**（[rules.rs](src-tauri/src/minecraft/launch/jvm_args/rules.rs) / [build.rs](src-tauri/src/minecraft/launch/jvm_args/build.rs)）：Java ≤ 7 时注入 `-XX:MaxPermSize`（取堆内存一半，下限 128M），避免装 mod 后 `OutOfMemoryError: PermGen space`；Java 8 起改用元空间，不设上限。
+
 ## [0.3.11-rc.1] - 2026-10-23
 
 ### 修复
