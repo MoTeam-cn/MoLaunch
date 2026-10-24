@@ -4,6 +4,24 @@
 
 ## [Unreleased]
 
+### 修复
+
+#### 修复自定义背景图填本地路径后不生效
+
+- **根因**（[ui-prefs.ts](src/utils/ui-prefs.ts)）：此前把用户填的字符串原样塞进 CSS 变量的 `url()` 里，而 WebView 既加载不了 `file://`，也解析不了 `D:/Pics/bg.png` 这种裸路径（反斜杠还会破坏 url 语法），整条声明被浏览器丢弃——背景永远不变。
+- **新增后端 action**（[game_dir.rs](src-tauri/src/commands/system/manager/game_dir.rs) / [game_dir.rs](src-tauri/src/commands/system/game_dir.rs)）：`read_image_data_url` 读取本地图片并编码成 `data:image/*;base64,...`。限制格式 png/jpg/jpeg/webp/bmp/gif、单文件 16 MB 以内，路径校验空值与空字节；CSP 现有 `img-src data:` 即可放行，无需放开 asset 协议。
+- **前端解析**（[ui-prefs.ts](src/stores/ui-prefs.ts) / [ui-prefs.ts](src/utils/ui-prefs.ts) / [system.ts](src/utils/api/system.ts)）：store 异步解析背景地址——`http(s)` / `data:` / `blob:` 直接用，其余一律当本地路径交后端转换；输入停顿 400 ms 才发起解析（避免逐字符输入刷 IPC），并用 token 丢弃过期结果；解析失败弹 toast 并回退纯色背景，不再静默失效。`applyUiPrefs` 增加 `backgroundImageUrl` 参数，未解析完成时写 `none` 而不是写坏 `url()`。
+- **背景层可见性**（[AppBackground.vue](src/components/common/AppBackground.vue)）：改用 `hasVisibleBackground`，图片真正可用才渲染背景层与卡片半透明。
+- **测试**（[ui-prefs-image.test.ts](src/utils/__tests__/ui-prefs-image.test.ts) 新增）：6 个用例覆盖 http/https、data/blob、Windows 与 POSIX 本地路径、空值、大写协议。
+
+#### 修复深色模式下下拉框、输入框等自绘组件仍是浅色
+
+- **根因**（[theme-dark.scss](src/assets/styles/theme-dark.scss)）：深色模式此前只重映射 Tailwind 工具类（`bg-white` / `text-gray-900` 等），而 `Select` / `Input` / `Drawer` / `ColorPicker` / `Checkbox` / `Slider` / `Toast` 用的是自带 SCSS 里的硬编码色值（`#fff` / `#f2f3f5` / `#1d2129`），完全没被覆盖，于是出现「深色底 + 白块」与「白底 + 浅字」。
+- **语义 token 化**（[tokens.scss](src/assets/styles/tokens.scss) / [theme-dark.scss](src/assets/styles/theme-dark.scss)）：新增 `--surface-0/1/2/3`、`--surface-pop`、`--border-subtle/strong`、`--text-1/2/3`、`--text-disabled`、`--toast-bg`、`--shadow-pop`，浅色取值与原硬编码完全一致（浅色观感零变化），深色在 `[data-theme=dark]` 里覆盖同名变量。
+- **组件改用变量**（[Select.scss](src/components/common/Select.scss) / [Input.scss](src/components/common/Input.scss) / [Drawer.scss](src/components/common/Drawer.scss) / [ColorPicker.scss](src/components/common/ColorPicker.scss) / [Checkbox.vue](src/components/common/Checkbox.vue) / [Slider.vue](src/components/common/Slider.vue) / [Toast.vue](src/components/common/Toast.vue)）：77 处背景/边框/文字色改为引用语义变量，组件从此自动跟随主题，不必再逐个补深色覆盖规则。
+- **标签配色**（[theme-dark.scss](src/assets/styles/theme-dark.scss)）：13 个 `tag-*` 预设色在深色下由「浅底 + 深字」改为「半透明底 + 提亮字」，否则徽章在深色页面上会变成刺眼白块；同时补齐 `bg-{cyan,purple,violet,orange,lime,indigo,pink,rose,sky,teal,yellow,emerald}-50/100` 与对应 `text-*-600/700` 的深色取值。
+- **设置文案**（[BackgroundSection.vue](src/views/settings/personal/BackgroundSection.vue)）：明确提示可直接填本地路径。
+
 ## [0.3.11-rc.5] - 2026-10-24
 
 ### 重构
