@@ -51,9 +51,18 @@ function collectNeutralClasses(): Map<string, string[]> {
   return found
 }
 
-/** 把工具类名转成 CSS 选择器里的转义写法（斜杠转义） */
-function toSelector(cls: string): string {
-  return '.' + cls.replace(/\//g, '\\/')
+/**
+ * 解析 theme-dark.scss 里已出现的工具类选择器名（把 `bg-white\/80` 还原成 `bg-white/80`）
+ *
+ * 不用「把类名拼成选择器再去 includes」的写法：那需要自己转义特殊字符，
+ * 漏转义就会误判（且属于不完整的字符串清洗）。直接解析已有选择器更可靠。
+ */
+function darkSelectors(): Set<string> {
+  const found = new Set<string>()
+  for (const match of DARK_SCSS.matchAll(/\.([a-zA-Z][a-zA-Z0-9_-]*(?:\\.[a-zA-Z0-9_-]+)*)/g)) {
+    found.add(match[1].replace(/\\(.)/g, '$1'))
+  }
+  return found
 }
 
 describe('深色主题覆盖', () => {
@@ -67,10 +76,11 @@ describe('深色主题覆盖', () => {
   })
 
   it('should 提供深色规则 when 源码用到带透明度的中性色', () => {
+    const covered = darkSelectors()
     const missing: string[] = []
     for (const [cls, files] of collectNeutralClasses()) {
       if (GLASS_HIGHLIGHTS.has(cls)) continue
-      if (!DARK_SCSS.includes(toSelector(cls))) missing.push(`${cls}（${files[0]}）`)
+      if (!covered.has(cls)) missing.push(`${cls}（${files[0]}）`)
     }
     expect(missing, '这些类编译成字面色值，必须在 theme-dark.scss 里补深色规则').toEqual([])
   })

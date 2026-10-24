@@ -6,6 +6,10 @@
 
 ### 修复
 
+#### 深色主题守护测试的类名匹配改为解析已有选择器（消除 code scanning 告警）
+
+- **问题**（[`dark-theme-coverage.test.ts`](src/assets/styles/__tests__/dark-theme-coverage.test.ts)）：守护测试原先「把工具类名拼成 CSS 选择器再 `includes`」，只转义了斜杠，属于不完整的字符串清洗，CodeQL `js/incomplete-sanitization` 报了 high。
+- **改法**：改为先从 `theme-dark.scss` 解析出「已覆盖的类名集合」（把 `bg-white\/80` 还原成 `bg-white/80`），再做集合判断，不再动态构造选择器。测试语义不变，4 条用例仍全绿。
 #### 安装 Fabric/Forge 时下载管理页提前退出，实际仍在后台安装
 
 - **根因**（[`install/flow.rs`](src-tauri/src/commands/version/install/flow.rs) / [`install/download.rs`](src-tauri/src/commands/version/install/download.rs)）：整合安装是「MC 本体下载 → 加载器安装 → 后处理 → Fabric API」多段流程，但面板显隐与 `is_active` 都只跟着**本体下载批次**走。本体下载一结束，`DownloadBatch` 释放面板计数并 emit `download-panel-state{visible:false}`，同时进度回调把 `download_state.is_active` 置 false；前端据此认为任务结束——`Downloads.vue` 的 `hasActiveDownload` 由 true 变 false 直接 `router.back()`，退出瞬间正好落在「加载器安装」阶段，于是表现为「刚进下载管理页、安装 Fabric 时就退出，但回去一看还在下」。重进页面同样被 `isDownloading()` 判成无任务，3 秒重试后再次弹回。
