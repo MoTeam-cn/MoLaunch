@@ -1,18 +1,22 @@
 #!/usr/bin/env node
 /* eslint-env node */
 /**
- * quark-upload.cjs — 把发布产物上传到夸克网盘（经 api-server 中转签名）
+ * quark-upload.cjs — 把发布产物上传到夸克网盘（经 api-server 签名直传）
  *
- * 用法: node quark-upload.cjs <dir> [--dry-run]
- *   dir        待上传目录（目录内普通文件逐个上传，不递归）
- *   --dry-run  只列出将要上传的文件，不发任何请求
+ * 用法: node quark-upload.cjs <dir> [--channel <stable|beta|alpha>] [--version <ver>] [--dry-run]
+ *
+ * 目录约定（<dir> 下每个子目录名即平台）:
+ *   <dir>/windows/MoLaunch_0.3.11_Windows-setup.zip
+ *   <dir>/windows/MoLaunch_0.3.11_Windows-portable.zip
+ *   <dir>/macos/MoLaunch_0.3.11_macOS.zip
+ *   <dir>/linux/MoLaunch_0.3.11_Linux.zip
+ *
+ * 服务端按 根目录/平台/通道/版本号 自动建目录；本脚本只传平台、通道、版本三个标识，
+ * 目录名（Windows / Stable（正式版） / 0.3.11）由服务端映射，避免编码与命名分叉。
  *
  * 环境变量:
  *   MOLAUNCH_ACTION_PUSH_KEY     MoSign-v2 HMAC 密钥（必填）
- *   MOLAUNCH_ACTION_PUSH_SERVER  api-server 地址（必填，如 https://api.example.com）
- *
- * 账号与 token 全在服务端，CI 只负责直传字节：
- *   begin（取 proof 采样范围）→ prepare（换预签名直传 URL）→ PUT 分片 → finish（合并）。
+ *   MOLAUNCH_ACTION_PUSH_SERVER  api-server 地址（必填）
  */
 
 'use strict';
@@ -24,11 +28,15 @@ const crypto = require('crypto');
 const args = process.argv.slice(2);
 const DIR = args.find((a) => !a.startsWith('--'));
 const DRY_RUN = args.includes('--dry-run');
+const opt = (name, fallback) => {
+  const i = args.indexOf('--' + name);
+  return i >= 0 && args[i + 1] ? args[i + 1] : fallback;
+};
 const PUSH_KEY = process.env.MOLAUNCH_ACTION_PUSH_KEY || '';
 const SERVER = (process.env.MOLAUNCH_ACTION_PUSH_SERVER || '').replace(/\/+$/, '');
 
 if (!DIR) {
-  console.error('用法: node quark-upload.cjs <dir> [--dry-run]');
+  console.error('用法: node quark-upload.cjs <dir> [--channel <c>] [--version <v>] [--dry-run]');
   process.exit(1);
 }
 
@@ -37,9 +45,17 @@ function fail(msg) {
   process.exit(1);
 }
 
+/** 版本后缀 → 通道（与 ci-upload.cjs 保持一致：rc 与 beta 同属 beta） */
+function resolveChannel(version) {
+  const suffix = (version.split('-')[1] || '').replace(/[\d.]+$/, '').toLowerCase();
+  if (!suffix) return 'stable';
+  if (suffix.startsWith('rc') || suffix.startsWith('beta')) return 'beta';
+  return 'alpha';
+}
+
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
-/** MoSign-v2 签名：string-to-sign = METHOD\\nPATH\\nTIMESTAMP\\nNONCE\\nBODY_SHA256_HEX */
+/** MoSign-v2 签名：METHOD\\nPATH\\nTIMESTAMP\\nNONCE\\nBODY_SHA256 */
 function signHeaders(method, reqPath, bodyBuffer) {
   const timestamp = Math.floor(Date.now() / 1000).toString();
   const nonce = crypto.randomBytes(16).toString('hex');
@@ -54,7 +70,6 @@ function signHeaders(method, reqPath, bodyBuffer) {
   };
 }
 
-/** 调 api-server（失败重试 3 次，指数退避） */
 async function apiPost(reqPath, payload, label) {
   const body = Buffer.from(JSON.stringify(payload));
   for (let attempt = 1; ; attempt++) {
@@ -77,13 +92,12 @@ async function apiPost(reqPath, payload, label) {
     } catch (err) {
       if (attempt >= 3) throw err;
       const delay = Math.min(1000 * 2 ** (attempt - 1), 8000);
-      console.log('::warning::' + label + ' 失败（' + err.message + '），' + delay + 'ms 后第 ' + attempt + ' 次重试...');
+      console.log('::warning::' + label + ' 失败（' + err.message + '），' + delay + 'ms 后重试...');
       await sleep(delay);
     }
   }
 }
 
-/** 直传单个分片，返回 ETag */
 async function putPart(part, chunk, label) {
   const headers = {};
   for (const h of part.headers) headers[h.name] = h.value;
@@ -104,31 +118,26 @@ async function putPart(part, chunk, label) {
   }
 }
 
-function guessMime(file) {
-  const ext = path.extname(file).toLowerCase();
-  if (ext === '.zip') return 'application/zip';
-  if (ext === '.gz') return 'application/gzip';
-  if (ext === '.exe') return 'application/octet-stream';
-  return 'application/octet-stream';
-}
-
-async function uploadFile(file) {
+async function uploadFile(file, platform, channel, version) {
   const name = path.basename(file);
   const data = fs.readFileSync(file);
   const size = data.length;
-  console.log('上传 ' + name + '（' + (size / 1048576).toFixed(1) + ' MB）');
+  console.log('上传 ' + platform + '/' + name + '（' + (size / 1048576).toFixed(1) + ' MB）');
 
-  const begin = await apiPost('/v3/ci/quark/begin', { filename: name, size }, '开会话');
+  const begin = await apiPost(
+    '/v3/ci/quark/begin',
+    { filename: name, size, platform, channel, version },
+    '开会话',
+  );
   const codes = (begin.ranges || []).map((r) => data.subarray(r.start, r.end).toString('base64'));
   const md5 = crypto.createHash('md5').update(data).digest('hex');
   const sha1 = crypto.createHash('sha1').update(data).digest('hex');
 
   const prep = await apiPost(
     '/v3/ci/quark/prepare',
-    { session_id: begin.session_id, codes, md5, sha1, mime: guessMime(file) },
+    { session_id: begin.session_id, codes, md5, sha1, mime: 'application/zip' },
     '换直传地址',
   );
-
   if (prep.finish) {
     console.log('  秒传命中，跳过分片上传（fid=' + (prep.fid || '-') + '）');
     return;
@@ -142,30 +151,42 @@ async function uploadFile(file) {
     offset += part.part_size;
     const etag = await putPart(part, chunk, name);
     etags.push({ part_number: part.part_number, part_size: part.part_size, etag });
-    process.stdout.write('\\r  分片 ' + part.part_number + '/' + parts.length + ' 完成');
+    process.stdout.write('\r  分片 ' + part.part_number + '/' + parts.length + ' 完成');
   }
-  if (parts.length > 0) process.stdout.write('\\n');
+  if (parts.length > 0) process.stdout.write('\n');
 
-  const done = await apiPost(
+  await apiPost(
     '/v3/ci/quark/finish',
     { session_id: begin.session_id, task_id: prep.task_id, parts: etags },
     '合并分片',
   );
-  console.log('  ✓ 已上传 ' + name + '（fid=' + (done.fid || '-') + '）');
+  console.log('  ✓ 已上传 ' + platform + '/' + name);
 }
 
 async function main() {
   if (!fs.existsSync(DIR)) fail('目录不存在: ' + DIR);
-  const files = fs
+  const platforms = fs
     .readdirSync(DIR)
-    .filter((n) => fs.statSync(path.join(DIR, n)).isFile())
-    .map((n) => path.join(DIR, n))
+    .filter((n) => fs.statSync(path.join(DIR, n)).isDirectory())
     .sort();
-  if (files.length === 0) fail('目录内没有可上传文件: ' + DIR);
+  if (platforms.length === 0) fail('目录下没有平台子目录（windows / macos / linux）: ' + DIR);
 
-  console.log('待上传 ' + files.length + ' 个文件');
-  for (const f of files) console.log('  · ' + path.basename(f) + '（' + (fs.statSync(f).size / 1048576).toFixed(1) + ' MB）');
+  const version = opt('version', process.env.MOLAUNCH_VERSION || '');
+  if (!version) fail('缺少 --version（或用 MOLAUNCH_VERSION 环境变量）');
+  const channel = opt('channel', resolveChannel(version));
 
+  const jobs = [];
+  for (const platform of platforms) {
+    const pdir = path.join(DIR, platform);
+    for (const f of fs.readdirSync(pdir)) {
+      const full = path.join(pdir, f);
+      if (fs.statSync(full).isFile()) jobs.push({ full, platform });
+    }
+  }
+  if (jobs.length === 0) fail('没有可上传文件');
+
+  console.log('版本 ' + version + ' / 通道 ' + channel + ' / 共 ' + jobs.length + ' 个文件');
+  for (const j of jobs) console.log('  · ' + j.platform + '/' + path.basename(j.full));
   if (DRY_RUN) {
     console.log('（--dry-run：不发请求）');
     return;
@@ -173,7 +194,7 @@ async function main() {
   if (!PUSH_KEY) fail('缺少 MOLAUNCH_ACTION_PUSH_KEY');
   if (!SERVER) fail('缺少 MOLAUNCH_ACTION_PUSH_SERVER');
 
-  for (const f of files) await uploadFile(f);
+  for (const j of jobs) await uploadFile(j.full, j.platform, channel, version);
   console.log('全部上传完成');
 }
 

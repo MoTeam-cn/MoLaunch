@@ -554,6 +554,12 @@ jobs:
         with:
           path: dist
 
+      # 打包规则（与网盘目录一一对应）：
+      #   quark-out/windows/MoLaunch_<ver>_Windows-setup.zip     安装版 exe + sig
+      #   quark-out/windows/MoLaunch_<ver>_Windows-portable.zip  便携版 exe + sig
+      #   quark-out/macos/MoLaunch_<ver>_macOS.zip               两种架构的 app.tar.gz + sig
+      #   quark-out/linux/MoLaunch_<ver>_Linux.zip               AppImage + sig
+      # 平台子目录名会被服务端映射成 Windows / macOS / Linux，CI 不传中文目录名。
       - name: Pack per-platform zips
         if: steps.guard.outputs.skip != 'true'
         shell: bash
@@ -561,31 +567,34 @@ jobs:
           set -euo pipefail
           VERSION="${{ inputs.version }}"
           OUT="$PWD/quark-out"
-          mkdir -p "$OUT"
+          mkdir -p "$OUT/windows" "$OUT/macos" "$OUT/linux"
           pack() {
-            local name="$1"; shift
+            local dest="$1"; shift
             local tmp
             tmp=$(mktemp -d)
             for d in "$@"; do
               [ -d "dist/$d" ] && cp -r "dist/$d/." "$tmp/"
             done
             if [ -n "$(ls -A "$tmp")" ]; then
-              ( cd "$tmp" && zip -qr "$OUT/$name" . )
-              echo "打包 $name（$(du -h "$OUT/$name" | cut -f1)）"
+              ( cd "$tmp" && zip -qr "$dest" . )
+              echo "打包 $(basename "$dest")（$(du -h "$dest" | cut -f1)）"
             else
-              echo "::warning::$name 没有可打包内容，跳过"
+              echo "::warning::$(basename "$dest") 没有可打包内容，跳过"
             fi
             rm -rf "$tmp"
           }
-          pack "MoLaunch_${VERSION}_windows.zip" windows-setup windows-portable
-          pack "MoLaunch_${VERSION}_macos.zip" macos-package-aarch64 macos-package-x86_64
-          pack "MoLaunch_${VERSION}_linux.zip" linux-package
-          pack "MoLaunch_${VERSION}_all.zip" windows-setup windows-portable macos-package-aarch64 macos-package-x86_64 linux-package
-          ls -lh "$OUT"
-
+          # Windows 拆成安装版 / 便携版两个 zip
+          mkdir -p dist/windows-setup-only dist/windows-portable-only
+          cp dist/windows-setup/*-setup.exe* dist/windows-setup-only/ 2>/dev/null || true
+          cp dist/windows-portable/* dist/windows-portable-only/ 2>/dev/null || true
+          pack "$OUT/windows/MoLaunch_${VERSION}_Windows-setup.zip" windows-setup-only
+          pack "$OUT/windows/MoLaunch_${VERSION}_Windows-portable.zip" windows-portable-only
+          pack "$OUT/macos/MoLaunch_${VERSION}_macOS.zip" macos-package-aarch64 macos-package-x86_64
+          pack "$OUT/linux/MoLaunch_${VERSION}_Linux.zip" linux-package
+          find "$OUT" -type f | sort
       - name: Upload to Quark Pan
         if: steps.guard.outputs.skip != 'true'
         env:
           MOLAUNCH_ACTION_PUSH_KEY: ${{ secrets.MOLAUNCH_ACTION_PUSH_KEY }}
           MOLAUNCH_ACTION_PUSH_SERVER: ${{ secrets.MOLAUNCH_ACTION_PUSH_SERVER }}
-        run: node scripts/quark-upload.cjs quark-out
+        run: node scripts/quark-upload.cjs quark-out --version "${{ inputs.version }}"
