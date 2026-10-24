@@ -6,6 +6,15 @@
 
 ### 新增
 
+#### 崩溃分析规则库（36 条规则）
+
+- **规则引擎**（[crash_rules/](src-tauri/src/commands/tools/crash_rules/) 新增）：规则外置为 [crash_rules.json](src-tauri/resources/crash_rules.json)，编译期嵌入二进制，支持 `all` / `any` / `regex` / `none` 四类条件组合，命中后按严重级别排序输出；规则库未命中时回退到原有 6 条关键词兜底逻辑，保证不会没有结论。
+- **规则覆盖**（[crash_rules.json](src-tauri/resources/crash_rules.json)）：从 6 条扩到 **36 条**，覆盖 Java 版本（过低/过高/32 位/OpenJ9/JVM 参数）、内存（堆/永久代）、显卡驱动（Intel / AMD / Nvidia 三条 `EXCEPTION_ACCESS_VIOLATION` 规则、OpenGL 版本、像素格式、光影 1282、材质过大）、Mod 问题（Mixin 失败、缺前置、重复安装、文件被解压、配置损坏、ID 上限、特殊字符）、加载器专有（Fabric / Forge / OptiFine 冲突 / ShadersMod / Forge 不完整）与其他（调试崩溃、输出过短、文件校验失败）。规则自带 `actions` 与 `refs`（含 Mojang bug 编号）。
+- **可疑 Mod 反查**（[mod_index.rs](src-tauri/src/minecraft/mods/mod_index.rs) 新增）：按 `mods/` 目录文件名建立 modid → 显示名索引（不打开 jar），mod 类规则命中时反查日志中出现的 mod，输出「疑似相关 mod」。`crash_analyze` 新增可选 `version_id` 参数用于定位版本 mods 目录。
+- **前端展示**（[CrashAnalyzer.vue](src/views/tools/data/CrashAnalyzer.vue) / [data.ts](src/utils/api/tools/data.ts)）：条目新增 `ruleId` / `actions` / `refs` / `suspects` 字段，工具页展示疑似 mod 与可点击的参考链接。
+
+### 新增
+
 #### 启动失败时自动切换 Java 重试
 
 - **自动换 Java 重试**（[execute.rs](src-tauri/src/minecraft/launch/pipeline/execute.rs) / [java_check.rs](src-tauri/src/minecraft/launch/pipeline/java_check.rs)）：启动因 Java 版本不兼容失败（`UnsupportedClassVersionError`、`Could not create the Java Virtual Machine`、`JNI error` 等）时，自动排除该 Java 重新选择并再试一次，只重试一次避免死循环；`custom` / `folder` 模式（用户手动指定）不自动替换。`detect_java` 拆出 `detect_java_excluding` 支持排除列表。
