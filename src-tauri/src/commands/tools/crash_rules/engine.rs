@@ -132,7 +132,7 @@ fn matches(rule: &CrashRule, index: &LogIndex) -> bool {
     if !spec.regex.is_empty()
         && !spec.regex.iter().any(|pattern| {
             compiled(pattern)
-                .map(|re| re.is_match(&index.text_lower()))
+                .map(|re| re.is_match(index.text_lower()))
                 .unwrap_or(false)
         })
     {

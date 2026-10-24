@@ -67,7 +67,10 @@ pub fn run(
 fn plugin_load_failures(index: &LogIndex) -> Vec<CrashAnalysisItem> {
     let mut items: Vec<CrashAnalysisItem> = Vec::new();
     for line_no in index.all_lines("failed to load plugin '") {
-        let Some(plugin) = plugin_name(&index.raw_lines()[line_no - 1]) else {
+        let Some(raw_line) = index.raw_lines().get(line_no - 1) else {
+            continue;
+        };
+        let Some(plugin) = plugin_name(raw_line) else {
             continue;
         };
         let mut evidence: Vec<CrashEvidence> = Vec::new();
