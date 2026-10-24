@@ -372,7 +372,12 @@
 }
 
 @utility card {
-  @apply bg-white rounded-xl shadow-xs border border-gray-200 p-6;
+  /* 面板底色走语义 token：@apply bg-white 会内联成 var(--color-white)，
+     而 --color-white 故意不随深色重映射（否则彩色按钮上的白字会变黑），
+     导致卡片/弹窗在深色下仍是白底。 */
+  @apply rounded-xl shadow-xs border p-6;
+  background-color: var(--surface-0);
+  border-color: var(--border-subtle);
 }
 
 @utility badge {
@@ -406,7 +411,8 @@
 }
 
 @utility modal-body {
-  @apply relative w-full bg-white rounded-lg shadow-xl flex flex-col;
+  @apply relative w-full rounded-lg shadow-xl flex flex-col;
+  background-color: var(--surface-0);
   max-height: calc(100vh - 100px);
 }
 

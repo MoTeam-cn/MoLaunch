@@ -35,6 +35,25 @@ function collectSources(dir: string, out: string[] = []): string[] {
   return out
 }
 
+/** 递归收集 src 下全部 .scss（组件级 scss 是此前漏掉的白底来源） */
+function collectStyleFiles(dir: string, out: string[] = []): string[] {
+  for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
+    const full = path.join(dir, entry.name)
+    if (entry.isDirectory()) {
+      if (entry.name === '__tests__') continue
+      collectStyleFiles(full, out)
+    } else if (entry.name.endsWith('.scss')) {
+      out.push(full)
+    }
+  }
+  return out
+}
+
+/** 去掉注释，避免注释里的示例代码误判 */
+function stripComments(text: string): string {
+  return text.replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '')
+}
+
 /** 源码里实际用到的、带透明度或纯色的中性工具类 */
 function collectNeutralClasses(): Map<string, string[]> {
   const re = /\b((?:bg|from|via|to)-(?:white|gray|slate|zinc|neutral|stone)(?:-\d{2,3})?\/\d{1,3})\b/g
@@ -101,14 +120,32 @@ describe('深色主题覆盖', () => {
 
   it('should 禁止白色背景硬编码 when 书写样式文件', () => {
     const offenders: string[] = []
-    for (const file of fs.readdirSync(STYLES).filter((f) => f.endsWith('.scss') && f !== 'tokens.scss')) {
-      const text = fs.readFileSync(path.join(STYLES, file), 'utf8')
+    for (const file of collectStyleFiles(SRC)) {
+      if (file.endsWith('tokens.scss')) continue
+      const text = stripComments(fs.readFileSync(file, 'utf8'))
+      const rel = path.relative(SRC, file).replace(/\\/g, '/')
       text.split(/\r?\n/).forEach((line, index) => {
         if (/(?:background(?:-color)?)\s*:\s*(?:#fff\b|#ffffff\b|white\b|#f2f3f5\b|#e5e6eb\b|#f7f8fa\b|#f5f6f8\b|#c9cdd4\b)/i.test(line)) {
-          offenders.push(`${file}:${index + 1} ${line.trim()}`)
+          offenders.push(`${rel}:${index + 1} ${line.trim()}`)
         }
       })
     }
     expect(offenders, '白色背景请改用 var(--surface-0) 等语义 token').toEqual([])
+  })
+
+  it('should 禁止 @apply 内联白色面板 when 定义组合工具类', () => {
+    // @apply bg-white 会内联成 var(--color-white)，而 --color-white 故意不随深色
+    // 重映射（彩色按钮上的白字要靠它），于是 .card / .modal-body 这类组合类
+    // 在深色下仍是白底。面板底色必须显式写 var(--surface-*)。
+    const offenders: string[] = []
+    for (const file of collectStyleFiles(SRC)) {
+      const rel = path.relative(SRC, file).replace(/\\/g, '/')
+      stripComments(fs.readFileSync(file, 'utf8')).split(/\r?\n/).forEach((line, index) => {
+        if (/@apply[^;]*\bbg-white\b/.test(line) || /background(?:-color)?\s*:\s*var\(--color-white\)/.test(line)) {
+          offenders.push(`${rel}:${index + 1} ${line.trim()}`)
+        }
+      })
+    }
+    expect(offenders, '组合工具类的底色请写 var(--surface-0)/var(--surface-pop)，不要 @apply bg-white').toEqual([])
   })
 })

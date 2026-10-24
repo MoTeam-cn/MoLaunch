@@ -6,6 +6,12 @@
 
 ### 修复
 
+#### 弹窗与卡片在深色下仍是白底（`@apply bg-white` 绕过主题重映射）
+
+- **根因**（[`main.scss`](src/assets/styles/main.scss)）：`@utility card` 与 `@utility modal-body` 用 `@apply bg-white` 定义面板底色，编译成 `background-color: var(--color-white)`。而 `--color-white` **故意不随深色重映射**（彩色按钮上的 `text-white` 要靠它），`[data-theme='dark'] .bg-white` 那条规则也只对**真的带 `bg-white` 类名**的元素生效——组合工具类不吃这条规则，于是所有弹窗（皮肤与披风管理等）、抽屉里的卡片、`.card` 容器在深色下全是白底。
+- **改法**：两个组合类改为显式语义 token——`background-color: var(--surface-0)`、`border-color: var(--border-subtle)`，与 `Drawer.scss` 的 `var(--surface-pop)` 同源，深色自动跟随。
+- **守护测试**（[`dark-theme-coverage.test.ts`](src/assets/styles/__tests__/dark-theme-coverage.test.ts)）：新增「禁止 `@apply` 内联白色面板」用例；并把样式扫描范围从 `assets/styles/*.scss` 扩到 **`src` 下全部 `.scss`**——此前只扫 styles 目录，`components/**/*.scss`（如 `Drawer.scss`）是盲区。扫描前先剥注释，避免注释里的示例代码误判。
+- **验证**：真实 Chromium（headless）加载构建产物实测，深色下 `.modal-body` / `.card` 底色 `rgb(23,26,31)`、标题 `rgb(230,232,235)`、内层描边 `rgb(34,39,47)`、输入框 `rgb(31,36,43)`；浅色下仍为 `rgb(255,255,255)` / `rgb(242,243,245)`，无回归。
 #### 设备认证时间戳改用服务端对齐时间（修复「时间戳超出容差范围」）
 
 - **问题**（[`helpers.rs`](src-tauri/src/minecraft/online/auth/helpers.rs)）：注册/登录/续期的 `timestamp` 参与 MoSign-v1 签名，此前直接用本机时钟（`chrono::Utc::now()`）。服务端按 `auth.timestamp_skew` 校验容差，客户端时钟一漂移（CMOS 掉电、手动改时区/夏令时、虚拟机挂起、系统时间被同步工具回拨）就被拒成「时间戳超出容差范围」，表现为注册/登录随机失败。
