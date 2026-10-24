@@ -8,6 +8,8 @@
 //! 出现「同一个崩溃昨天说是内存、今天说是驱动」这类无法复现的问题。
 
 mod engine;
+pub mod evidence;
 pub mod schema;
+mod special;
 
-pub use engine::{analyze, rules_count, rules_version};
+pub use engine::{analyze, analyze_with_pending, rules_count, rules_version};

@@ -1,101 +1,183 @@
 {
-  "version": "1",
+  "version": "2",
   "rules": [
     {
       "id": "java-unsupported-class-version",
+      "cause": "java_version",
       "category": "java_version",
       "severity": "error",
+      "confidence": "high",
       "title": "Java 版本过低",
-      "suggestion": "游戏或 mod 需要更高版本的 Java。请在 版本设置 → 游戏 Java 中换用更高版本（多数新版需要 Java 17 或 21）。",
+      "impact": "游戏在类加载阶段就中断，表现为启动瞬间退出或卡在加载界面。",
+      "suggestion": "日志里写明了 class 编译版本与运行时版本，装一个不低于该版本的 Java（如 Java 21）并在启动器里切换过去。",
       "match": {
         "any": [
+          "unsupportedclassversionerror",
           "unsupported class file major version",
-          "has been compiled by a more recent version",
-          "unsupportedclassversionerror"
+          "has been compiled by a more recent version"
         ]
-      }
+      },
+      "evidence": {
+        "any": [
+          "unsupportedclassversionerror",
+          "unsupported class file major version"
+        ]
+      },
+      "actions": [
+        {
+          "type": "open_settings_java"
+        }
+      ]
     },
     {
       "id": "java-too-new",
+      "cause": "java_version",
       "category": "java_version",
-      "severity": "error",
+      "severity": "warning",
+      "confidence": "medium",
       "title": "Java 版本过高",
-      "suggestion": "部分老版本 mod / 加载器不支持过新的 Java。请改用与该版本匹配的 Java 8 / 17 / 21。",
+      "impact": "部分老版本 mod / 加载器不兼容过新的 Java，可能出现 Mixin 注入失败或反射报错。",
+      "suggestion": "换回该游戏版本推荐的 Java（1.16 及以下常用 Java 8，1.17~1.20 常用 Java 17）。",
       "match": {
+        "all": [
+          "java"
+        ],
         "any": [
-          "java.lang.noclassdeffounderror: java/lang/record",
-          "java.lang.nosuchmethoderror: java/lang/invoke",
-          "unsupportedoperationexception: java.lang.securitymanager"
+          "unsupported class file major version 65",
+          "class file version 65.0"
+        ],
+        "none": [
+          "compiled by a more recent version"
         ]
-      }
+      },
+      "evidence": {
+        "any": [
+          "class file version 65",
+          "unsupported class file major version 65"
+        ]
+      },
+      "actions": [
+        {
+          "type": "open_settings_java"
+        }
+      ]
     },
     {
       "id": "java-jdk-not-jre",
+      "cause": "java_jdk",
       "category": "java_version",
       "severity": "warning",
+      "confidence": "medium",
       "title": "当前使用的是 JDK 而非 JRE",
-      "suggestion": "使用 JDK 一般能运行，但体积更大、部分版本会与 mod 的反射检测冲突。建议改用 JRE。",
+      "impact": "JDK 自带的工具链可能影响部分 mod 的类加载，也可能让内存占用偏高。",
+      "suggestion": "启动器已尽量兼容 JDK；若遇到莫名其妙的类加载问题，可换用 JRE。",
       "match": {
-        "any": [
-          "using jdk"
+        "all": [
+          "jdk"
         ],
-        "none": [
-          "jre"
+        "any": [
+          "java.home",
+          "jdk/bin"
+        ]
+      },
+      "evidence": {
+        "any": [
+          "jdk"
         ]
       }
     },
     {
       "id": "java-32bit",
+      "cause": "java_32bit",
       "category": "java_version",
       "severity": "error",
+      "confidence": "high",
       "title": "使用了 32 位 Java 或内存分配失败",
-      "suggestion": "32 位 Java 最多只能分配约 1.5G 内存，极易 OutOfMemory。请换成 64 位 Java，或调低内存分配值。",
+      "impact": "32 位 Java 最多只能用约 1.5GB 内存，分配更大内存会直接启动失败。",
+      "suggestion": "安装 64 位 Java，并把内存分配控制在物理内存的一半以内。",
       "match": {
         "any": [
           "could not reserve enough space",
           "invalid maximum heap size",
-          "error occurred during initialization of vm"
+          "x86 32-bit"
         ]
-      }
+      },
+      "evidence": {
+        "any": [
+          "could not reserve enough space",
+          "invalid maximum heap size",
+          "x86 32-bit"
+        ]
+      },
+      "actions": [
+        {
+          "type": "open_settings_memory"
+        }
+      ]
     },
     {
       "id": "jvm-bad-args",
+      "cause": "jvm_bad_args",
       "category": "java_version",
       "severity": "error",
+      "confidence": "high",
       "title": "JVM 参数有误",
-      "suggestion": "启动参数无法被 JVM 识别（多为自定义 JVM 参数写错）。请检查 版本设置 → 高级选项 里的额外 JVM 参数。",
+      "impact": "JVM 在解析启动参数时就退出，游戏完全没开始加载。",
+      "suggestion": "检查版本设置里的自定义 JVM 参数，去掉不认识或重复的参数。",
       "match": {
         "any": [
           "unrecognized vm option",
-          "unrecognized option:",
           "error: could not create the java virtual machine",
-          "a java exception has occurred"
+          "unrecognized option"
+        ]
+      },
+      "evidence": {
+        "any": [
+          "unrecognized vm option",
+          "error: could not create the java virtual machine",
+          "unrecognized option"
         ]
       }
     },
     {
       "id": "java-openj9",
+      "cause": "java_openj9",
       "category": "java_version",
       "severity": "warning",
+      "confidence": "medium",
       "title": "检测到 OpenJ9 虚拟机",
-      "suggestion": "OpenJ9 与部分 mod（尤其优化类）兼容性较差，建议改用 HotSpot 版本的 Java（如 Temurin / Zulu）。",
+      "impact": "OpenJ9 与部分 mod 的 native 代码不兼容，可能崩溃或性能异常。",
+      "suggestion": "换成 HotSpot（Oracle / Temurin / Zulu 的常规构建）。",
       "match": {
         "any": [
-          "eclipse openj9",
-          "openj9 vm",
-          "ibm j9"
+          "openj9",
+          "eclipse openj9"
+        ]
+      },
+      "evidence": {
+        "any": [
+          "openj9"
         ]
       }
     },
     {
       "id": "memory-oom",
+      "cause": "memory_heap",
       "category": "memory",
       "severity": "error",
-      "title": "内存不足",
-      "suggestion": "堆内存不够。请调高 版本设置 → 游戏内存 的分配值（4G 起步，大型整合包建议 6~8G）。",
+      "confidence": "high",
+      "title": "内存不足（Java 堆）",
+      "impact": "堆内存耗尽，游戏随时被强杀，存档也可能来不及保存。",
+      "suggestion": "在版本设置里增大内存分配（如 4096MB），并确认物理内存充足；大型整合包建议 6~8GB。",
       "match": {
+        "all": [
+          "outofmemoryerror",
+          "heap space"
+        ]
+      },
+      "evidence": {
         "any": [
-          "java.lang.outofmemoryerror",
+          "java heap space",
           "outofmemoryerror"
         ]
       },
@@ -106,31 +188,730 @@
       ]
     },
     {
-      "id": "memory-permgen",
+      "id": "memory-metaspace",
+      "cause": "memory_metaspace",
       "category": "memory",
       "severity": "error",
+      "confidence": "high",
+      "title": "内存不足（Metaspace 元空间）",
+      "impact": "类元数据区耗尽，通常是 mod 数量过多或反复热重载导致。",
+      "suggestion": "增大 Metaspace（-XX:MaxMetaspaceSize=512m），并减少同时加载的 mod 数量。",
+      "match": {
+        "all": [
+          "outofmemoryerror",
+          "metaspace"
+        ]
+      },
+      "evidence": {
+        "any": [
+          "metaspace"
+        ]
+      }
+    },
+    {
+      "id": "memory-direct-buffer",
+      "cause": "memory_direct_buffer",
+      "category": "memory",
+      "severity": "error",
+      "confidence": "high",
+      "title": "内存不足（直接缓冲区）",
+      "impact": "堆外内存耗尽，常见于光影 / 高分辨率材质 / 大量区块加载。",
+      "suggestion": "降低渲染距离与光影质量，或加 -XX:MaxDirectMemorySize=1g。",
+      "match": {
+        "all": [
+          "outofmemoryerror",
+          "direct buffer memory"
+        ]
+      },
+      "evidence": {
+        "any": [
+          "direct buffer memory"
+        ]
+      }
+    },
+    {
+      "id": "memory-native-thread",
+      "cause": "memory_native_thread",
+      "category": "memory",
+      "severity": "error",
+      "confidence": "high",
+      "title": "内存不足（无法创建本地线程）",
+      "impact": "进程 / 线程数触顶，通常是内存不足或系统句柄耗尽。",
+      "suggestion": "降低内存分配、关闭后台程序后重启；服务器端检查 ulimit / 进程数上限。",
+      "match": {
+        "all": [
+          "outofmemoryerror",
+          "unable to create native thread"
+        ]
+      },
+      "evidence": {
+        "any": [
+          "unable to create native thread"
+        ]
+      }
+    },
+    {
+      "id": "memory-gc-overhead",
+      "cause": "memory_gc_overhead",
+      "category": "memory",
+      "severity": "warning",
+      "confidence": "medium",
+      "title": "内存不足（GC 开销超限）",
+      "impact": "垃圾回收占用了绝大部分 CPU，游戏卡成幻灯片。",
+      "suggestion": "增大内存分配，或减少 mod / 视距以减少内存压力。",
+      "match": {
+        "all": [
+          "outofmemoryerror",
+          "gc overhead limit exceeded"
+        ]
+      },
+      "evidence": {
+        "any": [
+          "gc overhead limit exceeded"
+        ]
+      }
+    },
+    {
+      "id": "memory-permgen",
+      "cause": "memory_permgen",
+      "category": "memory",
+      "severity": "error",
+      "confidence": "high",
       "title": "永久代空间不足（Java 7 及更早）",
-      "suggestion": "老版本 Java 的永久代默认过小。建议升级到 Java 8。",
+      "impact": "Java 7 及更早版本的永久代耗尽，游戏直接崩溃。",
+      "suggestion": "换用 Java 8+，或加 -XX:MaxPermSize=256m。",
+      "match": {
+        "all": [
+          "permgen space"
+        ]
+      },
+      "evidence": {
+        "any": [
+          "permgen space"
+        ]
+      }
+    },
+    {
+      "id": "mod-version-mismatch",
+      "cause": "version_mismatch",
+      "category": "mod_conflict",
+      "severity": "error",
+      "confidence": "high",
+      "title": "mod 与游戏 / 加载器版本不匹配",
+      "impact": "mod 编译时调用的方法在当前游戏版本里不存在，注入失败后 mod 无法工作。",
+      "suggestion": "把该 mod（及加载器）换成与游戏版本对应的版本；Mixin 报错的行里能看到具体是哪个 mod。",
       "match": {
         "any": [
-          "outofmemoryerror: permgen space"
+          "mixinapplyerror",
+          "nosuchmethoderror",
+          "no such method error"
+        ]
+      },
+      "evidence": {
+        "any": [
+          "mixinapplyerror",
+          "nosuchmethoderror",
+          "no such method error"
+        ]
+      }
+    },
+    {
+      "id": "mod-mixin-conflict",
+      "cause": "mixin_conflict",
+      "category": "mod_conflict",
+      "severity": "error",
+      "confidence": "medium",
+      "title": "两个 mod 改写了同一个注入点（Mixin 冲突）",
+      "impact": "注入冲突会导致其中一个 mod 的功能失效，或直接启动崩溃。",
+      "suggestion": "按冲突行里的两个 mixin 来源，保留一个 mod，或在配置里关掉其中一个的功能。",
+      "match": {
+        "all": [
+          "@redirect conflict"
+        ],
+        "none": [
+          "skipping"
+        ]
+      },
+      "evidence": {
+        "any": [
+          "@redirect conflict"
+        ]
+      }
+    },
+    {
+      "id": "mod-mixin-conflict-skipped",
+      "cause": "mixin_conflict_skipped",
+      "category": "mod_conflict",
+      "severity": "warning",
+      "confidence": "medium",
+      "title": "Mixin 注入点冲突（加载器已跳过该注入）",
+      "impact": "冲突注入被跳过，通常不影响启动，但被跳过的那项功能会失效。",
+      "suggestion": "若相关功能异常，按冲突行里的两个来源排查；只是 WARN 且游戏正常时可忽略。",
+      "match": {
+        "all": [
+          "@redirect conflict",
+          "skipping"
+        ]
+      },
+      "evidence": {
+        "any": [
+          "@redirect conflict"
+        ]
+      }
+    },
+    {
+      "id": "mod-mixin-bootstrap-missing",
+      "cause": "mixin_bootstrap_missing",
+      "category": "mod_conflict",
+      "severity": "error",
+      "confidence": "high",
+      "title": "缺少 MixinBootstrap",
+      "impact": "加载器缺少 Mixin 引导，所有依赖 Mixin 的 mod 都无法加载。",
+      "suggestion": "安装对应加载器版本的 Mixin 引导 mod，或重装加载器。",
+      "match": {
+        "all": [
+          "mixinbootstrap"
+        ],
+        "any": [
+          "could not find",
+          "not found",
+          "classnotfound"
+        ]
+      },
+      "evidence": {
+        "any": [
+          "mixinbootstrap"
+        ]
+      }
+    },
+    {
+      "id": "mod-file-extracted",
+      "cause": "mod_file_extracted",
+      "category": "mod_conflict",
+      "severity": "error",
+      "confidence": "high",
+      "title": "Mod 文件被解压",
+      "impact": "解压后的 mod 目录会被加载器当成损坏的 jar，直接报错。",
+      "suggestion": "把 mods 目录里被解压出来的文件夹删掉，只保留 .jar 文件。",
+      "match": {
+        "any": [
+          "is a directory",
+          "not a valid mod file",
+          "invalid mod file"
+        ]
+      },
+      "evidence": {
+        "any": [
+          "is a directory",
+          "not a valid mod file",
+          "invalid mod file"
+        ]
+      },
+      "actions": [
+        {
+          "type": "open_mods_dir"
+        }
+      ]
+    },
+    {
+      "id": "mod-config-broken",
+      "cause": "mod_config_broken",
+      "category": "mod_conflict",
+      "severity": "error",
+      "confidence": "high",
+      "title": "Mod 配置文件损坏",
+      "impact": "配置解析失败，mod 会回落到默认值或直接不加载。",
+      "suggestion": "按日志里的文件名删掉该配置文件让 mod 重新生成，或修好其中的语法错误。",
+      "match": {
+        "any": [
+          "failed to load configuration",
+          "invalid pack.mcmeta",
+          "yamlexception",
+          "invalid json"
+        ]
+      },
+      "evidence": {
+        "any": [
+          "failed to load configuration",
+          "invalid pack.mcmeta",
+          "yamlexception"
+        ]
+      }
+    },
+    {
+      "id": "mod-load-failed-generic",
+      "cause": "mod_load_failed",
+      "category": "mod_conflict",
+      "severity": "warning",
+      "confidence": "low",
+      "title": "mod 加载失败（原因未定）",
+      "impact": "该 mod 未加载成功，相关功能缺失。",
+      "suggestion": "把该 mod 单独装进一个测试版本复现，或换一个版本重试。",
+      "match": {
+        "regex": [
+          "failed to load mod '"
+        ]
+      },
+      "gates": {
+        "require_absent": [
+          "missing dependency",
+          "noclassdeffounderror",
+          "nosuchmethoderror"
+        ]
+      }
+    },
+    {
+      "id": "fabric-api-missing",
+      "cause": "fabric_api_missing",
+      "category": "missing_mod",
+      "severity": "error",
+      "confidence": "high",
+      "title": "缺少 Fabric API",
+      "impact": "绝大多数 Fabric mod 依赖 Fabric API，缺失时它们全部加载失败。",
+      "suggestion": "下载与游戏版本、加载器版本对应的 Fabric API 放进 mods 目录。",
+      "match": {
+        "any": [
+          "requires fabric-api",
+          "fabric-api is missing",
+          "requires any version of fabric-api"
+        ]
+      },
+      "gates": {
+        "require_absent": [
+          "- fabric-api"
+        ]
+      },
+      "evidence": {
+        "any": [
+          "requires fabric-api",
+          "fabric-api is missing"
+        ]
+      }
+    },
+    {
+      "id": "forge-error",
+      "cause": "forge_loader_error",
+      "category": "mod_conflict",
+      "severity": "error",
+      "confidence": "medium",
+      "title": "Forge 加载失败",
+      "impact": "加载器自身初始化失败，游戏无法进入。",
+      "suggestion": "重装对应版本的 Forge；若装了 OptiFine，先移除再试。",
+      "match": {
+        "any": [
+          "forge mod loader",
+          "fmlloadingplugin"
+        ],
+        "all": [
+          "error"
+        ]
+      },
+      "evidence": {
+        "any": [
+          "fmlloadingplugin",
+          "forge mod loader"
+        ]
+      }
+    },
+    {
+      "id": "forge-incomplete",
+      "cause": "forge_incomplete",
+      "category": "mod_conflict",
+      "severity": "error",
+      "confidence": "high",
+      "title": "Forge 安装不完整",
+      "impact": "版本 json 或库文件缺失，加载器无法启动。",
+      "suggestion": "在启动器里删除该版本并重新安装。",
+      "match": {
+        "any": [
+          "missing minecraft library",
+          "could not find required library",
+          "libraries missing"
+        ]
+      },
+      "evidence": {
+        "any": [
+          "missing minecraft library",
+          "could not find required library",
+          "libraries missing"
+        ]
+      }
+    },
+    {
+      "id": "optifine-forge-conflict",
+      "cause": "optifine_forge_conflict",
+      "category": "mod_conflict",
+      "severity": "error",
+      "confidence": "medium",
+      "title": "OptiFine 与 Forge 不兼容",
+      "impact": "两者的类转换互相覆盖，启动阶段就崩溃。",
+      "suggestion": "改用 OptiFine 的 Forge 兼容版（OptiFine HD U + OptiForge），或去掉其中一个。",
+      "match": {
+        "all": [
+          "optifine",
+          "forge"
+        ],
+        "any": [
+          "duplicate class",
+          "conflict"
+        ]
+      },
+      "evidence": {
+        "any": [
+          "optifine"
+        ]
+      }
+    },
+    {
+      "id": "shadersmod-optifine",
+      "cause": "shadersmod_optifine",
+      "category": "mod_conflict",
+      "severity": "warning",
+      "confidence": "medium",
+      "title": "ShadersMod 与 OptiFine 同时安装",
+      "impact": "两者功能重叠，可能互相顶掉导致光影失效或崩溃。",
+      "suggestion": "只保留 OptiFine（自带光影支持）。",
+      "match": {
+        "all": [
+          "shadersmod",
+          "optifine"
+        ]
+      },
+      "evidence": {
+        "any": [
+          "shadersmod"
+        ]
+      }
+    },
+    {
+      "id": "optifine-world-load",
+      "cause": "optifine_world_load",
+      "category": "mod_conflict",
+      "severity": "error",
+      "confidence": "medium",
+      "title": "OptiFine 导致世界加载失败",
+      "impact": "进入世界时崩溃，通常与光影或区块渲染有关。",
+      "suggestion": "关闭光影、降低渲染距离，或换用不含 OptiFine 的组合。",
+      "match": {
+        "all": [
+          "optifine"
+        ],
+        "any": [
+          "failed to load world",
+          "exception loading entity"
+        ]
+      },
+      "evidence": {
+        "any": [
+          "optifine"
+        ]
+      }
+    },
+    {
+      "id": "mod-id-limit",
+      "cause": "mod_id_limit",
+      "category": "mod_conflict",
+      "severity": "error",
+      "confidence": "high",
+      "title": "Mod 过多超出 ID 上限",
+      "impact": "方块 / 物品 ID 用尽，注册阶段直接崩。",
+      "suggestion": "减少 mod 数量，或换用更高版本的整合包。",
+      "match": {
+        "any": [
+          "registry id limit",
+          "out of ids",
+          "no more free ids"
+        ]
+      },
+      "evidence": {
+        "any": [
+          "registry id limit",
+          "out of ids",
+          "no more free ids"
+        ]
+      }
+    },
+    {
+      "id": "mod-special-chars",
+      "cause": "mod_special_chars",
+      "category": "mod_conflict",
+      "severity": "warning",
+      "confidence": "low",
+      "title": "Mod 名称含特殊字符",
+      "impact": "部分加载器对非 ASCII 文件名处理有 bug，可能加载失败。",
+      "suggestion": "把 mods 目录里带空格 / 中文 / 特殊符号的文件改名。",
+      "match": {
+        "regex": [
+          "failed to read (jar|zip).*[^\\x00-\\x7F]"
+        ]
+      },
+      "evidence": {
+        "regex": [
+          "failed to read (jar|zip)"
+        ]
+      }
+    },
+    {
+      "id": "world-region-corrupt",
+      "cause": "world_region_corrupt",
+      "category": "world",
+      "severity": "error",
+      "confidence": "high",
+      "title": "区块 / 区域文件损坏",
+      "impact": "受影响的区块无法加载，周围地形会丢方块或被重置为空。",
+      "suggestion": "从备份恢复该存档；没有备份时可用区块修复工具，或删掉受损区域文件让游戏重新生成（会丢地形）。",
+      "match": {
+        "any": [
+          "region file is truncated",
+          "corrupt block palette",
+          "region file header is corrupt"
+        ]
+      },
+      "evidence": {
+        "any": [
+          "region file is truncated",
+          "corrupt block palette",
+          "region file header is corrupt"
+        ]
+      }
+    },
+    {
+      "id": "player-data-corrupt",
+      "cause": "player_data_corrupt",
+      "category": "world",
+      "severity": "error",
+      "confidence": "high",
+      "title": "玩家数据损坏",
+      "impact": "玩家进度 / 背包可能被重置，或无法进入世界。",
+      "suggestion": "从备份恢复 playerdata；没有备份时游戏会重置该玩家数据（背包丢失）。",
+      "match": {
+        "any": [
+          "player data file for player",
+          "failed to save player data",
+          "player data is corrupted"
+        ]
+      },
+      "evidence": {
+        "any": [
+          "is corrupted",
+          "failed to save player data",
+          "resetting player data"
+        ]
+      }
+    },
+    {
+      "id": "world-level-dat-missing",
+      "cause": "world_level_dat_missing",
+      "category": "world",
+      "severity": "error",
+      "confidence": "medium",
+      "title": "存档缺少 level.dat",
+      "impact": "该世界无法被识别，界面上会显示为不存在。",
+      "suggestion": "从备份恢复 level.dat；无法恢复时该世界只能重建。",
+      "match": {
+        "any": [
+          "missing level.dat",
+          "level.dat is missing"
+        ]
+      },
+      "evidence": {
+        "any": [
+          "missing level.dat",
+          "level.dat is missing"
+        ]
+      }
+    },
+    {
+      "id": "registry-duplicate",
+      "cause": "registry_duplicate",
+      "category": "world",
+      "severity": "warning",
+      "confidence": "medium",
+      "title": "注册表条目重复",
+      "impact": "同一个 ID 被注册两次，后者覆盖前者，可能引发随机崩溃。",
+      "suggestion": "按日志里的注册名排查重复注册的 mod，移除其中一个。",
+      "match": {
+        "any": [
+          "duplicate registry entry"
+        ]
+      },
+      "evidence": {
+        "any": [
+          "duplicate registry entry"
+        ]
+      }
+    },
+    {
+      "id": "file-validation-failed",
+      "cause": "file_validation_failed",
+      "category": "other",
+      "severity": "error",
+      "confidence": "high",
+      "title": "游戏文件校验失败",
+      "impact": "核心 jar 或资源缺失 / 被改动，游戏无法启动。",
+      "suggestion": "在启动器里对该版本执行「修复」或重新安装。",
+      "match": {
+        "any": [
+          "file validation failed",
+          "checksum mismatch",
+          "failed to verify game files",
+          "game files are corrupt"
+        ]
+      },
+      "evidence": {
+        "any": [
+          "file validation failed",
+          "checksum mismatch",
+          "failed to verify game files",
+          "game files are corrupt"
+        ]
+      }
+    },
+    {
+      "id": "disk-full-chain",
+      "cause": "disk_full",
+      "category": "server",
+      "severity": "error",
+      "confidence": "high",
+      "title": "磁盘空间耗尽",
+      "impact": "存档、日志、崩溃报告都写不进去，世界数据可能已经部分损坏。",
+      "suggestion": "先腾出磁盘空间（至少留出存档大小 2 倍），再重启服务器；已损坏的区块从备份恢复。",
+      "match": {
+        "any": [
+          "no space left on device"
+        ]
+      },
+      "steps": [
+        {
+          "label": "磁盘空间耗尽",
+          "any": [
+            "no space left on device"
+          ]
+        },
+        {
+          "label": "存档 / 日志写入失败",
+          "any": [
+            "failed to save",
+            "failed to write"
+          ]
+        },
+        {
+          "label": "服务器卡死被看门狗强杀",
+          "any": [
+            "watchdog killed server thread"
+          ]
+        },
+        {
+          "label": "崩溃报告写不出（丢失）",
+          "any": [
+            "failed to write crash report"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "server-tps-stall",
+      "cause": "server_tps_stall",
+      "category": "server",
+      "severity": "error",
+      "confidence": "high",
+      "title": "服务器处理不过来（TPS 掉底）",
+      "impact": "服务端单帧耗时过长，玩家表现为全服卡住、方块回弹。",
+      "suggestion": "降低视距与实体数量，检查是否有卡区块 / 大量掉落物；配合磁盘与内存结论一起排查。",
+      "match": {
+        "any": [
+          "can't keep up"
+        ]
+      },
+      "steps": [
+        {
+          "label": "服务器处理不过来（TPS 掉底）",
+          "any": [
+            "can't keep up"
+          ]
+        },
+        {
+          "label": "看门狗判定卡死并强杀服务端线程",
+          "any": [
+            "watchdog killed server thread"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "watchdog-kill",
+      "cause": "watchdog_kill",
+      "category": "server",
+      "severity": "error",
+      "confidence": "high",
+      "title": "看门狗强杀服务端线程",
+      "impact": "服务端单帧卡住超过阈值，被看门狗判定为死锁并强杀。",
+      "suggestion": "结合同时出现的其它结论（磁盘满 / 内存不足 / TPS 掉底）定位根因，单看看门狗只是结果。",
+      "match": {
+        "any": [
+          "watchdog killed server thread"
+        ]
+      },
+      "evidence": {
+        "any": [
+          "watchdog killed server thread"
+        ]
+      },
+      "gates": {
+        "require_absent": [
+          "can't keep up",
+          "no space left on device"
+        ]
+      }
+    },
+    {
+      "id": "mysql-unreachable",
+      "cause": "mysql_unreachable",
+      "category": "server",
+      "severity": "error",
+      "confidence": "high",
+      "title": "数据库不可达",
+      "impact": "依赖数据库的功能（登录、经济、统计）全部失败，重连多次后放弃。",
+      "suggestion": "确认 MySQL 服务在跑、端口与账号密码正确、防火墙放行；恢复后重启服务器。",
+      "match": {
+        "any": [
+          "failed to connect to mysql",
+          "communications link failure"
+        ]
+      },
+      "evidence": {
+        "any": [
+          "failed to connect to mysql",
+          "communications link failure",
+          "mysql reconnect attempt"
         ]
       }
     },
     {
       "id": "driver-intel-access-violation",
+      "cause": "driver_intel",
       "category": "driver",
       "severity": "error",
+      "confidence": "high",
       "title": "Intel 显卡驱动不兼容",
-      "suggestion": "EXCEPTION_ACCESS_VIOLATION 由 Intel 驱动触发。请更新 Intel 核显驱动，或在系统中指定使用独立显卡。",
+      "impact": "驱动在渲染线程崩溃，游戏直接退出。",
+      "suggestion": "更新 Intel 核显驱动到最新版；仍崩时把渲染交给独显。",
       "match": {
         "all": [
           "exception_access_violation"
         ],
         "any": [
           "igdumd",
-          "igdkmd",
+          "ig4icd",
+          "igd10iumd",
           "intel"
+        ]
+      },
+      "evidence": {
+        "any": [
+          "igdumd",
+          "ig4icd",
+          "igd10iumd"
         ]
       },
       "refs": [
@@ -139,397 +920,245 @@
     },
     {
       "id": "driver-amd-access-violation",
+      "cause": "driver_amd",
       "category": "driver",
       "severity": "error",
+      "confidence": "high",
       "title": "AMD 显卡驱动不兼容",
-      "suggestion": "EXCEPTION_ACCESS_VIOLATION 由 AMD 驱动触发。请更新显卡驱动，或关闭驱动中的游戏优化功能。",
+      "impact": "驱动在渲染线程崩溃，游戏直接退出。",
+      "suggestion": "用 DDU 干净卸载后重装 AMD 驱动。",
       "match": {
         "all": [
           "exception_access_violation"
         ],
         "any": [
-          "amdvlk",
-          "amdocl",
-          "aticfx",
           "atio6axx",
-          "amd"
+          "amdvlk",
+          "amdxc",
+          "aticfx"
         ]
       },
-      "refs": [
-        "https://bugs.mojang.com/browse/MC-31618"
-      ]
+      "evidence": {
+        "any": [
+          "atio6axx",
+          "amdvlk",
+          "amdxc",
+          "aticfx"
+        ]
+      }
     },
     {
       "id": "driver-nvidia-access-violation",
+      "cause": "driver_nvidia",
       "category": "driver",
       "severity": "error",
+      "confidence": "high",
       "title": "Nvidia 显卡驱动不兼容",
-      "suggestion": "EXCEPTION_ACCESS_VIOLATION 由 Nvidia 驱动触发。请更新显卡驱动，或回退到稳定版本驱动。",
+      "impact": "驱动在渲染线程崩溃，游戏直接退出。",
+      "suggestion": "更新或回退 Nvidia 驱动；笔记本用户确认游戏跑在独显上。",
       "match": {
         "all": [
           "exception_access_violation"
         ],
         "any": [
           "nvoglv",
-          "nvoglv64",
+          "nvcuda",
+          "nvwgf2umx",
           "nvidia"
+        ]
+      },
+      "evidence": {
+        "any": [
+          "nvoglv",
+          "nvcuda",
+          "nvwgf2umx"
         ]
       }
     },
     {
       "id": "driver-no-opengl",
+      "cause": "driver_no_opengl",
       "category": "driver",
       "severity": "error",
+      "confidence": "high",
       "title": "显卡不支持所需 OpenGL 版本",
-      "suggestion": "显卡或驱动不支持游戏要求的 OpenGL 版本。请更新驱动；老显卡可尝试旧版本游戏。",
+      "impact": "游戏在创建窗口阶段就失败。",
+      "suggestion": "更新驱动；过老的核显 / 虚拟机可能确实不支持所需 OpenGL 版本。",
       "match": {
         "any": [
-          "unsupported required opengl",
-          "opengl 3.2 is not supported",
-          "pixel format not accelerated",
-          "failed to create display"
+          "unsupported opengl version",
+          "opengl 3.2 not supported",
+          "glfw error 65542"
+        ]
+      },
+      "evidence": {
+        "any": [
+          "unsupported opengl version",
+          "opengl 3.2 not supported",
+          "glfw error 65542"
         ]
       }
     },
     {
       "id": "driver-pixel-format",
+      "cause": "driver_pixel_format",
       "category": "driver",
       "severity": "error",
+      "confidence": "medium",
       "title": "显卡驱动无法设置像素格式",
-      "suggestion": "驱动在创建窗口时失败，常见于远程桌面 / 虚拟机环境。请关闭远程桌面或更新驱动。",
+      "impact": "窗口创建失败，游戏打不开。",
+      "suggestion": "更新显卡驱动；远程桌面 / 虚拟机上常见，建议在本机运行。",
       "match": {
         "any": [
-          "could not set pixel format"
+          "failed to set pixel format",
+          "pixel format not supported"
+        ]
+      },
+      "evidence": {
+        "any": [
+          "failed to set pixel format",
+          "pixel format not supported"
         ]
       }
     },
     {
       "id": "shader-gl-error",
+      "cause": "shader_gl_error",
       "category": "driver",
       "severity": "warning",
+      "confidence": "medium",
       "title": "光影或资源包导致 OpenGL 错误",
-      "suggestion": "多为光影包与当前显卡/驱动不兼容。请先移除光影再启动，逐一排查。",
+      "impact": "画面异常或渲染线程崩溃。",
+      "suggestion": "关闭光影 / 移除最近添加的资源包后重试。",
       "match": {
         "any": [
-          "opengl error 1282",
-          "gl error 1282",
-          "invalid operation (1282)"
+          "shader compile error",
+          "glsl error",
+          "opengl error 1281"
+        ]
+      },
+      "evidence": {
+        "any": [
+          "shader compile error",
+          "glsl error",
+          "opengl error 1281"
         ]
       }
     },
     {
       "id": "texture-too-large",
+      "cause": "texture_too_large",
       "category": "driver",
       "severity": "warning",
+      "confidence": "medium",
       "title": "材质过大或显存不足",
-      "suggestion": "高清材质包超出显卡显存或最大纹理尺寸。请降低材质分辨率。",
+      "impact": "材质上传失败，出现紫黑格或渲染崩溃。",
+      "suggestion": "降低材质分辨率 / 关闭光影，或换用显存更大的显卡。",
       "match": {
         "any": [
-          "gl_out_of_memory",
           "texture too large",
-          "framebuffer incomplete"
-        ]
-      }
-    },
-    {
-      "id": "mod-mixin-apply-failed",
-      "category": "mod_conflict",
-      "severity": "error",
-      "title": "Mixin 注入失败",
-      "suggestion": "通常是 mod 之间相互改写同一个类导致冲突。请按下方提示逐个排查最近新增的 mod。",
-      "match": {
-        "any": [
-          "mixinapplyerror",
-          "mixin apply failed",
-          "org.spongepowered.asm.mixin"
+          "out of vram",
+          "failed to upload texture"
         ]
       },
-      "hint_mod": true
-    },
-    {
-      "id": "mod-mixin-bootstrap-missing",
-      "category": "mod_conflict",
-      "severity": "error",
-      "title": "缺少 MixinBootstrap",
-      "suggestion": "Forge 安装不完整或 mod 放错位置。请在 版本设置 → 修复加载器 中重装 Forge。",
-      "match": {
+      "evidence": {
         "any": [
-          "mixinbootstrap",
-          "no mixinbootstrap"
+          "texture too large",
+          "out of vram",
+          "failed to upload texture"
         ]
       }
-    },
-    {
-      "id": "mod-missing-dependency",
-      "category": "missing_mod",
-      "severity": "error",
-      "title": "缺少前置 mod",
-      "suggestion": "某个 mod 的依赖没有安装。请补装前置 mod（堆栈中通常能看到缺失的 modid）。",
-      "match": {
-        "any": [
-          "noclassdeffounderror",
-          "no class definition found"
-        ]
-      },
-      "hint_mod": true
-    },
-    {
-      "id": "mod-nosuchmethod",
-      "category": "missing_mod",
-      "severity": "error",
-      "title": "mod 与游戏/加载器版本不匹配",
-      "suggestion": "调用的方法不存在，通常是 mod 与当前游戏版本或加载器版本不匹配。请换用对应版本的 mod。",
-      "match": {
-        "any": [
-          "nosuchmethoderror",
-          "no such method"
-        ]
-      },
-      "hint_mod": true
-    },
-    {
-      "id": "mod-duplicate",
-      "category": "mod_conflict",
-      "severity": "warning",
-      "title": "Mod 重复安装",
-      "suggestion": "同一 mod 存在多个版本（不同文件名）。请删除旧版本，只保留一个。",
-      "match": {
-        "any": [
-          "duplicate mod",
-          "duplicate registration",
-          "already registered"
-        ]
-      },
-      "hint_mod": true
-    },
-    {
-      "id": "mod-file-extracted",
-      "category": "mod_conflict",
-      "severity": "error",
-      "title": "Mod 文件被解压",
-      "suggestion": "mods 目录里出现了解压后的文件夹。mod 必须是 .jar 文件，请删除解压出来的目录。",
-      "match": {
-        "any": [
-          "zip file closed",
-          "invalid or corrupt jarfile"
-        ]
-      }
-    },
-    {
-      "id": "mod-config-broken",
-      "category": "mod_conflict",
-      "severity": "error",
-      "title": "Mod 配置文件损坏",
-      "suggestion": "配置文件解析失败（常见于手工编辑出错）。请删除或还原 config 目录下对应的配置文件。",
-      "match": {
-        "any": [
-          "com.electronwill.nightconfig",
-          "malformed config",
-          "failed to load config",
-          "tomlparseexception"
-        ]
-      }
-    },
-    {
-      "id": "mod-loader-error",
-      "category": "mod_conflict",
-      "severity": "error",
-      "title": "Mod 加载器报错",
-      "suggestion": "加载器在加载 mod 时失败。请确认堆栈提到的 mod 与游戏版本匹配。",
-      "match": {
-        "any": [
-          "modlauncher",
-          "failed to load mod",
-          "mod loading error"
-        ]
-      },
-      "hint_mod": true
-    },
-    {
-      "id": "fabric-error",
-      "category": "mod_conflict",
-      "severity": "error",
-      "title": "Fabric 加载失败",
-      "suggestion": "Fabric 报错，常见原因是 Fabric API 缺失或版本不匹配。请安装对应版本的 Fabric API。",
-      "match": {
-        "any": [
-          "net.fabricmc.loader.impl.formattedexception",
-          "fabric loader failed",
-          "net.fabricmc.loader"
-        ]
-      }
-    },
-    {
-      "id": "forge-error",
-      "category": "mod_conflict",
-      "severity": "error",
-      "title": "Forge 加载失败",
-      "suggestion": "Forge 报错，常见原因是 Forge 安装不完整或 mod 与 Forge 版本不兼容。请重装 Forge 或调整 mod。",
-      "match": {
-        "any": [
-          "net.minecraftforge.fml.loading",
-          "forge mod loader",
-          "fml early loading"
-        ]
-      }
-    },
-    {
-      "id": "forge-incomplete",
-      "category": "mod_conflict",
-      "severity": "error",
-      "title": "Forge 安装不完整",
-      "suggestion": "版本 JSON 与 Forge 库不匹配。请在 版本设置 → 修复加载器 中重装 Forge。",
-      "match": {
-        "any": [
-          "missing forge",
-          "could not find forge"
-        ]
-      }
-    },
-    {
-      "id": "optifine-forge-conflict",
-      "category": "mod_conflict",
-      "severity": "error",
-      "title": "OptiFine 与 Forge 不兼容",
-      "suggestion": "OptiFine 与当前 Forge 版本冲突。请使用与 Forge 匹配的 OptiFine 版本，或改用替代优化 mod。",
-      "match": {
-        "all": [
-          "optifine"
-        ],
-        "any": [
-          "forge",
-          "fml"
-        ]
-      }
-    },
-    {
-      "id": "shadersmod-optifine",
-      "category": "mod_conflict",
-      "severity": "warning",
-      "title": "ShadersMod 与 OptiFine 同时安装",
-      "suggestion": "两者功能重叠会导致渲染冲突。请只保留其中一个。",
-      "match": {
-        "all": [
-          "shadersmod"
-        ],
-        "any": [
-          "optifine"
-        ]
-      }
-    },
-    {
-      "id": "optifine-world-load",
-      "category": "mod_conflict",
-      "severity": "error",
-      "title": "OptiFine 导致世界加载失败",
-      "suggestion": "OptiFine 在部分版本加载世界时崩溃。请更新或移除 OptiFine。",
-      "match": {
-        "all": [
-          "optifine"
-        ],
-        "any": [
-          "exception ticking world",
-          "exception loading entity"
-        ]
-      },
-      "refs": [
-        "https://www.minecraftforum.net/forums/support/java-edition-support/3051132-exception-ticking-world"
-      ]
     },
     {
       "id": "specific-block-crash",
+      "cause": "specific_block_crash",
       "category": "mod_conflict",
       "severity": "warning",
+      "confidence": "low",
       "title": "特定方块导致崩溃",
-      "suggestion": "某个方块渲染或逻辑出错（多来自 mod）。请排查最近添加的方块类 mod。",
+      "impact": "放置 / 渲染某个方块时崩溃，通常是某个 mod 的方块实现有问题。",
+      "suggestion": "按日志里的方块 ID 定位 mod，更新或移除它。",
       "match": {
-        "any": [
-          "exception ticking block entity",
-          "exception in block"
+        "regex": [
+          "while (placing|rendering) block"
         ]
       },
-      "hint_mod": true
-    },
-    {
-      "id": "specific-entity-crash",
-      "category": "mod_conflict",
-      "severity": "warning",
-      "title": "特定实体导致崩溃",
-      "suggestion": "某个实体在生成或更新时出错（多来自 mod）。请排查生物/实体类 mod。",
-      "match": {
-        "any": [
-          "exception ticking entity",
-          "exception in entity"
-        ]
-      },
-      "hint_mod": true
-    },
-    {
-      "id": "mod-id-limit",
-      "category": "mod_conflict",
-      "severity": "error",
-      "title": "Mod 过多超出 ID 上限",
-      "suggestion": "1.12 及更早的方块/物品 ID 已用尽。请减少 mod 数量或使用 ID 重映射工具。",
-      "match": {
-        "any": [
-          "id limit",
-          "registry limit",
-          "out of ids",
-          "duplicate id"
+      "evidence": {
+        "regex": [
+          "while (placing|rendering) block"
         ]
       }
     },
     {
-      "id": "mod-special-chars",
+      "id": "specific-entity-crash",
+      "cause": "specific_entity_crash",
       "category": "mod_conflict",
       "severity": "warning",
-      "title": "Mod 名称含特殊字符",
-      "suggestion": "文件名中的特殊字符可能导致加载失败。请把 mod 文件名改为纯英文+数字。",
+      "confidence": "low",
+      "title": "特定实体导致崩溃",
+      "impact": "实体 tick / 渲染时崩溃，常见于自定义生物。",
+      "suggestion": "按日志里的实体 ID 定位 mod，更新或移除它。",
       "match": {
-        "any": [
-          "illegal character",
-          "invalid path"
+        "regex": [
+          "entity .* failed to load",
+          "ticking entity"
+        ]
+      },
+      "evidence": {
+        "regex": [
+          "entity .* failed to load",
+          "ticking entity"
+        ]
+      },
+      "gates": {
+        "require_absent": [
+          "region file is truncated",
+          "corrupt block palette"
         ]
       }
     },
     {
       "id": "debug-crash-manual",
+      "cause": "debug_crash_manual",
       "category": "other",
       "severity": "info",
+      "confidence": "high",
       "title": "手动触发的调试崩溃",
-      "suggestion": "日志显示这是主动触发的调试崩溃（如按 F3+C），不是真实故障。",
+      "impact": "游戏是被手动 / 调试手段关掉的，不是真的崩溃。",
+      "suggestion": "无需处理。",
       "match": {
         "any": [
-          "debug crash",
-          "manually triggered crash"
+          "manually triggered crash",
+          "debug crash"
+        ]
+      },
+      "evidence": {
+        "any": [
+          "manually triggered crash",
+          "debug crash"
         ]
       }
     },
     {
       "id": "output-too-short",
+      "cause": "output_too_short",
       "category": "other",
       "severity": "info",
+      "confidence": "medium",
       "title": "程序输出极短",
-      "suggestion": "游戏几乎没输出就退出，通常是 Java 参数错误或启动命令有误。请检查 JVM 参数与 Java 路径。",
+      "impact": "日志只有很少几行，说明 JVM / 启动器在游戏初始化前就退出了。",
+      "suggestion": "检查 Java 是否可执行、启动参数是否正确，以及是否被杀毒软件拦截。",
       "match": {
-        "any": [
-          "could not find or load main class",
-          "classnotfoundexception"
+        "regex": [
+          "."
         ]
-      }
-    },
-    {
-      "id": "file-validation-failed",
-      "category": "other",
-      "severity": "error",
-      "title": "游戏文件校验失败",
-      "suggestion": "核心库文件缺失或损坏。请在 版本设置 中执行文件校验 / 重新下载。",
-      "match": {
-        "any": [
-          "failed to download",
-          "sha1 mismatch",
-          "invalid sha1",
-          "corrupted jar"
+      },
+      "gates": {
+        "max_lines": 200
+      },
+      "evidence": {
+        "regex": [
+          "."
         ]
       }
     }

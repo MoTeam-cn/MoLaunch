@@ -13,23 +13,52 @@ pub struct CrashAnalyzeParams {
 /// 崩溃日志分析结果
 #[derive(Debug, Serialize, Deserialize)]
 pub struct CrashAnalyzeResult {
-    /// 识别出的崩溃分析条目
+    /// 已确认的崩溃分析条目（每条都带证据行）
     pub analyses: Vec<CrashAnalysisItem>,
+    /// 待确认条目：规则命中了关键词，但找不到可引用的日志行，或证据不足
+    #[serde(default)]
+    pub pending: Vec<CrashAnalysisItem>,
+    /// 日志总行数（前端用于展示与「输出极短」判定说明）
+    #[serde(default)]
+    pub line_count: usize,
+}
+
+/// 一条日志证据：行号 + 原文（原文是日志的子串，不做任何改写）
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub struct CrashEvidence {
+    /// 行号（从 1 开始）
+    pub line_no: usize,
+    /// 该行原文（已去掉首尾空白，内容与日志一致）
+    pub raw_line: String,
 }
 
 /// 单个崩溃分析条目
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct CrashAnalysisItem {
-    /// 分类：java_version / missing_mod / memory / driver / mod_conflict / other
+    /// 归因键：同一 cause 只输出一条（用于去重与合并证据）
+    pub cause: String,
+    /// 分类：java_version / missing_mod / memory / driver / mod_conflict / world / server / plugin / other
     pub category: String,
     /// 严重级别：error / warning / info
     pub severity: String,
     /// 标题
     pub title: String,
-    /// 匹配到的相关行片段
+    /// 首条证据原文（保留旧字段，等价于 evidence[0].raw_line）
     pub detail: String,
     /// 中文修复建议
     pub suggestion: String,
+    /// 影响说明
+    #[serde(default)]
+    pub impact: String,
+    /// 置信度：high / medium / low
+    #[serde(default)]
+    pub confidence: String,
+    /// 证据行（≥1 条；为空表示未确认，只进 pending）
+    #[serde(default)]
+    pub evidence: Vec<CrashEvidence>,
+    /// 置信度不足时说明还缺什么证据
+    #[serde(default)]
+    pub missing_evidence: String,
     /// 命中的规则 id（规则引擎产出时填充，兜底逻辑为空）
     #[serde(default)]
     pub rule_id: String,
@@ -43,6 +72,17 @@ pub struct CrashAnalysisItem {
     #[serde(default)]
     pub suspects: Vec<String>,
 }
+
+impl CrashAnalysisItem {
+    /// 首条证据行号（排序用；无证据返回 usize::MAX）
+    pub fn first_line_no(&self) -> usize {
+        self.evidence
+            .first()
+            .map(|e| e.line_no)
+            .unwrap_or(usize::MAX)
+    }
+}
+
 /// 规则误报反馈参数
 #[derive(Debug, Serialize, Deserialize)]
 pub struct CrashRuleFeedbackParams {

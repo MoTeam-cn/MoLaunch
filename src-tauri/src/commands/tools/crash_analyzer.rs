@@ -1,191 +1,168 @@
 //! 崩溃日志分析
-//! - `analyze`：对游戏崩溃日志文本做大小写不敏感的模式匹配，识别常见崩溃原因
-//!   （Java 版本 / 缺失 mod / 内存 / 驱动 / Mod 冲突 / 其他），返回结构化的分析条目供前端展示。
 //!
-//! 本模块为纯文本分析，不读取文件系统，不使用 state 参数（签名保持统一）。
+//! 流程：规则引擎（证据驱动）→ 兜底关键词 → 合并去重。
+//! 所有结论都必须带至少一条日志原文证据，拿不到证据的进「待确认」。
 
 use crate::log_info;
 use crate::state::AppState;
 
-use super::crash_rules;
+use super::crash_rules::{self, evidence::LogIndex};
 use super::types::{
-    CrashAnalysisItem, CrashAnalyzeParams, CrashAnalyzeResult, CrashRuleFeedbackParams,
+    CrashAnalysisItem, CrashAnalyzeParams, CrashAnalyzeResult, CrashEvidence,
+    CrashRuleFeedbackParams,
 };
 
-/// 分析崩溃日志文本，识别常见崩溃模式（纯文本、无状态，供命令与 AI 工具复用）
-///
-/// 匹配规则（大小写不敏感）：
-/// - Java 版本不匹配：`UnsupportedClassVersionError` / `Unsupported class file major version` 等
-/// - 缺失 mod：`NoClassDefFoundError` / `NoSuchMethodError` / `FileNotFoundException`(路径含 mods)
-/// - 内存不足：`OutOfMemoryError`；显卡驱动：`GLFW`/`OpenGL`/`Pixel format`/`driver`
-/// - Mod 冲突：`MixinApplyError`/`Duplicate`/`Conflicting`
-/// - 其他：含 `Exception`/`Error`/`Crash`（仅未命中上述分类时）。空文本返回空。
+/// 分析崩溃日志文本，识别常见崩溃模式（仅返回已确认条目）
 pub fn analyze_log_text(log_text: &str) -> Vec<CrashAnalysisItem> {
     analyze_log_text_with_mods(log_text, None)
 }
 
 /// 分析崩溃日志，附带 mod 索引用于反查可疑 mod
 ///
-/// 先用规则引擎（resources/crash_rules.json）匹配，未命中任何规则时回退到
-/// 内置的关键词兜底逻辑，保证不会因为规则库缺条目而完全没有结论。
+/// 规则引擎命中即返回；完全没命中时才回退到内置关键词兜底，保证不至于空手而归。
 pub fn analyze_log_text_with_mods(
     log_text: &str,
     mod_index: Option<&std::collections::HashMap<String, String>>,
 ) -> Vec<CrashAnalysisItem> {
-    if log_text.trim().is_empty() {
-        return Vec::new();
-    }
-    let matched = crash_rules::analyze(log_text, mod_index);
-    if !matched.is_empty() {
-        log_info!(
-            "[CrashAnalyzer] 规则引擎命中 {} 条（规则库 v{}）",
-            matched.len(),
-            crash_rules::rules_version()
-        );
-        return matched;
-    }
-    legacy_analyze(log_text)
+    analyze_log_text_full(log_text, mod_index).analyses
 }
 
-/// 关键词兜底分析（规则库未命中时使用）
-fn legacy_analyze(log_text: &str) -> Vec<CrashAnalysisItem> {
-    let mut analyses: Vec<CrashAnalysisItem> = Vec::new();
+/// 完整分析：已确认条目 + 待确认条目 + 日志行数
+pub fn analyze_log_text_full(
+    log_text: &str,
+    mod_index: Option<&std::collections::HashMap<String, String>>,
+) -> CrashAnalyzeResult {
+    let line_count = log_text.lines().count();
     if log_text.trim().is_empty() {
-        return analyses;
+        return CrashAnalyzeResult {
+            analyses: Vec::new(),
+            pending: Vec::new(),
+            line_count,
+        };
     }
 
-    let lower = log_text.to_lowercase();
-    let lines: Vec<&str> = log_text.lines().collect();
+    let (mut analyses, pending) = crash_rules::analyze_with_pending(log_text, mod_index);
+    if analyses.is_empty() && pending.is_empty() {
+        analyses = legacy_analyze(log_text);
+    }
+    log_info!(
+        "[CrashAnalyzer] 规则引擎 v{} 产出 {} 条结论（待确认 {} 条，日志 {} 行）",
+        crash_rules::rules_version(),
+        analyses.len(),
+        pending.len(),
+        line_count
+    );
+    CrashAnalyzeResult {
+        analyses,
+        pending,
+        line_count,
+    }
+}
+
+/// 关键词兜底分析（规则库完全没命中时使用）
+fn legacy_analyze(log_text: &str) -> Vec<CrashAnalysisItem> {
+    let index = LogIndex::new(log_text);
+    let mut analyses: Vec<CrashAnalysisItem> = Vec::new();
 
     // 1. Java 版本不匹配
-    if lower.contains("unsupported class file major version")
-        || lower.contains("has been compiled by a more recent version")
-        || lower.contains("java.lang.unsupportedclassversionerror")
-    {
-        analyses.push(CrashAnalysisItem {
-            category: "java_version".to_string(),
-            severity: "error".to_string(),
-            title: "Java 版本不匹配".to_string(),
-            detail: find_relevant_line(&lines, "UnsupportedClassVersionError"),
-            suggestion: "当前 Java 版本与 mod / 游戏所需的版本不一致。请在启动器设置中切换到更高（或更低）的 Java 版本，通常较新的 mod 需要更新版本的 Java。".to_string(),
-            rule_id: String::new(),
-            actions: Vec::new(),
-            refs: Vec::new(),
-            suspects: Vec::new(),
-        });
+    if let Some(item) = legacy_item(
+        &index,
+        &[
+            "unsupported class file major version",
+            "has been compiled by a more recent version",
+            "unsupportedclassversionerror",
+        ],
+        "legacy-java-version",
+        "java_version",
+        "error",
+        "Java 版本不匹配",
+        "当前 Java 版本与 mod / 游戏所需版本不一致，游戏在类加载阶段就中断。",
+        "在启动器设置里切换到匹配的 Java 版本；较新的 mod 通常需要更高版本。",
+    ) {
+        analyses.push(item);
     }
 
-    // 2. 缺失 mod
-    if lower.contains("noclassdeffounderror")
-        || lower.contains("nosuchmethoderror")
-        || (lower.contains("filenotfoundexception") && lower.contains("mods"))
-    {
-        let detail = if lower.contains("noclassdeffounderror") {
-            find_relevant_line(&lines, "NoClassDefFoundError")
-        } else if lower.contains("nosuchmethoderror") {
-            find_relevant_line(&lines, "NoSuchMethodError")
-        } else {
-            find_relevant_line(&lines, "FileNotFoundException")
-        };
-        analyses.push(CrashAnalysisItem {
-            category: "missing_mod".to_string(),
-            severity: "error".to_string(),
-            title: "缺失 Mod 或 Mod 文件损坏".to_string(),
-            detail,
-            suggestion: "游戏引用的类 / 方法找不到，通常是缺少前置 mod 或 mod 文件损坏。请检查是否漏装了所需的前置 mod，或重新下载相关 mod。".to_string(),
-            rule_id: String::new(),
-            actions: Vec::new(),
-            refs: Vec::new(),
-            suspects: Vec::new(),
-        });
+    // 2. 缺失 mod / 类缺失
+    if let Some(item) = legacy_item(
+        &index,
+        &["noclassdeffounderror", "nosuchmethoderror"],
+        "legacy-missing-mod",
+        "missing_mod",
+        "error",
+        "缺失 Mod 或 Mod 文件损坏",
+        "游戏引用的类 / 方法找不到，通常是缺少前置 mod 或 mod 文件损坏。",
+        "检查是否漏装前置 mod；依赖齐全则重新下载相关 mod。",
+    ) {
+        analyses.push(item);
     }
 
     // 3. 内存不足
-    if lower.contains("outofmemoryerror") || lower.contains("outofmemory") {
-        analyses.push(CrashAnalysisItem {
-            category: "memory".to_string(),
-            severity: "error".to_string(),
-            title: "内存不足".to_string(),
-            detail: find_relevant_line(&lines, "OutOfMemory"),
-            suggestion: "JVM 堆内存不足导致崩溃。请在启动器版本设置中增大 Java 内存分配（如 4096MB 或更高），并确保电脑物理内存充足。".to_string(),
-            rule_id: String::new(),
-            actions: Vec::new(),
-            refs: Vec::new(),
-            suspects: Vec::new(),
-        });
+    if let Some(item) = legacy_item(
+        &index,
+        &["outofmemoryerror", "outofmemory"],
+        "legacy-memory",
+        "memory",
+        "error",
+        "内存不足",
+        "JVM 内存不足，游戏随时会被强杀或卡死。",
+        "在版本设置里增大内存分配，并确认物理内存充足。",
+    ) {
+        analyses.push(item);
     }
 
     // 4. 显卡驱动
-    if lower.contains("glfw")
-        || lower.contains("opengl")
-        || lower.contains("pixel format")
-        || lower.contains("driver")
-    {
-        analyses.push(CrashAnalysisItem {
-            category: "driver".to_string(),
-            severity: "warning".to_string(),
-            title: "显卡驱动 / 图形库问题".to_string(),
-            detail: find_relevant_line(&lines, "GLFW"),
-            suggestion: "图形相关错误，可能是显卡驱动过旧或不兼容。请更新显卡驱动到最新版本，或在启动器中尝试切换使用的显卡（集成显卡 / 独立显卡）。".to_string(),
-            rule_id: String::new(),
-            actions: Vec::new(),
-            refs: Vec::new(),
-            suspects: Vec::new(),
-        });
+    if let Some(item) = legacy_item(
+        &index,
+        &["glfw", "opengl", "pixel format"],
+        "legacy-driver",
+        "driver",
+        "warning",
+        "显卡驱动 / 图形库问题",
+        "图形相关错误，可能是驱动过旧或不兼容，表现为启动即崩或画面异常。",
+        "更新显卡驱动到最新版本，或尝试切换使用的显卡。",
+    ) {
+        analyses.push(item);
     }
-
-    // 5. Mod 冲突
-    if lower.contains("mixinapplyerror")
-        || lower.contains("duplicate")
-        || lower.contains("conflicting")
-    {
-        let detail = if lower.contains("mixinapplyerror") {
-            find_relevant_line(&lines, "MixinApplyError")
-        } else if lower.contains("duplicate") {
-            find_relevant_line(&lines, "Duplicate")
-        } else {
-            find_relevant_line(&lines, "Conflicting")
-        };
-        analyses.push(CrashAnalysisItem {
-            category: "mod_conflict".to_string(),
-            severity: "warning".to_string(),
-            title: "Mod 冲突".to_string(),
-            detail,
-            suggestion: "检测到 mod 之间存在冲突（如重复注册、Mixin 冲突）。请尝试逐个排查最近安装的 mod，移除冲突项或查看 mod 兼容性说明。".to_string(),
-            rule_id: String::new(),
-            actions: Vec::new(),
-            refs: Vec::new(),
-            suspects: Vec::new(),
-        });
-    }
-
-    // 6. 其他通用错误（仅当未命中具体分类时）
-    if analyses.is_empty()
-        && (lower.contains("exception") || lower.contains("error") || lower.contains("crash"))
-    {
-        let detail = if lower.contains("exception") {
-            find_relevant_line(&lines, "Exception")
-        } else if lower.contains("error") {
-            find_relevant_line(&lines, "Error")
-        } else {
-            find_relevant_line(&lines, "Crash")
-        };
-        analyses.push(CrashAnalysisItem {
-            category: "other".to_string(),
-            severity: "info".to_string(),
-            title: "检测到通用错误信息".to_string(),
-            detail,
-            suggestion: "日志中包含异常信息但未识别出具体模式。建议查看完整崩溃日志，或在社区反馈时附上完整日志以便进一步诊断。".to_string(),
-            rule_id: String::new(),
-            actions: Vec::new(),
-            refs: Vec::new(),
-            suspects: Vec::new(),
-        });
-    }
-
-    log_info!("[CrashAnalyzer] 分析完成，识别 {} 条问题", analyses.len());
 
     analyses
+}
+
+/// 兜底条目构造：命中任一关键词才产出，证据取首个命中行
+#[allow(clippy::too_many_arguments)]
+fn legacy_item(
+    index: &LogIndex,
+    needles: &[&str],
+    cause: &str,
+    category: &str,
+    severity: &str,
+    title: &str,
+    impact: &str,
+    suggestion: &str,
+) -> Option<CrashAnalysisItem> {
+    let owned: Vec<String> = needles.iter().map(|s| s.to_string()).collect();
+    let evidence: Vec<CrashEvidence> = index.collect(&owned, &[], 2);
+    if evidence.is_empty() {
+        return None;
+    }
+    Some(CrashAnalysisItem {
+        cause: cause.to_string(),
+        category: category.to_string(),
+        severity: severity.to_string(),
+        title: title.to_string(),
+        detail: evidence
+            .first()
+            .map(|e| e.raw_line.clone())
+            .unwrap_or_default(),
+        suggestion: suggestion.to_string(),
+        impact: impact.to_string(),
+        confidence: "medium".to_string(),
+        evidence,
+        missing_evidence: String::new(),
+        rule_id: String::new(),
+        actions: Vec::new(),
+        refs: Vec::new(),
+        suspects: Vec::new(),
+    })
 }
 
 /// 崩溃日志分析命令入口（包装纯函数，返回 JSON）
@@ -193,7 +170,6 @@ pub async fn analyze(
     state: &AppState,
     params: CrashAnalyzeParams,
 ) -> Result<serde_json::Value, String> {
-    // state 仅用于按版本定位 mods 目录（可选）
     log_info!(
         "[CrashAnalyzer] 开始分析日志，长度 {} 字节",
         params.log_text.len()
@@ -217,33 +193,8 @@ pub async fn analyze(
         None => None,
     };
 
-    let result = CrashAnalyzeResult {
-        analyses: analyze_log_text_with_mods(&params.log_text, mod_index.as_ref()),
-    };
+    let result = analyze_log_text_full(&params.log_text, mod_index.as_ref());
     serde_json::to_value(&result).map_err(|e| e.to_string())
-}
-
-/// 在日志行中查找首个包含 needle（大小写不敏感）的非空行，返回其截断片段
-///
-/// 找不到时回退到首个非空行；都没有则返回空字符串。
-fn find_relevant_line(lines: &[&str], needle: &str) -> String {
-    let needle_l = needle.to_lowercase();
-    for line in lines {
-        if line.to_lowercase().contains(&needle_l) {
-            let t = line.trim();
-            if !t.is_empty() {
-                return truncate(t, 300);
-            }
-        }
-    }
-    // 回退：首个非空行
-    for line in lines {
-        let t = line.trim();
-        if !t.is_empty() {
-            return truncate(t, 300);
-        }
-    }
-    String::new()
 }
 
 /// 在日志中定位首个命中关键词（大小写不敏感）的行，返回该行及其前后各 `context` 行的
@@ -275,17 +226,6 @@ pub fn locate_keyword_context(
         out.push_str(&format!("{:>6}| {}\n", i + 1, line));
     }
     (Some(idx + 1), out)
-}
-
-/// 将字符串按字符数截断，超长时追加省略号
-fn truncate(s: &str, max: usize) -> String {
-    if s.chars().count() <= max {
-        s.to_string()
-    } else {
-        let mut out: String = s.chars().take(max).collect();
-        out.push('…');
-        out
-    }
 }
 
 /// 记录一条「规则判断不对」的反馈

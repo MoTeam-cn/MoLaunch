@@ -64,16 +64,39 @@ fn test_analyze_mod_索引用于反查可疑_mod() {
     let mut index = HashMap::new();
     index.insert("create".to_string(), "Create".to_string());
     index.insert("sodium".to_string(), "Sodium".to_string());
+    // 只有类缺失、没有依赖声明 → 低置信「类缺失」，但仍应反查到可疑 mod
     let log = "java.lang.NoClassDefFoundError: com/simibubi/create/AllBlocks";
     let items = analyze(log, Some(&index));
+    let hit = items.iter().find(|item| item.cause == "class_missing");
+    let hit = hit.expect("应产出类缺失结论");
+    assert_eq!(hit.confidence, "low");
+    assert!(
+        !hit.missing_evidence.is_empty(),
+        "低置信结论必须说明还缺什么证据"
+    );
+    assert!(
+        hit.suspects.iter().any(|name| name == "Create"),
+        "应反查到 Create，实际: {:?}",
+        hit.suspects
+    );
+}
+
+#[test]
+fn test_analyze_有依赖声明时归因为缺前置() {
+    let log = "Mod 'create' (0.5.1) is missing dependency 'flywheel' (>=0.6.9)\n\
+               java.lang.NoClassDefFoundError: com/simibubi/create/AllBlocks";
+    let items = analyze(log, None);
     let hit = items
         .iter()
-        .find(|item| item.rule_id == "mod-missing-dependency");
-    let suspects = hit.map(|item| item.suspects.clone()).unwrap_or_default();
+        .find(|item| item.cause == "missing_dependency")
+        .expect("应归因为缺前置");
+    assert_eq!(hit.confidence, "high");
     assert!(
-        suspects.iter().any(|name| name == "Create"),
-        "应反查到 Create，实际: {:?}",
-        suspects
+        hit.evidence[0]
+            .raw_line
+            .contains("missing dependency 'flywheel'"),
+        "证据应指向依赖声明行，实际: {:?}",
+        hit.evidence
     );
 }
 

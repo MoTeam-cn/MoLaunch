@@ -1,0 +1,403 @@
+[12:00:01] [main/INFO]: Loading Minecraft 1.20.1 with Fabric Loader 0.15.7
+[12:00:01] [main/INFO]: Loading 87 mods:
+[12:00:02] [main/INFO]: 	- fabric-api 0.92.2+1.20.1
+[12:00:02] [main/INFO]: 	- sodium 0.5.8
+[12:00:02] [main/INFO]: 	- lithium 0.11.3
+[12:00:03] [main/WARN]: Mod 'create' (0.5.1) is missing dependency 'flywheel' (>=0.6.9)
+[12:00:03] [main/ERROR]: Failed to load mod 'create'
+[12:00:03] [main/ERROR]: java.lang.NoClassDefFoundError: com/simibubi/create/foundation/events/ClientEvents
+[12:00:03] [main/ERROR]: 	at com.simibubi.create.Create.<clinit>(Create.java:42)
+[12:00:03] [main/ERROR]: 	at java.base/java.lang.Class.forName0(Native Method)
+[12:00:03] [main/ERROR]: 	at net.fabricmc.loader.impl.launch.knot.KnotClassLoader.loadClass(KnotClassLoader.java:231)
+[12:00:04] [main/WARN]: Skipping mod 'create'
+[12:00:04] [main/INFO]: Loading 86 mods (1 failed)
+[12:00:05] [main/ERROR]: Mixin apply failed jei.mixins.json:ClientMixin -> net.minecraft.client.MinecraftClient
+[12:00:05] [main/ERROR]: org.spongepowered.asm.mixin.throwables.MixinApplyError: Mixin [jei.mixins.json:ClientMixin] from mod [jei] failed
+[12:00:05] [main/ERROR]: Caused by: java.lang.NoSuchMethodError: 'void net.minecraft.client.MinecraftClient.setScreen(net.minecraft.client.gui.screen.Screen)'
+[12:00:06] [main/WARN]: @Redirect conflict. Skipping sodium.mixins.json:LightmapTextureMixin
+[12:00:07] [main/INFO]: SpongePowered MIXIN Subsystem initialized
+[12:00:08] [main/WARN]: Missing texture atlas entry: minecraft:textures/block/stone.png
+[12:00:10] [main/INFO]: Loading world 'world' (minecraft:overworld)
+[12:00:12] [Server thread/INFO]: Preparing level "world"
+[12:00:14] [Server thread/WARN]: Chunk file at chunk [12, 34] is missing the level.dat tag
+[12:00:14] [Server thread/ERROR]: Failed to load chunk [12, 34] in dimension minecraft:overworld
+[12:00:14] [Server thread/ERROR]: java.io.IOException: Region file is truncated
+[12:00:14] [Server thread/ERROR]: 	at net.minecraft.world.storage.RegionFile.readChunk(RegionFile.java:184)
+[12:00:14] [Server thread/ERROR]: 	at net.minecraft.world.storage.ChunkStorage.loadChunk(ChunkStorage.java:112)
+[12:00:15] [Server thread/WARN]: Recreating chunk [12, 34] as empty
+[12:00:16] [Server thread/ERROR]: Entity entity.minecraft.zombie with UUID 4f2a1c3e-8b9d-4e5f-a6b7-c8d9e0f1a2b3 failed to load
+[12:00:16] [Server thread/ERROR]: java.lang.NullPointerException: Cannot invoke "net.minecraft.entity.Entity.getPos()" because "entity" is null
+[12:00:16] [Server thread/ERROR]: 	at net.minecraft.world.entity.EntityList.loadEntity(EntityList.java:98)
+[12:00:17] [Server thread/WARN]: Dropping invalid entity from world
+[12:00:18] [Server thread/ERROR]: Exception ticking world
+[12:00:18] [Server thread/ERROR]: java.lang.ArrayIndexOutOfBoundsException: Index 256 out of bounds for length 256
+[12:00:18] [Server thread/ERROR]: 	at net.minecraft.world.chunk.PalettedContainer.get(PalettedContainer.java:145)
+[12:00:18] [Server thread/ERROR]: 	at net.minecraft.world.chunk.ProtoChunk.getBlockState(ProtoChunk.java:88)
+[12:00:19] [Server thread/WARN]: Chunk [44, -19] had a corrupt block palette, regenerating
+[12:00:20] [Server thread/ERROR]: Player data file for player 'Steve' is corrupted
+[12:00:20] [Server thread/ERROR]: com.google.gson.JsonSyntaxException: Expected BEGIN_OBJECT but was STRING at line 1 column 1
+[12:00:20] [Server thread/ERROR]: 	at com.google.gson.internal.bind.JsonTreeReader.beginObject(JsonTreeReader.java:72)
+[12:00:20] [Server thread/WARN]: Resetting player data for 'Steve'
+[12:00:22] [Netty Server IO #1/ERROR]: Failed to handle packet play:net.minecraft.network.packet.c2s.play.PlayerMoveC2SPacket
+[12:00:22] [Netty Server IO #1/ERROR]: java.lang.IllegalArgumentException: Invalid player movement
+[12:00:22] [Netty Server IO #1/ERROR]: 	at net.minecraft.server.network.ServerPlayNetworkHandler.onPlayerMove(ServerPlayNetworkHandler.java:412)
+[12:00:24] [Server thread/WARN]: Can't keep up! Is the server overloaded? Running 5234ms or 104 ticks behind
+[12:00:25] [Server thread/ERROR]: OutOfMemoryError: Java heap space
+[12:00:25] [Server thread/ERROR]: java.lang.OutOfMemoryError: Java heap space
+[12:00:25] [Server thread/ERROR]: 	at net.minecraft.world.chunk.Chunk.<init>(Chunk.java:201)
+[12:00:26] [Server thread/WARN]: Attempting to recover from out of memory condition
+[12:00:30] [Server thread/INFO]: Saving and pausing game...
+[12:00:31] [Server thread/ERROR]: Failed to save chunk [88, 12]
+[12:00:31] [Server thread/ERROR]: java.io.IOException: No space left on device
+[12:00:31] [Server thread/ERROR]: 	at java.base/java.io.FileOutputStream.writeBytes(Native Method)
+[12:00:32] [Server thread/ERROR]: Failed to save level data
+[12:00:33] [Server thread/WARN]: Level data save failed, retrying...
+[12:00:34] [Server thread/ERROR]: Retry failed, aborting save
+[12:00:36] [Server thread/ERROR]: Exception in thread "Server thread" java.lang.RuntimeException: Shutdown failed
+[12:00:36] [Server thread/ERROR]: 	at net.minecraft.server.MinecraftServer.stop(MinecraftServer.java:912)
+[12:00:37] [Worker-Main-3/WARN]: Scheduled task failed: net.minecraft.server.world.ChunkTicketManager
+[12:00:38] [Worker-Main-3/ERROR]: java.util.ConcurrentModificationException
+[12:00:38] [Worker-Main-3/ERROR]: 	at java.base/java.util.HashMap$HashIterator.nextNode(HashMap.java:1511)
+[12:00:38] [Worker-Main-3/ERROR]: 	at net.minecraft.server.world.ChunkTicketManager.tick(ChunkTicketManager.java:287)
+[12:00:40] [Render thread/ERROR]: OpenGL error 1281 (GL_INVALID_VALUE) at glTexImage2D
+[12:00:40] [Render thread/WARN]: Failed to upload texture minecraft:textures/entity/zombie/zombie.png
+[12:00:41] [Render thread/ERROR]: java.lang.IllegalStateException: Buffer already allocated
+[12:00:41] [Render thread/ERROR]: 	at com.mojang.blaze3d.platform.GlStateManager._glBindBuffer(GlStateManager.java:412)
+[12:00:42] [Render thread/WARN]: Skipping rendering of invalid entity 4f2a1c3e
+[12:00:44] [Server thread/ERROR]: Command '/give' failed: Unknown item 'minecraft:not_an_item'
+[12:00:45] [Server thread/ERROR]: com.mojang.brigadier.exceptions.CommandSyntaxException: Unknown item 'minecraft:not_an_item'
+[12:00:46] [Server thread/WARN]: Unknown recipe type 'mymod:custom_crafting'
+[12:00:47] [Server thread/ERROR]: Failed to parse loot table 'mymod:blocks/custom_ore'
+[12:00:47] [Server thread/ERROR]: com.google.gson.JsonParseException: Missing required field 'pools'
+[12:00:48] [Server thread/WARN]: Loot table 'mymod:blocks/custom_ore' skipped
+[12:00:50] [Server thread/ERROR]: Failed to load advancement 'mymod:adventure/find_gem'
+[12:00:50] [Server thread/ERROR]: java.lang.IllegalArgumentException: Unknown criterion trigger 'mymod:custom_trigger'
+[12:00:52] [Server thread/ERROR]: Tag 'mymod:blocks/needs_custom_tool' references unknown block 'mymod:missing_block'
+[12:00:53] [Server thread/WARN]: Removed 3 invalid entries from tag 'mymod:blocks/needs_custom_tool'
+[12:00:55] [Server thread/ERROR]: Failed to register dimension 'mymod:custom_dim'
+[12:00:55] [Server thread/ERROR]: java.lang.NullPointerException: DimensionType cannot be null
+[12:00:56] [Server thread/WARN]: Falling back to overworld for dimension 'mymod:custom_dim'
+[12:00:58] [Server thread/ERROR]: Exception loading structure 'mymod:custom_village'
+[12:00:58] [Server thread/ERROR]: java.io.FileNotFoundException: structures/mymod/custom_village.nbt (No such file or directory)
+[12:01:00] [Server thread/WARN]: Structure 'mymod:custom_village' will not generate
+[12:01:02] [Server thread/ERROR]: Failed to load biome 'mymod:crystal_forest'
+[12:01:02] [Server thread/ERROR]: com.google.gson.JsonSyntaxException: Expected ',' but was '}'
+[12:01:03] [Server thread/WARN]: Biome 'mymod:crystal_forest' replaced with plains
+[12:01:05] [Server thread/ERROR]: Exception in server tick loop
+[12:01:05] [Server thread/ERROR]: java.lang.StackOverflowError
+[12:01:05] [Server thread/ERROR]: 	at net.minecraft.world.chunk.Chunk.getBlockState(Chunk.java:344)
+[12:01:05] [Server thread/ERROR]: 	at net.minecraft.world.World.getBlockState(World.java:612)
+[12:01:05] [Server thread/ERROR]: 	at net.minecraft.world.World.getBlockState(World.java:612)
+[12:01:06] [Server thread/WARN]: Stack overflow detected, attempting recovery
+[12:01:08] [Server thread/ERROR]: Failed to recover from stack overflow, shutting down
+[12:01:10] [Server thread/INFO]: Stopping server
+[12:01:11] [Server thread/ERROR]: Failed to save player data for 'Alex'
+[12:01:11] [Server thread/ERROR]: java.io.IOException: Stream Closed
+[12:01:12] [Server thread/WARN]: Player data save skipped for 'Alex'
+[12:01:14] [Server thread/ERROR]: Failed to close region file region/r.12.34.mca
+[12:01:14] [Server thread/ERROR]: java.io.IOException: Channel already closed
+[12:01:15] [Server thread/INFO]: Server stopped
+[12:01:16] [main/ERROR]: Uncaught exception in thread "main"
+[12:01:16] [main/ERROR]: java.lang.IllegalStateException: Server crashed during shutdown
+[12:01:16] [main/ERROR]: 	at net.minecraft.server.Main.main(Main.java:145)
+[12:01:17] [main/WARN]: Crash report will be saved to crashes/crash-2024-01-15_12.01.17-server.txt
+[12:01:18] [main/ERROR]: Failed to write crash report
+[12:01:18] [main/ERROR]: java.io.IOException: No space left on device
+[12:01:19] [main/INFO]: Exiting
+[12:01:20] [main/ERROR]: JVM terminated with exit code 1
+[12:01:21] [main/ERROR]: java.lang.OutOfMemoryError: Metaspace
+[12:01:22] [main/ERROR]: java.lang.OutOfMemoryError: Direct buffer memory
+[12:01:23] [main/ERROR]: java.lang.OutOfMemoryError: unable to create native thread
+[12:01:24] [main/ERROR]: java.lang.OutOfMemoryError: GC overhead limit exceeded
+[12:01:25] [main/ERROR]: java.lang.StackOverflowError at net.minecraft.util.math.MathHelper.clamp
+[12:01:26] [main/ERROR]: java.lang.ArrayIndexOutOfBoundsException: Index -1 out of bounds for length 16
+[12:01:27] [main/ERROR]: java.lang.NegativeArraySizeException: -16
+[12:01:28] [main/ERROR]: java.lang.ClassCastException: class java.lang.String cannot be cast to class java.lang.Integer
+[12:01:29] [main/ERROR]: java.lang.NumberFormatException: For input string: "NaN"
+[12:01:30] [main/ERROR]: java.lang.IllegalArgumentException: Chunk coordinates out of range
+[12:01:31] [main/ERROR]: java.util.NoSuchElementException: No value present
+[12:01:32] [main/ERROR]: java.util.zip.ZipException: invalid entry CRC
+[12:01:33] [main/ERROR]: java.nio.file.AccessDeniedException: world/region/r.0.0.mca
+[12:01:34] [main/ERROR]: java.nio.file.NoSuchFileException: mods/mymod-1.0.jar
+[12:01:35] [main/ERROR]: java.net.UnknownHostException: session.minecraft.net
+[12:01:36] [main/ERROR]: java.net.SocketTimeoutException: Read timed out
+[12:01:37] [main/ERROR]: java.net.ConnectException: Connection refused
+[12:01:38] [main/ERROR]: javax.net.ssl.SSLHandshakeException: PKIX path building failed
+[12:01:39] [main/ERROR]: java.security.cert.CertificateExpiredException: Certificate expired
+[12:01:40] [main/ERROR]: java.lang.SecurityException: Permission denied
+[12:01:41] [main/ERROR]: java.lang.UnsatisfiedLinkError: no lwjgl in java.library.path
+[12:01:42] [main/ERROR]: java.lang.NoSuchFieldError: field_1234
+[12:01:43] [main/ERROR]: java.lang.AbstractMethodError: com/mymod/Foo.bar()V
+[12:01:44] [main/ERROR]: java.lang.IncompatibleClassChangeError: Found interface but class was expected
+[12:01:45] [main/ERROR]: java.lang.VerifyError: Bad type on operand stack
+[12:01:46] [main/ERROR]: java.lang.ClassFormatError: Truncated class file
+[12:01:47] [main/ERROR]: java.lang.UnsupportedClassVersionError: compiled with Java 21, runtime is Java 17
+[12:01:48] [main/ERROR]: java.lang.LinkageError: loader constraint violation
+[12:01:49] [main/ERROR]: java.lang.AssertionError: PalettedContainer size mismatch
+[12:01:50] [main/ERROR]: java.lang.InternalError: markStack overflow
+[12:01:51] [main/ERROR]: java.lang.ExceptionInInitializerError: null
+[12:01:52] [main/ERROR]: Caused by: java.lang.RuntimeException: Static initializer failed
+[12:01:53] [main/ERROR]: Caused by: java.lang.IllegalStateException: Registry already frozen
+[12:01:54] [main/WARN]: Forced registry unfreeze to recover
+[12:01:55] [main/ERROR]: Registry corruption detected in 'minecraft:item'
+[12:01:56] [main/ERROR]: java.lang.IllegalStateException: Duplicate registry entry 'minecraft:stone'
+[12:01:57] [main/WARN]: Removed duplicate entry 'minecraft:stone'
+[12:01:58] [main/ERROR]: Failed to reload resources
+[12:01:58] [main/ERROR]: java.lang.RuntimeException: Resource reload failed
+[12:01:59] [main/ERROR]: 	at net.minecraft.resource.SimpleResourceReload.reload(SimpleResourceReload.java:78)
+[12:02:00] [main/ERROR]: Caused by: java.io.IOException: Invalid pack.mcmeta
+[12:02:01] [main/WARN]: Resource pack 'mymod:resources' disabled
+[12:02:02] [main/ERROR]: Failed to load language file 'en_us.json' for mod 'mymod'
+[12:02:02] [main/ERROR]: com.google.gson.JsonSyntaxException: Unterminated string at line 42
+[12:02:03] [main/WARN]: Language file skipped, using fallback keys
+[12:02:04] [main/ERROR]: Failed to bake model 'mymod:block/custom_machine'
+[12:02:04] [main/ERROR]: java.lang.IllegalArgumentException: Unable to resolve texture 'mymod:block/missing_texture'
+[12:02:05] [main/WARN]: Model 'mymod:block/custom_machine' replaced with missing model
+[12:02:06] [main/ERROR]: Failed to compile shader 'mymod:custom_shader'
+[12:02:06] [main/ERROR]: org.lwjgl.opengl.GLException: Shader compilation failed: 0(12) : error C1008: undefined variable "vColor"
+[12:02:07] [main/WARN]: Shader 'mymod:custom_shader' disabled
+[12:02:08] [main/ERROR]: Particle 'mymod:sparkle' failed to spawn
+[12:02:08] [main/ERROR]: java.lang.NullPointerException: Particle texture is null
+[12:02:09] [main/WARN]: Particle 'mymod:sparkle' skipped
+[12:02:10] [main/ERROR]: Sound event 'mymod:ambient_hum' failed to play
+[12:02:10] [main/ERROR]: java.lang.IllegalArgumentException: Sound file not found: sounds/mymod/ambient_hum.ogg
+[12:02:11] [main/WARN]: Sound 'mymod:ambient_hum' disabled
+[12:02:12] [main/ERROR]: Network channel 'mymod:main' failed to register
+[12:02:12] [main/ERROR]: java.lang.IllegalStateException: Channel already registered
+[12:02:13] [main/WARN]: Packet handler for 'mymod:custom_packet' not found
+[12:02:14] [main/ERROR]: Failed to decode packet 'mymod:custom_packet'
+[12:02:14] [main/ERROR]: io.netty.handler.codec.DecoderException: java.lang.IndexOutOfBoundsException: readerIndex(12) + length(32) exceeds writerIndex(20)
+[12:02:15] [main/WARN]: Disconnecting client due to packet decode error
+[12:02:16] [main/ERROR]: Client connection lost: io.netty.channel.ChannelException: Connection reset by peer
+[12:02:17] [main/ERROR]: java.io.IOException: An existing connection was forcibly closed by the remote host
+[12:02:18] [main/WARN]: Reconnecting to server...
+[12:02:19] [main/ERROR]: Reconnect attempt 1 failed
+[12:02:20] [main/ERROR]: Reconnect attempt 2 failed
+[12:02:21] [main/ERROR]: Reconnect attempt 3 failed
+[12:02:22] [main/WARN]: Giving up reconnection after 3 attempts
+[12:02:23] [main/ERROR]: Failed to authenticate player 'Alex'
+[12:02:23] [main/ERROR]: com.mojang.authlib.exceptions.AuthenticationException: Invalid session
+[12:02:24] [main/WARN]: Player 'Alex' kicked: Invalid session
+[12:02:25] [main/ERROR]: Failed to load player skin for 'Steve'
+[12:02:25] [main/ERROR]: java.net.SocketTimeoutException: Connect timed out to textures.minecraft.net
+[12:02:26] [main/WARN]: Using default skin for 'Steve'
+[12:02:27] [main/ERROR]: Failed to load server icon
+[12:02:27] [main/ERROR]: javax.imageio.IIOException: Can't read input file!
+[12:02:28] [main/WARN]: Server icon disabled
+[12:02:29] [main/ERROR]: Failed to parse server.properties
+[12:02:29] [main/ERROR]: java.lang.IllegalArgumentException: Invalid value 'maybe' for property 'pvp'
+[12:02:30] [main/WARN]: Using default value for 'pvp'
+[12:02:31] [main/ERROR]: Failed to load ops.json
+[12:02:31] [main/ERROR]: com.google.gson.JsonSyntaxException: Expected BEGIN_ARRAY but was BEGIN_OBJECT
+[12:02:32] [main/WARN]: ops.json reset to empty
+[12:02:33] [main/ERROR]: Failed to load whitelist.json
+[12:02:33] [main/ERROR]: java.io.IOException: Unexpected end of file
+[12:02:34] [main/WARN]: whitelist.json reset to empty
+[12:02:35] [main/ERROR]: Failed to load banned-players.json
+[12:02:35] [main/ERROR]: com.google.gson.JsonSyntaxException: Malformed JSON
+[12:02:36] [main/WARN]: banned-players.json reset to empty
+[12:02:37] [main/ERROR]: Failed to load banned-ips.json
+[12:02:37] [main/ERROR]: java.io.FileNotFoundException: banned-ips.json
+[12:02:38] [main/WARN]: banned-ips.json created with empty list
+[12:02:39] [main/ERROR]: Failed to execute command 'worldborder set 100000000'
+[12:02:39] [main/ERROR]: java.lang.IllegalArgumentException: World border size too large
+[12:02:40] [main/WARN]: Command 'worldborder' aborted
+[12:02:41] [main/ERROR]: Failed to teleport entity 4f2a1c3e
+[12:02:41] [main/ERROR]: java.lang.IllegalArgumentException: Destination world not loaded
+[12:02:42] [main/WARN]: Entity teleport cancelled
+[12:02:43] [main/ERROR]: Failed to spawn entity 'mymod:custom_mob'
+[12:02:43] [main/ERROR]: java.lang.IllegalArgumentException: Entity type not registered
+[12:02:44] [main/WARN]: Spawn attempt for 'mymod:custom_mob' skipped
+[12:02:45] [main/ERROR]: Entity 'mymod:custom_mob' has invalid bounding box
+[12:02:45] [main/ERROR]: java.lang.IllegalArgumentException: Negative entity dimensions
+[12:02:46] [main/WARN]: Entity 'mymod:custom_mob' removed from world
+[12:02:47] [main/ERROR]: Pathfinding failed for entity 4f2a1c3e
+[12:02:47] [main/ERROR]: java.lang.IllegalStateException: Node not in graph
+[12:02:48] [main/WARN]: Entity stuck, resetting path
+[12:02:49] [main/ERROR]: Redstone update loop detected at [120, 64, -340]
+[12:02:49] [main/ERROR]: java.lang.StackOverflowError at net.minecraft.block.RedstoneWireBlock.update
+[12:02:50] [main/WARN]: Breaking redstone loop by removing block at [120, 64, -340]
+[12:02:51] [main/ERROR]: Fluid update loop detected at [88, 12, 200]
+[12:02:51] [main/ERROR]: java.lang.StackOverflowError at net.minecraft.fluid.FlowableFluid.update
+[12:02:52] [main/WARN]: Breaking fluid loop by removing block at [88, 12, 200]
+[12:02:53] [main/ERROR]: Failed to schedule block tick at [44, -19, 77]
+[12:02:53] [main/ERROR]: java.lang.IllegalArgumentException: Block position out of bounds
+[12:02:54] [main/WARN]: Block tick at [44, -19, 77] skipped
+[12:02:55] [main/ERROR]: Failed to load scheduled ticks for chunk [12, 34]
+[12:02:55] [main/ERROR]: java.io.IOException: Corrupt tick data
+[12:02:56] [main/WARN]: Scheduled ticks for chunk [12, 34] cleared
+[12:02:57] [main/ERROR]: Failed to load entity data for chunk [88, 12]
+[12:02:57] [main/ERROR]: java.io.IOException: Unexpected end of NBT stream
+[12:02:58] [main/WARN]: Entities in chunk [88, 12] dropped
+[12:02:59] [main/ERROR]: Failed to load block entity at [10, 64, 10]
+[12:02:59] [main/ERROR]: java.lang.NullPointerException: BlockEntityType is null
+[12:03:00] [main/WARN]: Block entity at [10, 64, 10] removed
+[12:03:01] [main/ERROR]: Failed to load POI data for chunk [44, -19]
+[12:03:01] [main/ERROR]: java.io.IOException: Corrupt POI data
+[12:03:02] [main/WARN]: POI data for chunk [44, -19] cleared
+[12:03:03] [main/ERROR]: Failed to load raids data
+[12:03:03] [main/ERROR]: com.google.gson.JsonSyntaxException: Expected NUMBER but was STRING
+[12:03:04] [main/WARN]: Raids data reset
+[12:03:05] [main/ERROR]: Failed to load scoreboard data
+[12:03:05] [main/ERROR]: java.io.IOException: Corrupt scoreboard NBT
+[12:03:06] [main/WARN]: Scoreboard data reset
+[12:03:07] [main/ERROR]: Failed to load map data 'map_0.dat'
+[12:03:07] [main/ERROR]: java.util.zip.ZipException: invalid stored block lengths
+[12:03:08] [main/WARN]: Map 'map_0' reset
+[12:03:09] [main/ERROR]: Failed to load advancement data for player 'Steve'
+[12:03:09] [main/ERROR]: com.google.gson.JsonSyntaxException: Expected BEGIN_ARRAY but was STRING
+[12:03:10] [main/WARN]: Advancement data for 'Steve' reset
+[12:03:11] [main/ERROR]: Failed to load statistics data for player 'Alex'
+[12:03:11] [main/ERROR]: java.io.IOException: Corrupt statistics file
+[12:03:12] [main/WARN]: Statistics data for 'Alex' reset
+[12:03:13] [main/ERROR]: Failed to load recipe book data for player 'Steve'
+[12:03:13] [main/ERROR]: java.lang.NullPointerException: Recipe book is null
+[12:03:14] [main/WARN]: Recipe book data for 'Steve' reset
+[12:03:15] [main/ERROR]: Failed to load inventory for player 'Alex'
+[12:03:15] [main/ERROR]: java.lang.IllegalArgumentException: Invalid item stack size 128
+[12:03:16] [main/WARN]: Inventory for 'Alex' reset
+[12:03:17] [main/ERROR]: Failed to load ender chest for player 'Steve'
+[12:03:17] [main/ERROR]: java.io.IOException: Corrupt ender chest NBT
+[12:03:18] [main/WARN]: Ender chest for 'Steve' reset
+[12:03:19] [main/ERROR]: Failed to load effects for player 'Alex'
+[12:03:19] [main/ERROR]: java.lang.IllegalArgumentException: Unknown effect 'mymod:custom_effect'
+[12:03:20] [main/WARN]: Effects for 'Alex' cleared
+[12:03:21] [main/ERROR]: Failed to load attributes for player 'Steve'
+[12:03:21] [main/ERROR]: java.lang.IllegalArgumentException: Unknown attribute 'mymod:custom_attribute'
+[12:03:22] [main/WARN]: Attributes for 'Steve' reset to default
+[12:03:23] [main/ERROR]: Failed to load permissions for player 'Alex'
+[12:03:23] [main/ERROR]: java.lang.IllegalStateException: Permission manager not initialized
+[12:03:24] [main/WARN]: Permissions for 'Alex' defaulted
+[12:03:25] [main/ERROR]: Failed to load economy data
+[12:03:25] [main/ERROR]: java.sql.SQLException: Database connection failed
+[12:03:26] [main/WARN]: Economy data unavailable, using defaults
+[12:03:27] [main/ERROR]: Failed to connect to MySQL server at localhost:3306
+[12:03:27] [main/ERROR]: com.mysql.cj.jdbc.exceptions.CommunicationsException: Communications link failure
+[12:03:28] [main/WARN]: Retrying MySQL connection in 5 seconds...
+[12:03:33] [main/ERROR]: MySQL reconnect attempt 1 failed
+[12:03:38] [main/ERROR]: MySQL reconnect attempt 2 failed
+[12:03:43] [main/ERROR]: MySQL reconnect attempt 3 failed
+[12:03:44] [main/WARN]: Giving up MySQL reconnection
+[12:03:45] [main/ERROR]: Failed to load plugin 'EssentialsX'
+[12:03:45] [main/ERROR]: java.lang.NoClassDefFoundError: org/bukkit/plugin/java/JavaPlugin
+[12:03:46] [main/WARN]: Plugin 'EssentialsX' disabled
+[12:03:47] [main/ERROR]: Failed to load plugin 'WorldEdit'
+[12:03:47] [main/ERROR]: java.lang.UnsupportedClassVersionError: com/sk89q/worldedit/bukkit/WorldEditPlugin has been compiled by a more recent version of the Java Runtime
+[12:03:48] [main/WARN]: Plugin 'WorldEdit' disabled
+[12:03:49] [main/ERROR]: Failed to load plugin 'Vault'
+[12:03:49] [main/ERROR]: java.lang.ClassNotFoundException: net/milkbowl/vault/Vault
+[12:03:50] [main/WARN]: Plugin 'Vault' disabled
+[12:03:51] [main/ERROR]: Plugin 'MyPlugin' threw an exception in onEnable
+[12:03:51] [main/ERROR]: java.lang.NullPointerException: Plugin instance is null
+[12:03:52] [main/WARN]: Plugin 'MyPlugin' disabled
+[12:03:53] [main/ERROR]: Plugin 'ChatMod' threw an exception in onDisable
+[12:03:53] [main/ERROR]: java.lang.IllegalStateException: Already disabled
+[12:03:54] [main/WARN]: Plugin 'ChatMod' force-disabled
+[12:03:55] [main/ERROR]: Event handler for 'PlayerJoinEvent' failed
+[12:03:55] [main/ERROR]: java.lang.NullPointerException: Player is null
+[12:03:56] [main/WARN]: Event handler for 'PlayerJoinEvent' unregistered
+[12:03:57] [main/ERROR]: Task 'MyPlugin-Task-1' threw an exception
+[12:03:57] [main/ERROR]: java.lang.ArrayIndexOutOfBoundsException: Index 10 out of bounds for length 5
+[12:03:58] [main/WARN]: Task 'MyPlugin-Task-1' cancelled
+[12:03:59] [main/ERROR]: Command 'mycommand' failed
+[12:03:59] [main/ERROR]: java.lang.IllegalArgumentException: Invalid argument
+[12:04:00] [main/WARN]: Command 'mycommand' aborted
+[12:04:01] [main/ERROR]: Permission check failed for 'myplugin.admin'
+[12:04:01] [main/ERROR]: java.lang.SecurityException: Access denied
+[12:04:02] [main/WARN]: Falling back to default permission
+[12:04:03] [main/ERROR]: Failed to load configuration 'config.yml'
+[12:04:03] [main/ERROR]: org.yaml.snakeyaml.error.YAMLException: Unable to find property 'invalid_key'
+[12:04:04] [main/WARN]: Configuration 'config.yml' reset to defaults
+[12:04:05] [main/ERROR]: Failed to save configuration 'config.yml'
+[12:04:05] [main/ERROR]: java.io.IOException: Permission denied
+[12:04:06] [main/WARN]: Configuration save skipped
+[12:04:07] [main/ERROR]: Failed to load locale file 'messages.properties'
+[12:04:07] [main/ERROR]: java.util.MissingResourceException: Can't find bundle
+[12:04:08] [main/WARN]: Locale file 'messages.properties' skipped
+[12:04:09] [main/ERROR]: Failed to send message to player 'Steve'
+[12:04:09] [main/ERROR]: java.lang.IllegalStateException: Player not online
+[12:04:10] [main/WARN]: Message to 'Steve' dropped
+[12:04:11] [main/ERROR]: Failed to kick player 'Alex'
+[12:04:11] [main/ERROR]: java.lang.IllegalStateException: Player already disconnected
+[12:04:12] [main/WARN]: Kick attempt for 'Alex' ignored
+[12:04:13] [main/ERROR]: Failed to ban player 'Steve'
+[12:04:13] [main/ERROR]: java.io.IOException: Unable to write banned-players.json
+[12:04:14] [main/WARN]: Ban attempt for 'Steve' failed
+[12:04:15] [main/ERROR]: Failed to load world 'world_nether'
+[12:04:15] [main/ERROR]: java.io.IOException: Region file header is corrupt
+[12:04:16] [main/WARN]: World 'world_nether' unavailable
+[12:04:17] [main/ERROR]: Failed to load world 'world_the_end'
+[12:04:17] [main/ERROR]: java.io.IOException: Missing level.dat
+[12:04:18] [main/WARN]: World 'world_the_end' unavailable
+[12:04:19] [main/ERROR]: Failed to unload chunk [12, 34]
+[12:04:19] [main/ERROR]: java.lang.IllegalStateException: Chunk still in use
+[12:04:20] [main/WARN]: Chunk [12, 34] forced unload
+[12:04:21] [main/ERROR]: Failed to compress chunk [88, 12]
+[12:04:21] [main/ERROR]: java.util.zip.DeflaterException: Compression failed
+[12:04:22] [main/WARN]: Chunk [88, 12] saved uncompressed
+[12:04:23] [main/ERROR]: Failed to defragment region file region/r.44.-19.mca
+[12:04:23] [main/ERROR]: java.io.IOException: Defragmentation aborted
+[12:04:24] [main/WARN]: Region file region/r.44.-19.mca left defragmented
+[12:04:25] [main/ERROR]: Watchdog thread detected server hang
+[12:04:25] [main/ERROR]: java.lang.ThreadDeath: Watchdog killed server thread
+[12:04:26] [main/WARN]: Server hung for 60 seconds, restarting
+[12:04:27] [main/ERROR]: Failed to restart server
+[12:04:27] [main/ERROR]: java.io.IOException: Unable to start process
+[12:04:28] [main/WARN]: Restart attempt failed, manual intervention required
+[12:04:29] [main/ERROR]: Crash report saved to crashes/crash-2024-01-15_12.04.29-server.txt
+[12:04:30] [main/ERROR]: Failed to upload crash report
+[12:04:30] [main/ERROR]: java.net.UnknownHostException: crash.minecraft.net
+[12:04:31] [main/WARN]: Crash report upload skipped
+[12:04:32] [main/ERROR]: Failed to write latest.log
+[12:04:32] [main/ERROR]: java.io.IOException: No space left on device
+[12:04:33] [main/ERROR]: Logger appender 'File' failed
+[12:04:33] [main/ERROR]: org.apache.logging.log4j.core.appender.AppenderLoggingException: Unable to write to file
+[12:04:34] [main/WARN]: Logger appender 'File' disabled
+[12:04:35] [main/ERROR]: Failed to shut down logger
+[12:04:35] [main/ERROR]: java.lang.IllegalStateException: Logger already stopped
+[12:04:36] [main/ERROR]: JVM shutdown hook failed
+[12:04:36] [main/ERROR]: java.lang.RuntimeException: Shutdown hook interrupted
+[12:04:37] [main/ERROR]: Final exit code: 1
+[12:04:38] [main/INFO]: JVM terminated
+[12:04:39] [main/ERROR]: Log file truncated due to fatal error
+[12:04:40] [main/ERROR]: Last write attempt failed
+[12:04:41] [main/ERROR]: java.io.IOException: Broken pipe
+[12:04:42] [main/ERROR]: Fallback logger failed
+[12:04:43] [main/ERROR]: java.lang.OutOfMemoryError: Java heap space (fallback)
+[12:04:44] [main/ERROR]: Recovery attempt 1 failed
+[12:04:45] [main/ERROR]: Recovery attempt 2 failed
+[12:04:46] [main/ERROR]: Recovery attempt 3 failed
+[12:04:47] [main/ERROR]: Giving up recovery after 3 attempts
+[12:04:48] [main/WARN]: Server marked as crashed
+[12:04:49] [main/ERROR]: Failed to notify administrators
+[12:04:49] [main/ERROR]: java.net.SocketTimeoutException: SMTP connection timed out
+[12:04:50] [main/WARN]: Administrator notification skipped
+[12:04:51] [main/ERROR]: Failed to update MOTD
+[12:04:51] [main/ERROR]: java.lang.IllegalArgumentException: MOTD too long
+[12:04:52] [main/WARN]: MOTD update skipped
+[12:04:53] [main/ERROR]: Failed to load favicon
+[12:04:53] [main/ERROR]: javax.imageio.IIOException: Unsupported image format
+[12:04:54] [main/WARN]: Favicon disabled
+[12:04:55] [main/ERROR]: Failed to load server properties backup
+[12:04:55] [main/ERROR]: java.io.FileNotFoundException: server.properties.bak
+[12:04:56] [main/WARN]: Server properties backup skipped
+[12:04:57] [main/ERROR]: Failed to verify world integrity
+[12:04:57] [main/ERROR]: java.lang.IllegalStateException: World integrity check failed
+[12:04:58] [main/WARN]: World integrity check skipped
+[12:04:59] [main/ERROR]: Failed to repair world
+[12:04:59] [main/ERROR]: java.lang.UnsupportedOperationException: Repair not implemented
+[12:05:00] [main/WARN]: World repair skipped
+[12:05:01] [main/ERROR]: Failed to generate backup
+[12:05:01] [main/ERROR]: java.io.IOException: Backup destination full
+[12:05:02] [main/WARN]: Backup skipped
+[12:05:03] [main/ERROR]: Failed to clean up temporary files
+[12:05:03] [main/ERROR]: java.nio.file.AccessDeniedException: temp/session.lock
+[12:05:04] [main/WARN]: Temporary files left behind
+[12:05:05] [main/ERROR]: Failed to release session lock
+[12:05:05] [main/ERROR]: java.io.IOException: Lock already released
+[12:05:06] [main/WARN]: Session lock release skipped
+[12:05:07] [main/ERROR]: Failed to flush remaining logs
+[12:05:07] [main/ERROR]: java.io.IOException: Stream closed
+[12:05:08] [main/WARN]: Remaining logs discarded
+[12:05:09] [main/ERROR]: Fatal error: Unable to recover from cascading failures
+[12:05:10] [main/ERROR]: System halted
