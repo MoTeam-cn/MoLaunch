@@ -12,6 +12,7 @@ pub mod language;
 pub mod launch;
 pub mod launcher_profiles;
 pub mod loaders;
+pub mod mods;
 pub mod online;
 pub mod resourcepack_options;
 pub mod skin;

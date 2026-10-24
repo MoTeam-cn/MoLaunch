@@ -11,6 +11,7 @@ use crate::utils::dispatcher::ActionRequest;
 pub mod archive;
 pub mod cleanup;
 pub mod crash_analyzer;
+pub mod crash_rules;
 mod dispatcher;
 pub mod download;
 pub mod filename;

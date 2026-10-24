@@ -5,6 +5,9 @@ use serde::{Deserialize, Serialize};
 pub struct CrashAnalyzeParams {
     /// 崩溃日志原文
     pub log_text: String,
+    /// 版本 ID（可选）：提供时会读取该版本的 mods 目录，用于反查可疑 mod
+    #[serde(default)]
+    pub version_id: Option<String>,
 }
 
 /// 崩溃日志分析结果
@@ -27,4 +30,16 @@ pub struct CrashAnalysisItem {
     pub detail: String,
     /// 中文修复建议
     pub suggestion: String,
+    /// 命中的规则 id（规则引擎产出时填充，兜底逻辑为空）
+    #[serde(default)]
+    pub rule_id: String,
+    /// 可执行的修复动作（由前端按 type 执行）
+    #[serde(default)]
+    pub actions: Vec<super::super::crash_rules::schema::CrashAction>,
+    /// 参考链接
+    #[serde(default)]
+    pub refs: Vec<String>,
+    /// 疑似相关的 mod 显示名（来自 mods 目录索引）
+    #[serde(default)]
+    pub suspects: Vec<String>,
 }

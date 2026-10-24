@@ -9,6 +9,15 @@ import { TOOLS_ACTIONS, toolsManager } from './core'
 
 // ==================== 崩溃日志分析 ====================
 
+/** 崩溃分析命中的修复动作（由前端按 type 执行） */
+export type CrashAction =
+  | { type: 'open_url'; url: string }
+  | { type: 'open_mods_dir' }
+  | { type: 'open_settings_java' }
+  | { type: 'open_settings_memory' }
+  | { type: 'set_java_version'; major: number }
+  | { type: 'set_memory'; mb: number }
+
 /** 单个崩溃分析条目 */
 export interface CrashAnalysisItem {
   /** 分类：java_version / missing_mod / memory / driver / mod_conflict / other */
@@ -21,6 +30,14 @@ export interface CrashAnalysisItem {
   detail: string
   /** 中文修复建议 */
   suggestion: string
+  /** 命中的规则 id（规则引擎产出时填充，兜底逻辑为空） */
+  ruleId?: string
+  /** 可执行的修复动作 */
+  actions?: CrashAction[]
+  /** 参考链接 */
+  refs?: string[]
+  /** 疑似相关的 mod 显示名 */
+  suspects?: string[]
 }
 
 /** 崩溃日志分析结果 */
@@ -28,9 +45,16 @@ export interface CrashAnalyzeResult {
   analyses: CrashAnalysisItem[]
 }
 
-/** 崩溃日志分析 */
-export function crashAnalyze(logText: string): Promise<CrashAnalyzeResult> {
-  return toolsManager<CrashAnalyzeResult>(TOOLS_ACTIONS.CRASH_ANALYZE, { log_text: logText })
+/**
+ * 崩溃日志分析
+ *
+ * `versionId` 提供时会读取该版本的 mods 目录，用于反查「疑似相关 mod」。
+ */
+export function crashAnalyze(logText: string, versionId?: string): Promise<CrashAnalyzeResult> {
+  return toolsManager<CrashAnalyzeResult>(TOOLS_ACTIONS.CRASH_ANALYZE, {
+    log_text: logText,
+    ...(versionId ? { version_id: versionId } : {}),
+  })
 }
 
 // ==================== 截图批量管理 ====================

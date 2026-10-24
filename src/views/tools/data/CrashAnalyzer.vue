@@ -15,6 +15,7 @@ import {
 const Button = defineAsyncComponent(() => import('@/components/common/Button.vue'))
 const Input = defineAsyncComponent(() => import('@/components/common/Input.vue'))
 import { SparklesIcon } from '@heroicons/vue/24/outline'
+import { open } from '@tauri-apps/plugin-shell'
 import { toastSuccess, toastError, toastInfo } from '@/utils/toast'
 import { crashAnalyze } from '@/utils/api/tools'
 import type { CrashAnalyzeResult } from '@/utils/api/tools'
@@ -67,7 +68,16 @@ async function runAnalyze() {
   }
 }
 
-function clearAll() {
+  /** 打开规则自带的参考链接（规则库内置 URL，属可信来源，不再二次确认） */
+  async function openRef(url: string) {
+    try {
+      await open(url)
+    } catch {
+      toastError('打开链接失败')
+    }
+  }
+
+  function clearAll() {
   logText.value = ''
   result.value = null
 }
@@ -129,6 +139,22 @@ function clearAll() {
             </div>
             <div v-if="item.suggestion" class="mt-1.5 text-xs text-green-600">
               建议：{{ item.suggestion }}
+            </div>
+            <!-- 规则引擎反查出的可疑 mod（来自该版本 mods 目录索引） -->
+            <div v-if="item.suspects && item.suspects.length" class="mt-1.5 text-xs text-amber-700">
+              疑似相关 mod：{{ item.suspects.join('、') }}
+            </div>
+            <!-- 规则自带的参考链接（Mojang bug、论坛帖等） -->
+            <div v-if="item.refs && item.refs.length" class="mt-1.5 flex flex-wrap gap-2">
+              <button
+                v-for="ref in item.refs"
+                :key="ref"
+                type="button"
+                class="text-xs text-primary-600 underline-offset-2 hover:underline"
+                @click="openRef(ref)"
+              >
+                参考链接
+              </button>
             </div>
           </div>
 

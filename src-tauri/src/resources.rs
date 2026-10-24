@@ -16,6 +16,8 @@ fn embedded_text(path: &str) -> Option<&'static str> {
         "defaults/instance.ini" => Some(include_str!("../resources/defaults/instance.ini")),
         "defaults/setup.ini" => Some(include_str!("../resources/defaults/setup.ini")),
         "moddata.txt" => Some(include_str!("../resources/moddata.txt")),
+        // 崩溃分析规则库（由 commands/tools/crash_rules 解析；改规则后重新编译即生效）
+        "crash_rules.json" => Some(include_str!("../resources/crash_rules.json")),
         // 关于页面数据（markdown 表格格式，由 commands/system/about.rs 解析）
         "about/acknowledgements.txt" => {
             Some(include_str!("../resources/about/acknowledgements.txt"))

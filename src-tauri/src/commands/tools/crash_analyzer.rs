@@ -7,6 +7,7 @@
 use crate::log_info;
 use crate::state::AppState;
 
+use super::crash_rules;
 use super::types::{CrashAnalysisItem, CrashAnalyzeParams, CrashAnalyzeResult};
 
 /// 分析崩溃日志文本，识别常见崩溃模式（纯文本、无状态，供命令与 AI 工具复用）
@@ -18,6 +19,34 @@ use super::types::{CrashAnalysisItem, CrashAnalyzeParams, CrashAnalyzeResult};
 /// - Mod 冲突：`MixinApplyError`/`Duplicate`/`Conflicting`
 /// - 其他：含 `Exception`/`Error`/`Crash`（仅未命中上述分类时）。空文本返回空。
 pub fn analyze_log_text(log_text: &str) -> Vec<CrashAnalysisItem> {
+    analyze_log_text_with_mods(log_text, None)
+}
+
+/// 分析崩溃日志，附带 mod 索引用于反查可疑 mod
+///
+/// 先用规则引擎（resources/crash_rules.json）匹配，未命中任何规则时回退到
+/// 内置的关键词兜底逻辑，保证不会因为规则库缺条目而完全没有结论。
+pub fn analyze_log_text_with_mods(
+    log_text: &str,
+    mod_index: Option<&std::collections::HashMap<String, String>>,
+) -> Vec<CrashAnalysisItem> {
+    if log_text.trim().is_empty() {
+        return Vec::new();
+    }
+    let matched = crash_rules::analyze(log_text, mod_index);
+    if !matched.is_empty() {
+        log_info!(
+            "[CrashAnalyzer] 规则引擎命中 {} 条（规则库 v{}）",
+            matched.len(),
+            crash_rules::rules_version()
+        );
+        return matched;
+    }
+    legacy_analyze(log_text)
+}
+
+/// 关键词兜底分析（规则库未命中时使用）
+fn legacy_analyze(log_text: &str) -> Vec<CrashAnalysisItem> {
     let mut analyses: Vec<CrashAnalysisItem> = Vec::new();
     if log_text.trim().is_empty() {
         return analyses;
@@ -37,6 +66,10 @@ pub fn analyze_log_text(log_text: &str) -> Vec<CrashAnalysisItem> {
             title: "Java 版本不匹配".to_string(),
             detail: find_relevant_line(&lines, "UnsupportedClassVersionError"),
             suggestion: "当前 Java 版本与 mod / 游戏所需的版本不一致。请在启动器设置中切换到更高（或更低）的 Java 版本，通常较新的 mod 需要更新版本的 Java。".to_string(),
+            rule_id: String::new(),
+            actions: Vec::new(),
+            refs: Vec::new(),
+            suspects: Vec::new(),
         });
     }
 
@@ -58,6 +91,10 @@ pub fn analyze_log_text(log_text: &str) -> Vec<CrashAnalysisItem> {
             title: "缺失 Mod 或 Mod 文件损坏".to_string(),
             detail,
             suggestion: "游戏引用的类 / 方法找不到，通常是缺少前置 mod 或 mod 文件损坏。请检查是否漏装了所需的前置 mod，或重新下载相关 mod。".to_string(),
+            rule_id: String::new(),
+            actions: Vec::new(),
+            refs: Vec::new(),
+            suspects: Vec::new(),
         });
     }
 
@@ -69,6 +106,10 @@ pub fn analyze_log_text(log_text: &str) -> Vec<CrashAnalysisItem> {
             title: "内存不足".to_string(),
             detail: find_relevant_line(&lines, "OutOfMemory"),
             suggestion: "JVM 堆内存不足导致崩溃。请在启动器版本设置中增大 Java 内存分配（如 4096MB 或更高），并确保电脑物理内存充足。".to_string(),
+            rule_id: String::new(),
+            actions: Vec::new(),
+            refs: Vec::new(),
+            suspects: Vec::new(),
         });
     }
 
@@ -84,6 +125,10 @@ pub fn analyze_log_text(log_text: &str) -> Vec<CrashAnalysisItem> {
             title: "显卡驱动 / 图形库问题".to_string(),
             detail: find_relevant_line(&lines, "GLFW"),
             suggestion: "图形相关错误，可能是显卡驱动过旧或不兼容。请更新显卡驱动到最新版本，或在启动器中尝试切换使用的显卡（集成显卡 / 独立显卡）。".to_string(),
+            rule_id: String::new(),
+            actions: Vec::new(),
+            refs: Vec::new(),
+            suspects: Vec::new(),
         });
     }
 
@@ -105,6 +150,10 @@ pub fn analyze_log_text(log_text: &str) -> Vec<CrashAnalysisItem> {
             title: "Mod 冲突".to_string(),
             detail,
             suggestion: "检测到 mod 之间存在冲突（如重复注册、Mixin 冲突）。请尝试逐个排查最近安装的 mod，移除冲突项或查看 mod 兼容性说明。".to_string(),
+            rule_id: String::new(),
+            actions: Vec::new(),
+            refs: Vec::new(),
+            suspects: Vec::new(),
         });
     }
 
@@ -125,6 +174,10 @@ pub fn analyze_log_text(log_text: &str) -> Vec<CrashAnalysisItem> {
             title: "检测到通用错误信息".to_string(),
             detail,
             suggestion: "日志中包含异常信息但未识别出具体模式。建议查看完整崩溃日志，或在社区反馈时附上完整日志以便进一步诊断。".to_string(),
+            rule_id: String::new(),
+            actions: Vec::new(),
+            refs: Vec::new(),
+            suspects: Vec::new(),
         });
     }
 
@@ -138,13 +191,32 @@ pub async fn analyze(
     state: &AppState,
     params: CrashAnalyzeParams,
 ) -> Result<serde_json::Value, String> {
-    let _ = state; // 纯文本分析，不使用 state
+    // state 仅用于按版本定位 mods 目录（可选）
     log_info!(
         "[CrashAnalyzer] 开始分析日志，长度 {} 字节",
         params.log_text.len()
     );
+    // 提供版本 ID 时读取该版本的 mods 目录，用于反查可疑 mod（读不到就退化为纯文本分析）
+    let mod_index = match params
+        .version_id
+        .as_ref()
+        .filter(|id| !id.trim().is_empty())
+    {
+        Some(version_id) => {
+            let game_dir = crate::state::resolve_game_dir_from_state(state).await;
+            let mods_dir = game_dir.join("versions").join(version_id).join("mods");
+            let index = crate::minecraft::mods::load_mod_index(&mods_dir);
+            if index.is_empty() {
+                None
+            } else {
+                Some(index)
+            }
+        }
+        None => None,
+    };
+
     let result = CrashAnalyzeResult {
-        analyses: analyze_log_text(&params.log_text),
+        analyses: analyze_log_text_with_mods(&params.log_text, mod_index.as_ref()),
     };
     serde_json::to_value(&result).map_err(|e| e.to_string())
 }
