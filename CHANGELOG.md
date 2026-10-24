@@ -4,6 +4,8 @@
 
 ## [Unreleased]
 
+## [0.3.12-rc.2] - 2026-10-24
+
 ### 修复
 
 #### 深色下弱提示文字看不清、主色不跟随（主页「1/3」「‹」「皮肤」等）
@@ -11,22 +13,30 @@
 - **根因一（文字灰被当背景压深）**（[`theme-dark.scss`](src/assets/styles/theme-dark.scss)）：变量重映射把 `gray-50~200` 压成 `#1c2027~#2a2f37`（它们主要当背景用），但同一批数字也常被当**弱提示文字**使用。实测截图像素：页码 `1/3` 只有 **1.91:1**、切换箭头 `‹` 只有 **1.56:1**，肉眼基本看不见。现在文字侧单独抬到可读区间（`text-gray-200` → 5.56:1、`300` → 6.22:1、`400` → 7.02:1、`500` → 7.82:1），并保持 50<100<…<900 亮度递增；圆点/滚动条这类非文字形状用的 `bg-gray-300` 抬到 **3.05:1**（WCAG 非文字 3:1）。
 - **根因二（主色钉死成蓝色）**（[`theme-dark.scss`](src/assets/styles/theme-dark.scss)）：`text-primary-500~800` 与 `bg-primary-50/100` 深色值写死了 `#6ea8ff` 与 `rgb(11 91 203 / .18)`，换紫色/绿色主色（动态主色）时串味——选中账号卡的强调字变成深紫压深底，实测 **2.11:1**。改用 `color-mix(in oklab, var(--color-primary-500) …)`，跟随主色提亮：紫主色下 6.14:1。
 - **守护测试**（[`dark-theme-coverage.test.ts`](src/assets/styles/__tests__/dark-theme-coverage.test.ts)）：新增「低端文字灰必须单独抬升」与「主色浅底/主色文字必须 color-mix 跟随动态主色、不得写死色值」两条用例。
+
 #### 弹窗与卡片在深色下仍是白底（`@apply bg-white` 绕过主题重映射）
 
 - **根因**（[`main.scss`](src/assets/styles/main.scss)）：`@utility card` 与 `@utility modal-body` 用 `@apply bg-white` 定义面板底色，编译成 `background-color: var(--color-white)`。而 `--color-white` **故意不随深色重映射**（彩色按钮上的 `text-white` 要靠它），`[data-theme='dark'] .bg-white` 那条规则也只对**真的带 `bg-white` 类名**的元素生效——组合工具类不吃这条规则，于是所有弹窗（皮肤与披风管理等）、抽屉里的卡片、`.card` 容器在深色下全是白底。
 - **改法**：两个组合类改为显式语义 token——`background-color: var(--surface-0)`、`border-color: var(--border-subtle)`，与 `Drawer.scss` 的 `var(--surface-pop)` 同源，深色自动跟随。
 - **守护测试**（[`dark-theme-coverage.test.ts`](src/assets/styles/__tests__/dark-theme-coverage.test.ts)）：新增「禁止 `@apply` 内联白色面板」用例；并把样式扫描范围从 `assets/styles/*.scss` 扩到 **`src` 下全部 `.scss`**——此前只扫 styles 目录，`components/**/*.scss`（如 `Drawer.scss`）是盲区。扫描前先剥注释，避免注释里的示例代码误判。
 - **验证**：真实 Chromium（headless）加载构建产物实测，深色下 `.modal-body` / `.card` 底色 `rgb(23,26,31)`、标题 `rgb(230,232,235)`、内层描边 `rgb(34,39,47)`、输入框 `rgb(31,36,43)`；浅色下仍为 `rgb(255,255,255)` / `rgb(242,243,245)`，无回归。
+
+## [0.3.12-rc.1] - 2026-10-24
+
+### 修复
+
 #### 设备认证时间戳改用服务端对齐时间（修复「时间戳超出容差范围」）
 
 - **问题**（[`helpers.rs`](src-tauri/src/minecraft/online/auth/helpers.rs)）：注册/登录/续期的 `timestamp` 参与 MoSign-v1 签名，此前直接用本机时钟（`chrono::Utc::now()`）。服务端按 `auth.timestamp_skew` 校验容差，客户端时钟一漂移（CMOS 掉电、手动改时区/夏令时、虚拟机挂起、系统时间被同步工具回拨）就被拒成「时间戳超出容差范围」，表现为注册/登录随机失败。
 - **改法**（[`time_sync.rs`](src-tauri/src/minecraft/online/time_sync.rs) 新增）：用已有的 `GET /v3/time` 计算「服务端 - 本机」偏移并缓存 10 分钟，`now_timestamp()` 改为读对齐后的 `server_now()`；注册、登录、静默注册、refresh 前调用 `ensure_fresh()`，并发调用只发一次请求。
 - **降级**：对齐失败只打 `warn` 并回落本机时钟——时间对齐是增强项，不能阻断认证流程；偏移超过 30 秒时日志会明确写出偏差秒数，便于排查客户端时钟异常。
 - **测试**（[`time_sync_test.rs`](src-tauri/src/minecraft/online/time_sync_test.rs) 新增）：偏移计算的正/负/零/极端值，以及未对齐时 `server_now()` 等于本机时间。
+
 #### 深色主题守护测试的类名匹配改为解析已有选择器（消除 code scanning 告警）
 
 - **问题**（[`dark-theme-coverage.test.ts`](src/assets/styles/__tests__/dark-theme-coverage.test.ts)）：守护测试原先「把工具类名拼成 CSS 选择器再 `includes`」，只转义了斜杠，属于不完整的字符串清洗，CodeQL `js/incomplete-sanitization` 报了 high。
 - **改法**：改为先从 `theme-dark.scss` 解析出「已覆盖的类名集合」（把 `bg-white\/80` 还原成 `bg-white/80`），再做集合判断，不再动态构造选择器。测试语义不变，4 条用例仍全绿。
+
 #### 安装 Fabric/Forge 时下载管理页提前退出，实际仍在后台安装
 
 - **根因**（[`install/flow.rs`](src-tauri/src/commands/version/install/flow.rs) / [`install/download.rs`](src-tauri/src/commands/version/install/download.rs)）：整合安装是「MC 本体下载 → 加载器安装 → 后处理 → Fabric API」多段流程，但面板显隐与 `is_active` 都只跟着**本体下载批次**走。本体下载一结束，`DownloadBatch` 释放面板计数并 emit `download-panel-state{visible:false}`，同时进度回调把 `download_state.is_active` 置 false；前端据此认为任务结束——`Downloads.vue` 的 `hasActiveDownload` 由 true 变 false 直接 `router.back()`，退出瞬间正好落在「加载器安装」阶段，于是表现为「刚进下载管理页、安装 Fabric 时就退出，但回去一看还在下」。重进页面同样被 `isDownloading()` 判成无任务，3 秒重试后再次弹回。
@@ -34,6 +44,7 @@
 - **活跃标记**（[`install/download.rs`](src-tauri/src/commands/version/install/download.rs)）：进度回调对 `is_active` 改成「只升不降」，本体下载收尾不再熄灭它；最终由 `mark_complete` / `mark_failed` 收尾，`isDownloading()` 在整个安装期间都是 true。
 - **前端兜底**（[`Downloads.vue`](src/views/Downloads.vue) / [`useDownloadPageRestore.ts`](src/composables/useDownloadPageRestore.ts) 新增 / [`downloadPageGuard.ts`](src/utils/downloadPageGuard.ts) 新增）：前端状态熄灭后不再立刻退回，而是回问一次后端——`restoreDownloadFromBackend()` 重新拉取真实进度写回 store；只有前后端都确认结束才 `router.back()`，查询失败时保守留在页面。用户主动取消时跳过该判定直接返回。进页面的 3 秒重试同样复用这套恢复逻辑。
 - **测试**（[`download-page-guard.test.ts`](src/utils/__tests__/download-page-guard.test.ts) 新增）：覆盖四种空闲判定（前端仍在下载 / 后端仍在跑 / 后端查询失败 / 前后端都结束）。
+
 #### 深色主题下仍出现白底卡片与看不清的浅字（中性色改为变量统一重映射）
 
 - **根因**（[`theme-dark.scss`](src/assets/styles/theme-dark.scss)）：上一轮只按「用到的类名」逐条写了 `bg-white` / `text-gray-*` / `border-gray-*` 的深色覆盖，覆盖网是枚举出来的，必然有漏。实测漏在三类写法上：① 渐变端点 `bg-linear-to-br from-gray-50 to-white`（首页时钟卡整块发白）；② 带透明度的类 `bg-white/80`、`bg-gray-50/50`，Tailwind v4 把它们编译成字面色值 `#fffc`，变量根本管不到；③ `text-gray-300/200`、`bg-gray-300/400/500`、`divide-gray-100`、`ring-gray-100/200` 从未写过覆盖，深色下是亮白分隔线与亮白圆点。
