@@ -4,12 +4,14 @@
 
 ## [Unreleased]
 
+## [0.3.11-rc.7] - 2026-10-24
+
+### 修复
+
 #### 更新检查通道改为「最低可接受等级」，测试版用户不再错过正式版
 
 - **GitHub 备用源**（[github.rs](src-tauri/src/commands/system/updater/github.rs) / [github_test.rs](src-tauri/src/commands/system/updater/github_test.rs)）：备用源此前只读请求通道对应的清单（`channel-beta` / `channel-alpha`），正式版更新后测试版用户从备用源同样拿不到更新。现按通道层级（beta → beta + stable，alpha → 三档全部）取版本号更高的条目，并返回实际命中的通道；与云端「最低可接受等级」语义保持一致。
 - **通道标注**（[check.rs](src-tauri/src/commands/system/updater/check.rs) / [api.rs](src-tauri/src/commands/system/updater/api.rs) / [state.ts](src/utils/updater/state.ts) / [check.ts](src/utils/updater/check.ts) / [UpdateDialog.vue](src/components/about/UpdateDialog.vue)）：更新信息新增 `channel` 字段，更新弹窗在版本号旁标注「正式版 / 测试版 / 内测版」，测试版用户被带上正式版时不会误以为下错了包。
-
-### 修复
 
 #### 崩溃日志本地引擎改为「证据驱动」，修掉 10 类误报与漏报
 
