@@ -29,6 +29,13 @@ export interface ListField {
   format?: ValueFormat
 }
 
+/** 按钮动作：启动游戏 / 打开链接 / 切换页面 / 复制文本 */
+export type ButtonAction =
+  | { type: 'launch'; version?: string }
+  | { type: 'open_url'; url: string }
+  | { type: 'navigate'; path: string }
+  | { type: 'copy'; text: string }
+
 /** 布局 section 联合类型 */
 export type LayoutSection =
   | { type: 'stat-grid'; columns?: number; items: StatItem[] }
@@ -36,6 +43,15 @@ export type LayoutSection =
   | { type: 'progress'; label?: string; value: string; max?: string; color?: string; format?: ValueFormat }
   | { type: 'text'; content: string; variant?: 'default' | 'muted' | 'warning' }
   | { type: 'divider' }
+  | {
+      type: 'button'
+      /** 按钮文字 */
+      label: string
+      /** 点击后执行的动作 */
+      action: ButtonAction
+      /** 视觉样式（默认 outline） */
+      variant?: 'primary' | 'outline'
+    }
   | {
       type: 'html'
       /** HTML 内容（内联字符串） */

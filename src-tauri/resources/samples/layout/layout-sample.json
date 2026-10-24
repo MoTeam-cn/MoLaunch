@@ -6,9 +6,23 @@
       "type": "stat-grid",
       "columns": 3,
       "items": [
-        { "label": "缓存占用", "value": "{{cache.totalSize}}", "format": "bytes", "color": "primary" },
-        { "label": "内存使用率", "value": "{{system.usagePercent}}", "format": "percent", "color": "green" },
-        { "label": "已装版本", "value": "{{versions.count}}", "format": "number" }
+        {
+          "label": "缓存占用",
+          "value": "{{cache.totalSize}}",
+          "format": "bytes",
+          "color": "primary"
+        },
+        {
+          "label": "内存使用率",
+          "value": "{{system.usagePercent}}",
+          "format": "percent",
+          "color": "green"
+        },
+        {
+          "label": "已装版本",
+          "value": "{{versions.count}}",
+          "format": "number"
+        }
       ]
     },
     {
@@ -30,11 +44,40 @@
       "title": "最近启动",
       "source": "history.recent",
       "fields": [
-        { "key": "version_id", "label": "版本" },
-        { "key": "launch_time", "label": "时间", "format": "datetime" }
+        {
+          "key": "version_id",
+          "label": "版本"
+        },
+        {
+          "key": "launch_time",
+          "label": "时间",
+          "format": "datetime"
+        }
       ]
     },
-    { "type": "divider" },
-    { "type": "text", "content": "数据每 3 秒自动刷新", "variant": "muted" }
+    {
+      "type": "divider"
+    },
+    {
+      "type": "text",
+      "content": "数据每 3 秒自动刷新",
+      "variant": "muted"
+    },
+    {
+      "type": "button",
+      "label": "启动当前版本",
+      "variant": "primary",
+      "action": {
+        "type": "launch"
+      }
+    },
+    {
+      "type": "button",
+      "label": "打开 MC 百科",
+      "action": {
+        "type": "open_url",
+        "url": "https://zh.minecraft.wiki/"
+      }
+    }
   ]
 }

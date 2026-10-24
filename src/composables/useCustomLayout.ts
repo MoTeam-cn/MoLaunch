@@ -24,7 +24,7 @@ export function useCustomLayout() {
   const inlinePlaceholder = computed(() => {
     switch (customConfig.value.format) {
       case 'json':
-        return '{\n  "title": "我的面板",\n  "sections": [\n    { "type": "text", "content": "Hello" }\n  ]\n}'
+        return '{\n  "title": "我的面板",\n  "sections": [\n    { "type": "text", "content": "Hello" },\n    { "type": "button", "label": "启动游戏", "variant": "primary", "action": { "type": "launch" } }\n  ]\n}'
       case 'xml':
         return '<panel title="我的面板">\n  <text>Hello</text>\n</panel>'
       case 'html':

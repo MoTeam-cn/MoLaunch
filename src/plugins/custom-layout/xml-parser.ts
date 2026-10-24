@@ -1,5 +1,14 @@
-import type { LayoutSchema, ListField, LayoutSection, ParseResult, StatItem, ValueFormat } from './types'
-import { VALID_COLORS, VALID_FORMATS, VALID_SECTION_TYPES, VALID_VARIANTS, type SectionError, type SectionResult } from './schema-types'
+import type { ButtonAction, LayoutSchema, ListField, LayoutSection, ParseResult, StatItem, ValueFormat } from './types'
+import {
+  ALLOWED_NAV_PATHS,
+  VALID_ACTION_TYPES,
+  VALID_COLORS,
+  VALID_FORMATS,
+  VALID_SECTION_TYPES,
+  VALID_VARIANTS,
+  type SectionError,
+  type SectionResult,
+} from './schema-types'
 
 /**
  * 解析 XML 布局
@@ -68,6 +77,8 @@ function parseXmlNode(type: string, el: Element): SectionResult | SectionError {
       return { section: { type: 'divider' } }
     case 'html':
       return parseHtmlXml(el)
+    case 'button':
+      return parseButtonXml(el)
     default:
       return { error: `未知节点 <${type}>` }
   }
@@ -165,6 +176,55 @@ function parseTextXml(el: Element): SectionResult | SectionError {
   const variant = el.getAttribute('variant')
   if (variant && VALID_VARIANTS.has(variant)) {
     section.variant = variant as 'default' | 'muted' | 'warning'
+  }
+  return { section }
+}
+
+/** 解析 <button> 节点 */
+function parseButtonXml(el: Element): SectionResult | SectionError {
+  const label = (el.getAttribute('label') ?? '').trim()
+  if (!label) {
+    return { error: 'button 缺少 label 属性' }
+  }
+  const actionType = (el.getAttribute('action') ?? '').trim()
+  if (!VALID_ACTION_TYPES.has(actionType)) {
+    return { error: `button 动作类型无效：${actionType}` }
+  }
+  let action: ButtonAction
+  switch (actionType) {
+    case 'launch': {
+      const version = (el.getAttribute('version') ?? '').trim()
+      action = version ? { type: 'launch', version } : { type: 'launch' }
+      break
+    }
+    case 'open_url': {
+      const url = (el.getAttribute('url') ?? '').trim()
+      if (!/^https?:\/\//i.test(url)) {
+        return { error: 'button 的 url 必须是 http(s) 地址' }
+      }
+      action = { type: 'open_url', url }
+      break
+    }
+    case 'navigate': {
+      const path = (el.getAttribute('path') ?? '').trim()
+      if (!ALLOWED_NAV_PATHS.has(path)) {
+        return { error: `button 的 path 不在允许列表内：${path}` }
+      }
+      action = { type: 'navigate', path }
+      break
+    }
+    default: {
+      const text = el.getAttribute('text') ?? ''
+      if (!text) {
+        return { error: 'button 的 copy 动作缺少 text 属性' }
+      }
+      action = { type: 'copy', text }
+    }
+  }
+  const section: LayoutSection = { type: 'button', label, action }
+  const variant = el.getAttribute('variant')
+  if (variant === 'primary' || variant === 'outline') {
+    section.variant = variant
   }
   return { section }
 }

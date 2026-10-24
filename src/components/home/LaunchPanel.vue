@@ -6,12 +6,14 @@
  * - 底部：版本选择 + 版本设置 + 启动按钮
  */
 
-import { computed, defineAsyncComponent } from 'vue'
+import { computed, defineAsyncComponent, onMounted, onUnmounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { ShieldCheckIcon, ServerStackIcon, UserIcon } from '@heroicons/vue/24/outline'
 import { ArrowPathIcon, PlayIcon, StopIcon } from '@heroicons/vue/24/solid'
 import { useAuthStore } from '@/stores/auth'
 import { useVersionStore } from '@/stores/version'
+import { applyConfig } from '@/utils/api/config'
+import { LAUNCH_REQUEST_EVENT } from '@/utils/custom-layout-actions'
 import { toastError, toastWarning, toastSuccess, toastInfo } from '@/utils/toast'
 const AccountSelector = defineAsyncComponent(() => import('./AccountSelector.vue'))
 const VersionSelector = defineAsyncComponent(() => import('./VersionSelector.vue'))
@@ -88,6 +90,25 @@ async function handleLaunch() {
     }
   }
 }
+/**
+ * 自定义布局按钮请求启动游戏
+ *
+ * 布局里声明的 version 与当前选中版本不同时，先写回配置并重新读取，再走正常启动流程，
+ * 保证启动参数（账号 / Java / 内存）仍由启动面板统一组装。
+ */
+async function onLaunchRequest(event: Event) {
+  const detail = (event as CustomEvent<{ version?: string }>).detail
+  const requested = detail?.version?.trim()
+  if (requested && requested !== versionStore.selectedVersion) {
+    await applyConfig({ selectedVersion: requested })
+    await versionStore.restoreSelectedVersionFast()
+  }
+  await handleLaunch()
+}
+
+onMounted(() => window.addEventListener(LAUNCH_REQUEST_EVENT, onLaunchRequest))
+onUnmounted(() => window.removeEventListener(LAUNCH_REQUEST_EVENT, onLaunchRequest))
+
 </script>
 
 <template>

@@ -1,5 +1,14 @@
-import type { LayoutSchema, ListField, LayoutSection, ParseResult, StatItem, ValueFormat } from './types'
-import { VALID_COLORS, VALID_FORMATS, VALID_SECTION_TYPES, VALID_VARIANTS, type SectionError, type SectionResult } from './schema-types'
+import type { ButtonAction, LayoutSchema, ListField, LayoutSection, ParseResult, StatItem, ValueFormat } from './types'
+import {
+  ALLOWED_NAV_PATHS,
+  VALID_ACTION_TYPES,
+  VALID_COLORS,
+  VALID_FORMATS,
+  VALID_SECTION_TYPES,
+  VALID_VARIANTS,
+  type SectionError,
+  type SectionResult,
+} from './schema-types'
 
 /**
  * 解析 JSON 布局
@@ -70,6 +79,8 @@ function parseSection(type: string, s: Record<string, unknown>): SectionResult |
       return parseTextJson(s)
     case 'divider':
       return { section: { type: 'divider' } }
+    case 'button':
+      return parseButtonJson(s)
     case 'html':
       return parseHtmlJson(s)
     default:
@@ -173,4 +184,63 @@ function parseTextJson(s: Record<string, unknown>): SectionResult | SectionError
     section.variant = s.variant as 'default' | 'muted' | 'warning'
   }
   return { section }
+}
+
+/** 解析 button section（JSON） */
+function parseButtonJson(s: Record<string, unknown>): SectionResult | SectionError {
+  const label = typeof s.label === 'string' ? s.label.trim() : ''
+  if (!label) {
+    return { error: 'button 缺少 label' }
+  }
+  const rawAction = s.action as Record<string, unknown> | undefined
+  if (!rawAction || typeof rawAction !== 'object') {
+    return { error: 'button 缺少 action' }
+  }
+  const parsed = parseActionJson(rawAction)
+  if ('error' in parsed) {
+    return parsed
+  }
+  const section: LayoutSection = { type: 'button', label, action: parsed.action }
+  const variant = String(s.variant ?? '')
+  if (variant === 'primary' || variant === 'outline') {
+    section.variant = variant
+  }
+  return { section }
+}
+
+/** 解析按钮动作（JSON），动作参数非法时返回错误 */
+function parseActionJson(raw: Record<string, unknown>): { action: ButtonAction } | SectionError {
+  const type = String(raw.type ?? '')
+  if (!VALID_ACTION_TYPES.has(type)) {
+    return { error: `button 动作类型无效：${type}` }
+  }
+  switch (type) {
+    case 'launch': {
+      const version = typeof raw.version === 'string' && raw.version.trim() ? raw.version.trim() : undefined
+      return { action: version ? { type: 'launch', version } : { type: 'launch' } }
+    }
+    case 'open_url': {
+      const url = typeof raw.url === 'string' ? raw.url.trim() : ''
+      if (!/^https?:\/\//i.test(url)) {
+        return { error: 'button 的 url 必须是 http(s) 地址' }
+      }
+      return { action: { type: 'open_url', url } }
+    }
+    case 'navigate': {
+      const path = typeof raw.path === 'string' ? raw.path.trim() : ''
+      if (!ALLOWED_NAV_PATHS.has(path)) {
+        return { error: `button 的 path 不在允许列表内：${path}` }
+      }
+      return { action: { type: 'navigate', path } }
+    }
+    case 'copy': {
+      const text = typeof raw.text === 'string' ? raw.text : ''
+      if (!text) {
+        return { error: 'button 的 copy 动作缺少 text' }
+      }
+      return { action: { type: 'copy', text } }
+    }
+    default:
+      return { error: `button 动作类型无效：${type}` }
+  }
 }

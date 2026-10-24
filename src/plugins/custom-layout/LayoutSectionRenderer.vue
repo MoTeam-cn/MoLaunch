@@ -26,6 +26,8 @@ import {
   formatFieldValue,
 } from './renderHelpers'
 import { renderHtmlShadow } from './htmlShadowRenderer'
+import { useRouter } from 'vue-router'
+import { runLayoutAction } from '@/utils/custom-layout-actions'
 
 const props = defineProps<{
   /** 当前 section 配置 */
@@ -33,6 +35,14 @@ const props = defineProps<{
   /** 数据上下文（用于解析插值） */
   dataCtx: DataContext
 }>()
+
+const router = useRouter()
+
+/** 点击按钮：执行布局里声明的动作（启动 / 打开链接 / 切换页面 / 复制） */
+async function onClickButton() {
+  if (props.section.type !== 'button') return
+  await runLayoutAction(props.section.action, router)
+}
 </script>
 
 <template>
@@ -127,6 +137,19 @@ const props = defineProps<{
   >
     {{ props.section.content }}
   </p>
+
+  <!-- 按钮（交互层：启动游戏 / 打开链接 / 切换页面 / 复制文本） -->
+  <button
+    v-else-if="props.section.type === 'button'"
+    type="button"
+    class="inline-flex h-8 items-center justify-center rounded-sm border px-3 text-xs font-medium transition-colors"
+    :class="props.section.variant === 'primary'
+      ? 'border-primary-500 bg-primary-500 text-white hover:bg-primary-400'
+      : 'border-gray-300 bg-white text-gray-700 hover:border-primary-400 hover:text-primary-600'"
+    @click="onClickButton"
+  >
+    {{ props.section.label }}
+  </button>
 
   <!-- 分割线 -->
   <hr v-else-if="props.section.type === 'divider'" class="border-gray-200" />
