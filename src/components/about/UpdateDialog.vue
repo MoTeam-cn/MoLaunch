@@ -88,6 +88,20 @@ function onVisibleChange(v: boolean) {
   if (!v && canClose.value) closeDialog()
 }
 
+/** 新版本通道标签：beta 客户端收到正式版时会显示「正式版」，避免用户以为下错了包 */
+const channelTag = computed<{ text: string; color: string } | null>(() => {
+  switch (updateState.channel) {
+    case 'stable':
+      return { text: '正式版', color: 'green' }
+    case 'beta':
+      return { text: '测试版', color: 'gold' }
+    case 'alpha':
+      return { text: '内测版', color: 'gold' }
+    default:
+      return null
+  }
+})
+
 /** 下载进度百分比（0-100），total 未知时返回 null（indeterminate） */
 const progressPct = computed(() => {
   if (updateState.total <= 0) return null
@@ -147,6 +161,7 @@ function onRetry() {
       <div class="flex items-center gap-2 py-1 text-sm">
         <span class="text-gray-500">最新版本：</span>
         <span class="font-semibold text-primary-600">v{{ updateState.version }}</span>
+        <Tag v-if="channelTag" size="small" :color="channelTag.color">{{ channelTag.text }}</Tag>
         <span v-if="updateState.forceUpdate" class="ml-1">
           <Tag size="small" color="red">强制更新</Tag>
         </span>

@@ -38,13 +38,35 @@ pub(super) fn platform_key(os: &str, arch: &str) -> String {
     }
 }
 
-/// 从清单中挑出指定通道的条目；通道缺失或非法时回退 stable
-pub(super) fn pick_channel_entry<'a>(manifest: &'a Value, channel: &str) -> Option<&'a Value> {
+/// 从清单中挑出「版本号更高」的通道条目，返回 (条目, 实际通道)
+///
+/// 候选来自通道层级（beta → beta + stable，alpha → 三档全部），所以正式版发布后
+/// 测试版用户也能拿到正式版；版本号相同（或无法比较）时优先请求通道。
+pub(super) fn pick_best_channel_entry<'a>(
+    manifest: &'a Value,
+    channel: &str,
+) -> Option<(&'a Value, &'static str)> {
     let channels = manifest.get("channels")?;
-    channels
-        .get(channel)
-        .filter(|v| v.is_object())
-        .or_else(|| channels.get("stable").filter(|v| v.is_object()))
+    let mut best: Option<(&'a Value, &'static str)> = None;
+    for &name in super::check::channel_tiers(channel) {
+        let Some(entry) = channels.get(name).filter(|v| v.is_object()) else {
+            continue;
+        };
+        let version = entry.get("version").and_then(|v| v.as_str()).unwrap_or("");
+        match best {
+            None => best = Some((entry, name)),
+            Some((current, _)) => {
+                let current_version = current
+                    .get("version")
+                    .and_then(|v| v.as_str())
+                    .unwrap_or("");
+                if super::check::is_version_newer(version, current_version) {
+                    best = Some((entry, name));
+                }
+            }
+        }
+    }
+    best
 }
 
 /// 从通道条目里取指定平台的下载信息（地址 + 可选签名）
@@ -98,10 +120,17 @@ pub(super) async fn check_github(
         .await
         .map_err(|e| format!("检查更新失败：解析 GitHub 清单失败: {}", e))?;
 
-    let Some(entry) = pick_channel_entry(&manifest, channel) else {
+    let Some((entry, served_channel)) = pick_best_channel_entry(&manifest, channel) else {
         log_warn!("[Updater] GitHub 清单缺少通道 {} 且无 stable 回退", channel);
         return Ok(UpdateInfo::default());
     };
+    if served_channel != channel {
+        log_info!(
+            "[Updater] GitHub 清单跨通道命中：请求 {} → 实际 {}",
+            channel,
+            served_channel
+        );
+    }
 
     let version = entry.get("version").and_then(|v| v.as_str()).unwrap_or("");
     if version.is_empty() {
@@ -142,6 +171,7 @@ pub(super) async fn check_github(
             .unwrap_or(false),
         download_url: download_url.to_string(),
         signature: signature.to_string(),
+        channel: served_channel.to_string(),
     })
 }
 

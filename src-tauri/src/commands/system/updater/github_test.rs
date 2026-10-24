@@ -1,6 +1,6 @@
 //! github 模块单元测试（纯函数：清单地址、平台键、通道与平台挑选）
 
-use super::{manifest_url, pick_channel_entry, pick_platform, platform_key};
+use super::{manifest_url, pick_best_channel_entry, pick_platform, platform_key};
 use serde_json::json;
 
 #[test]
@@ -28,33 +28,49 @@ fn test_platform_key_maps_os_and_arch() {
 }
 
 #[test]
-fn test_pick_channel_entry_prefers_requested_channel() {
+fn test_pick_best_channel_entry_prefers_newer_channel() {
     let manifest = json!({
         "channels": {
             "stable": { "version": "0.4.0" },
             "beta": { "version": "0.4.1-beta.1" }
         }
     });
-    let entry = pick_channel_entry(&manifest, "beta").expect("beta 通道应命中");
+    let (entry, served) = pick_best_channel_entry(&manifest, "beta").expect("beta 通道应命中");
     assert_eq!(
         entry.get("version").and_then(|v| v.as_str()),
         Some("0.4.1-beta.1")
     );
+    assert_eq!(served, "beta");
 }
 
 #[test]
-fn test_pick_channel_entry_falls_back_to_stable() {
+fn test_pick_best_channel_entry_picks_stable_when_newer() {
+    // 测试版用户遇到更高的正式版：必须拿到正式版
+    let manifest = json!({
+        "channels": {
+            "stable": { "version": "0.4.0" },
+            "beta": { "version": "0.3.9-rc.4" }
+        }
+    });
+    let (entry, served) = pick_best_channel_entry(&manifest, "beta").expect("应命中 stable");
+    assert_eq!(entry.get("version").and_then(|v| v.as_str()), Some("0.4.0"));
+    assert_eq!(served, "stable");
+}
+
+#[test]
+fn test_pick_best_channel_entry_falls_back_to_stable() {
     let manifest = json!({
         "channels": { "stable": { "version": "0.4.0" } }
     });
-    let entry = pick_channel_entry(&manifest, "alpha").expect("缺通道应回退 stable");
+    let (entry, served) = pick_best_channel_entry(&manifest, "alpha").expect("缺通道应回退 stable");
     assert_eq!(entry.get("version").and_then(|v| v.as_str()), Some("0.4.0"));
+    assert_eq!(served, "stable");
 }
 
 #[test]
-fn test_pick_channel_entry_without_channels_returns_none() {
+fn test_pick_best_channel_entry_without_channels_returns_none() {
     let manifest = json!({ "version": "0.4.0" });
-    assert!(pick_channel_entry(&manifest, "stable").is_none());
+    assert!(pick_best_channel_entry(&manifest, "stable").is_none());
 }
 
 #[test]

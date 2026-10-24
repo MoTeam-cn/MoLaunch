@@ -29,6 +29,11 @@ pub struct UpdateInfo {
     /// 签名（base64，Windows 预留验签用）
     #[serde(default)]
     pub signature: String,
+    /// 该版本所属通道：`stable` / `beta` / `alpha`
+    ///
+    /// beta 客户端收到正式版时这里是 `stable`，供界面标注「正式版」。
+    #[serde(default)]
+    pub channel: String,
 }
 
 /// 待安装更新状态（`pending_update_status` 返回）

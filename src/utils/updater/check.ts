@@ -34,6 +34,7 @@ export async function checkForUpdate(opts: { silent?: boolean } = {}): Promise<v
       updateState.version = info.version
       updateState.notes = info.notes ?? ''
       updateState.forceUpdate = info.forceUpdate === true
+      updateState.channel = info.channel ?? ''
       updateState.downloaded = 0
       updateState.total = 0
       updateState.error = ''
@@ -148,6 +149,7 @@ async function silentCheckAndDownload(): Promise<void> {
         // 更新状态供 UI 展示（如有更新提示组件）
         updateState.version = info.version
         updateState.notes = info.notes ?? ''
+        updateState.channel = info.channel ?? ''
         // 抽屉正开着且就是这个版本：同步切到「待重启」，避免按钮仍停留在「立即更新」
         if (
           updateState.showDialog &&

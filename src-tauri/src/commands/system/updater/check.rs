@@ -22,6 +22,18 @@ const UPDATE_CHECK_TIMEOUT: std::time::Duration = std::time::Duration::from_secs
 fn platform_target() -> &'static str {
     std::env::consts::OS
 }
+/// 通道层级：请求通道 → 允许的候选通道（由激进到稳定）
+///
+/// 与云端一致：通道是「最低可接受等级」而非精确匹配，测试版用户必须能收到
+/// 正式版，否则正式版发布后会一直卡在测试版旧版本上。
+pub(super) fn channel_tiers(channel: &str) -> &'static [&'static str] {
+    match channel {
+        "alpha" => &["alpha", "beta", "stable"],
+        "beta" => &["beta", "stable"],
+        _ => &["stable"],
+    }
+}
+
 /// 判断 manifest 版本是否高于 current 版本
 ///
 /// 支持 pre-release 段（rc/beta/alpha 等），如 0.3.5-rc7 > 0.3.5-rc6。
@@ -284,6 +296,12 @@ async fn check_api(
         download_url,
         signature: manifest
             .get("signature")
+            .and_then(|v| v.as_str())
+            .unwrap_or("")
+            .to_string(),
+        // 该版本所属通道：beta 客户端收到正式版时这里是 stable
+        channel: manifest
+            .get("channel")
             .and_then(|v| v.as_str())
             .unwrap_or("")
             .to_string(),

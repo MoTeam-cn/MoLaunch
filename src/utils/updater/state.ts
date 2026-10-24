@@ -27,6 +27,8 @@ export interface UpdateInfo {
   forceUpdate: boolean
   downloadUrl: string
   signature: string
+  /** 该版本所属通道（stable / beta / alpha）；beta 客户端收到正式版时为 stable */
+  channel?: string
 }
 
 export interface UpdateState {
@@ -38,6 +40,8 @@ export interface UpdateState {
   notes: string
   /** 是否强制更新（来自 manifest 扩展字段） */
   forceUpdate: boolean
+  /** 新版本所属通道（stable / beta / alpha，空串表示未知） */
+  channel: string
   /** 已下载字节数（当前版本不报告精确进度，保持 0） */
   downloaded: number
   /** 总字节数（当前版本不报告精确进度，保持 0） */
@@ -56,6 +60,7 @@ export const updateState = reactive<UpdateState>({
   version: '',
   notes: '',
   forceUpdate: false,
+  channel: '',
   downloaded: 0,
   total: 0,
   error: '',
