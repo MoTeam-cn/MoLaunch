@@ -4,6 +4,18 @@
 
 ## [Unreleased]
 
+### 新增
+
+#### 旧版 Fabric / Quilt 加载器 + Java 25 直接拦下
+
+- **加载器版本解析**（[loader_version.rs](src-tauri/src/minecraft/java_selector/loader_version.rs) 新增）：从版本 JSON 的 `libraries[].name` 解析 `net.fabricmc:fabric-loader` / `org.quiltmc:quilt-loader` / Forge / NeoForge 的版本号，附带 semver 三元组解析（支持 `0.15.11-beta.1` 这类后缀）。
+- **硬约束**（[rules.rs](src-tauri/src/minecraft/java_selector/rules.rs) / [java_check.rs](src-tauri/src/minecraft/launch/pipeline/java_check.rs)）：加载器 < 0.15 且 Java ≥ 25 时阻断启动并给出明确文案（改为 Java 21 或升级加载器）；版本设置里开启「忽略 Java 兼容性警告」可绕过。此前只有不阻断的「Java 过新提示」，现在把确定会崩的组合提前拦下来。
+
+#### 崩溃规则误报反馈
+
+- **反馈入口**（[CrashAnalyzer.vue](src/views/tools/data/CrashAnalyzer.vue) / [data.ts](src/utils/api/tools/data.ts)）：命中具体规则的条目下方新增「这条判断不对？」，点击后调用 `crash_rule_feedback`。
+- **只写本地日志**（[crash_analyzer.rs](src-tauri/src/commands/tools/crash_analyzer.rs) / [dispatcher.rs](src-tauri/src/commands/tools/dispatcher.rs)）：记录 `rule=… category=…` 到启动器日志，**不上报任何内容**；用户反馈问题时附上日志即可定位是哪条规则误报。
+
 ## [0.3.11-rc.2] - 2026-10-24
 
 ### 新增
