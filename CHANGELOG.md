@@ -12,6 +12,7 @@
 - **分片**（[`chunk/download.rs`](src-tauri/src/minecraft/download/chunk/download.rs) / [`downloader/retry.rs`](src-tauri/src/minecraft/download/downloader/retry.rs)）：分片请求此前会协商 gzip，服务端对 206 响应返回的是压缩流片段，解码即失败（日志里的 `chunk 0..3 失败: error decoding response body`），即使不失败合并出来也是坏文件。现分片请求一律 `Accept-Encoding: identity`；探测到响应带 `Content-Encoding` 时直接禁用分片；新增「小于 1 MiB 不分片」门槛，几 KB 的元数据 JSON 不再走 4 片并发。
 - **校验**（[`downloader/retry.rs`](src-tauri/src/minecraft/download/downloader/retry.rs) / [`downloader/stream.rs`](src-tauri/src/minecraft/download/downloader/stream.rs)）：大小校验只接受任务自带的 `expected_size`（清单给的可信值），探测值不再参与；压缩响应的 `Content-Length` 同样按未知处理，避免把压缩长度写进进度与字节上限导致正常文件被截断。
 - **兜底**（[`loaders/fabric.rs`](src-tauri/src/minecraft/loaders/fabric.rs)）：profile 下载完成后强制 `serde_json` 解析，失败即删除并报错，杜绝把截断的 JSON 写进 `versions` 目录后启动阶段才炸。
+- **同源问题排查**（[`downloader/retry.rs`](src-tauri/src/minecraft/download/downloader/retry.rs) / [`loaders/liteloader.rs`](src-tauri/src/minecraft/loaders/liteloader.rs)）：把全部 25 处下载任务按「大小从哪来」过了一遍。大小来自清单/元数据且带 sha1/sha256 的 8 处（Mojang 本体与资源、Java 运行时、Modrinth/CurseForge 文件、Mojang mappings、Authlib）安全；`expected_size = 0` 的 15 处本就跳过大小校验。真正的同类隐患只剩两处：easytier 的 `expected_size` 来自 HEAD 探测（压缩或 chunked 响应下同样会误杀），现改为「响应没给可信长度就不做大小校验」；LiteLoader profile 与 Fabric 同样是无校验下载，补上 JSON 解析兜底。
 - **测试**（[`chunk/probe_test.rs`](src-tauri/src/minecraft/download/chunk/probe_test.rs) / [`downloader/retry_test.rs`](src-tauri/src/minecraft/download/downloader/retry_test.rs)）：覆盖 `Content-Range` 解析与分片策略（大文件分片、小文件不分片、大小未知不分片、单分片不分片）。
 
 ## [0.3.11-rc.7] - 2026-10-24

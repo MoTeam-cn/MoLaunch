@@ -128,6 +128,15 @@ pub async fn install(
         }
     }
 
+    // 与 Fabric 一致：JSON 解析失败说明内容被截断或镜像返回了错误页，
+    // 此时报错并删除，避免把坏 profile 留在 versions 目录里
+    let profile_path = version_dir.join(format!("{}.json", version_id));
+    let profile_text = std::fs::read_to_string(&profile_path)?;
+    if let Err(e) = serde_json::from_str::<serde_json::Value>(&profile_text) {
+        let _ = std::fs::remove_file(&profile_path);
+        return Err(anyhow::anyhow!("LiteLoader JSON 解析失败：{}", e));
+    }
+
     crate::log_info!("[LiteLoader] Installed: {}", version_id);
 
     if let Some(ref cb) = progress_callback {

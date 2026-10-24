@@ -151,7 +151,10 @@ pub(super) async fn download_with_retries(
             .await
             {
                 Ok((downloaded, total, speed)) => {
-                    if let Some(err) = verify::check_stream(task, trusted_size, downloaded) {
+                    // 响应没给出可信长度（压缩响应 / chunked 传输）时不做大小校验：
+                    // 此时的 expected_size 可能是压缩后长度或 HEAD 探测值，硬校验会误杀正常文件
+                    let expected = stream_expected(trusted_size, total);
+                    if let Some(err) = verify::check_stream(task, expected, downloaded) {
                         log_warn!("文件校验失败：{} - {}", task.local_path, err);
                         let _ = std::fs::remove_file(&task.local_path);
                         // 回滚已计数进度：文件将由下一个 URL 重新下载，避免进度重复累计
@@ -208,6 +211,18 @@ fn rollback_progress(progress: &Option<Arc<StdMutex<GlobalProgress>>>, bytes: u6
     if let Some(ref p) = progress {
         let mut p = p.lock().unwrap();
         p.downloaded_bytes = p.downloaded_bytes.saturating_sub(bytes);
+    }
+}
+
+/// 单流校验用的期望大小
+///
+/// `response_total` 为响应自报长度（Content-Length）：为 0 说明服务端没给可信长度
+/// （压缩响应被解码、或 chunked 传输），此时一律返回 0 交给 `check_stream` 按实际字节跳过校验。
+fn stream_expected(trusted_size: u64, response_total: u64) -> u64 {
+    if response_total > 0 {
+        trusted_size
+    } else {
+        0
     }
 }
 
