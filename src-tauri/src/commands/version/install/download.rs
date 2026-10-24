@@ -37,7 +37,13 @@ pub(crate) async fn download_base_mc(
     let version_name_for_cb = state.download_state.lock().unwrap().version_name.clone();
     let progress_callback = Arc::new(move |progress: download_types::GlobalProgress| {
         let mut ds = state_clone.lock().unwrap();
-        ds.is_active = progress.is_active;
+        // 只允许「点亮」不允许「熄灭」：本体下载收尾时 DownloadManager 会把
+        // GlobalProgress.is_active 置 false，但整合安装后面还有加载器安装/后处理，
+        // 此时熄灭会让前端认为任务已结束（下载管理页自动退回、isDownloading() 变 false）。
+        // 真正结束由 install_merged 的 mark_complete / mark_failed 收尾。
+        if progress.is_active {
+            ds.is_active = true;
+        }
         let idx = ds.current_stage_index;
         ds.sync_stage_from_progress(
             idx,

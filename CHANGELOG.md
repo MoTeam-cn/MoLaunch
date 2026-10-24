@@ -6,6 +6,13 @@
 
 ### 修复
 
+#### 安装 Fabric/Forge 时下载管理页提前退出，实际仍在后台安装
+
+- **根因**（[`install/flow.rs`](src-tauri/src/commands/version/install/flow.rs) / [`install/download.rs`](src-tauri/src/commands/version/install/download.rs)）：整合安装是「MC 本体下载 → 加载器安装 → 后处理 → Fabric API」多段流程，但面板显隐与 `is_active` 都只跟着**本体下载批次**走。本体下载一结束，`DownloadBatch` 释放面板计数并 emit `download-panel-state{visible:false}`，同时进度回调把 `download_state.is_active` 置 false；前端据此认为任务结束——`Downloads.vue` 的 `hasActiveDownload` 由 true 变 false 直接 `router.back()`，退出瞬间正好落在「加载器安装」阶段，于是表现为「刚进下载管理页、安装 Fabric 时就退出，但回去一看还在下」。重进页面同样被 `isDownloading()` 判成无任务，3 秒重试后再次弹回。
+- **面板持有**（[`install/flow.rs`](src-tauri/src/commands/version/install/flow.rs)）：`install_merged` 全程持有一个 `PanelLease`（RAII，失败/取消的提前 return 也会释放），本体下载批次结束时共享计数不会归零，`visible:false` 只在真正装完才 emit。
+- **活跃标记**（[`install/download.rs`](src-tauri/src/commands/version/install/download.rs)）：进度回调对 `is_active` 改成「只升不降」，本体下载收尾不再熄灭它；最终由 `mark_complete` / `mark_failed` 收尾，`isDownloading()` 在整个安装期间都是 true。
+- **前端兜底**（[`Downloads.vue`](src/views/Downloads.vue) / [`useDownloadPageRestore.ts`](src/composables/useDownloadPageRestore.ts) 新增 / [`downloadPageGuard.ts`](src/utils/downloadPageGuard.ts) 新增）：前端状态熄灭后不再立刻退回，而是回问一次后端——`restoreDownloadFromBackend()` 重新拉取真实进度写回 store；只有前后端都确认结束才 `router.back()`，查询失败时保守留在页面。用户主动取消时跳过该判定直接返回。进页面的 3 秒重试同样复用这套恢复逻辑。
+- **测试**（[`download-page-guard.test.ts`](src/utils/__tests__/download-page-guard.test.ts) 新增）：覆盖四种空闲判定（前端仍在下载 / 后端仍在跑 / 后端查询失败 / 前后端都结束）。
 #### 深色主题下仍出现白底卡片与看不清的浅字（中性色改为变量统一重映射）
 
 - **根因**（[`theme-dark.scss`](src/assets/styles/theme-dark.scss)）：上一轮只按「用到的类名」逐条写了 `bg-white` / `text-gray-*` / `border-gray-*` 的深色覆盖，覆盖网是枚举出来的，必然有漏。实测漏在三类写法上：① 渐变端点 `bg-linear-to-br from-gray-50 to-white`（首页时钟卡整块发白）；② 带透明度的类 `bg-white/80`、`bg-gray-50/50`，Tailwind v4 把它们编译成字面色值 `#fffc`，变量根本管不到；③ `text-gray-300/200`、`bg-gray-300/400/500`、`divide-gray-100`、`ring-gray-100/200` 从未写过覆盖，深色下是亮白分隔线与亮白圆点。

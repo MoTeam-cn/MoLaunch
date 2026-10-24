@@ -59,6 +59,14 @@ pub async fn install_merged(
         .download_pause_flag
         .store(false, std::sync::atomic::Ordering::Relaxed);
 
+    // 面板持有：整个整合安装（本体下载 → 加载器安装 → 后处理 → Fabric API）期间
+    // 一直保持下载面板显示。否则本体下载批次结束时会 emit
+    // `download-panel-state{visible:false}`，前端据此把「下载管理」页当成任务结束
+    // 直接退回上一页，而加载器安装（Fabric/Forge）其实还在后台跑。
+    // 守卫随作用域 Drop 释放（含失败/取消的提前 return）。
+    let panel_manager = crate::minecraft::download::DownloadManager::from_state(state).await;
+    let _panel_lease = crate::minecraft::download::manager::PanelLease::acquire(&panel_manager);
+
     // 清空上一次下载的 stages（避免累积导致前端显示历史阶段）
     // 修复：之前 append_stages 会保留旧 stages，多次安装后 stages 数组越来越长
     {
