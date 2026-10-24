@@ -6,6 +6,11 @@
 
 ### 修复
 
+#### 深色下弱提示文字看不清、主色不跟随（主页「1/3」「‹」「皮肤」等）
+
+- **根因一（文字灰被当背景压深）**（[`theme-dark.scss`](src/assets/styles/theme-dark.scss)）：变量重映射把 `gray-50~200` 压成 `#1c2027~#2a2f37`（它们主要当背景用），但同一批数字也常被当**弱提示文字**使用。实测截图像素：页码 `1/3` 只有 **1.91:1**、切换箭头 `‹` 只有 **1.56:1**，肉眼基本看不见。现在文字侧单独抬到可读区间（`text-gray-200` → 5.56:1、`300` → 6.22:1、`400` → 7.02:1、`500` → 7.82:1），并保持 50<100<…<900 亮度递增；圆点/滚动条这类非文字形状用的 `bg-gray-300` 抬到 **3.05:1**（WCAG 非文字 3:1）。
+- **根因二（主色钉死成蓝色）**（[`theme-dark.scss`](src/assets/styles/theme-dark.scss)）：`text-primary-500~800` 与 `bg-primary-50/100` 深色值写死了 `#6ea8ff` 与 `rgb(11 91 203 / .18)`，换紫色/绿色主色（动态主色）时串味——选中账号卡的强调字变成深紫压深底，实测 **2.11:1**。改用 `color-mix(in oklab, var(--color-primary-500) …)`，跟随主色提亮：紫主色下 6.14:1。
+- **守护测试**（[`dark-theme-coverage.test.ts`](src/assets/styles/__tests__/dark-theme-coverage.test.ts)）：新增「低端文字灰必须单独抬升」与「主色浅底/主色文字必须 color-mix 跟随动态主色、不得写死色值」两条用例。
 #### 弹窗与卡片在深色下仍是白底（`@apply bg-white` 绕过主题重映射）
 
 - **根因**（[`main.scss`](src/assets/styles/main.scss)）：`@utility card` 与 `@utility modal-body` 用 `@apply bg-white` 定义面板底色，编译成 `background-color: var(--color-white)`。而 `--color-white` **故意不随深色重映射**（彩色按钮上的 `text-white` 要靠它），`[data-theme='dark'] .bg-white` 那条规则也只对**真的带 `bg-white` 类名**的元素生效——组合工具类不吃这条规则，于是所有弹窗（皮肤与披风管理等）、抽屉里的卡片、`.card` 容器在深色下全是白底。

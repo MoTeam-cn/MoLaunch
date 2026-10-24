@@ -94,6 +94,23 @@ describe('深色主题覆盖', () => {
     expect(DARK_SCSS).not.toMatch(/--color-white:/)
   })
 
+  it('should 抬升低端文字灰 when 深色主题', () => {
+    // gray-50~300 在变量重映射里被压成深底（当背景用），但同一批数字也常被当
+    // 「弱提示文字」（页码、占位、次级说明）使用，不单独抬升就是深灰压深底。
+    for (const shade of ['200', '300', '400', '500']) {
+      expect(DARK_SCSS, `--text 侧的 .text-gray-${shade} 必须在深色下单独提亮`).toContain(`.text-gray-${shade} {`)
+    }
+    // 圆点/滚动条这类非文字形状用 bg-gray-300，需要够得着 3:1
+    expect(DARK_SCSS).toContain('.bg-gray-300 {')
+  })
+
+  it('should 跟随动态主色 when 深色下使用主色浅底与主色文字', () => {
+    // 钉死 #0b5bcb 时换紫色/绿色主色会串味：选中卡片变蓝、强调字变蓝
+    expect(DARK_SCSS).toMatch(/\.bg-primary-50[\s\S]{0,200}color-mix\(in oklab, var\(--color-primary-500\)/)
+    expect(DARK_SCSS).toMatch(/\.text-primary-500[\s\S]{0,300}color-mix\(in oklab, var\(--color-primary-500\)/)
+    expect(DARK_SCSS, '主色浅底不得再写死具体色值').not.toMatch(/\.bg-primary-50[\s\S]{0,80}rgb\(11 91 203/)
+  })
+
   it('should 提供深色规则 when 源码用到带透明度的中性色', () => {
     const covered = darkSelectors()
     const missing: string[] = []
