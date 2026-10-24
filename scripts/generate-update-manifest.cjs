@@ -48,6 +48,26 @@ function findOne(dir, predicate) {
   return hit ? path.join(dir, hit) : null;
 }
 
+/** 收集某个平台的全部产物目录（macOS 双架构会拆成 macos-aarch64 / macos-x86_64） */
+function collectPlatformDirs(root, prefix) {
+  let entries;
+  try {
+    entries = fs.readdirSync(root);
+  } catch {
+    return [];
+  }
+  return entries
+    .filter((name) => name === prefix || name.startsWith(prefix + '-'))
+    .map((name) => path.join(root, name))
+    .filter((p) => {
+      try {
+        return fs.statSync(p).isDirectory();
+      } catch {
+        return false;
+      }
+    });
+}
+
 /** 读取签名内容（缺失返回空串并告警，不阻断发版） */
 function readSignature(file) {
   if (!file) return '';
@@ -89,10 +109,13 @@ const candidates = [
     'windows',
     'x86_64',
   ),
-  buildPlatform(
-    findOne(path.join(ARTIFACTS_DIR, 'macos'), (n) => n.endsWith('.app.tar.gz')),
-    'macos',
-    'aarch64',
+  // macOS 双架构：aarch64 与 x86_64 各一个目录，逐个生成 darwin-<arch> 条目
+  ...collectPlatformDirs(ARTIFACTS_DIR, 'macos').map((dir) =>
+    buildPlatform(
+      findOne(dir, (n) => n.endsWith('.app.tar.gz')),
+      'macos',
+      'aarch64',
+    ),
   ),
   buildPlatform(
     findOne(path.join(ARTIFACTS_DIR, 'linux'), (n) => n.endsWith('.AppImage')),
@@ -106,6 +129,7 @@ if (candidates.length === 0) {
   process.exit(1);
 }
 
+// 同一平台出现多个条目时以最后一条为准（macOS 双架构各自 key 不同，正常不会冲突）
 const platforms = Object.fromEntries(candidates);
 
 const notes = NOTES_FILE && fs.existsSync(NOTES_FILE) ? fs.readFileSync(NOTES_FILE, 'utf8').trim() : '';

@@ -50,6 +50,13 @@ jobs:
             target: aarch64-apple-darwin
             arch: aarch64
             bundle_type: app
+          # macOS（Intel x86_64；在 arm 版 runner 上交叉编译。
+          # Intel Mac 此前只有 aarch64 产物、云端从未登记过 darwin-x86_64，等于拿不到更新）
+          - platform: macos
+            os: macos-latest
+            target: x86_64-apple-darwin
+            arch: x86_64
+            bundle_type: app
           # Linux（AppImage，updater 主格式）
           - platform: linux
             os: ubuntu-22.04
@@ -167,7 +174,8 @@ jobs:
           # Windows 优先使用 NSIS 安装包（而非 MSI），与 updater 协议一致
           updaterJsonPreferNsis: true
           # Windows 构建 NSIS 安装版；macOS/Linux 维持单一产物（app/appimage）。
-          args: ${{ matrix.platform == 'windows' && '--bundles nsis' || '' }}
+          # Windows 用 NSIS；macOS Intel 需显式指定交叉编译目标（产物落在 target/<triple>/release）
+          args: ${{ matrix.platform == 'windows' && '--bundles nsis' || (matrix.platform == 'macos' && matrix.arch == 'x86_64' && '--target x86_64-apple-darwin' || '') }}
 
       # ===== Windows 便携版 =====
       - name: Create portable build (Windows only)
@@ -207,10 +215,24 @@ jobs:
               PORTABLE_FILE=$(find "$BUNDLE_DIR/nsis" -name "*.exe" ! -name "*-setup.exe" 2>/dev/null | head -1)
               ;;
             macos)
-              SETUP_FILE=$(find "$BUNDLE_DIR/macos" -name "*.app.tar.gz" ! -name "*.sig" 2>/dev/null | head -1)
+              # 交叉编译时产物在 target/<triple>/release/bundle 下，故从 target 整体查找
+              SETUP_FILE=$(find src-tauri/target -path "*bundle/macos*" -name "*.app.tar.gz" ! -name "*.sig" 2>/dev/null | head -1)
+              # 双架构发版：文件名带架构后缀，避免 GitHub Release 资产与 S3 对象重名
+              if [ -n "$SETUP_FILE" ] && [ -f "$SETUP_FILE" ]; then
+                MACOS_SUFFIX=$([ "${{ matrix.arch }}" = "x86_64" ] && echo "x64" || echo "aarch64")
+                MACOS_NEW="$(dirname "$SETUP_FILE")/MoLaunch_${{ steps.version.outputs.VERSION }}_${MACOS_SUFFIX}.app.tar.gz"
+                if [ "$SETUP_FILE" != "$MACOS_NEW" ]; then
+                  mv "$SETUP_FILE" "$MACOS_NEW"
+                  if [ -f "${SETUP_FILE}.sig" ]; then
+                    mv "${SETUP_FILE}.sig" "${MACOS_NEW}.sig"
+                  fi
+                  SETUP_FILE="$MACOS_NEW"
+                  echo "[CI] macOS 产物已重命名: $SETUP_FILE"
+                fi
+              fi
               ;;
             linux)
-              SETUP_FILE=$(find "$BUNDLE_DIR/appimage" -name "*.AppImage" ! -name "*.sig" 2>/dev/null | head -1)
+              SETUP_FILE=$(find src-tauri/target -path "*bundle/appimage*" -name "*.AppImage" ! -name "*.sig" 2>/dev/null | head -1)
               ;;
           esac
 
@@ -302,7 +324,8 @@ jobs:
         if: matrix.platform == 'macos'
         uses: actions/upload-artifact@v6
         with:
-          name: macos-package
+          # 双架构并行上传，artifact 名必须带架构，否则同名冲突
+          name: macos-package-${{ matrix.arch }}
           path: |
             ${{ steps.locate.outputs.setup_file }}
             ${{ steps.locate.outputs.sig_file }}
@@ -353,11 +376,17 @@ jobs:
           name: windows-setup
           path: artifacts/windows
 
-      - name: Download macOS package artifact
+      - name: Download macOS package artifact (aarch64)
         uses: actions/download-artifact@v8
         with:
-          name: macos-package
-          path: artifacts/macos
+          name: macos-package-aarch64
+          path: artifacts/macos-aarch64
+
+      - name: Download macOS package artifact (x86_64)
+        uses: actions/download-artifact@v8
+        with:
+          name: macos-package-x86_64
+          path: artifacts/macos-x86_64
 
       - name: Download Linux package artifact
         uses: actions/download-artifact@v8
@@ -465,8 +494,8 @@ jobs:
             artifacts/windows/*-setup.exe
             artifacts/windows/*_x64.exe
             artifacts/windows/*.sig
-            artifacts/macos/*.app.tar.gz
-            artifacts/macos/*.sig
+            artifacts/macos*/*.app.tar.gz
+            artifacts/macos*/*.sig
             artifacts/linux/*.AppImage
             artifacts/linux/*.sig
             artifacts/latest.json
