@@ -4,6 +4,23 @@
 
 ## [Unreleased]
 
+### 新增
+
+#### 界面个性化：深色模式、背景、密度、动效与功能隐藏
+
+- **外观模式**（[theme-dark.css](src/assets/styles/theme-dark.css) 新增 / [AppearanceSection.vue](src/views/settings/personal/AppearanceSection.vue)）：浅色 / 深色 / 跟随系统三档，跟随系统时随 `prefers-color-scheme` 实时切换。深色采用「覆盖层」策略——在工具类之上按 `[data-theme='dark']` 重映射颜色（属性+类特异性 0,2,0 高于工具类 0,1,0，无需 `!important`），后续组件迁移到语义 token 时可逐条删除。
+- **自定义背景**（[BackgroundSection.vue](src/views/settings/personal/BackgroundSection.vue) / [AppBackground.vue](src/components/common/AppBackground.vue) 新增）：本地图片或 http(s) 地址，支持模糊半径 0–32px、遮罩不透明度 0–100%、铺满裁剪/完整显示/平铺三种填充；开背景后卡片自动转半透明（`[data-has-background]`），否则背景会被完全盖住。
+- **界面密度**（[UiLayoutSection.vue](src/views/settings/personal/UiLayoutSection.vue) 新增）：标准 / 紧凑两档，紧凑通过 `<html>` 根字号 16px→14px 让 rem 间距与字号整体收紧。
+- **减少动效**（[theme-dark.css](src/assets/styles/theme-dark.css)）：手动开关 + 自动尊重系统 `prefers-reduced-motion`，动画/过渡统一压到 0.01ms。
+- **功能隐藏**（[HiddenItemsSection.vue](src/views/settings/personal/HiddenItemsSection.vue) 新增 / [TopNavLayout.vue](src/components/layout/TopNavLayout.vue) / [router/index.ts](src/router/index.ts)）：可隐藏下载与版本、下载管理、工具箱、联机大厅、实验性功能五个导航入口；隐藏后顶部导航不再显示，深链接访问会被路由守卫拦回首页。首页与设置页不可隐藏（设置页是恢复入口）。
+- **偏好存储**（[ui-prefs.ts](src/types/ui-prefs.ts) / [utils/ui-prefs.ts](src/utils/ui-prefs.ts) / [stores/ui-prefs.ts](src/stores/ui-prefs.ts) 新增）：纯前端 localStorage（`molaunch.ui`），与既有 `layoutMode` / `language` 同层，不改后端配置结构；每次修改即时写盘并应用到 `<html>` 的 `data-*` 属性与 CSS 变量。
+
+#### 自定义布局交互层：按钮
+
+- **button section**（[types.ts](src/plugins/custom-layout/types.ts) / [schema-types.ts](src/plugins/custom-layout/schema-types.ts) / [json-parser.ts](src/plugins/custom-layout/json-parser.ts) / [xml-parser.ts](src/plugins/custom-layout/xml-parser.ts) / [LayoutSectionRenderer.vue](src/plugins/custom-layout/LayoutSectionRenderer.vue)）：自定义布局新增按钮，支持四类动作——`launch`（启动当前/指定版本）、`open_url`、`navigate`（页面白名单）、`copy`。此前自定义布局只能展示，现在能驱动操作。
+- **动作执行器**（[custom-layout-actions.ts](src/utils/custom-layout-actions.ts) 新增）：`open_url` 只放行 http(s)，`navigate` 只放行 `/apps` 系列白名单路径，启动请求通过 `molaunch:launch-request` 事件交给主页启动面板处理（账号 / Java / 内存仍由启动面板统一组装），布局内容即使来自远程 URL 也无法执行任意代码。
+- **样例与测试**（[layout-sample.json](src-tauri/resources/samples/layout/layout-sample.json) / [layout-sample.xml](src-tauri/resources/samples/layout/layout-sample.xml) / [button-section.test.ts](src/plugins/custom-layout/__tests__/button-section.test.ts) 新增）：示例模板补三个按钮；8 个单测覆盖动作解析、协议校验、跳转白名单与非法输入。
+
 ## [0.3.11-rc.3] - 2026-10-24
 
 ### 新增
