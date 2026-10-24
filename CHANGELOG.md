@@ -4,6 +4,16 @@
 
 ## [Unreleased]
 
+### 重构
+
+#### 样式层迁移 SCSS 并按职责拆分为模块
+
+- **全局样式拆分**（[styles/](src/assets/styles/)）：原 670 行单文件 `main.css` 拆为 6 个模块——[main.scss](src/assets/styles/main.scss)（只留 Tailwind 入口 `@import` / `@config` / `@utility` 组件库 / `@layer` 字体）、[tokens.scss](src/assets/styles/tokens.scss)（设计变量）、[base.scss](src/assets/styles/base.scss)（基础排版 + 滚动条）、[transitions.scss](src/assets/styles/transitions.scss)（过渡与关键帧）、[markdown.scss](src/assets/styles/markdown.scss)（正文排版）、[theme-dark.scss](src/assets/styles/theme-dark.scss)（深色/密度/动效/背景）。由 [main.ts](src/main.ts) 按顺序引入，顺序即级联顺序。
+- **Tailwind v4 适配**（[base.scss](src/assets/styles/base.scss)）：独立样式文件使用 `@apply` 需声明主题引用，补 `@reference './main.scss'`；`@utility` 组件库仍保留在 Tailwind 入口文件内。
+- **组件样式转 SCSS**（[ColorPicker](src/components/common/ColorPicker.scss) / [Drawer](src/components/common/Drawer.scss) / [Input](src/components/common/Input.scss) / [Select](src/components/common/Select.scss)）：四个组件独立样式表改 `.scss`，引用同步更新。
+- **组件内联样式启用 SCSS**（58 个 Vue 组件的 `<style>` 块）：统一加 `lang="scss"`，后续可直接使用嵌套与变量；现有内容无需改写（纯 CSS 是 SCSS 子集）。
+- **依赖**（[package.json](package.json)）：新增开发依赖 `sass`。
+
 ## [0.3.11-rc.4] - 2026-10-24
 
 ### 新增
