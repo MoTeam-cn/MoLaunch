@@ -53,7 +53,9 @@ fn test_analyze_intel_驱动规则需要厂商关键词() {
 
 #[test]
 fn test_analyze_错误分级_error_排在最前() {
-    let log = "EXCEPTION_ACCESS_VIOLATION igdumd64.dll\njava.lang.OutOfMemoryError";
+    // 需要两个 error 级结论：驱动 + 堆内存不足（内存规则现在要求具体子类型关键词）
+    let log =
+        "EXCEPTION_ACCESS_VIOLATION igdumd64.dll\njava.lang.OutOfMemoryError: Java heap space";
     let items = analyze(log, None);
     assert!(items.len() >= 2);
     assert_eq!(items[0].severity, "error");
@@ -106,8 +108,17 @@ fn test_analyze_空日志返回空() {
 }
 
 #[test]
-fn test_analyze_无匹配时返回空交由兜底处理() {
-    assert!(analyze("这是一段没有任何错误关键词的正常日志", None).is_empty());
+fn test_analyze_无错误关键词时不产出可执行结论() {
+    // 正常日志（无任何崩溃关键词）最多只剩「输出极短」这类提示性条目，不应产出 error / warning 结论
+    let items = analyze("这是一段没有任何错误关键词的正常日志", None);
+    assert!(
+        items.iter().all(|item| item.severity == "info"),
+        "不应产出可执行结论，实际: {:?}",
+        items
+            .iter()
+            .map(|item| (&item.rule_id, &item.severity))
+            .collect::<Vec<_>>()
+    );
 }
 
 #[test]

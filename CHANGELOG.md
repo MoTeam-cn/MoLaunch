@@ -16,7 +16,7 @@
 - **结论无依据**（[crash_analyzer.rs](src-tauri/src/commands/tools/types/crash_analyzer.rs) / [engine.rs](src-tauri/src/commands/tools/crash_rules/engine.rs)）：输出结构增加 `cause` / `confidence`（高·中·低）/ `evidence[{lineNo, rawLine}]` / `impact` / `missingEvidence`。规则命中关键词只是候选，必须再定位到具体日志行才算结论；拿不到证据行的进「待确认」区（`CrashAnalyzeResult.pending`），不再凭关键词下结论。`rawLine` 一律取自日志原文切片，不做拼接改写。
 - **归因错误**（[special.rs](src-tauri/src/commands/tools/crash_rules/special.rs) 新增）：`NoClassDefFoundError` 在前后 30 行内检索 `is missing dependency` / `requires` / `Missing mod`，命中则结论「缺少前置 mod」并引用依赖声明行；未命中才降级为「类缺失（可能 mod 损坏或版本不匹配）」，置信度低并说明还缺什么证据。
 - **概念混淆**（[crash_rules.json](src-tauri/resources/crash_rules.json)）：拆成 `mod-version-mismatch`（`MixinApplyError` / `NoSuchMethodError` → 版本不匹配）与 `mod-mixin-conflict`（仅双来源 `@Redirect conflict` 才判冲突）；`@Redirect conflict ... Skipping` 单列为「注入点冲突（加载器已跳过）」。
-- **三类误报加门槛**（[schema.rs](src-tauri/src/commands/tools/crash_rules/schema.rs) 新增 `gates`）：Fabric 规则要求 `requires fabric-api` 且 mod 列表里没有 fabric-api；Mod 重复安装必须真找到同名不同版本的列表行；「输出极短」按日志行数判定（>200 行强制禁用）。
+- **三类误报加门槛**（[schema.rs](src-tauri/src/commands/tools/crash_rules/schema.rs) 新增 `gates`）：Fabric 规则要求 `requires fabric-api` 且 mod 列表里没有 fabric-api；Mod 重复安装必须真找到同名不同版本的列表行；「输出极短」只在日志不足 20 行时启用（此前任何短日志都会误报）。
 - **现象当原因**（[engine.rs](src-tauri/src/commands/tools/crash_rules/engine.rs)）：无具体堆栈/版本号的泛化结论（如「Mod 加载器报错」）落进待确认区，不作为正式结论。
 - **冗余**（[engine.rs](src-tauri/src/commands/tools/crash_rules/engine.rs)）：按 `cause` 去重，同一根因只输出一条，证据合并取最早 + 最晚各一条；Java 版本类合并为一条并引用 `UnsupportedClassVersionError` 行。
 - **因果链**（[crash_rules.json](src-tauri/resources/crash_rules.json) 的 `steps`）：磁盘满 → 存档/日志写入失败 → 看门狗强杀服务端线程 → 崩溃报告写不出，合成 1 条箭头链；TPS 掉底链同理。缺环自动跳过，不编造。

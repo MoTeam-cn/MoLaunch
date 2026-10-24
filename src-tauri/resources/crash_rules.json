@@ -1146,7 +1146,7 @@
       "severity": "info",
       "confidence": "medium",
       "title": "程序输出极短",
-      "impact": "日志只有很少几行，说明 JVM / 启动器在游戏初始化前就退出了。",
+      "impact": "日志只有十几行，说明 JVM / 启动器在游戏初始化前就退出了。",
       "suggestion": "检查 Java 是否可执行、启动参数是否正确，以及是否被杀毒软件拦截。",
       "match": {
         "regex": [
@@ -1154,7 +1154,7 @@
         ]
       },
       "gates": {
-        "max_lines": 200
+        "max_lines": 20
       },
       "evidence": {
         "regex": [
