@@ -83,6 +83,9 @@ node_modules
 # 工具链本地产物（Playwright MCP 运行数据等）
 .playwright-mcp/
 
+# 本地工具状态（DSH / gh 设备标识等，仅本机使用，不入库）
+/.local/
+
 # 文件备份（批量替换前生成的临时备份，不入库）
 /CHANGELOG.bak
 
