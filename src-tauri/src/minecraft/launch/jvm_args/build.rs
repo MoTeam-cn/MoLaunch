@@ -288,6 +288,9 @@ pub(crate) fn build_jvm_args(
     args.push(format!("-Xms{}M", min_memory));
     args.push(format!("-Xmx{}M", max_memory));
 
+    // 永久代（Java 7 及更早）：不显式给足会 OutOfMemoryError: PermGen space
+    super::rules::add_memory_pool_args(&mut args, java_major, max_memory);
+
     // GC 策略
     super::rules::add_gc_args(&mut args, java_major);
 

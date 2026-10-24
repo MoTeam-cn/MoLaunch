@@ -16,6 +16,26 @@ pub(super) fn add_gc_args(args: &mut Vec<String>, java_major: Option<u32>) {
     }
 }
 
+/// 内存池参数：Java 7 及更早需要显式指定永久代大小
+///
+/// Java 8 之前类元数据放在永久代（PermGen），默认只有 64~128MB，
+/// 装几个 mod 就会 `OutOfMemoryError: PermGen space`。给堆内存的一半（下限 128M）。
+/// Java 8 起改为元空间（Metaspace），无上限反而符合预期，因此不设 cap。
+pub(super) fn add_memory_pool_args(
+    args: &mut Vec<String>,
+    java_major: Option<u32>,
+    max_memory: u32,
+) {
+    let Some(major) = java_major else {
+        return;
+    };
+    if major > 7 {
+        return;
+    }
+    let perm_size = (max_memory / 2).max(128);
+    args.push(format!("-XX:MaxPermSize={}M", perm_size));
+}
+
 /// 检测系统是否使用 GBK 编码（Windows ANSI 代码页 936）
 #[cfg(target_os = "windows")]
 pub(super) fn is_gbk_encoding() -> bool {

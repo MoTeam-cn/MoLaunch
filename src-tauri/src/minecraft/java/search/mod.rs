@@ -4,6 +4,7 @@
 
 mod entry;
 mod platform;
+pub(crate) mod priority;
 mod version;
 
 pub use entry::{search_java, search_java_with_paths};

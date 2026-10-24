@@ -12,4 +12,7 @@ pub struct JavaRuntime {
     pub major_version: u32,
     pub is_jre: bool,
     pub is_64bit: bool,
+    /// 候选路径降权标记（system32 / 转发目录 / 符号链接）：排序时排在同版本正常路径之后
+    #[serde(default)]
+    pub deprioritized: bool,
 }

@@ -53,6 +53,7 @@ fn test_select_best_java_with_user_path() {
             major_version: 8,
             is_jre: true,
             is_64bit: true,
+            deprioritized: false,
         },
         JavaRuntime {
             executable: "C:\\Java17\\java.exe".to_string(),
@@ -62,6 +63,7 @@ fn test_select_best_java_with_user_path() {
             major_version: 17,
             is_jre: true,
             is_64bit: true,
+            deprioritized: false,
         },
     ];
 
@@ -85,6 +87,7 @@ fn test_select_best_java_auto() {
             major_version: 8,
             is_jre: true,
             is_64bit: true,
+            deprioritized: false,
         },
         JavaRuntime {
             executable: "C:\\Java17\\java.exe".to_string(),
@@ -94,6 +97,7 @@ fn test_select_best_java_auto() {
             major_version: 17,
             is_jre: true,
             is_64bit: true,
+            deprioritized: false,
         },
         JavaRuntime {
             executable: "C:\\Java21\\java.exe".to_string(),
@@ -103,6 +107,7 @@ fn test_select_best_java_auto() {
             major_version: 21,
             is_jre: true,
             is_64bit: true,
+            deprioritized: false,
         },
     ];
 
@@ -130,6 +135,7 @@ fn test_select_best_java_with_loader_smoke() {
         major_version: 17,
         is_jre: true,
         is_64bit: true,
+        deprioritized: false,
     }];
 
     let result = select_best_java_with_loader("1.18.2", Some("fabric"), &java_list, None);

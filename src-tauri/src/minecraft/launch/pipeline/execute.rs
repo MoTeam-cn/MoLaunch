@@ -5,6 +5,17 @@
 use crate::{log_info, log_warn};
 use tauri::Emitter;
 
+/// 判定「Java 版本不兼容」类的启动失败信号
+const JAVA_FAILURE_SIGNATURES: [&str; 5] = [
+    "UnsupportedClassVersionError",
+    "has been compiled by a more recent version",
+    "Could not create the Java Virtual Machine",
+    "A Java Exception has occurred",
+    "A JNI error has occurred",
+];
+
+use std::path::PathBuf;
+
 use super::{LaunchError, LaunchPipeline, LaunchResult, LaunchStage};
 
 impl LaunchPipeline {
@@ -50,7 +61,72 @@ impl LaunchPipeline {
     }
 
     /// 执行启动流程
+    ///
+    /// 自动换 Java 重试：首次启动因 Java 版本不兼容失败时，排除该 Java 后重新选择并再试一次
+    /// （只重试一次，避免死循环）。用户手动指定的 Java（custom / folder 模式）不自动替换。
     pub async fn execute(&self) -> Result<LaunchResult, LaunchError> {
+        let mut excluded: Vec<String> = Vec::new();
+        let mut retried = false;
+
+        loop {
+            let mut chosen_java: Option<PathBuf> = None;
+            match self.execute_once(&excluded, &mut chosen_java).await {
+                Ok(result) => return Ok(result),
+                Err(err) => {
+                    if retried || !is_java_version_failure(&err) || !self.allows_java_auto_retry() {
+                        return Err(err);
+                    }
+                    let Some(java) = chosen_java else {
+                        return Err(err);
+                    };
+                    let failed = java.to_string_lossy().to_string();
+                    if excluded
+                        .iter()
+                        .any(|item| item.eq_ignore_ascii_case(&failed))
+                    {
+                        return Err(err);
+                    }
+                    log_warn!(
+                        "[Launch] Java 版本相关失败，自动切换其它 Java 重试（已排除 {}）",
+                        failed
+                    );
+                    excluded.push(failed.clone());
+                    retried = true;
+                    if let Some(app_handle) = self.config.app_handle.as_ref() {
+                        let _ = app_handle.emit(
+                            "launch-java-switch",
+                            serde_json::json!({
+                                "from": failed,
+                                "message": "检测到 Java 版本不兼容，正在自动切换其它 Java 重试…"
+                            }),
+                        );
+                    }
+                }
+            }
+        }
+    }
+
+    /// 是否允许自动换 Java 重试（用户手动指定的 Java 不自动替换）
+    fn allows_java_auto_retry(&self) -> bool {
+        let mode = self
+            .config
+            .java_mode
+            .as_deref()
+            .unwrap_or("")
+            .trim()
+            .to_lowercase();
+        mode != "custom" && mode != "folder"
+    }
+
+    /// 执行一次完整启动流程
+    ///
+    /// `excluded` 中的 Java 会被跳过；`chosen_java` 回传本次实际使用的 Java，
+    /// 供调用方在失败重试时排除。
+    async fn execute_once(
+        &self,
+        excluded: &[String],
+        chosen_java: &mut Option<PathBuf>,
+    ) -> Result<LaunchResult, LaunchError> {
         log_info!(
             "Starting launch pipeline for version: {}",
             self.config.version_id
@@ -68,7 +144,8 @@ impl LaunchPipeline {
         // 阶段1: 获取Java
         self.update_progress(LaunchStage::GetJava, 0.0, "正在检测Java...")
             .await;
-        let java_path = self.detect_java().await?;
+        let java_path = self.detect_java_excluding(excluded).await?;
+        *chosen_java = Some(java_path.clone());
         self.update_progress(LaunchStage::GetJava, 1.0, "Java检测完成")
             .await;
 
@@ -159,4 +236,17 @@ impl LaunchPipeline {
 
         Ok(result)
     }
+}
+
+/// 判定错误是否属于「换一个 Java 可能解决」的类型
+///
+/// 只看启动进程阶段的错误：Java 版本不兼容会在进程退出前把上述信息打进日志，
+/// `launch_process` 会把最近日志附在错误消息里，因此匹配消息文本即可。
+fn is_java_version_failure(err: &LaunchError) -> bool {
+    if err.stage != LaunchStage::LaunchProcess {
+        return false;
+    }
+    JAVA_FAILURE_SIGNATURES
+        .iter()
+        .any(|signature| err.message.contains(signature))
 }

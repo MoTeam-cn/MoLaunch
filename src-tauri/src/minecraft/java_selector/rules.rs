@@ -132,6 +132,24 @@ pub fn get_java_version_range(
 
 /// 从版本 JSON 读取 Mojang 官方 Java 版本要求（覆盖规则表）
 ///
+/// Java 过新提示：返回 Some(文案) 表示「很可能不兼容，建议换版本」
+///
+/// Java 25 起收紧了原生访问限制（JEP 472）并移除了一批旧 API，Minecraft 1.x 系列
+/// 使用的旧版 LWJGL 与加载器 ASM 未必适配。只提示不阻断——用户可能确实需要新 Java。
+pub fn java_too_new_warning(mc_version: &str, java_major: u32) -> Option<String> {
+    if java_major < 25 {
+        return None;
+    }
+    // 仅对 1.x 系列提示；26.x 起（年.发布号）已适配新 JDK
+    if !mc_version.starts_with("1.") {
+        return None;
+    }
+    Some(format!(
+        "当前 Java {} 对 Minecraft {} 可能过新（Java 25 起收紧原生访问限制），若启动失败请改用 Java 21 或更低版本",
+        java_major, mc_version
+    ))
+}
+
 /// 返回 Some(major_version) 若 JSON 中有 javaVersion.majorVersion 字段且 >= 22
 /// （阈值参考：低于 22 视为旧版本号，不覆盖规则表）
 pub fn get_mojang_java_requirement(version_json: &serde_json::Value) -> Option<u32> {

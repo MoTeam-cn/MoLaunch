@@ -68,3 +68,36 @@ fn test_add_json_jvm_args_规则不匹配时跳过() {
     ]));
     assert_eq!(args, vec!["-Xss1M".to_string()]);
 }
+
+// ===== 内存池参数（永久代 / 元空间） =====
+
+use super::super::rules::add_memory_pool_args;
+
+fn memory_pool_args(java_major: Option<u32>, max_memory: u32) -> Vec<String> {
+    let mut args = Vec::new();
+    add_memory_pool_args(&mut args, java_major, max_memory);
+    args
+}
+
+#[test]
+fn test_add_memory_pool_args_java7_注入永久代() {
+    let args = memory_pool_args(Some(7), 2048);
+    assert_eq!(args, vec!["-XX:MaxPermSize=1024M"]);
+}
+
+#[test]
+fn test_add_memory_pool_args_小内存时永久代保底128m() {
+    let args = memory_pool_args(Some(7), 256);
+    assert_eq!(args, vec!["-XX:MaxPermSize=128M"]);
+}
+
+#[test]
+fn test_add_memory_pool_args_java8_起不再注入永久代() {
+    assert!(memory_pool_args(Some(8), 2048).is_empty());
+    assert!(memory_pool_args(Some(17), 4096).is_empty());
+}
+
+#[test]
+fn test_add_memory_pool_args_版本未知时不注入() {
+    assert!(memory_pool_args(None, 2048).is_empty());
+}

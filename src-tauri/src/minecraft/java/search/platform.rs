@@ -5,6 +5,8 @@
 use std::collections::HashSet;
 use std::path::{Path, PathBuf};
 
+use super::priority::is_deprioritized_path;
+
 /// 搜索关键词（共67个）
 const SEARCH_KEYWORDS: &[&str] = &[
     "java",
@@ -66,8 +68,11 @@ const SEARCH_KEYWORDS: &[&str] = &[
 ];
 
 /// 候选路径收集器：维护去重后的候选列表
+///
+/// 每个候选带一个优先级（0 = 正常，1 = 降权），`into_inner` 时稳定排序，
+/// 降权项排在后面：用户机器上可能只有降权项可用，所以降权而不是排除。
 pub(super) struct CandidateCollector {
-    candidates: Vec<PathBuf>,
+    candidates: Vec<(PathBuf, u8)>,
     seen_paths: HashSet<String>,
 }
 
@@ -81,15 +86,23 @@ impl CandidateCollector {
 
     fn add(&mut self, path: &Path) {
         let path_str = path.to_string_lossy().to_lowercase().replace("\\", "/");
-        if !self.seen_paths.contains(&path_str) {
-            self.seen_paths.insert(path_str);
-            self.candidates.push(path.to_path_buf());
+        if self.seen_paths.contains(&path_str) {
+            return;
+        }
+        self.seen_paths.insert(path_str);
+        let priority = if is_deprioritized_path(path) { 1 } else { 0 };
+        if priority > 0 {
+            crate::log_debug!("[Java] Candidate (降权): {}", path.display());
+        } else {
             crate::log_debug!("[Java] Candidate: {}", path.display());
         }
+        self.candidates.push((path.to_path_buf(), priority));
     }
 
-    fn into_inner(self) -> Vec<PathBuf> {
-        self.candidates
+    /// 取出候选路径：稳定排序，降权项排在后面（同优先级保持发现顺序）
+    fn into_inner(mut self) -> Vec<PathBuf> {
+        self.candidates.sort_by_key(|(_, priority)| *priority);
+        self.candidates.into_iter().map(|(path, _)| path).collect()
     }
 }
 
@@ -243,14 +256,30 @@ fn is_symlink(path: &Path) -> bool {
     }
 }
 
+/// 驱动器探测超时（毫秒）：超过视为网络驱动器 / 无响应设备，跳过
+const DRIVE_PROBE_TIMEOUT_MS: u128 = 400;
+
 fn get_local_drives() -> Vec<PathBuf> {
     let mut drives = Vec::new();
     for letter in 'A'..='Z' {
         let drive = format!("{}:\\", letter);
         let path = PathBuf::from(&drive);
-        if path.exists() {
-            drives.push(path);
+        let started = std::time::Instant::now();
+        let exists = path.exists();
+        let elapsed_ms = started.elapsed().as_millis();
+        if !exists {
+            continue;
         }
+        if elapsed_ms > DRIVE_PROBE_TIMEOUT_MS {
+            // 网络驱动器 / 已断开的映射盘探测会阻塞数秒，直接跳过避免拖慢启动
+            crate::log_warn!(
+                "[Java] 跳过响应过慢的驱动器 {}（{}ms，疑似网络驱动器）",
+                path.display(),
+                elapsed_ms
+            );
+            continue;
+        }
+        drives.push(path);
     }
     drives
 }

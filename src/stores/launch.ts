@@ -9,7 +9,7 @@ import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
 import { listen } from '@tauri-apps/api/event'
 import * as tauri from '@/utils/tauri'
-import { toastSuccess, toastError, toastWarning } from '@/utils/toast'
+import { toastSuccess, toastError, toastWarning, toastInfo } from '@/utils/toast'
 import { showCrashDialog } from '@/utils/crashDialog'
 import { maybeTriggerLaunchHints } from '@/utils/buyHint'
 import { safeCall } from '@/utils/async'
@@ -41,6 +41,10 @@ const STAGE_NAMES: Record<string, string> = {
 
 /** 启动进度事件名（与后端 pipeline/execute.rs 的 emit 对应） */
 const LAUNCH_PROGRESS_EVENT = 'launch-progress'
+/** Java 过新提示（后端 java_check 阶段 emit，仅提示不阻断） */
+const LAUNCH_JAVA_WARNING_EVENT = 'launch-java-warning'
+/** 自动换 Java 重试通知（后端 execute 重试前 emit） */
+const LAUNCH_JAVA_SWITCH_EVENT = 'launch-java-switch'
 
 export const useLaunchStore = defineStore('launch', () => {
   // 启动状态
@@ -50,6 +54,8 @@ export const useLaunchStore = defineStore('launch', () => {
   const runningVersionId = ref<string | null>(null)
   const launchProgress = ref<tauri.LaunchProgress | null>(null)
   let launchProgressUnlisten: (() => void) | null = null
+/** Java 提示事件监听器（过新提示 + 自动换 Java 通知） */
+let javaNoticeUnlisten: Array<() => void> = []
 
   // Java 自动下载进度（启动时自动下载 Java 用，与版本设置页的独立下载共享事件）
   const javaDownloadProgress = ref<tauri.JavaDownloadProgress | null>(null)
@@ -191,6 +197,7 @@ export const useLaunchStore = defineStore('launch', () => {
   /** 监听启动进度事件（后端 pipeline 每步 update_progress 时 emit，替代 200ms 轮询） */
   async function startProgressListener() {
     await stopProgressListener()
+    await startJavaNoticeListener()
     launchProgressUnlisten = await listen<tauri.LaunchProgress>(
       LAUNCH_PROGRESS_EVENT,
       (e) => {
@@ -200,10 +207,31 @@ export const useLaunchStore = defineStore('launch', () => {
   }
 
   async function stopProgressListener() {
+    stopJavaNoticeListener()
     if (launchProgressUnlisten) {
       launchProgressUnlisten()
       launchProgressUnlisten = null
     }
+  }
+
+  /** 监听 Java 相关提示：版本过新提醒与自动切换通知 */
+  async function startJavaNoticeListener() {
+    stopJavaNoticeListener()
+    const warning = await listen<string>(LAUNCH_JAVA_WARNING_EVENT, (e) => {
+      toastWarning(e.payload)
+    })
+    const switching = await listen<{ from: string; message: string }>(
+      LAUNCH_JAVA_SWITCH_EVENT,
+      (e) => {
+        toastInfo(e.payload.message)
+      },
+    )
+    javaNoticeUnlisten = [warning, switching]
+  }
+
+  function stopJavaNoticeListener() {
+    for (const unlisten of javaNoticeUnlisten) unlisten()
+    javaNoticeUnlisten = []
   }
 
   /** 启动阶段名称（中文） */

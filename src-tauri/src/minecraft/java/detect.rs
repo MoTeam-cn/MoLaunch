@@ -71,6 +71,7 @@ pub fn detect_java(java_path: &Path) -> Result<JavaRuntime, String> {
         major_version,
         is_jre,
         is_64bit,
+        deprioritized: super::priority::is_deprioritized_path(java_path),
     })
 }
 

@@ -3,12 +3,21 @@
 use std::path::PathBuf;
 
 use crate::{log_info, log_warn};
+use tauri::Emitter;
 
 use super::{LaunchError, LaunchPipeline, LaunchStage};
 
 impl LaunchPipeline {
-    /// 检测Java
+    /// 检测 Java
     pub async fn detect_java(&self) -> Result<PathBuf, LaunchError> {
+        self.detect_java_excluding(&[]).await
+    }
+
+    /// 检测 Java，跳过 `excluded` 中的可执行文件（自动换 Java 重试时使用）
+    ///
+    /// 排除只作用于「自动选择」分支：用户手动指定（custom）与版本文件夹（folder）
+    /// 模式保持原行为，避免违背用户意图。
+    pub async fn detect_java_excluding(&self, excluded: &[String]) -> Result<PathBuf, LaunchError> {
         let version_dir = self
             .config
             .game_dir
@@ -127,6 +136,20 @@ impl LaunchPipeline {
             is_user_facing: false,
         })?;
 
+        // 自动换 Java 重试：剔除上一轮已失败的 Java
+        let java_list: Vec<_> = if excluded.is_empty() {
+            java_list
+        } else {
+            java_list
+                .into_iter()
+                .filter(|java| {
+                    !excluded
+                        .iter()
+                        .any(|path| path.eq_ignore_ascii_case(&java.executable))
+                })
+                .collect()
+        };
+
         self.update_progress(LaunchStage::GetJava, 0.6, "正在选择最佳Java...")
             .await;
 
@@ -207,6 +230,19 @@ impl LaunchPipeline {
         };
 
         log_info!("Selected Java: {}", selected_path);
+
+        // Java 过新提示（不阻断）：仅在明显不匹配时提示一次
+        if let Some(java_major) = crate::minecraft::java::detect_java_version(&selected_path) {
+            if let Some(warning) =
+                crate::minecraft::java_selector::java_too_new_warning(&mc_version, java_major)
+            {
+                log_warn!("[DetectJava] {}", warning);
+                if let Some(app_handle) = self.config.app_handle.as_ref() {
+                    let _ = app_handle.emit("launch-java-warning", &warning);
+                }
+            }
+        }
+
         Ok(PathBuf::from(&selected_path))
     }
 

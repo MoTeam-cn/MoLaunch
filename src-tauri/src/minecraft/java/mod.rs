@@ -12,3 +12,6 @@ pub use detect::{detect_java, detect_java_version};
 pub use search::{search_java, search_java_with_paths};
 pub use select::select_best_java;
 pub use types::JavaRuntime;
+
+// 供 detect 标注候选优先级使用
+pub(crate) use search::priority;
