@@ -2,46 +2,30 @@
 /**
  * 崩溃日志分析
  *
- * 粘贴崩溃日志文本 → 调用 crashAnalyze → 展示识别出的崩溃原因条目。
- * 后端按 6 类模式（Java 版本 / 缺失 Mod / 内存 / 显卡驱动 / Mod 冲突 / 其他）
- * 做大小写不敏感匹配，返回带严重级别与修复建议的条目列表。
+ * 粘贴崩溃日志 → 本地规则引擎（关键词/正则检索 → 规则映射 → 诊断输出）产出结论。
+ * 每条结论都带置信度与证据行（行号 + 原文）；拿不到证据的进「待确认」区，不下结论。
  */
 import { ref, computed, defineAsyncComponent } from 'vue'
-import {
-  CommandLineIcon,
-  MagnifyingGlassIcon,
-  ExclamationCircleIcon,
-} from '@heroicons/vue/24/outline'
-const Button = defineAsyncComponent(() => import('@/components/common/Button.vue'))
-const Input = defineAsyncComponent(() => import('@/components/common/Input.vue'))
-import { SparklesIcon } from '@heroicons/vue/24/outline'
+import { CommandLineIcon, MagnifyingGlassIcon, ExclamationCircleIcon, SparklesIcon } from '@heroicons/vue/24/outline'
 import { open } from '@tauri-apps/plugin-shell'
 import { toastSuccess, toastError, toastInfo } from '@/utils/toast'
 import { crashAnalyze, crashRuleFeedback } from '@/utils/api/tools'
-import type { CrashAnalyzeResult } from '@/utils/api/tools'
+import type { CrashAnalyzeResult, CrashAnalysisItem } from '@/utils/api/tools'
+import CrashAnalysisCard from './crash-analysis/CrashAnalysisCard.vue'
+
+const Button = defineAsyncComponent(() => import('@/components/common/Button.vue'))
+const Input = defineAsyncComponent(() => import('@/components/common/Input.vue'))
 
 const emit = defineEmits<{ 'ai-followup': [logText: string] }>()
 
 const logText = ref('')
 const loading = ref(false)
 const result = ref<CrashAnalyzeResult | null>(null)
+const showPending = ref(false)
 
 const canAnalyze = computed(() => logText.value.trim().length > 0)
-
-const categoryLabel: Record<string, string> = {
-  java_version: 'Java 版本',
-  missing_mod: '缺失 Mod',
-  memory: '内存不足',
-  driver: '显卡驱动',
-  mod_conflict: 'Mod 冲突',
-  other: '其他',
-}
-
-const severityStyle: Record<string, string> = {
-  error: 'bg-red-100 text-red-700',
-  warning: 'bg-amber-100 text-amber-700',
-  info: 'bg-blue-100 text-blue-700',
-}
+const analyses = computed(() => result.value?.analyses ?? [])
+const pending = computed(() => result.value?.pending ?? [])
 
 async function runAnalyze() {
   if (!canAnalyze.value) {
@@ -50,14 +34,15 @@ async function runAnalyze() {
   }
   loading.value = true
   result.value = null
+  showPending.value = false
   try {
     result.value = await crashAnalyze(logText.value)
     const items = result.value.analyses
-    // 本地引擎没有识别到具体问题（无条目，或仅有 other/info 通用条目）：
-    // 只提示用户可点「用 AI 深度分析」按钮深入——不自动弹窗，AI 分析完全由用户主动触发。
     const hasSpecific = items.some((it) => it.category !== 'other' && it.severity !== 'info')
-    if (items.length === 0 || !hasSpecific) {
+    if (items.length === 0) {
       toastInfo('本地引擎未识别出具体问题，可点击「用 AI 深度分析」进一步诊断')
+    } else if (!hasSpecific) {
+      toastInfo('只识别到通用信息，可点击「用 AI 深度分析」进一步诊断')
     } else {
       toastSuccess('分析完成，识别出 ' + items.length + ' 个可能原因')
     }
@@ -68,32 +53,33 @@ async function runAnalyze() {
   }
 }
 
-  /** 标记这条判断有误（只写本地日志，不上报） */
-  async function reportWrong(item: { ruleId?: string; category: string }) {
-    if (!item.ruleId) {
-      toastInfo('该结论来自通用兜底逻辑，暂无规则 id')
-      return
-    }
-    try {
-      await crashRuleFeedback(item.ruleId, item.category)
-      toastInfo('已记录到本地日志，反馈问题时附上启动器日志即可帮我们修正这条规则')
-    } catch (e) {
-      toastError(`记录失败: ${e instanceof Error ? e.message : String(e)}`)
-    }
+/** 标记这条判断有误（只写本地日志，不上报） */
+async function reportWrong(item: CrashAnalysisItem) {
+  if (!item.ruleId) {
+    toastInfo('该结论来自通用兜底逻辑，暂无规则 id')
+    return
   }
-
-  /** 打开规则自带的参考链接（规则库内置 URL，属可信来源，不再二次确认） */
-  async function openRef(url: string) {
-    try {
-      await open(url)
-    } catch {
-      toastError('打开链接失败')
-    }
+  try {
+    await crashRuleFeedback(item.ruleId, item.category)
+    toastInfo('已记录到本地日志，反馈问题时附上启动器日志即可帮我们修正这条规则')
+  } catch (e) {
+    toastError(`记录失败: ${e instanceof Error ? e.message : String(e)}`)
   }
+}
 
-  function clearAll() {
+/** 打开规则自带的参考链接（规则库内置 URL，属可信来源） */
+async function openRef(url: string) {
+  try {
+    await open(url)
+  } catch {
+    toastError('打开链接失败')
+  }
+}
+
+function clearAll() {
   logText.value = ''
   result.value = null
+  showPending.value = false
 }
 </script>
 
@@ -105,10 +91,9 @@ async function runAnalyze() {
     </div>
     <div class="px-5 pb-5 space-y-3">
       <p class="text-xs text-gray-500">
-        粘贴 Minecraft 崩溃日志，自动识别常见崩溃原因（Java 版本不匹配、缺失 Mod、内存不足、显卡驱动、Mod 冲突等）并给出修复建议。
+        粘贴 Minecraft 崩溃日志，本地引擎会检索日志原文并逐条给出结论；每条结论都附带行号与原文，方便你回日志里核对。
       </p>
 
-      <!-- 日志输入 -->
       <Input
         v-model="logText"
         textarea
@@ -116,7 +101,6 @@ async function runAnalyze() {
         placeholder="在此粘贴崩溃日志全文（crash report 或 latest.log 中的报错片段）..."
       />
 
-      <!-- 操作按钮 -->
       <div class="flex justify-end gap-2">
         <Button type="ghost" size="small" :disabled="!logText" @click="clearAll">清空</Button>
         <Button type="primary" :loading="loading" :disabled="!canAnalyze" @click="runAnalyze">
@@ -125,64 +109,46 @@ async function runAnalyze() {
         </Button>
       </div>
 
-      <!-- 结果区 -->
       <div v-if="result">
-        <div v-if="result.analyses.length === 0" class="flex flex-col items-center justify-center py-8 text-gray-400">
+        <div v-if="analyses.length === 0" class="flex flex-col items-center justify-center py-8 text-gray-400">
           <ExclamationCircleIcon class="h-8 w-8 mb-2" />
           <span class="text-xs">未识别到已知崩溃模式</span>
         </div>
 
         <div v-else class="space-y-2">
-          <div class="text-sm font-medium text-gray-700">识别出 {{ result.analyses.length }} 个可能原因</div>
-          <div
-            v-for="(item, idx) in result.analyses"
-            :key="idx"
-            class="rounded-lg border border-gray-200 px-4 py-3"
-          >
-            <div class="flex items-center gap-2">
-              <span
-                class="rounded-full px-2 py-0.5 text-xs font-medium"
-                :class="severityStyle[item.severity] ?? 'bg-gray-100 text-gray-700'"
-              >
-                {{ categoryLabel[item.category] ?? item.category }}
-              </span>
-              <span class="text-sm font-medium text-gray-900">{{ item.title }}</span>
-            </div>
-            <div v-if="item.detail" class="mt-1.5 rounded-sm bg-gray-50 px-2 py-1 text-xs text-gray-600 break-all">
-              {{ item.detail }}
-            </div>
-            <div v-if="item.suggestion" class="mt-1.5 text-xs text-green-600">
-              建议：{{ item.suggestion }}
-            </div>
-            <!-- 规则引擎反查出的可疑 mod（来自该版本 mods 目录索引） -->
-            <div v-if="item.suspects && item.suspects.length" class="mt-1.5 text-xs text-amber-700">
-              疑似相关 mod：{{ item.suspects.join('、') }}
-            </div>
-            <!-- 误报反馈入口：只在命中具体规则时出现 -->
-            <div v-if="item.ruleId" class="mt-1.5">
-              <button
-                type="button"
-                class="text-xs text-gray-400 transition-colors hover:text-gray-600"
-                @click="reportWrong(item)"
-              >
-                这条判断不对？
-              </button>
-            </div>
-            <!-- 规则自带的参考链接（Mojang bug、论坛帖等） -->
-            <div v-if="item.refs && item.refs.length" class="mt-1.5 flex flex-wrap gap-2">
-              <button
-                v-for="ref in item.refs"
-                :key="ref"
-                type="button"
-                class="text-xs text-primary-600 underline-offset-2 hover:underline"
-                @click="openRef(ref)"
-              >
-                参考链接
-              </button>
+          <div class="flex items-center justify-between text-sm font-medium text-gray-700">
+            <span>识别出 {{ analyses.length }} 个可能原因</span>
+            <span v-if="result.lineCount" class="text-xs font-normal text-gray-400">
+              日志共 {{ result.lineCount }} 行
+            </span>
+          </div>
+
+          <CrashAnalysisCard
+            v-for="(item, idx) in analyses"
+            :key="item.cause + '-' + idx"
+            :item="item"
+            @report-wrong="reportWrong"
+            @open-ref="openRef"
+          />
+
+          <!-- 待确认：命中关键词但拿不到证据行，不作为正式结论 -->
+          <div v-if="pending.length" class="rounded-lg border border-dashed border-gray-300 px-4 py-3">
+            <button
+              type="button"
+              class="flex w-full items-center justify-between text-xs text-gray-500"
+              @click="showPending = !showPending"
+            >
+              <span>另有 {{ pending.length }} 条线索证据不足，未计入结论</span>
+              <span>{{ showPending ? '收起' : '展开' }}</span>
+            </button>
+            <div v-if="showPending" class="mt-2 space-y-1">
+              <div v-for="(item, idx) in pending" :key="'pending-' + idx" class="text-xs text-gray-500">
+                <span class="text-gray-700">{{ item.title }}</span>
+                <span v-if="item.missingEvidence" class="text-gray-400">：{{ item.missingEvidence }}</span>
+              </div>
             </div>
           </div>
 
-          <!-- 流水线第二步入口：把本地检索到的范围交给 AI 深度分析 -->
           <div class="mt-3 flex items-center gap-2 rounded-lg bg-primary-50/60 px-3 py-2.5">
             <SparklesIcon class="h-4 w-4 shrink-0 text-primary-500" />
             <span class="min-w-0 flex-1 text-xs text-gray-600">

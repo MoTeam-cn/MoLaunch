@@ -18,19 +18,37 @@ export type CrashAction =
   | { type: 'set_java_version'; major: number }
   | { type: 'set_memory'; mb: number }
 
+/** 一条日志证据：行号 + 原文（原文是日志子串，不做改写） */
+export interface CrashEvidence {
+  /** 行号（从 1 开始） */
+  lineNo: number
+  /** 该行原文 */
+  rawLine: string
+}
+
 /** 单个崩溃分析条目 */
 export interface CrashAnalysisItem {
-  /** 分类：java_version / missing_mod / memory / driver / mod_conflict / other */
+  /** 归因键：同一 cause 只出现一条 */
+  cause: string
+  /** 分类：java_version / missing_mod / memory / driver / mod_conflict / world / server / plugin / other */
   category: string
   /** 严重级别：error / warning / info */
   severity: string
   /** 标题 */
   title: string
-  /** 匹配到的相关行片段 */
+  /** 首条证据原文（等价于 evidence[0].rawLine） */
   detail: string
   /** 中文修复建议 */
   suggestion: string
-  /** 命中的规则 id（规则引擎产出时填充，兜底逻辑为空） */
+  /** 影响说明 */
+  impact?: string
+  /** 置信度：high / medium / low */
+  confidence?: string
+  /** 证据行（已确认条目必有 ≥1 条） */
+  evidence?: CrashEvidence[]
+  /** 置信度不足时说明还缺什么证据 */
+  missingEvidence?: string
+  /** 命中的规则 id（兜底逻辑为空） */
   ruleId?: string
   /** 可执行的修复动作 */
   actions?: CrashAction[]
@@ -59,7 +77,12 @@ export function crashRuleFeedback(
 
 /** 崩溃日志分析结果 */
 export interface CrashAnalyzeResult {
+  /** 已确认条目（每条都带证据行） */
   analyses: CrashAnalysisItem[]
+  /** 待确认条目：命中关键词但找不到可引用的日志行 */
+  pending?: CrashAnalysisItem[]
+  /** 日志总行数 */
+  lineCount?: number
 }
 
 /**
