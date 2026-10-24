@@ -195,7 +195,7 @@ function moveEditing(direction: 'up' | 'down' | 'left' | 'right') {
   height: 1.5rem;
   border: 1px solid #e5e6eb;
   border-radius: 4px;
-  background: #fff;
+  background: var(--surface-0);
   color: #4e5969;
   cursor: pointer;
   transition:

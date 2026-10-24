@@ -113,7 +113,7 @@ function onOpenFullLog() {
 .markdown-body :deep(code) {
   padding: 0.0625rem 0.25rem;
   border-radius: 0.25rem;
-  background-color: #e5e6eb;
+  background-color: var(--surface-2);
   font-family: inherit;
 }
 </style>

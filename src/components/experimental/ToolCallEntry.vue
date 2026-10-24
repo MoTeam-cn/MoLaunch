@@ -147,7 +147,7 @@ function toggleDetail(i: number) {
   width: 0.3125rem;
   height: 0.3125rem;
   border-radius: 9999px;
-  background-color: #ffffff;
+  background-color: var(--surface-0);
   border: 1.5px solid #d0d5dd;
   box-sizing: border-box;
 }

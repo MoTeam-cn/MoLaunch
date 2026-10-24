@@ -64,12 +64,12 @@ const emit = defineEmits<{
 
 <style lang="scss" scoped>
 .timeline-item { position: relative; padding-left: 1.375rem; padding-bottom: 0.875rem; }
-.timeline-item::before { content: ''; position: absolute; left: 0.25rem; top: 1rem; bottom: 0; width: 1px; background-color: #e5e6eb; }
+.timeline-item::before { content: ''; position: absolute; left: 0.25rem; top: 1rem; bottom: 0; width: 1px; background-color: var(--surface-2); }
 .timeline-item:last-child { padding-bottom: 1.25rem; }
-.timeline-dot { position: absolute; left: 0; top: 0.3125rem; width: 0.5625rem; height: 0.5625rem; border-radius: 9999px; background-color: #ffffff; border: 2px solid #d0d5dd; box-sizing: border-box; }
+.timeline-dot { position: absolute; left: 0; top: 0.3125rem; width: 0.5625rem; height: 0.5625rem; border-radius: 9999px; background-color: var(--surface-0); border: 2px solid var(--border-strong); box-sizing: border-box; }
 .timeline-dot.is-latest { background-color: var(--color-primary-500, #4f6ef2); border-color: var(--color-primary-500, #4f6ef2); }
 .timeline-head { display: flex; align-items: center; gap: 0.375rem; margin-bottom: 0.375rem; cursor: pointer; user-select: none; border-radius: 0.375rem; padding: 0.125rem 0; transition: background-color 0.15s; }
-.timeline-head:hover { background-color: #f5f6f8; }
+.timeline-head:hover { background-color: var(--surface-subtle); }
 .timeline-head:focus-visible { outline: 2px solid var(--color-primary-500, #165dff); outline-offset: 1px; }
 .timeline-chevron { display: inline-flex; flex: none; color: #c0c4cc; }
 .timeline-version { font-weight: 600; }
@@ -85,8 +85,8 @@ const emit = defineEmits<{
 .markdown-body :deep(ul), .markdown-body :deep(ol) { margin: 0.125rem 0 0.375rem; padding-left: 1.125rem; list-style: disc; }
 .markdown-body :deep(ol) { list-style: decimal; }
 .markdown-body :deep(li) { margin: 0.125rem 0; }
-.markdown-body :deep(code) { padding: 0.0625rem 0.25rem; border-radius: 0.25rem; background-color: #e5e6eb; font-family: inherit; }
-.markdown-body :deep(pre) { margin: 0.375rem 0; padding: 0.5rem 0.625rem; overflow-x: auto; border-radius: 0.375rem; background-color: #f2f3f5; }
+.markdown-body :deep(code) { padding: 0.0625rem 0.25rem; border-radius: 0.25rem; background-color: var(--surface-2); font-family: inherit; }
+.markdown-body :deep(pre) { margin: 0.375rem 0; padding: 0.5rem 0.625rem; overflow-x: auto; border-radius: 0.375rem; background-color: var(--surface-1); }
 .markdown-body :deep(pre code) { padding: 0; background-color: transparent; }
 .markdown-body :deep(a) { color: var(--color-primary-500, #4f6ef2); text-decoration: underline; }
 </style>

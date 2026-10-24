@@ -125,7 +125,7 @@ function pick(id: string) {
   padding: 0 0.5rem;
   border: 1px solid #e5e6eb;
   border-radius: 4px;
-  background: #fff;
+  background: var(--surface-0);
   cursor: pointer;
   transition: border-color 0.15s ease, background-color 0.15s ease;
 }
@@ -149,7 +149,7 @@ function pick(id: string) {
   flex: none;
   padding: 0 6px;
   border-radius: 999px;
-  background: #f2f3f5;
+  background: var(--surface-1);
   color: #86909c;
   font-size: 0.65rem;
   line-height: 1.4rem;

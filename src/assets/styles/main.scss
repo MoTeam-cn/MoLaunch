@@ -84,18 +84,18 @@
      default bg #f2f3f5 color #4e5969 / hover bg #e5e6eb / active bg #c9cdd4
      disabled bg #f7f8fa color #c9cdd4 */
   @apply btn;
-  color: #4e5969;
-  background-color: #f2f3f5;
+  color: var(--text-2);
+  background-color: var(--surface-1);
   border-color: transparent;
   &:hover:not(:disabled) {
-    background-color: #e5e6eb;
+    background-color: var(--surface-2);
   }
   &:active:not(:disabled) {
-    background-color: #c9cdd4;
+    background-color: var(--surface-4);
   }
   &:disabled {
-    color: #c9cdd4;
-    background-color: #f7f8fa;
+    color: var(--text-disabled);
+    background-color: var(--surface-subtle);
   }
 }
 
@@ -123,12 +123,12 @@
 @utility btn-ghost {
   /* Ghost：透明底，hover 浅灰 */
   @apply btn;
-  color: #4e5969;
+  color: var(--text-2);
   background-color: transparent;
   border-color: transparent;
   &:hover:not(:disabled) {
     color: var(--color-primary-500);
-    background-color: #f2f3f5;
+    background-color: var(--surface-1);
   }
 }
 
@@ -140,10 +140,10 @@
   background-color: transparent;
   border-color: transparent;
   &:hover:not(:disabled) {
-    background-color: #f2f3f5;
+    background-color: var(--surface-1);
   }
   &:active:not(:disabled) {
-    background-color: #e5e6eb;
+    background-color: var(--surface-2);
   }
   &:disabled {
     color: var(--color-primary-300);
@@ -168,9 +168,9 @@
   white-space: nowrap;
   border: 1px solid transparent;
   border-radius: 2px;
-  color: #1d2129;
-  background-color: #f2f3f5;
-  border-color: #f2f3f5;
+  color: var(--text-1);
+  background-color: var(--surface-1);
+  border-color: var(--surface-1);
   user-select: none;
   transition: all 0.1s cubic-bezier(0, 0, 1, 1);
 }

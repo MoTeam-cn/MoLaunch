@@ -183,7 +183,7 @@ function clearCloseTimer() {
   aspect-ratio: 696 / 292;
   border: 1px solid #e5e6eb;
   border-radius: 8px;
-  background-color: #f7f8fa;
+  background-color: var(--surface-subtle);
   background-repeat: no-repeat;
   background-size: cover;
 }

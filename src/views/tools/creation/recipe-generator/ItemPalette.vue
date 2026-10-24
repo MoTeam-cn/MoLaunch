@@ -136,7 +136,7 @@ function pick(item: AssetItem) {
   padding: 0.3rem 0.15rem;
   border: 1px solid #e5e6eb;
   border-radius: 4px;
-  background: #fff;
+  background: var(--surface-0);
   cursor: pointer;
   transition: border-color 0.15s ease, background-color 0.15s ease;
 }

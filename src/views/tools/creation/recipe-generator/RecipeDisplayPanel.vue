@@ -83,7 +83,7 @@ const emit = defineEmits<{
 .recipe-panel {
   border: 1px solid #e5e6eb;
   border-radius: 8px;
-  background: #fff;
+  background: var(--surface-0);
   overflow: hidden;
 }
 
@@ -119,7 +119,7 @@ const emit = defineEmits<{
   overflow: auto;
   border: 1px solid #e5e6eb;
   border-radius: 6px;
-  background: #f7f8fa;
+  background: var(--surface-subtle);
   color: #4e5969;
   font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
   font-size: 0.72rem;

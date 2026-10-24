@@ -69,7 +69,7 @@ const backgroundStyle = computed(() => {
   height: 100%;
   border: 1px dashed #c9cdd4;
   border-radius: 2px;
-  background: #f2f3f5;
+  background: var(--surface-1);
   color: #86909c;
   font-size: 12px;
 }

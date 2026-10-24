@@ -91,7 +91,7 @@ function toggleCollapsed(index: number): void {
 .markdown-body :deep(code) {
   padding: 0.0625rem 0.25rem;
   border-radius: 0.25rem;
-  background-color: #e5e6eb;
+  background-color: var(--surface-2);
   font-family: inherit;
 }
 
@@ -100,7 +100,7 @@ function toggleCollapsed(index: number): void {
   padding: 0.5rem 0.625rem;
   overflow-x: auto;
   border-radius: 0.375rem;
-  background-color: #f2f3f5;
+  background-color: var(--surface-1);
 }
 
 .markdown-body :deep(pre code) {

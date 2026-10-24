@@ -102,7 +102,7 @@ function onCookingTimeChange(value: string | number) {
 .recipe-panel {
   border: 1px solid #e5e6eb;
   border-radius: 8px;
-  background: #fff;
+  background: var(--surface-0);
   overflow: hidden;
 }
 
