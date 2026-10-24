@@ -55,12 +55,12 @@ async function runAnalyze() {
 
 /** 标记这条判断有误（只写本地日志，不上报） */
 async function reportWrong(item: CrashAnalysisItem) {
-  if (!item.ruleId) {
+  if (!item.rule_id) {
     toastInfo('该结论来自通用兜底逻辑，暂无规则 id')
     return
   }
   try {
-    await crashRuleFeedback(item.ruleId, item.category)
+    await crashRuleFeedback(item.rule_id, item.category)
     toastInfo('已记录到本地日志，反馈问题时附上启动器日志即可帮我们修正这条规则')
   } catch (e) {
     toastError(`记录失败: ${e instanceof Error ? e.message : String(e)}`)
@@ -118,8 +118,8 @@ function clearAll() {
         <div v-else class="space-y-2">
           <div class="flex items-center justify-between text-sm font-medium text-gray-700">
             <span>识别出 {{ analyses.length }} 个可能原因</span>
-            <span v-if="result.lineCount" class="text-xs font-normal text-gray-400">
-              日志共 {{ result.lineCount }} 行
+            <span v-if="result.line_count" class="text-xs font-normal text-gray-400">
+              日志共 {{ result.line_count }} 行
             </span>
           </div>
 
@@ -144,7 +144,7 @@ function clearAll() {
             <div v-if="showPending" class="mt-2 space-y-1">
               <div v-for="(item, idx) in pending" :key="'pending-' + idx" class="text-xs text-gray-500">
                 <span class="text-gray-700">{{ item.title }}</span>
-                <span v-if="item.missingEvidence" class="text-gray-400">：{{ item.missingEvidence }}</span>
+                <span v-if="item.missing_evidence" class="text-gray-400">：{{ item.missing_evidence }}</span>
               </div>
             </div>
           </div>

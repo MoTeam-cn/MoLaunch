@@ -70,11 +70,11 @@ const visibleEvidence = () => (expanded.value ? evidence() : evidence().slice(0,
     <div v-if="evidence().length" class="mt-1.5 space-y-1">
       <div
         v-for="line in visibleEvidence()"
-        :key="line.lineNo"
+        :key="line.line_no"
         class="flex gap-2 rounded-sm bg-gray-50 px-2 py-1 text-xs text-gray-600"
       >
-        <span class="shrink-0 font-mono text-gray-400">L{{ line.lineNo }}</span>
-        <span class="min-w-0 break-all font-mono">{{ line.rawLine }}</span>
+        <span class="shrink-0 font-mono text-gray-400">L{{ line.line_no }}</span>
+        <span class="min-w-0 break-all font-mono">{{ line.raw_line }}</span>
       </div>
       <button
         v-if="evidence().length > 1"
@@ -86,8 +86,8 @@ const visibleEvidence = () => (expanded.value ? evidence() : evidence().slice(0,
       </button>
     </div>
 
-    <div v-if="item.missingEvidence" class="mt-1.5 text-xs text-amber-700">
-      还缺证据：{{ item.missingEvidence }}
+    <div v-if="item.missing_evidence" class="mt-1.5 text-xs text-amber-700">
+      还缺证据：{{ item.missing_evidence }}
     </div>
 
     <div v-if="item.suggestion" class="mt-1.5 text-xs text-green-600">建议：{{ item.suggestion }}</div>
@@ -98,7 +98,7 @@ const visibleEvidence = () => (expanded.value ? evidence() : evidence().slice(0,
 
     <div class="mt-1.5 flex flex-wrap items-center gap-3">
       <button
-        v-if="item.ruleId"
+        v-if="item.rule_id"
         type="button"
         class="text-xs text-gray-400 transition-colors hover:text-gray-600"
         @click="emit('report-wrong', item)"

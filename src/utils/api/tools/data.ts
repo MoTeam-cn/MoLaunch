@@ -21,9 +21,9 @@ export type CrashAction =
 /** 一条日志证据：行号 + 原文（原文是日志子串，不做改写） */
 export interface CrashEvidence {
   /** 行号（从 1 开始） */
-  lineNo: number
+  line_no: number
   /** 该行原文 */
-  rawLine: string
+  raw_line: string
 }
 
 /** 单个崩溃分析条目 */
@@ -36,7 +36,7 @@ export interface CrashAnalysisItem {
   severity: string
   /** 标题 */
   title: string
-  /** 首条证据原文（等价于 evidence[0].rawLine） */
+  /** 首条证据原文（等价于 evidence[0].raw_line） */
   detail: string
   /** 中文修复建议 */
   suggestion: string
@@ -47,9 +47,9 @@ export interface CrashAnalysisItem {
   /** 证据行（已确认条目必有 ≥1 条） */
   evidence?: CrashEvidence[]
   /** 置信度不足时说明还缺什么证据 */
-  missingEvidence?: string
+  missing_evidence?: string
   /** 命中的规则 id（兜底逻辑为空） */
-  ruleId?: string
+  rule_id?: string
   /** 可执行的修复动作 */
   actions?: CrashAction[]
   /** 参考链接 */
@@ -82,7 +82,7 @@ export interface CrashAnalyzeResult {
   /** 待确认条目：命中关键词但找不到可引用的日志行 */
   pending?: CrashAnalysisItem[]
   /** 日志总行数 */
-  lineCount?: number
+  line_count?: number
 }
 
 /**
