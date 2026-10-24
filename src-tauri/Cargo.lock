@@ -2871,7 +2871,7 @@ dependencies = [
 
 [[package]]
 name = "mo-launch"
-version = "0.3.11-rc.1"
+version = "0.3.11-rc.2"
 dependencies = [
  "aes-gcm",
  "anyhow",
