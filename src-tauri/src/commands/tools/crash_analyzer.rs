@@ -8,7 +8,9 @@ use crate::log_info;
 use crate::state::AppState;
 
 use super::crash_rules;
-use super::types::{CrashAnalysisItem, CrashAnalyzeParams, CrashAnalyzeResult};
+use super::types::{
+    CrashAnalysisItem, CrashAnalyzeParams, CrashAnalyzeResult, CrashRuleFeedbackParams,
+};
 
 /// 分析崩溃日志文本，识别常见崩溃模式（纯文本、无状态，供命令与 AI 工具复用）
 ///
@@ -284,4 +286,17 @@ fn truncate(s: &str, max: usize) -> String {
         out.push('…');
         out
     }
+}
+
+/// 记录一条「规则判断不对」的反馈
+///
+/// 只写本地启动器日志，不上报任何内容：用户反馈问题时把日志附上即可。
+pub fn report_rule_feedback(params: &CrashRuleFeedbackParams) -> Result<serde_json::Value, String> {
+    crate::log_warn!(
+        "[CrashRules] 用户标记误报: rule={} category={:?} note={:?}",
+        params.rule_id,
+        params.category,
+        params.note
+    );
+    Ok(serde_json::json!({ "recorded": true }))
 }

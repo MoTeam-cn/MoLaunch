@@ -231,14 +231,36 @@ impl LaunchPipeline {
 
         log_info!("Selected Java: {}", selected_path);
 
-        // Java 过新提示（不阻断）：仅在明显不匹配时提示一次
+        // Java 版本相关的提示与硬约束（只探测一次 Java 版本）
         if let Some(java_major) = crate::minecraft::java::detect_java_version(&selected_path) {
+            // 1) 过新提示（不阻断）
             if let Some(warning) =
                 crate::minecraft::java_selector::java_too_new_warning(&mc_version, java_major)
             {
                 log_warn!("[DetectJava] {}", warning);
                 if let Some(app_handle) = self.config.app_handle.as_ref() {
                     let _ = app_handle.emit("launch-java-warning", &warning);
+                }
+            }
+
+            // 2) 加载器 × Java 硬约束（旧版 Fabric/Quilt + Java 25 必崩，直接阻断）
+            let loader_version = self.read_loader_version(&version_dir, loader.as_deref());
+            if let Some(reason) = crate::minecraft::java_selector::check_loader_java_compat(
+                loader.as_deref().unwrap_or(""),
+                loader_version.as_deref(),
+                java_major,
+            ) {
+                if self.config.ignore_java_warning {
+                    log_warn!(
+                        "[DetectJava] {}（已开启「忽略 Java 兼容性警告」，继续启动）",
+                        reason
+                    );
+                } else {
+                    return Err(LaunchError {
+                        stage: LaunchStage::GetJava,
+                        message: reason,
+                        is_user_facing: true,
+                    });
                 }
             }
         }
@@ -306,6 +328,19 @@ impl LaunchPipeline {
             version_dir,
             &self.config.version_id,
         )
+    }
+
+    /// 读取加载器版本号（从版本 JSON 的 libraries 解析；读不到返回 None）
+    fn read_loader_version(
+        &self,
+        version_dir: &std::path::Path,
+        loader: Option<&str>,
+    ) -> Option<String> {
+        let loader = loader?;
+        let json_path = version_dir.join(format!("{}.json", self.config.version_id));
+        let raw = std::fs::read_to_string(&json_path).ok()?;
+        let json: serde_json::Value = serde_json::from_str(&raw).ok()?;
+        crate::minecraft::java_selector::loader_version::parse_loader_version(&json, loader)
     }
 
     /// 从版本 JSON 读取 Mojang 官方 Java 版本要求

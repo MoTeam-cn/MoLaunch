@@ -17,7 +17,7 @@ const Input = defineAsyncComponent(() => import('@/components/common/Input.vue')
 import { SparklesIcon } from '@heroicons/vue/24/outline'
 import { open } from '@tauri-apps/plugin-shell'
 import { toastSuccess, toastError, toastInfo } from '@/utils/toast'
-import { crashAnalyze } from '@/utils/api/tools'
+import { crashAnalyze, crashRuleFeedback } from '@/utils/api/tools'
 import type { CrashAnalyzeResult } from '@/utils/api/tools'
 
 const emit = defineEmits<{ 'ai-followup': [logText: string] }>()
@@ -67,6 +67,20 @@ async function runAnalyze() {
     loading.value = false
   }
 }
+
+  /** 标记这条判断有误（只写本地日志，不上报） */
+  async function reportWrong(item: { ruleId?: string; category: string }) {
+    if (!item.ruleId) {
+      toastInfo('该结论来自通用兜底逻辑，暂无规则 id')
+      return
+    }
+    try {
+      await crashRuleFeedback(item.ruleId, item.category)
+      toastInfo('已记录到本地日志，反馈问题时附上启动器日志即可帮我们修正这条规则')
+    } catch (e) {
+      toastError(`记录失败: ${e instanceof Error ? e.message : String(e)}`)
+    }
+  }
 
   /** 打开规则自带的参考链接（规则库内置 URL，属可信来源，不再二次确认） */
   async function openRef(url: string) {
@@ -143,6 +157,16 @@ async function runAnalyze() {
             <!-- 规则引擎反查出的可疑 mod（来自该版本 mods 目录索引） -->
             <div v-if="item.suspects && item.suspects.length" class="mt-1.5 text-xs text-amber-700">
               疑似相关 mod：{{ item.suspects.join('、') }}
+            </div>
+            <!-- 误报反馈入口：只在命中具体规则时出现 -->
+            <div v-if="item.ruleId" class="mt-1.5">
+              <button
+                type="button"
+                class="text-xs text-gray-400 transition-colors hover:text-gray-600"
+                @click="reportWrong(item)"
+              >
+                这条判断不对？
+              </button>
             </div>
             <!-- 规则自带的参考链接（Mojang bug、论坛帖等） -->
             <div v-if="item.refs && item.refs.length" class="mt-1.5 flex flex-wrap gap-2">

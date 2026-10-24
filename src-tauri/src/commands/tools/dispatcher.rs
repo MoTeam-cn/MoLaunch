@@ -108,6 +108,14 @@ static DISPATCHER: Lazy<Dispatcher> = Lazy::new(|| {
             crash_analyzer::analyze(&state, p).await
         }),
     );
+    d.register(
+        "crash_rule_feedback",
+        handler!(_state, _app, params, {
+            let p: CrashRuleFeedbackParams =
+                serde_json::from_value(params).map_err(|e| format!("参数解析失败: {}", e))?;
+            crash_analyzer::report_rule_feedback(&p)
+        }),
+    );
 
     // 截图管理
     d.register(

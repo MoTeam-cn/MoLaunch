@@ -40,6 +40,23 @@ export interface CrashAnalysisItem {
   suspects?: string[]
 }
 
+/**
+ * 标记某条规则判断有误（只写本地启动器日志，不上报任何内容）
+ *
+ * 用户反馈问题时把启动器日志一并附上，即可定位是哪条规则误报。
+ */
+export function crashRuleFeedback(
+  ruleId: string,
+  category?: string,
+  note?: string,
+): Promise<{ recorded: boolean }> {
+  return toolsManager<{ recorded: boolean }>(TOOLS_ACTIONS.CRASH_RULE_FEEDBACK, {
+    rule_id: ruleId,
+    ...(category ? { category } : {}),
+    ...(note ? { note } : {}),
+  })
+}
+
 /** 崩溃日志分析结果 */
 export interface CrashAnalyzeResult {
   analyses: CrashAnalysisItem[]

@@ -132,6 +132,34 @@ pub fn get_java_version_range(
 
 /// 从版本 JSON 读取 Mojang 官方 Java 版本要求（覆盖规则表）
 ///
+/// 加载器 × Java 的硬约束：返回 Some(原因) 表示「一定会崩，应阻断启动」
+///
+/// 依据：旧版 Fabric / Quilt 加载器（0.15 之前）在 Java 25 上会在引导阶段直接崩溃
+/// （加载器自身的 ASM 版本读不懂 Java 25 的类文件）。新版加载器已适配，不拦。
+/// 用户可在版本设置里开启「忽略 Java 兼容性警告」绕过本约束。
+pub fn check_loader_java_compat(
+    loader: &str,
+    loader_version: Option<&str>,
+    java_major: u32,
+) -> Option<String> {
+    let loader_lower = loader.to_lowercase();
+    if loader_lower != "fabric" && loader_lower != "quilt" {
+        return None;
+    }
+    if java_major < 25 {
+        return None;
+    }
+    let version = loader_version?;
+    let parsed = super::loader_version::parse_semver3(version)?;
+    if parsed >= (0, 15, 0) {
+        return None;
+    }
+    Some(format!(
+        "{} {} 不支持 Java {}：Java 25 起收紧了原生访问限制，旧版加载器会在启动阶段直接崩溃。\n请在 版本设置 → 游戏 Java 改为 Java 21 或更低，或把加载器升级到 0.15 及以上。",
+        loader_lower, version, java_major
+    ))
+}
+
 /// Java 过新提示：返回 Some(文案) 表示「很可能不兼容，建议换版本」
 ///
 /// Java 25 起收紧了原生访问限制（JEP 472）并移除了一批旧 API，Minecraft 1.x 系列

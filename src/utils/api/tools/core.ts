@@ -35,6 +35,7 @@ export const TOOLS_ACTIONS = {
   // 文件名获取
   FETCH_FILENAME: 'fetch_filename',
   // 清理游戏垃圾
+  CRASH_RULE_FEEDBACK: 'crash_rule_feedback',
   CLEANUP_SCAN: 'cleanup_scan',
   CLEANUP_EXECUTE: 'cleanup_execute',
   // 内存优化

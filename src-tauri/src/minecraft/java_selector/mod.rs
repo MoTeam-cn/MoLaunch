@@ -4,6 +4,7 @@
 
 mod compat;
 mod installer;
+pub mod loader_version;
 mod rules;
 mod select;
 mod weight;
@@ -15,8 +16,8 @@ mod tests;
 pub use compat::{check_java_compatible, describe_java_requirement};
 pub use installer::get_java_for_installer;
 pub use rules::{
-    get_java_version_range, get_mojang_java_requirement, get_recommended_java_version,
-    get_required_java_version, java_too_new_warning,
+    check_loader_java_compat, get_java_version_range, get_mojang_java_requirement,
+    get_recommended_java_version, get_required_java_version, java_too_new_warning,
 };
 pub use select::{select_best_java, select_best_java_with_loader};
 pub use weight::get_java_version_weight;

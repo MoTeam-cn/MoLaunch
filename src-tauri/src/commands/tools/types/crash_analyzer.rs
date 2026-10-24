@@ -43,3 +43,15 @@ pub struct CrashAnalysisItem {
     #[serde(default)]
     pub suspects: Vec<String>,
 }
+/// 规则误报反馈参数
+#[derive(Debug, Serialize, Deserialize)]
+pub struct CrashRuleFeedbackParams {
+    /// 被标记误报的规则 id
+    pub rule_id: String,
+    /// 分类（可选，便于日志检索）
+    #[serde(default)]
+    pub category: Option<String>,
+    /// 用户补充说明（可选）
+    #[serde(default)]
+    pub note: Option<String>,
+}
