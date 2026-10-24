@@ -48,63 +48,81 @@ html[data-theme='dark'],
   background-color: var(--ui-page-bg);
 }
 
-/* 表面 */
-[data-theme='dark'] .bg-white {
-  background-color: var(--ui-surface);
-}
-[data-theme='dark'] .bg-gray-50 {
-  background-color: var(--ui-surface-raised);
-}
-[data-theme='dark'] .bg-gray-100 {
-  background-color: #22272f;
-}
-[data-theme='dark'] .bg-gray-200 {
-  background-color: #2b313a;
-}
-[data-theme='dark'] .hover\:bg-gray-50:hover {
-  background-color: #1f242b;
-}
-[data-theme='dark'] .hover\:bg-gray-100:hover {
-  background-color: #262c34;
+/* ------------------------------------------------------------
+   中性色：重映射 Tailwind v4 主题变量
+   ------------------------------------------------------------
+   v4 把 bg / text / border / divide / ring / from / to / via 全部编译成
+   var(--color-*) 引用，覆盖变量即可一次覆盖所有写法（含 hover / focus
+   变体、渐变端点、分隔线、描边环），不存在「漏掉某种工具类」的情况。
+   例外：gray-700~900 既当文字（要提亮）又当日志终端底色（要压深），
+   变量按文字语义提亮，终端面在下方单独钉回深色；white 不重映射，
+   否则 bg-primary-500 上的 text-white 会变成深字。
+------------------------------------------------------------ */
+[data-theme='dark'] {
+  --color-gray-50: #1c2027;
+  --color-gray-100: #22272f;
+  --color-gray-200: #2a2f37;
+  --color-gray-300: #454c57;
+  --color-gray-400: #7f8792;
+  --color-gray-500: #949ba5;
+  --color-gray-600: #aeb5bf;
+  --color-gray-700: #c9ced5;
+  --color-gray-800: #dcdfe3;
+  --color-gray-900: #e6e8eb;
+  --color-gray-950: #f2f4f6;
+  --color-slate-300: #7f8792;
+  --color-slate-400: #454c57;
+  --color-slate-500: #949ba5;
+  --color-slate-600: #aeb5bf;
 }
 
-/* 文字 */
-[data-theme='dark'] .text-gray-900 {
-  color: var(--ui-text);
+/* 白色面（卡片 / 浮层 / 渐变端点）：white 变量不能动，逐条重映射 */
+[data-theme='dark'] .bg-white {
+  background-color: #171a1f;
 }
-[data-theme='dark'] .text-gray-800 {
-  color: #dcdfe3;
+[data-theme='dark'] .to-white {
+  --tw-gradient-to: #171a1f;
 }
-[data-theme='dark'] .text-gray-700 {
-  color: #c9ced5;
+[data-theme='dark'] .from-white {
+  --tw-gradient-from: #171a1f;
 }
-[data-theme='dark'] .text-gray-600 {
-  color: var(--ui-text-muted);
+[data-theme='dark'] .via-white {
+  --tw-gradient-via: #171a1f;
 }
-[data-theme='dark'] .text-gray-500 {
-  color: #949ba4;
+
+/* 日志 / 终端类深色面：浅色主题下本来就是深底，深色主题继续压深 */
+[data-theme='dark'] .bg-gray-800,
+[data-theme='dark'] .bg-gray-900 {
+  background-color: #0b0d11;
 }
-[data-theme='dark'] .text-gray-400 {
-  color: #7b828b;
+[data-theme='dark'] .border-gray-700,
+[data-theme='dark'] .border-gray-800 {
+  border-color: #2a2f37;
 }
 [data-theme='dark'] .text-black {
   color: var(--ui-text);
 }
 
-/* 边框 */
-[data-theme='dark'] .border-gray-200 {
-  border-color: var(--ui-border);
-}
-[data-theme='dark'] .border-gray-300 {
-  border-color: var(--ui-border-strong);
-}
-[data-theme='dark'] .border-gray-100 {
-  border-color: #23282f;
-}
-[data-theme='dark'] .divide-gray-200 > :not([hidden]) ~ :not([hidden]) {
-  border-color: var(--ui-border);
-}
-
+/* 带透明度的中性色：v4 编译成字面色值（如 #fffc），变量覆盖不到，逐条重映射
+   注意：bg-white/10、/20、/40 是彩色条上的高光玻璃（顶栏按钮、进度条流光），
+   两种主题下都应保持白色，不在此重映射。 */
+[data-theme='dark'] .bg-white\/50 { background-color: rgb(23 26 31 / 0.50); }
+[data-theme='dark'] .bg-white\/60 { background-color: rgb(23 26 31 / 0.60); }
+[data-theme='dark'] .bg-white\/80 { background-color: rgb(23 26 31 / 0.80); }
+[data-theme='dark'] .bg-white\/90 { background-color: rgb(23 26 31 / 0.90); }
+[data-theme='dark'] .bg-white\/95 { background-color: rgb(23 26 31 / 0.95); }
+[data-theme='dark'] .bg-gray-50\/40 { background-color: rgb(28 32 39 / 0.40); }
+[data-theme='dark'] .bg-gray-50\/50 { background-color: rgb(28 32 39 / 0.50); }
+[data-theme='dark'] .bg-gray-50\/60 { background-color: rgb(28 32 39 / 0.60); }
+[data-theme='dark'] .bg-gray-50\/80 { background-color: rgb(28 32 39 / 0.80); }
+[data-theme='dark'] .bg-gray-50\/85 { background-color: rgb(28 32 39 / 0.85); }
+[data-theme='dark'] .bg-gray-100\/90 { background-color: rgb(34 39 47 / 0.9); }
+[data-theme='dark'] .bg-gray-200\/90 { background-color: rgb(42 47 55 / 0.9); }
+[data-theme='dark'] .bg-gray-800\/50 { background-color: rgb(11 13 17 / 0.5); }
+[data-theme='dark'] .hover\:bg-gray-800\/50:hover { background-color: rgb(11 13 17 / 0.5); }
+[data-theme='dark'] .bg-gray-900\/50 { background-color: rgb(11 13 17 / 0.5); }
+[data-theme='dark'] .bg-gray-900\/70 { background-color: rgb(11 13 17 / 0.7); }
+[data-theme='dark'] .bg-gray-900\/90 { background-color: rgb(11 13 17 / 0.9); }
 /* 主色浅底：深色下压成半透明主色，避免整块发白 */
 [data-theme='dark'] .bg-primary-50,
 [data-theme='dark'] .bg-primary-100 {

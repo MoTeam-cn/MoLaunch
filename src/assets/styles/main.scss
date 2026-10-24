@@ -267,9 +267,9 @@
 }
 
 @utility tag-gray {
-  color: #86909c;
-  background-color: #f2f3f5;
-  border-color: #f2f3f5;
+  color: var(--text-3);
+  background-color: var(--surface-1);
+  border-color: var(--surface-1);
 }
 
 @utility tag-primary {
@@ -320,8 +320,8 @@
   padding: 0 12px;
   font-size: 14px;
   line-height: 1.5715;
-  color: #1d2129;
-  background-color: #f2f3f5;
+  color: var(--text-1);
+  background-color: var(--surface-1);
   border: 1px solid transparent;
   border-radius: 2px;
   outline: none;
@@ -330,19 +330,19 @@
     border-color 0.1s cubic-bezier(0, 0, 1, 1),
     background-color 0.1s cubic-bezier(0, 0, 1, 1);
   &::placeholder {
-    color: #86909c;
+    color: var(--text-3);
   }
   &:hover:not(:disabled):not(:focus) {
-    background-color: #e5e6eb;
+    background-color: var(--surface-2);
   }
   &:focus {
     z-index: 1;
-    background-color: #ffffff;
+    background-color: var(--surface-0);
     border-color: var(--color-primary-500);
   }
   &:disabled {
-    color: #c9cdd4;
-    background-color: #f2f3f5;
+    color: var(--text-disabled);
+    background-color: var(--surface-1);
     cursor: not-allowed;
   }
   .search-input & {

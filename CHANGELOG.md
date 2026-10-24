@@ -4,6 +4,17 @@
 
 ## [Unreleased]
 
+### 修复
+
+#### 深色主题下仍出现白底卡片与看不清的浅字（中性色改为变量统一重映射）
+
+- **根因**（[`theme-dark.scss`](src/assets/styles/theme-dark.scss)）：上一轮只按「用到的类名」逐条写了 `bg-white` / `text-gray-*` / `border-gray-*` 的深色覆盖，覆盖网是枚举出来的，必然有漏。实测漏在三类写法上：① 渐变端点 `bg-linear-to-br from-gray-50 to-white`（首页时钟卡整块发白）；② 带透明度的类 `bg-white/80`、`bg-gray-50/50`，Tailwind v4 把它们编译成字面色值 `#fffc`，变量根本管不到；③ `text-gray-300/200`、`bg-gray-300/400/500`、`divide-gray-100`、`ring-gray-100/200` 从未写过覆盖，深色下是亮白分隔线与亮白圆点。
+- **结构修法**（[`theme-dark.scss`](src/assets/styles/theme-dark.scss)）：Tailwind v4 的工具类一律编译成 `var(--color-*)`，所以在 `[data-theme='dark']` 里直接重映射 `--color-gray-50 ~ 950` 与 `--color-slate-*`，`bg / text / border / divide / ring / from / to / via` 以及 `hover:` 变体一次性全部跟随，不再依赖枚举。`--color-white` 故意不动（`bg-primary-500 text-white` 的主按钮文字必须保持白），白色面改用 `.bg-white` / `.to-white` / `.from-white` 显式规则；`bg-gray-800/900` 这类日志终端面显式钉回 `#0b0d11`，因为 gray 变量按「文字语义」提亮，会让终端底色翻白。
+- **透明度档位**（[`theme-dark.scss`](src/assets/styles/theme-dark.scss)）：`bg-white/50·60·80·90·95` 与 `bg-gray-50/40·50·60·80·85`、`bg-gray-100/90`、`bg-gray-200/90`、`bg-gray-800/50`、`bg-gray-900/50·70·90` 逐条给出深色值。`bg-white/10·20·40` 不重映射——那是顶栏按钮与进度条上的高光玻璃，两种主题下都该是白的。
+- **自绘样式**（[`main.scss`](src/assets/styles/main.scss)）：`@utility input` 的底色/文字/占位符/聚焦/禁用态与 `@utility tag-gray` 此前是硬编码 `#f2f3f5` / `#1d2129` / `#86909c`，深色下输入框是一块亮白。现全部改走 `var(--surface-*)` / `var(--text-*)`，浅色取值与原硬编码逐位相同，观感零变化。
+- **守护测试**（[`dark-theme-coverage.test.ts`](src/assets/styles/__tests__/dark-theme-coverage.test.ts) 新增）：三条不变量挡回归——中性色变量必须整体重映射、源码里出现的带透明度中性色必须有深色规则（玻璃高光白名单除外）、样式文件不得再出现白色背景硬编码。
+- **验收**（无头浏览器实测计算样式，浅色/深色各一遍）：21 项深色断言全绿（卡片 `#171a1f`、边框 `#2a2f37`、标题 `#e6e8eb`、渐变 `#1c2027→#171a1f`、输入框 `#1f242b`、半透明浮层 `rgba(23,26,31,.8)`、终端 `#0b0d11`、分隔线 `#2a2f37`、圆点 `#454c57`），6 项浅色回归全绿（`bg-white` 仍 `#fff`、输入框仍 `#f2f3f5`、主按钮文字仍白、玻璃高光仍白）；深色对比度实测 14.21 / 6.22 / 4.80 / 12.71 / 9.49 / 5.36 / 5.26，全部达到 WCAG AA。
+
 ## [0.3.11] - 2026-10-24
 
 ### 修复
