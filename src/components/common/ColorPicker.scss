@@ -19,9 +19,9 @@
   height: 32px;
   padding: 0 12px;
   box-sizing: border-box;
-  color: #1d2129;
+  color: var(--text-1);
   font-size: 14px;
-  background-color: #f2f3f5;
+  background-color: var(--surface-1);
   border: 1px solid transparent;
   border-radius: 2px;
   cursor: pointer;
@@ -33,19 +33,19 @@
 }
 
 .color-picker-trigger:hover {
-  background-color: #e5e6eb;
+  background-color: var(--surface-2);
   border-color: transparent;
 }
 
 .color-picker-trigger.active {
-  background-color: #fff;
+  background-color: var(--surface-pop);
   border-color: var(--color-primary-500);
   box-shadow: none;
 }
 
 .color-picker-trigger.disabled {
-  color: #c9cdd4;
-  background-color: #f2f3f5;
+  color: var(--text-disabled);
+  background-color: var(--surface-1);
   border-color: transparent;
   cursor: not-allowed;
 }
@@ -72,7 +72,7 @@
 .color-picker-arrow {
   width: 12px;
   height: 12px;
-  color: #86909c;
+  color: var(--text-3);
   transition: transform 0.2s ease;
   flex-shrink: 0;
 }
@@ -83,8 +83,8 @@
 
 /* ---------- 下拉面板 ---------- */
 .color-picker-dropdown {
-  background-color: #fff;
-  border: 1px solid #e5e6eb;
+  background-color: var(--surface-pop);
+  border: 1px solid var(--border-subtle);
   border-radius: 4px;
   box-shadow: 0 4px 10px rgba(0, 0, 0, 0.1);
   padding: 12px;
@@ -93,7 +93,7 @@
 
 .cp-section-label {
   font-size: 12px;
-  color: #86909c;
+  color: var(--text-3);
   margin-bottom: 8px;
 }
 
@@ -125,7 +125,7 @@
 }
 
 .cp-preset-swatch.selected {
-  border: 2px solid #1d2129;
+  border: 2px solid var(--text-1);
 }
 
 .cp-check {
@@ -161,8 +161,8 @@
   box-sizing: border-box;
   font-size: 13px;
   font-family: 'Consolas', 'Monaco', monospace;
-  color: #1d2129;
-  background-color: #f2f3f5;
+  color: var(--text-1);
+  background-color: var(--surface-1);
   border: 1px solid transparent;
   border-radius: 2px;
   outline: none;
@@ -170,11 +170,11 @@
 }
 
 .color-picker-input:hover {
-  background-color: #e5e6eb;
+  background-color: var(--surface-2);
 }
 
 .color-picker-input:focus {
-  background-color: #fff;
+  background-color: var(--surface-pop);
   border-color: var(--color-primary-500);
 }
 

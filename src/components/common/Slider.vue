@@ -188,7 +188,7 @@ const showMeteor = computed(() => props.meteor && percent.value >= 66)
   width: 14px;
   height: 14px;
   border-radius: 50%;
-  background: #ffffff;
+  background: var(--surface-pop);
   border: 2px solid var(--color-primary-500);
   box-shadow: 0 1px 2px rgba(0, 0, 0, 0.15);
   cursor: pointer;
@@ -199,7 +199,7 @@ const showMeteor = computed(() => props.meteor && percent.value >= 66)
   width: 14px;
   height: 14px;
   border-radius: 50%;
-  background: #ffffff;
+  background: var(--surface-pop);
   border: 2px solid var(--color-primary-500);
   box-shadow: 0 1px 2px rgba(0, 0, 0, 0.15);
   cursor: pointer;
@@ -233,7 +233,7 @@ const showMeteor = computed(() => props.meteor && percent.value >= 66)
   top: 0;
   transform: translateX(-50%);
   font-size: 10px;
-  color: #86909c;
+  color: var(--text-3);
   white-space: nowrap;
 }
 

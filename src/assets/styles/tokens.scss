@@ -40,3 +40,34 @@
     --color-warning: 245 158 11;
     --color-error: 239 68 68;
   }
+
+/*
+  语义色 token（浅色默认值）
+
+  组件样式一律引用这些变量，深色模式只需在 theme-dark.scss 里覆盖同名变量，
+  不必为每个组件单独写 [data-theme='dark'] 覆盖规则。
+*/
+:root {
+  /* 表面 */
+  --surface-0: #ffffff;      /* 卡片底色 */
+  --surface-1: #f2f3f5;      /* 输入框 / 次级底色 */
+  --surface-2: #e5e6eb;      /* hover 底色 */
+  --surface-3: #d9dce0;      /* 按压 / 强调底色 */
+  --surface-pop: #ffffff;    /* 浮层：下拉、抽屉、弹层 */
+
+  /* 边框 */
+  --border-subtle: #e5e6eb;
+  --border-strong: #d1d5db;
+
+  /* 文字 */
+  --text-1: #1d2129;
+  --text-2: #4e5969;
+  --text-3: #86909c;
+  --text-disabled: #c9cdd4;
+
+  /* 轻提示底色（半透明浮层） */
+  --toast-bg: rgb(255 255 255 / 0.95);
+
+  /* 浮层阴影 */
+  --shadow-pop: 0 4px 10px rgb(0 0 0 / 0.1);
+}

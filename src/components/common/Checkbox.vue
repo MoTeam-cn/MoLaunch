@@ -171,8 +171,8 @@ function onChange(e: Event) {
   box-sizing: border-box;
   width: 14px;
   height: 14px;
-  background-color: #ffffff;
-  border: 2px solid #c9cdd4;
+  background-color: var(--surface-pop);
+  border: 2px solid var(--text-disabled);
   border-radius: 2px;
   display: inline-flex;
   align-items: center;
@@ -189,7 +189,7 @@ function onChange(e: Event) {
   display: block;
   width: 6px;
   height: 2px;
-  background: #ffffff;
+  background: var(--surface-pop);
   border-radius: 0.5px;
   transform: translateX(-50%) translateY(-50%) scale(0);
 }
@@ -207,7 +207,7 @@ function onChange(e: Event) {
 
 /* hover 时边框变深 */
 .checkbox:hover .checkbox-icon {
-  border-color: #86909c;
+  border-color: var(--text-3);
 }
 
 /* 选中状态：主色底 + 透明边框 + 勾选图标 scale 1 */
@@ -237,7 +237,7 @@ function onChange(e: Event) {
 /* 文字标签 */
 .checkbox-label {
   margin-left: 8px;
-  color: #1d2129;
+  color: var(--text-1);
 }
 
 /* 禁用状态 */
@@ -248,8 +248,8 @@ function onChange(e: Event) {
   cursor: not-allowed;
 }
 .checkbox.checkbox-disabled .checkbox-icon {
-  background-color: #f2f3f5;
-  border-color: #c9cdd4;
+  background-color: var(--surface-1);
+  border-color: var(--text-disabled);
 }
 .checkbox.checkbox-disabled.checkbox-checked .checkbox-icon,
 .checkbox.checkbox-disabled.checkbox-indeterminate .checkbox-icon {
@@ -257,13 +257,13 @@ function onChange(e: Event) {
   border-color: transparent;
 }
 .checkbox.checkbox-disabled:hover .checkbox-icon {
-  border-color: #c9cdd4;
+  border-color: var(--text-disabled);
 }
 .checkbox.checkbox-disabled .checkbox-label {
-  color: #c9cdd4;
+  color: var(--text-disabled);
 }
 .checkbox.checkbox-disabled .checkbox-icon-check {
-  color: #c9cdd4;
+  color: var(--text-disabled);
 }
 .checkbox.checkbox-disabled:hover .checkbox-icon-hover::before {
   background-color: transparent;

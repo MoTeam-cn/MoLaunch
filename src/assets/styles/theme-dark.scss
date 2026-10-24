@@ -19,6 +19,21 @@
   --ui-border-strong: #343a44;
   --ui-text: #e6e8eb;
   --ui-text-muted: #a8aeb6;
+
+  /* 语义 token 的深色取值（浅色默认值在 tokens.scss） */
+  --surface-0: #171a1f;
+  --surface-1: #1f242b;
+  --surface-2: #262c34;
+  --surface-3: #313843;
+  --surface-pop: #1c2027;
+  --border-subtle: #2a2f37;
+  --border-strong: #3a414c;
+  --text-1: #e6e8eb;
+  --text-2: #b7bdc6;
+  --text-3: #8b939d;
+  --text-disabled: #5c646e;
+  --toast-bg: rgb(28 32 39 / 0.95);
+  --shadow-pop: 0 8px 24px rgb(0 0 0 / 0.55);
 }
 
 html[data-theme='dark'],
@@ -152,6 +167,171 @@ html[data-theme='dark'],
   box-shadow: 0 1px 3px rgb(0 0 0 / 0.5);
 }
 
+
+/* ============================================================
+   标签：浅色底 + 深色字在深色下会变成刺眼的浅色块，改成半透明底 + 提亮文字
+   ============================================================ */
+[data-theme='dark'] .tag-red {
+  color: #ff8f8f;
+  background-color: rgb(245 63 63 / 0.16);
+  border-color: transparent;
+}
+[data-theme='dark'] .tag-orangered {
+  color: #ffa552;
+  background-color: rgb(255 125 0 / 0.16);
+  border-color: transparent;
+}
+[data-theme='dark'] .tag-orange {
+  color: #ffb45e;
+  background-color: rgb(255 154 46 / 0.16);
+  border-color: transparent;
+}
+[data-theme='dark'] .tag-gold {
+  color: #f7ca5c;
+  background-color: rgb(247 186 30 / 0.16);
+  border-color: transparent;
+}
+[data-theme='dark'] .tag-lime {
+  color: #b9e85c;
+  background-color: rgb(159 219 29 / 0.16);
+  border-color: transparent;
+}
+[data-theme='dark'] .tag-green {
+  color: #4fd96b;
+  background-color: rgb(0 180 42 / 0.16);
+  border-color: transparent;
+}
+[data-theme='dark'] .tag-cyan {
+  color: #4fe0e0;
+  background-color: rgb(20 201 201 / 0.16);
+  border-color: transparent;
+}
+[data-theme='dark'] .tag-blue {
+  color: #6fb3ff;
+  background-color: rgb(52 145 250 / 0.18);
+  border-color: transparent;
+}
+[data-theme='dark'] .tag-arcoblue {
+  color: #6ea8ff;
+  background-color: rgb(22 93 255 / 0.2);
+  border-color: transparent;
+}
+[data-theme='dark'] .tag-purple {
+  color: #b98af0;
+  background-color: rgb(114 46 209 / 0.2);
+  border-color: transparent;
+}
+[data-theme='dark'] .tag-pinkpurple {
+  color: #ef7bef;
+  background-color: rgb(217 26 217 / 0.18);
+  border-color: transparent;
+}
+[data-theme='dark'] .tag-magenta {
+  color: #ff7ab8;
+  background-color: rgb(245 49 157 / 0.18);
+  border-color: transparent;
+}
+[data-theme='dark'] .tag-gray {
+  color: var(--text-3);
+  background-color: rgb(134 144 156 / 0.16);
+  border-color: transparent;
+}
+
+/* 其它浅底工具类（cyan / purple / orange / lime / indigo / pink / sky / teal / rose / violet / yellow / emerald） */
+[data-theme='dark'] .bg-cyan-50,
+[data-theme='dark'] .bg-cyan-100 {
+  background-color: rgb(8 145 178 / 0.16);
+}
+[data-theme='dark'] .bg-purple-50,
+[data-theme='dark'] .bg-purple-100,
+[data-theme='dark'] .bg-violet-50,
+[data-theme='dark'] .bg-violet-100 {
+  background-color: rgb(124 58 237 / 0.16);
+}
+[data-theme='dark'] .bg-orange-50,
+[data-theme='dark'] .bg-orange-100 {
+  background-color: rgb(234 88 12 / 0.16);
+}
+[data-theme='dark'] .bg-lime-50,
+[data-theme='dark'] .bg-lime-100 {
+  background-color: rgb(101 163 13 / 0.16);
+}
+[data-theme='dark'] .bg-indigo-50,
+[data-theme='dark'] .bg-indigo-100 {
+  background-color: rgb(79 70 229 / 0.16);
+}
+[data-theme='dark'] .bg-pink-50,
+[data-theme='dark'] .bg-pink-100,
+[data-theme='dark'] .bg-rose-50,
+[data-theme='dark'] .bg-rose-100 {
+  background-color: rgb(219 39 119 / 0.16);
+}
+[data-theme='dark'] .bg-sky-50,
+[data-theme='dark'] .bg-sky-100 {
+  background-color: rgb(2 132 199 / 0.16);
+}
+[data-theme='dark'] .bg-teal-50,
+[data-theme='dark'] .bg-teal-100 {
+  background-color: rgb(13 148 136 / 0.16);
+}
+[data-theme='dark'] .bg-yellow-50,
+[data-theme='dark'] .bg-yellow-100 {
+  background-color: rgb(202 138 4 / 0.16);
+}
+[data-theme='dark'] .bg-emerald-50,
+[data-theme='dark'] .bg-emerald-100 {
+  background-color: rgb(5 150 105 / 0.16);
+}
+
+/* 对应的深色文字提亮（浅底上的 -600 在深色下对比不足） */
+[data-theme='dark'] .text-cyan-600,
+[data-theme='dark'] .text-cyan-700 {
+  color: #4fe0e0;
+}
+[data-theme='dark'] .text-blue-600,
+[data-theme='dark'] .text-blue-700 {
+  color: #6fb3ff;
+}
+[data-theme='dark'] .text-purple-600,
+[data-theme='dark'] .text-purple-700,
+[data-theme='dark'] .text-violet-600,
+[data-theme='dark'] .text-violet-700 {
+  color: #b98af0;
+}
+[data-theme='dark'] .text-orange-600,
+[data-theme='dark'] .text-orange-700 {
+  color: #ffb45e;
+}
+[data-theme='dark'] .text-lime-600,
+[data-theme='dark'] .text-lime-700 {
+  color: #b9e85c;
+}
+[data-theme='dark'] .text-indigo-600,
+[data-theme='dark'] .text-indigo-700 {
+  color: #a5b4fc;
+}
+[data-theme='dark'] .text-pink-600,
+[data-theme='dark'] .text-pink-700,
+[data-theme='dark'] .text-rose-600,
+[data-theme='dark'] .text-rose-700 {
+  color: #ff7ab8;
+}
+[data-theme='dark'] .text-sky-600,
+[data-theme='dark'] .text-sky-700 {
+  color: #7dd3fc;
+}
+[data-theme='dark'] .text-teal-600,
+[data-theme='dark'] .text-teal-700 {
+  color: #5eead4;
+}
+[data-theme='dark'] .text-yellow-600,
+[data-theme='dark'] .text-yellow-700 {
+  color: #f7ca5c;
+}
+[data-theme='dark'] .text-emerald-600,
+[data-theme='dark'] .text-emerald-700 {
+  color: #6ee7b7;
+}
 /* ============================================================
    界面密度：紧凑 = 根字号缩小，rem 间距/字号整体收紧
    ============================================================ */

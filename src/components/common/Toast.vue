@@ -171,7 +171,7 @@ defineExpose({
   align-items: center;
   height: 32px;
   border-radius: 0 8px 8px 0;
-  background: rgba(255, 255, 255, 0.95);
+  background: var(--toast-bg);
   box-shadow: 0 2px 12px rgba(0, 0, 0, 0.1), 0 1px 3px rgba(0, 0, 0, 0.06);
   overflow: hidden;
   /* 基类必须是可见的结束态：进入动画的 0% 关键帧已提供初始隐藏态
@@ -219,7 +219,7 @@ defineExpose({
 }
 
 .toast-text {
-  color: #1f2937;
+  color: var(--text-1);
   font-size: 13px;
   font-weight: 500;
   padding: 0 12px 0 8px;

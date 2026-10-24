@@ -1,6 +1,6 @@
 /* ============================================================
  * 触发器
- * height: 32px, font-size: 14px, bg: #f2f3f5, border-radius: 2px
+ * height: 32px, font-size: 14px, bg: var(--surface-1), border-radius: 2px
  * ============================================================ */
 .custom-select {
   position: relative;
@@ -17,11 +17,11 @@
   height: 32px;
   padding: 0 12px;
   box-sizing: border-box;
-  /* 文字色 #1d2129, 字号 14px */
-  color: #1d2129;
+  /* 文字色 var(--text-1), 字号 14px */
+  color: var(--text-1);
   font-size: 14px;
-  /* 背景 #f2f3f5, 边框透明 */
-  background-color: #f2f3f5;
+  /* 背景 var(--surface-1), 边框透明 */
+  background-color: var(--surface-1);
   border: 1px solid transparent;
   /* 圆角 2px */
   border-radius: 2px;
@@ -35,24 +35,24 @@
     background-color 0.1s cubic-bezier(0, 0, 1, 1);
 }
 
-/* hover：背景 #e5e6eb */
+/* hover：背景 var(--surface-2) */
 .select-trigger:hover {
-  background-color: #e5e6eb;
+  background-color: var(--surface-2);
   border-color: transparent;
 }
 
-/* 展开时：背景 #fff, 边框主色 */
+/* 展开时：背景 var(--surface-pop), 边框主色 */
 .select-trigger.active {
-  background-color: #fff;
+  background-color: var(--surface-pop);
   border-color: var(--color-primary-500);
   /* 无外扩阴影，仅边框变色 */
   box-shadow: none;
 }
 
-/* 禁用态：文字 #c9cdd4, 背景 #f2f3f5 */
+/* 禁用态：文字 var(--text-disabled), 背景 var(--surface-1) */
 .select-trigger.disabled {
-  color: #c9cdd4;
-  background-color: #f2f3f5;
+  color: var(--text-disabled);
+  background-color: var(--surface-1);
   border-color: transparent;
   cursor: not-allowed;
 }
@@ -67,13 +67,13 @@
 }
 
 .select-value.placeholder {
-  color: #86909c;
+  color: var(--text-3);
 }
 
 .select-arrow {
   width: 12px;
   height: 12px;
-  color: #86909c;
+  color: var(--text-3);
   transition: transform 0.2s ease;
   flex-shrink: 0;
 }
@@ -103,7 +103,7 @@
   display: block;
   width: 12px;
   height: 12px;
-  color: #86909c;
+  color: var(--text-3);
 }
 
 /* hover 触发器时：显示清空按钮 + 隐藏后续兄弟箭头 */
@@ -117,17 +117,17 @@
 
 /* 清空按钮自身 hover：浅灰圆形背景（比触发器 hover 略深以保证可见） */
 .select-clear-btn:hover {
-  background-color: #d9dce0;
+  background-color: var(--surface-3);
 }
 
 /* ============================================================
  * 下拉面板
- * bg: #fff, border 1px #e5e6eb, radius 4px, shadow 0 4px 10px
+ * bg: var(--surface-pop), border 1px var(--border-subtle), radius 4px, shadow 0 4px 10px
  * padding: 4px 0, max-height 200px
  * ============================================================ */
 .select-dropdown {
-  background-color: #fff;
-  border: 1px solid #e5e6eb;
+  background-color: var(--surface-pop);
+  border: 1px solid var(--border-subtle);
   border-radius: 4px;
   box-shadow: 0 4px 10px rgba(0, 0, 0, 0.1);
   padding: 4px 0;
@@ -142,7 +142,7 @@
 /* ============================================================
  * 选项
  * line-height: 36px, padding 0 12px, font-size 14px
- * hover bg: #f2f3f5, selected font-weight 500
+ * hover bg: var(--surface-1), selected font-weight 500
  * ============================================================ */
 .select-option {
   display: flex;
@@ -156,7 +156,7 @@
   line-height: 36px;
   height: 36px;
   font-size: 14px;
-  color: #1d2129;
+  color: var(--text-1);
   text-align: left;
   background-color: transparent;
   cursor: pointer;
@@ -164,13 +164,13 @@
 }
 
 .select-option:hover {
-  color: #1d2129;
-  background-color: #f2f3f5;
+  color: var(--text-1);
+  background-color: var(--surface-1);
 }
 
 /* 选中态：font-weight 500, 背景透明, 颜色不变 */
 .select-option.selected {
-  color: #1d2129;
+  color: var(--text-1);
   font-weight: 500;
   background-color: transparent;
 }
@@ -203,7 +203,7 @@
   padding: 8px 12px;
   text-align: center;
   font-size: 14px;
-  color: #86909c;
+  color: var(--text-3);
 }
 
 /* ============================================================
