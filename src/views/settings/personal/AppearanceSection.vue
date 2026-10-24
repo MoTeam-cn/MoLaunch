@@ -1,15 +1,17 @@
 <script setup lang="ts">
 import { defineAsyncComponent } from 'vue'
 /**
- * 外观设置区：主题色 + 启动器语言
+ * 外观设置区：外观模式 + 主题色 + 动态主色 + 启动器语言
  */
 import { useSettingsStore } from '@/stores/settings'
+import { useUiPrefsStore } from '@/stores/ui-prefs'
 import { useAccentDynamics } from '@/composables/useAccentDynamics'
 const Select = defineAsyncComponent(() => import('@/components/common/Select.vue'))
 const ColorPicker = defineAsyncComponent(() => import('@/components/common/ColorPicker.vue'))
 const AccentDynamicsSection = defineAsyncComponent(() => import('./AccentDynamicsSection.vue'))
 
 const settingsStore = useSettingsStore()
+const uiStore = useUiPrefsStore()
 const { available: accentReady } = useAccentDynamics()
 </script>
 
@@ -17,6 +19,26 @@ const { available: accentReady } = useAccentDynamics()
   <div class="bg-white rounded-lg border border-gray-300 overflow-hidden">
     <h3 class="text-sm font-semibold text-gray-900 px-5 pt-5 pb-3">外观</h3>
     <div class="divide-y divide-gray-200">
+      <!-- 外观模式（浅色 / 深色 / 跟随系统） -->
+      <div class="px-5 py-4">
+        <div class="flex items-center justify-between gap-4">
+          <div class="min-w-0">
+            <p class="text-sm font-medium text-gray-900">外观模式</p>
+            <p class="text-xs text-gray-500 mt-0.5">深色模式覆盖启动器全部界面；跟随系统会随系统配色自动切换</p>
+          </div>
+          <div class="flex-none w-40">
+            <Select
+              :model-value="uiStore.appearance"
+              :options="[
+                { label: '跟随系统', value: 'system' },
+                { label: '浅色', value: 'light' },
+                { label: '深色', value: 'dark' },
+              ]"
+              @update:model-value="uiStore.setAppearance($event as 'light' | 'dark' | 'system')"
+            />
+          </div>
+        </div>
+      </div>
       <!-- 主题色（Arco Design 风格颜色选择器，控制所有 primary 蓝色区域） -->
       <div class="px-5 py-4">
         <div class="flex items-center justify-between gap-4">

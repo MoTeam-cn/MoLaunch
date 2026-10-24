@@ -52,6 +52,7 @@ import { useAccentDynamics } from '@/composables/useAccentDynamics'
 import { attachInputTelemetry } from '@/composables/useInputTelemetry'
 import { toastInfo } from '@/utils/toast'
 import type { EasyTierStatusResult } from '@/types/online'
+import AppBackground from '@/components/common/AppBackground.vue'
 
 const sdkStore = useSdkStore()
 const authStore = useAuthStore()
@@ -236,6 +237,7 @@ async function restorePage(savedPath: string): Promise<void> {
 </script>
 
 <template>
+  <AppBackground />
   <TopNavLayout>
     <!--
       wrapper div 提供 relative 定位上下文，让路由切换时离开组件的

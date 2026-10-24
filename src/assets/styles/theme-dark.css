@@ -1,0 +1,212 @@
+/*
+  界面个性化：深色模式 / 界面密度 / 减少动效 / 自定义背景层
+
+  说明：本文件是「覆盖层」——在 Tailwind 工具类之上按 [data-theme='dark'] 等属性重映射颜色。
+  选择器特异性（属性 + 类 = 0,2,0）高于工具类（0,1,0），无需 !important。
+  后续若把组件逐步迁移到语义 token，可逐条删除这里对应的规则。
+*/
+
+/* ============================================================
+   深色模式
+   ============================================================ */
+[data-theme='dark'] {
+  color-scheme: dark;
+  --ui-page-bg: #0f1115;
+  --ui-surface: #171a1f;
+  --ui-surface-raised: #1c2027;
+  --ui-surface-sunken: #12151a;
+  --ui-border: #2a2f37;
+  --ui-border-strong: #343a44;
+  --ui-text: #e6e8eb;
+  --ui-text-muted: #a8aeb6;
+}
+
+html[data-theme='dark'],
+[data-theme='dark'] body {
+  background-color: var(--ui-page-bg);
+  color: var(--ui-text);
+}
+
+/* 页面底色 */
+[data-theme='dark'] .bg-page,
+[data-theme='dark'] .bg-brand-page {
+  background-color: var(--ui-page-bg);
+}
+
+/* 表面 */
+[data-theme='dark'] .bg-white {
+  background-color: var(--ui-surface);
+}
+[data-theme='dark'] .bg-gray-50 {
+  background-color: var(--ui-surface-raised);
+}
+[data-theme='dark'] .bg-gray-100 {
+  background-color: #22272f;
+}
+[data-theme='dark'] .bg-gray-200 {
+  background-color: #2b313a;
+}
+[data-theme='dark'] .hover\:bg-gray-50:hover {
+  background-color: #1f242b;
+}
+[data-theme='dark'] .hover\:bg-gray-100:hover {
+  background-color: #262c34;
+}
+
+/* 文字 */
+[data-theme='dark'] .text-gray-900 {
+  color: var(--ui-text);
+}
+[data-theme='dark'] .text-gray-800 {
+  color: #dcdfe3;
+}
+[data-theme='dark'] .text-gray-700 {
+  color: #c9ced5;
+}
+[data-theme='dark'] .text-gray-600 {
+  color: var(--ui-text-muted);
+}
+[data-theme='dark'] .text-gray-500 {
+  color: #949ba4;
+}
+[data-theme='dark'] .text-gray-400 {
+  color: #7b828b;
+}
+[data-theme='dark'] .text-black {
+  color: var(--ui-text);
+}
+
+/* 边框 */
+[data-theme='dark'] .border-gray-200 {
+  border-color: var(--ui-border);
+}
+[data-theme='dark'] .border-gray-300 {
+  border-color: var(--ui-border-strong);
+}
+[data-theme='dark'] .border-gray-100 {
+  border-color: #23282f;
+}
+[data-theme='dark'] .divide-gray-200 > :not([hidden]) ~ :not([hidden]) {
+  border-color: var(--ui-border);
+}
+
+/* 主色浅底：深色下压成半透明主色，避免整块发白 */
+[data-theme='dark'] .bg-primary-50,
+[data-theme='dark'] .bg-primary-100 {
+  background-color: rgb(11 91 203 / 0.18);
+}
+[data-theme='dark'] .bg-primary-50\/60 {
+  background-color: rgb(11 91 203 / 0.16);
+}
+[data-theme='dark'] .text-primary-600,
+[data-theme='dark'] .text-primary-700 {
+  color: #6ea8ff;
+}
+
+/* 语义色浅底 */
+[data-theme='dark'] .bg-red-50,
+[data-theme='dark'] .bg-red-100 {
+  background-color: rgb(220 38 38 / 0.16);
+}
+[data-theme='dark'] .bg-amber-50,
+[data-theme='dark'] .bg-amber-100 {
+  background-color: rgb(217 119 6 / 0.16);
+}
+[data-theme='dark'] .bg-green-50,
+[data-theme='dark'] .bg-green-100 {
+  background-color: rgb(22 163 74 / 0.16);
+}
+[data-theme='dark'] .bg-blue-50,
+[data-theme='dark'] .bg-blue-100 {
+  background-color: rgb(37 99 235 / 0.16);
+}
+[data-theme='dark'] .text-red-700 {
+  color: #ff8f8f;
+}
+[data-theme='dark'] .text-amber-700 {
+  color: #f3c07a;
+}
+[data-theme='dark'] .text-green-700,
+[data-theme='dark'] .text-green-600 {
+  color: #6ed99a;
+}
+
+/* 输入框 / 滚动条 / 阴影 */
+[data-theme='dark'] input,
+[data-theme='dark'] textarea,
+[data-theme='dark'] select {
+  color: var(--ui-text);
+}
+[data-theme='dark'] ::placeholder {
+  color: #6f7681;
+}
+[data-theme='dark'] ::-webkit-scrollbar-track {
+  background: var(--ui-surface-sunken);
+}
+[data-theme='dark'] ::-webkit-scrollbar-thumb {
+  background: #3a414c;
+}
+[data-theme='dark'] .shadow-sm,
+[data-theme='dark'] .shadow-md,
+[data-theme='dark'] .shadow-lg {
+  box-shadow: 0 1px 3px rgb(0 0 0 / 0.5);
+}
+
+/* ============================================================
+   界面密度：紧凑 = 根字号缩小，rem 间距/字号整体收紧
+   ============================================================ */
+[data-density='compact'] {
+  font-size: 14px;
+}
+
+/* ============================================================
+   减少动效：用户开关 或 系统 prefers-reduced-motion 均生效
+   ============================================================ */
+[data-reduce-motion='true'] *,
+[data-reduce-motion='true'] *::before,
+[data-reduce-motion='true'] *::after {
+  animation-duration: 0.01ms !important;
+  animation-iteration-count: 1 !important;
+  transition-duration: 0.01ms !important;
+  scroll-behavior: auto !important;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+/* ============================================================
+   自定义背景层（由 AppBackground.vue 使用）
+   ============================================================ */
+.ui-bg-image {
+  background-image: var(--ui-bg-image, none);
+  background-size: var(--ui-bg-size, cover);
+  background-repeat: var(--ui-bg-repeat, no-repeat);
+  background-position: center;
+  filter: blur(var(--ui-bg-blur, 0px));
+  /* 模糊会吃掉边缘，稍微放大避免露白边 */
+  transform: scale(1.06);
+}
+
+.ui-bg-mask {
+  background-color: rgb(240 245 255 / var(--ui-bg-mask, 0));
+}
+
+[data-theme='dark'] .ui-bg-mask {
+  background-color: rgb(15 17 21 / var(--ui-bg-mask, 0));
+}
+
+/* 开背景图后让卡片半透明，否则背景被完全盖住看不出效果 */
+[data-has-background='true'] .bg-white {
+  background-color: rgb(255 255 255 / 0.88);
+}
+[data-has-background='true'][data-theme='dark'] .bg-white {
+  background-color: rgb(23 26 31 / 0.88);
+}

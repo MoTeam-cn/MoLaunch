@@ -19,16 +19,21 @@ const ExitConfirmDialog = defineAsyncComponent(() => import('./ExitConfirmDialog
 import { topNavItems, experimentalNavItem } from './topNavItems'
 import { useTauriEvent } from '@/utils/tauriEvent'
 import { useExperimental } from '@/composables/useExperimental'
+import { useUiPrefsStore } from '@/stores/ui-prefs'
 const appWindow = getCurrentWebviewWindow()
 const onlineStore = useOnlineStore()
 const { enabled: experimentalEnabled } = useExperimental()
+const uiPrefsStore = useUiPrefsStore()
 
 const router = useRouter()
 const route = useRoute()
 
 const visibleNavItems = computed(() => {
-  const items = topNavItems.filter((i) => i.path !== experimentalNavItem.path)
-  if (experimentalEnabled.value) {
+  // 先按「功能隐藏」过滤，再处理实验性入口的插入位置
+  const items = topNavItems.filter(
+    (i) => i.path !== experimentalNavItem.path && !uiPrefsStore.isPageHidden(i.path),
+  )
+  if (experimentalEnabled.value && !uiPrefsStore.isPageHidden(experimentalNavItem.path)) {
     const idx = items.findIndex((i) => i.path === '/apps/settings')
     if (idx >= 0) {
       items.splice(idx, 0, experimentalNavItem)

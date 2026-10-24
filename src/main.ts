@@ -7,6 +7,7 @@ import { usePluginStore } from './stores/plugins'
 import { renderNonTauriWarning } from './utils/checkTauriEnv'
 import { setupDevApi } from './utils/dev-api'
 import './assets/styles/main.css'
+import './assets/styles/theme-dark.css'
 import 'ol/ol.css'
 
 // 前端 JS 入口最早可执行点：此时 WebView2 已完成 HTML/JS bundle 加载

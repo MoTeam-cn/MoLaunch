@@ -2,7 +2,10 @@
 /**
  * 设置 - 个性化页面
  *
- * - 外观：主题色、启动器语言 → AppearanceSection
+ * - 外观：外观模式、主题色、启动器语言 → AppearanceSection
+ * - 界面排版：密度、减少动效 → UiLayoutSection
+ * - 背景：自定义背景图、模糊、遮罩 → BackgroundSection
+ * - 功能隐藏：隐藏导航页面 → HiddenItemsSection
  * - 主页：主页右侧内容区模式选择 → HomePanelModeSection
  * - 游戏：默认界面语言（写入 options.txt 的 lang 字段）
  */
@@ -13,6 +16,9 @@ const Select = defineAsyncComponent(() => import('@/components/common/Select.vue
 const ToggleRow = defineAsyncComponent(() => import('@/components/settings/ToggleRow.vue'))
 const AppearanceSection = defineAsyncComponent(() => import('./personal/AppearanceSection.vue'))
 const HomePanelModeSection = defineAsyncComponent(() => import('./personal/HomePanelModeSection.vue'))
+const UiLayoutSection = defineAsyncComponent(() => import('./personal/UiLayoutSection.vue'))
+const BackgroundSection = defineAsyncComponent(() => import('./personal/BackgroundSection.vue'))
+const HiddenItemsSection = defineAsyncComponent(() => import('./personal/HiddenItemsSection.vue'))
 
 const settingsStore = useSettingsStore()
 
@@ -52,6 +58,15 @@ watch(closeBehavior, (val) => {
   <div class="space-y-6">
     <!-- 外观 -->
     <AppearanceSection />
+
+    <!-- 界面排版（密度 / 减少动效） -->
+    <UiLayoutSection />
+
+    <!-- 背景 -->
+    <BackgroundSection />
+
+    <!-- 功能隐藏 -->
+    <HiddenItemsSection />
 
     <!-- 主页 -->
     <HomePanelModeSection />

@@ -6,6 +6,7 @@
 
 import { createRouter, createWebHistory } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
+import { useUiPrefsStore } from '@/stores/ui-prefs'
 
 const router = createRouter({
   history: createWebHistory(),
@@ -77,6 +78,11 @@ const router = createRouter({
 })
 
 router.beforeEach((to, _from, next) => {
+  // 被「功能隐藏」的页面直接访问时回到首页（导航入口已被过滤，这里兜住深链接）
+  if (isPathHidden(to.path)) {
+    next('/apps')
+    return
+  }
   const authStore = useAuthStore()
   // 会话恢复期间不拦截：restoreSession 是异步的，在 App.vue onMounted 中调用。
   // 若不跳过守卫，应用启动时 currentUser 还是 null，会把已登录用户错误地重定向到 /login。
@@ -95,5 +101,11 @@ router.beforeEach((to, _from, next) => {
     next()
   }
 })
+
+/** 路径是否被用户隐藏（设置页与首页永不放行隐藏） */
+function isPathHidden(path: string): boolean {
+  const store = useUiPrefsStore()
+  return store.isPageHidden(path)
+}
 
 export default router
