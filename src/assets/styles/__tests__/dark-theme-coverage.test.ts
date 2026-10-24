@@ -75,12 +75,26 @@ describe('深色主题覆盖', () => {
     expect(missing, '这些类编译成字面色值，必须在 theme-dark.scss 里补深色规则').toEqual([])
   })
 
+  it('should 禁止浅色背景硬编码 when 组件内写 scoped 样式', () => {
+    const offenders: string[] = []
+    const lightBg = /(?:background(?:-color)?)\s*:\s*(?:#fff\b|#ffffff\b|white\b|#f2f3f5\b|#e5e6eb\b|#f7f8fa\b|#f5f6f8\b)/i
+    for (const file of collectSources(SRC).filter((f) => f.endsWith('.vue'))) {
+      const text = fs.readFileSync(file, 'utf8')
+      for (const block of text.match(/<style[\s\S]*?<\/style>/g) ?? []) {
+        block.split(/\r?\n/).forEach((line, index) => {
+          if (lightBg.test(line)) offenders.push(`${path.relative(SRC, file).replace(/\\/g, '/')}:${index + 1} ${line.trim().slice(0, 80)}`)
+        })
+      }
+    }
+    expect(offenders, '组件内背景请改用 var(--surface-*) 语义 token').toEqual([])
+  })
+
   it('should 禁止白色背景硬编码 when 书写样式文件', () => {
     const offenders: string[] = []
     for (const file of fs.readdirSync(STYLES).filter((f) => f.endsWith('.scss') && f !== 'tokens.scss')) {
       const text = fs.readFileSync(path.join(STYLES, file), 'utf8')
       text.split(/\r?\n/).forEach((line, index) => {
-        if (/background(-color)?:\s*(#fff\b|#ffffff\b|white\b)/i.test(line)) {
+        if (/(?:background(?:-color)?)\s*:\s*(?:#fff\b|#ffffff\b|white\b|#f2f3f5\b|#e5e6eb\b|#f7f8fa\b|#f5f6f8\b|#c9cdd4\b)/i.test(line)) {
           offenders.push(`${file}:${index + 1} ${line.trim()}`)
         }
       })
