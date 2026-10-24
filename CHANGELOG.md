@@ -6,6 +6,12 @@
 
 ### 修复
 
+#### 设备认证时间戳改用服务端对齐时间（修复「时间戳超出容差范围」）
+
+- **问题**（[`helpers.rs`](src-tauri/src/minecraft/online/auth/helpers.rs)）：注册/登录/续期的 `timestamp` 参与 MoSign-v1 签名，此前直接用本机时钟（`chrono::Utc::now()`）。服务端按 `auth.timestamp_skew` 校验容差，客户端时钟一漂移（CMOS 掉电、手动改时区/夏令时、虚拟机挂起、系统时间被同步工具回拨）就被拒成「时间戳超出容差范围」，表现为注册/登录随机失败。
+- **改法**（[`time_sync.rs`](src-tauri/src/minecraft/online/time_sync.rs) 新增）：用已有的 `GET /v3/time` 计算「服务端 - 本机」偏移并缓存 10 分钟，`now_timestamp()` 改为读对齐后的 `server_now()`；注册、登录、静默注册、refresh 前调用 `ensure_fresh()`，并发调用只发一次请求。
+- **降级**：对齐失败只打 `warn` 并回落本机时钟——时间对齐是增强项，不能阻断认证流程；偏移超过 30 秒时日志会明确写出偏差秒数，便于排查客户端时钟异常。
+- **测试**（[`time_sync_test.rs`](src-tauri/src/minecraft/online/time_sync_test.rs) 新增）：偏移计算的正/负/零/极端值，以及未对齐时 `server_now()` 等于本机时间。
 #### 深色主题守护测试的类名匹配改为解析已有选择器（消除 code scanning 告警）
 
 - **问题**（[`dark-theme-coverage.test.ts`](src/assets/styles/__tests__/dark-theme-coverage.test.ts)）：守护测试原先「把工具类名拼成 CSS 选择器再 `includes`」，只转义了斜杠，属于不完整的字符串清洗，CodeQL `js/incomplete-sanitization` 报了 high。

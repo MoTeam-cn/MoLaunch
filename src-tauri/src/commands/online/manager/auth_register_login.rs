@@ -54,6 +54,9 @@ fn register_auth_register(d: &mut Dispatcher) {
                 format!("获取云端 RSA 公钥失败: {}", e)
             })?;
 
+            // 时间基准对齐服务端：注册时间戳参与签名，本机时钟漂移会被服务端拒
+            crate::minecraft::online::time_sync::ensure_fresh(&client).await;
+
             // 构造注册请求
             log_debug!("[Online] 构造注册请求（RSA-OAEP 加密 content）");
             let (req, mut creds) = build_register_request(&kp, &device_id, &server_rsa_pem)
@@ -121,6 +124,10 @@ fn register_auth_login(d: &mut Dispatcher) {
             }
             log_debug!("[Online] 登录设备 device_pk={}", creds.device_pk);
 
+            let client = super::make_client(&state).await;
+            // 时间基准对齐服务端：登录时间戳参与签名，本机时钟漂移会被服务端拒
+            crate::minecraft::online::time_sync::ensure_fresh(&client).await;
+
             // 构造登录请求
             log_debug!("[Online] 构造登录请求（ECDH + AES-GCM 加密 content）");
             let req = build_login_request(&creds).map_err(|e| {
@@ -129,7 +136,6 @@ fn register_auth_login(d: &mut Dispatcher) {
             })?;
 
             // 发起登录
-            let client = super::make_client(&state).await;
             let resp = client.login(&req).await.map_err(|e| {
                 log_error!("[Online] 登录请求失败: {}", e);
                 format!("登录请求失败: {}", e)
@@ -271,6 +277,9 @@ pub(crate) async fn silent_register(
         log_error!("[Online] 静默注册: 获取云端 RSA 公钥失败: {}", e);
         e.to_string()
     })?;
+
+    // 时间基准对齐服务端（静默注册同样带签名时间戳）
+    crate::minecraft::online::time_sync::ensure_fresh(&client).await;
 
     let (req, mut creds) =
         build_register_request(&kp, &device_id, &server_rsa_pem).map_err(|e| {

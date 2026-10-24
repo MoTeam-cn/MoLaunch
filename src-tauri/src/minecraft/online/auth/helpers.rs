@@ -12,8 +12,11 @@ pub(super) fn generate_nonce_b64u() -> String {
 }
 
 /// 当前 Unix 时间戳（秒）
+///
+/// 取服务端对齐时间而非本机时钟：本机时钟漂移会让服务端的容差校验直接拒绝
+/// （「时间戳超出容差范围」），对齐逻辑见 [`time_sync`](super::super::time_sync)。
 pub(super) fn now_timestamp() -> u64 {
-    chrono::Utc::now().timestamp() as u64
+    super::super::time_sync::server_now()
 }
 
 /// 生成设备友好标识 `mcsdk-xxxx-xxxx-xxxx-xxxx`（小写十六进制）

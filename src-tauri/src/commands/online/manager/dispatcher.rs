@@ -116,6 +116,8 @@ pub(crate) async fn refresh_credentials(
     }
 
     let client = make_client(state).await;
+    // 时间基准对齐服务端：refresh 时间戳参与签名
+    crate::minecraft::online::time_sync::ensure_fresh(&client).await;
     let req = build_refresh_request(&creds).map_err(|e| {
         log_error!("[Online] 构造 refresh 请求失败: {}", e);
         format!("构造 refresh 请求失败: {}", e)
@@ -220,12 +222,15 @@ pub(crate) async fn login_fresh(state: &AppState) -> Result<DeviceCredentials, S
         return Err("设备未注册，请先注册".to_string());
     }
 
+    let client = make_client(state).await;
+    // 时间基准对齐服务端：登录时间戳参与签名
+    crate::minecraft::online::time_sync::ensure_fresh(&client).await;
+
     let req = build_login_request(&creds).map_err(|e| {
         log_error!("[Online] login_fresh: 构造登录请求失败: {}", e);
         format!("构造登录请求失败: {}", e)
     })?;
 
-    let client = make_client(state).await;
     let resp = client.login(&req).await.map_err(|e| {
         log_error!("[Online] login_fresh: 登录请求失败: {}", e);
         format!("登录请求失败: {}", e)
