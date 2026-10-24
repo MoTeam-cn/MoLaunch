@@ -7,7 +7,8 @@ pub mod download;
 pub mod merge;
 pub mod probe;
 
-// 对外保持 `super::chunk::supports_range` 调用路径稳定
-pub use probe::supports_range;
+// 对外暴露探测能力：retry 需要「是否支持 Range + 声明大小」一起拿到，
+// 避免为了判断分片可行性多发一次请求
+pub use probe::{probe_file_size, probe_range, supports_range, RangeProbe};
 
 pub use api::{download_chunked, ChunkDownloadResult};

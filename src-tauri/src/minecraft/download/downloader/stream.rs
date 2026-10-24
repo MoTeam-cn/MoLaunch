@@ -48,7 +48,16 @@ pub(super) async fn download_from_url(
         return Err(format!("HTTP 错误：{}", response.status()).into());
     }
 
-    let total_size = response.content_length().unwrap_or(0);
+    // 响应被压缩时（服务端 gzip），Content-Length 是压缩后的长度，而落盘的是解压后的字节，
+    // 直接拿来当总量会让「已下载 / 总量」错乱，也会污染后续校验 —— 此时按未知大小处理
+    let compressed = response
+        .headers()
+        .contains_key(reqwest::header::CONTENT_ENCODING);
+    let total_size = if compressed {
+        0
+    } else {
+        response.content_length().unwrap_or(0)
+    };
 
     // 回填全局 total_bytes：download_batch 初始化时按 expected_size 求和，
     // 整合包归档 expected_size=0 导致初始 total_bytes=0。单流路径拿到 content_length
@@ -65,8 +74,9 @@ pub(super) async fn download_from_url(
     let mut downloaded: u64 = 0;
     let start_time = Instant::now();
 
-    // 下载流字节数上限：已知期望大小时允许 2 倍冗余，否则使用绝对上限
-    let byte_limit = if expected_size > 0 {
+    // 下载流字节数上限：已知期望大小时允许 2 倍冗余，否则使用绝对上限。
+    // 压缩响应例外：期望大小可能是压缩后长度（远小于解压后字节），按它设上限会截断正常文件
+    let byte_limit = if expected_size > 0 && !compressed {
         expected_size.saturating_mul(2)
     } else {
         super::MAX_UNVERIFIED_BYTES

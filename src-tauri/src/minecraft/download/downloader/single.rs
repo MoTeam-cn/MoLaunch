@@ -56,8 +56,8 @@ pub async fn download_single(
     }
 
     let file_size = task.expected_size.max(0) as u64;
-    let can_chunk =
-        chunk_count > 1 && (file_size == 0 || (file_size / chunk_count as u64) > 1_048_576);
+    // 分片门槛（大小下限、Range 支持）统一由 retry 内的 chunkable_size 判定
+    let can_chunk = chunk_count > 1;
     let result = retry::download_with_retries(
         client,
         task,

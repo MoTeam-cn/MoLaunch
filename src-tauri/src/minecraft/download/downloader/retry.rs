@@ -13,6 +13,7 @@ use super::super::super::types::{
 };
 use super::verify;
 use crate::minecraft::download::chunk;
+use crate::utils::format;
 use crate::{log_debug, log_warn};
 
 const MAX_RETRIES: usize = 3;
@@ -33,6 +34,12 @@ pub(super) async fn download_with_retries(
     cancel_flag: Option<Arc<AtomicBool>>,
     content_validator: Option<ContentValidator>,
 ) -> Option<DownloadProgress> {
+    // task.expected_size 是唯一可信的大小来源（清单/元数据给的）。
+    // file_size 之后可能被「探测值」覆盖，而探测值只用于分片切分与进度估算，绝不可用于校验：
+    // 部分服务端（如 Fabric 官方元数据）会把压缩后的长度写进 Content-Range（1401），
+    // 实际落盘的是解压后的字节（2778），拿探测值校验必然误杀正常文件。
+    let trusted_size = file_size;
+
     // 内容校验失败：删除文件、回滚已计进度、继续下一 URL（镜像坏文件自动回退官方等保底源）
     let invalid_content = |err: String, downloaded: u64| {
         log_warn!("文件内容校验失败：{} - {}", task.local_path, err);
@@ -50,7 +57,11 @@ pub(super) async fn download_with_retries(
                 if attempt == 1 {
                     log_debug!("[Download] 检测分片支持: {}", url);
                 }
-                if chunk::supports_range(client, url).await {
+                let probe = chunk::probe_range(client, url).await;
+                if file_size == 0 && probe.total > 0 {
+                    file_size = probe.total;
+                }
+                if probe.supports_range && chunkable_size(file_size, chunk_count) {
                     let limiter = rate_limiter
                         .clone()
                         .unwrap_or_else(|| Arc::new(Mutex::new(RateLimiter::new(0))));
@@ -70,7 +81,12 @@ pub(super) async fn download_with_retries(
                         file_size = result.total;
                     }
                     if result.status == DownloadStatus::Completed {
-                        if let Some(err) = verify::check_chunk(task, result.total) {
+                        let expected = if trusted_size > 0 {
+                            trusted_size
+                        } else {
+                            result.total
+                        };
+                        if let Some(err) = verify::check_chunk(task, expected) {
                             log_warn!("[Chunk] 文件校验失败：{} - {}", task.local_path, err);
                             let _ = std::fs::remove_file(&task.local_path);
                             // 回滚已计数进度：文件将被单流重新下载，避免 downloaded_bytes 重复累计
@@ -104,6 +120,13 @@ pub(super) async fn download_with_retries(
                         chunk_disabled = true;
                     }
                     log_debug!("[Chunk] 分片下载失败: {:?}, 回退单流", result.error);
+                } else {
+                    log_debug!(
+                        "[Download] 不走分片（Range 支持: {}，大小: {}）: {}",
+                        probe.supports_range,
+                        format::bytes(file_size),
+                        url
+                    );
                 }
             }
             log_debug!(
@@ -113,11 +136,12 @@ pub(super) async fn download_with_retries(
                 attempt,
                 MAX_RETRIES
             );
+            // 只传可信大小：探测值可能是压缩后长度，传进去会让字节上限与进度失真
             match super::super::stream::download_from_url(
                 client,
                 url,
                 &task.local_path,
-                file_size,
+                trusted_size,
                 rate_limiter.clone(),
                 timeout,
                 progress.clone(),
@@ -127,7 +151,7 @@ pub(super) async fn download_with_retries(
             .await
             {
                 Ok((downloaded, total, speed)) => {
-                    if let Some(err) = verify::check_stream(task, file_size, downloaded) {
+                    if let Some(err) = verify::check_stream(task, trusted_size, downloaded) {
                         log_warn!("文件校验失败：{} - {}", task.local_path, err);
                         let _ = std::fs::remove_file(&task.local_path);
                         // 回滚已计数进度：文件将由下一个 URL 重新下载，避免进度重复累计
@@ -186,3 +210,18 @@ fn rollback_progress(progress: &Option<Arc<StdMutex<GlobalProgress>>>, bytes: u6
         p.downloaded_bytes = p.downloaded_bytes.saturating_sub(bytes);
     }
 }
+
+/// 分片最小文件大小：低于此值分片只会多花往返开销，还会放大各源 Range 实现的差异
+const MIN_CHUNK_BYTES: u64 = 1024 * 1024;
+
+/// 是否值得分片下载
+///
+/// 只有「大小已知且不小于 1 MiB」才分片：大小未知时无法切分范围，
+/// 小文件（如几 KB 的元数据 JSON）分片既无收益又极易踩到服务端 Range 的实现差异。
+fn chunkable_size(file_size: u64, chunk_count: usize) -> bool {
+    chunk_count > 1 && file_size >= MIN_CHUNK_BYTES
+}
+
+#[cfg(test)]
+#[path = "retry_test.rs"]
+mod retry_test;

@@ -4,6 +4,16 @@
 
 ## [Unreleased]
 
+### 修复
+
+#### 修复安装 Fabric 时 profile 下载失败（把压缩后的字节数当成了文件大小）
+
+- **根因**（[`chunk/probe.rs`](src-tauri/src/minecraft/download/chunk/probe.rs)）：Range 探测拿到的 `Content-Range` 总长度其实是**压缩后**的长度。Fabric 官方元数据对 `profile/json` 返回 `bytes 0-0/1401`，而完整 GET 解压后是 2778 字节，探测值被写进 `file_size` 后又被当成校验依据，正常文件因此被判成「Size mismatch: expected 1401 B, got 2778 B」。现探测统一带 `Accept-Encoding: identity`，并明确探测值只用于分片切分与进度估算。
+- **分片**（[`chunk/download.rs`](src-tauri/src/minecraft/download/chunk/download.rs) / [`downloader/retry.rs`](src-tauri/src/minecraft/download/downloader/retry.rs)）：分片请求此前会协商 gzip，服务端对 206 响应返回的是压缩流片段，解码即失败（日志里的 `chunk 0..3 失败: error decoding response body`），即使不失败合并出来也是坏文件。现分片请求一律 `Accept-Encoding: identity`；探测到响应带 `Content-Encoding` 时直接禁用分片；新增「小于 1 MiB 不分片」门槛，几 KB 的元数据 JSON 不再走 4 片并发。
+- **校验**（[`downloader/retry.rs`](src-tauri/src/minecraft/download/downloader/retry.rs) / [`downloader/stream.rs`](src-tauri/src/minecraft/download/downloader/stream.rs)）：大小校验只接受任务自带的 `expected_size`（清单给的可信值），探测值不再参与；压缩响应的 `Content-Length` 同样按未知处理，避免把压缩长度写进进度与字节上限导致正常文件被截断。
+- **兜底**（[`loaders/fabric.rs`](src-tauri/src/minecraft/loaders/fabric.rs)）：profile 下载完成后强制 `serde_json` 解析，失败即删除并报错，杜绝把截断的 JSON 写进 `versions` 目录后启动阶段才炸。
+- **测试**（[`chunk/probe_test.rs`](src-tauri/src/minecraft/download/chunk/probe_test.rs) / [`downloader/retry_test.rs`](src-tauri/src/minecraft/download/downloader/retry_test.rs)）：覆盖 `Content-Range` 解析与分片策略（大文件分片、小文件不分片、大小未知不分片、单分片不分片）。
+
 ## [0.3.11-rc.7] - 2026-10-24
 
 ### 修复

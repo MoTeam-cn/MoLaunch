@@ -88,9 +88,12 @@ pub(super) async fn download_chunk(
 
     // 覆盖全局客户端的 30s timeout：大文件分片下载需要更长时间
     // 实际超时由下方 loop 里的"无数据流动 15s"控制，reqwest timeout 仅作 24h 兜底
+    // 必须禁用压缩：Range 切的是原始字节，带 Content-Encoding 时返回的是压缩流片段，
+    // 解码会失败（error decoding response body），即使不失败合并出来也是坏文件
     let response = client
         .get(url)
         .header("Range", &range_header)
+        .header(reqwest::header::ACCEPT_ENCODING, "identity")
         .timeout(Duration::from_secs(86400))
         .send()
         .await

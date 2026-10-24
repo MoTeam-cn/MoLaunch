@@ -117,6 +117,14 @@ pub async fn install(
         ));
     }
 
+    // profile 是 JSON：解析失败说明内容被截断或损坏（例如服务端按压缩长度切分 Range），
+    // 此时宁可报错也不能写进 versions 目录让启动阶段莫名其妙失败
+    let profile_text = std::fs::read_to_string(&profile_path)?;
+    if let Err(e) = serde_json::from_str::<serde_json::Value>(&profile_text) {
+        let _ = std::fs::remove_file(&profile_path);
+        return Err(anyhow::anyhow!("Fabric profile JSON 解析失败：{}", e));
+    }
+
     crate::log_info!("[Fabric] Installed: {}", version_id);
 
     Ok(())
