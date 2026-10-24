@@ -523,3 +523,70 @@ jobs:
           make_latest: 'false'
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  # =====================================================================
+  # 夸克网盘分发：把本版产物按平台打成 zip 上传
+  #
+  # 夸克没有开放 API，这里走网页端私有接口（pre → auth → 分片 PUT → commit），
+  # 实现见 scripts/quark-upload.cjs。需要 secret QUARK_COOKIE（必填）、
+  # QUARK_FID（可选，目标目录 fid，缺省上传到根目录）。
+  # 未配置 Cookie 时自动跳过；上传失败不影响已经发布的 Release（continue-on-error）。
+  # 注意：Cookie 会过期（通常数周），失效时该 job 会报明确错误，重新复制 Cookie 更新 secret 即可。
+  # =====================================================================
+  quark-upload:
+    name: Upload packages to Quark Pan
+    needs: release
+    runs-on: ubuntu-latest
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Check cookie configured
+        id: guard
+        run: |
+          if [ -z "${{ secrets.QUARK_COOKIE }}" ]; then
+            echo "::notice::未配置 QUARK_COOKIE，跳过夸克网盘上传"
+            echo "skip=true" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Download build artifacts
+        if: steps.guard.outputs.skip != 'true'
+        uses: actions/download-artifact@v8
+        with:
+          path: dist
+
+      - name: Pack per-platform zips
+        if: steps.guard.outputs.skip != 'true'
+        shell: bash
+        run: |
+          set -euo pipefail
+          VERSION="${{ inputs.version }}"
+          OUT="$PWD/quark-out"
+          mkdir -p "$OUT"
+          pack() {
+            local name="$1"; shift
+            local tmp
+            tmp=$(mktemp -d)
+            for d in "$@"; do
+              [ -d "dist/$d" ] && cp -r "dist/$d/." "$tmp/"
+            done
+            if [ -n "$(ls -A "$tmp")" ]; then
+              ( cd "$tmp" && zip -qr "$OUT/$name" . )
+              echo "打包 $name（$(du -h "$OUT/$name" | cut -f1)）"
+            else
+              echo "::warning::$name 没有可打包内容，跳过"
+            fi
+            rm -rf "$tmp"
+          }
+          pack "MoLaunch_${VERSION}_windows.zip" windows-setup windows-portable
+          pack "MoLaunch_${VERSION}_macos.zip" macos-package-aarch64 macos-package-x86_64
+          pack "MoLaunch_${VERSION}_linux.zip" linux-package
+          pack "MoLaunch_${VERSION}_all.zip" windows-setup windows-portable macos-package-aarch64 macos-package-x86_64 linux-package
+          ls -lh "$OUT"
+
+      - name: Upload to Quark Pan
+        if: steps.guard.outputs.skip != 'true'
+        env:
+          QUARK_COOKIE: ${{ secrets.QUARK_COOKIE }}
+          QUARK_FID: ${{ secrets.QUARK_FID }}
+        run: node scripts/quark-upload.cjs quark-out
