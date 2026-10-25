@@ -21,6 +21,7 @@
     "core:window:allow-request-user-attention",
     "core:window:allow-set-focus",
     "core:window:allow-start-dragging",
+    "core:window:allow-start-resize-dragging",
     "shell:allow-open",
     "dialog:default",
     "fs:allow-read-file",

@@ -58,13 +58,16 @@
         "label": "main",
         "fullscreen": false,
         "decorations": false,
-        "resizable": false,
+        "resizable": true,
         "title": "MoLaunch",
         "width": 1096,
         "height": 592,
         "center": true,
         "useHttpsScheme": true,
-        "visible": false
+        "visible": false,
+        "maximizable": true,
+        "minWidth": 1096,
+        "minHeight": 592
       }
     ],
     "security": {

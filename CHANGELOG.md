@@ -4,6 +4,17 @@
 
 ## [Unreleased]
 
+### 变更
+
+#### 主窗口改为可自由缩放，当前尺寸作为最小尺寸
+
+- **窗口配置**（[`tauri.conf.json`](src-tauri/tauri.conf.json)）：main 窗口 `resizable` / `maximizable` 改为 `true`，新增 `minWidth: 1096`、`minHeight: 592`（即原先的固定尺寸），启动尺寸不变。
+- **窗口按钮**（[`WindowControls.vue`](src/components/layout/WindowControls.vue) 新增）：标题栏按钮抽成独立组件，补上「最大化 / 还原」按钮（图标随状态切换，监听 `onResized` 同步）；关闭按钮只抛意图，由上层按 `closeBehavior` 分流。
+- **边缘缩放**（[`WindowResizeHandles.vue`](src/components/layout/WindowResizeHandles.vue) 新增）：`decorations: false` 的窗口在部分平台没有系统缩放边框，这里沿四边四角铺 6px 透明热区，按下交给 `startResizeDragging`；最大化 / 全屏时自动隐藏，避免抢走贴边点击。
+- **权限**（[`migrated.json`](src-tauri/capabilities/migrated.json)）：新增 `core:window:allow-start-resize-dragging`。
+- **标题栏**（[`TopNavLayout.vue`](src/components/layout/TopNavLayout.vue)）：改用 `WindowControls`，文件由 287 行降到 253 行。
+- **验证**：`typecheck` / `lint` / `vite build` 全绿。
+
 ### 重构
 
 #### 配方工作台面板、渐变文字、class 常量池与 JAR 打包改为独立实现

@@ -16,6 +16,7 @@ import { getConfigMap, applyConfig } from '@/utils/api/config'
 import { toastError } from '@/utils/toast'
 const Tooltip = defineAsyncComponent(() => import('@/components/common/Tooltip.vue'))
 const ExitConfirmDialog = defineAsyncComponent(() => import('./ExitConfirmDialog.vue'))
+const WindowControls = defineAsyncComponent(() => import('./WindowControls.vue'))
 import { topNavItems, experimentalNavItem } from './topNavItems'
 import { useTauriEvent } from '@/utils/tauriEvent'
 import { useExperimental } from '@/composables/useExperimental'
@@ -235,30 +236,8 @@ onUnmounted(() => {
         <!-- 中间拖拽空隙 -->
         <div data-tauri-drag-region class="flex-1 h-full" />
 
-        <!-- 右侧：窗口控制 -->
-        <!-- 保留原生 button：窗口控制（最小化/最大化/关闭）需 h-full 撑满 48px 标题栏，
-             Button.vue 的 scoped size 类固定 height 无法被 h-full 覆盖 -->
-        <div class="flex items-center h-full">
-          <!-- 最小化 -->
-          <button
-            class="h-full w-11 flex items-center justify-center hover:bg-white/10 transition-colors group"
-            @click="appWindow.minimize()"
-          >
-            <svg class="w-3.5 h-3.5 text-white/60 group-hover:text-white" viewBox="0 0 12 12" fill="none">
-              <rect x="1" y="5.5" width="10" height="1" rx="0.5" fill="currentColor" />
-            </svg>
-          </button>
-
-          <!-- 关闭 -->
-          <button
-            class="h-full w-11 flex items-center justify-center hover:bg-red-500 transition-colors group"
-            @click="handleClose"
-          >
-            <svg class="w-3.5 h-3.5 text-white/60 group-hover:text-white" viewBox="0 0 12 12" fill="none">
-              <path d="M1.5 1.5L10.5 10.5M1.5 10.5L10.5 1.5" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" />
-            </svg>
-          </button>
-        </div>
+        <!-- 右侧：窗口控制（最小化 / 最大化还原 / 关闭） -->
+        <WindowControls @close="handleClose" />
       </div>
     </header>
     

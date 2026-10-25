@@ -6,6 +6,7 @@
 import { onMounted, ref, defineAsyncComponent } from 'vue'
 import router from '@/router'
 import TopNavLayout from '@/components/layout/TopNavLayout.vue'
+import WindowResizeHandles from '@/components/layout/WindowResizeHandles.vue'
 import MessageDrawer from '@/components/common/MessageDrawer.vue'
 import CrashDialog from '@/components/common/CrashDialog.vue'
 import HintDialog from '@/components/common/HintDialog.vue'
@@ -238,6 +239,8 @@ async function restorePage(savedPath: string): Promise<void> {
 
 <template>
   <AppBackground />
+  <!-- 无边框窗口的四边/四角缩放热区（最大化时自动隐藏） -->
+  <WindowResizeHandles />
   <TopNavLayout>
     <!--
       wrapper div 提供 relative 定位上下文，让路由切换时离开组件的
