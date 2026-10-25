@@ -6,6 +6,12 @@
 
 ### 重构
 
+#### 模组翻译：测试用例按规格重写
+
+- **测试文件**（[`ledger_test.rs`](src-tauri/src/mod_translation/ledger_test.rs)、[`prompt_test.rs`](src-tauri/src/mod_translation/prompt_test.rs)、[`translate_class_test.rs`](src-tauri/src/mod_translation/translate_class/translate_class_test.rs)、[`translate_lang_test.rs`](src-tauri/src/mod_translation/translate_lang_test.rs)、[`repair_test.rs`](src-tauri/src/mod_translation/repair_test.rs)）：统一 `test_<功能>_<场景>_<预期>` 命名，fixture 收敛为构造函数，覆盖项按规格 §7 重排（工作图状态机、提示词解析、class 判定容错、语言路由、回修覆盖与写回）。
+
+### 重构
+
 #### 模组翻译：任务编排、记忆、续传与基础设施按规格重新实现
 
 - **任务编排**（[`task/prepare.rs`](src-tauri/src/mod_translation/task/prepare.rs)、[`task/run.rs`](src-tauri/src/mod_translation/task/run.rs)）：续传复用抽成 `reuse_resumable`，阶段错误归类为 `classify_error`（`None` = 取消），检查点恢复与落盘抽成 `restore_*` / `persist`，打包报告抽成 `completed_snapshot`。

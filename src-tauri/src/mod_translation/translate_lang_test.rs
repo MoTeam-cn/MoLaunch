@@ -1,4 +1,4 @@
-//! 语言翻译路由单元测试（经 translate_lang.rs 的 #[path] 子模块引入）
+//! 语言翻译路由测试（经 translate_lang.rs 的 #[path] 子模块引入）
 
 use super::*;
 use crate::mod_translation::types::{Loader, Quote};
@@ -53,29 +53,18 @@ fn sample_source() -> LanguageSource {
 }
 
 #[test]
-fn requires_work_filters_passthrough_and_translated_entries() {
+fn test_pending_entries_skip_blank_passthrough_and_translated() {
     let source = sample_source();
-    let entries: Vec<(String, String)> = source
-        .entries
-        .iter()
-        .filter(|(key, src)| {
-            quality::requires_work(
-                key,
-                src,
-                source.existing_target.get(*key).map(String::as_str),
-            )
-        })
-        .map(|(k, v)| (k.clone(), v.clone()))
-        .collect();
-    let keys: Vec<&str> = entries.iter().map(|(k, _)| k.as_str()).collect();
+    let pending = pending_entries(&source);
+    let keys: Vec<&str> = pending.iter().map(|(key, _)| key.as_str()).collect();
     assert_eq!(keys, vec!["demo.hello"]);
 }
 
 #[test]
-fn evaluate_rejects_placeholder_mismatch_and_empty() {
+fn test_evaluate_translation_rejects_empty_and_placeholder_break() {
     assert!(evaluate_translation("Spawn %d zombies", "生成 %s 只僵尸").is_err());
     assert_eq!(
-        evaluate_translation("Spawn %d zombies", "生成 %d 只僵尸").unwrap(),
+        evaluate_translation("Spawn %d zombies", "生成 %d 只僵尸").expect("ok"),
         "生成 %d 只僵尸"
     );
     assert!(evaluate_translation("Hello", "").is_err());
@@ -83,20 +72,21 @@ fn evaluate_rejects_placeholder_mismatch_and_empty() {
 }
 
 #[test]
-fn memory_hit_short_circuits_ai_call() {
+fn test_translate_batch_short_circuits_on_memory_hit() {
     let runtime = tokio::runtime::Builder::new_current_thread()
         .build()
-        .unwrap();
+        .expect("runtime");
     runtime.block_on(async {
         let mut memory = TranslationMemory::load(std::path::PathBuf::from("unused.json"));
         let mod_ids = vec!["demo".to_string()];
         let source = sample_source();
         memory.record(&mod_ids, "demo", "Hello", "你好".to_string());
+
         let batch = vec![("demo.hello".to_string(), "Hello".to_string())];
         let mut graph = WorkGraph::new("task-memory".to_string());
         let cancel = AtomicBool::new(false);
         let config = ai_core::AiConfig::default();
-        // 全部命中记忆：不触发 AI 调用，直接返回命中译文
+
         let accepted = translate_batch(
             &sample_inspection(),
             &source,
@@ -111,7 +101,8 @@ fn memory_hit_short_circuits_ai_call() {
             100.0,
         )
         .await
-        .unwrap();
+        .expect("batch");
+
         assert_eq!(accepted.get("demo.hello").map(String::as_str), Some("你好"));
         assert_eq!(graph.progress(), (1.0, 1.0));
     });
