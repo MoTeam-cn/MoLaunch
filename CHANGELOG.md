@@ -12,6 +12,8 @@
 - [`install.rs`](src-tauri/src/minecraft/loaders/forge/install.rs) / [`neoforge.rs`](src-tauri/src/minecraft/loaders/neoforge.rs)：安装器失败后自动预取库并重试一次，成功路径完全不经过这段逻辑，失败时保留原始错误。
 - [`forge_installer.rs`](src-tauri/src/minecraft/loaders/forge_installer.rs)：失败信息中识别到重定向超限时补一句可操作提示（切换下载源后重试）。
 
+## [0.3.12-rc.6] - 2026-10-25
+
 ### 修复
 
 #### Forge / NeoForge 安装器失败时看不到原因（last lines: []）
