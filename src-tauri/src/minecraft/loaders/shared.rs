@@ -142,6 +142,97 @@ pub async fn download_mojang_mappings(
     Ok(())
 }
 
+/// 预取安装器 install_profile.json 里声明的库到 libraries 目录
+///
+/// 注入器会把下载地址强制指向镜像，而安装器自身只跟随有限次重定向，镜像链路一长
+/// 就会报 `Invalid number of redirects` 直接失败。先用启动器自己的下载器（跟随重定向、
+/// 支持多源与重试）把库备好，安装器命中「文件已存在，校验通过」即可跳过下载。
+///
+/// 返回成功预取的库数量；任何单个库失败都不阻断（交给安装器自己再试）。
+pub async fn prefetch_install_libraries(
+    installer_path: &Path,
+    game_dir: &Path,
+    config: &DownloadManagerConfig,
+) -> anyhow::Result<usize> {
+    let file = std::fs::File::open(installer_path)?;
+    let mut archive = zip::ZipArchive::new(file)?;
+
+    let mut content = String::new();
+    {
+        let mut entry = archive.by_name("install_profile.json")?;
+        std::io::Read::read_to_string(&mut entry, &mut content)?;
+    }
+
+    let profile: serde_json::Value = serde_json::from_str(&content)?;
+    let libraries = profile["libraries"].as_array().cloned().unwrap_or_default();
+
+    let mut tasks: Vec<DownloadTask> = Vec::new();
+    let mut seen: std::collections::HashSet<String> = std::collections::HashSet::new();
+
+    for (index, library) in libraries.iter().enumerate() {
+        let Some(name) = library["name"].as_str() else {
+            continue;
+        };
+        // 只处理主 artifact，natives 等由安装器自己处理
+        let artifact = &library["downloads"]["artifact"];
+        let relative = artifact["path"]
+            .as_str()
+            .map(str::to_string)
+            .unwrap_or_else(|| crate::minecraft::utils::maven::maven_to_relative_path(name));
+        if !relative.ends_with(".jar") || !seen.insert(relative.clone()) {
+            continue;
+        }
+
+        let local_path = game_dir.join("libraries").join(&relative);
+        if local_path.exists() {
+            continue;
+        }
+
+        let official_url = artifact["url"]
+            .as_str()
+            .map(str::to_string)
+            .unwrap_or_else(|| format!("{}/{}", sources::MAVEN_FORGE, relative));
+        let urls = sources::build_replace_urls(
+            &official_url,
+            None,
+            sources::MAVEN_REPLACEMENTS,
+            config.source_mode,
+        );
+        if urls.is_empty() {
+            continue;
+        }
+
+        tasks.push(DownloadTask {
+            id: format!("forge-lib-{}", index),
+            urls,
+            local_path: local_path.to_string_lossy().to_string(),
+            expected_size: artifact["size"].as_i64().unwrap_or(0),
+            expected_hash: artifact["sha1"].as_str().map(str::to_string),
+        });
+    }
+
+    if tasks.is_empty() {
+        return Ok(0);
+    }
+
+    log_info!("[Installer] 预取安装库 {} 个", tasks.len());
+    let manager = DownloadManager::from_config(config);
+    let total = tasks.len();
+    let results = manager.download_batch(tasks, None).await;
+    let ok = results
+        .iter()
+        .filter(|result| result.status != DownloadStatus::Failed)
+        .count();
+    if ok < total {
+        log_warn!(
+            "[Installer] 预取安装库：成功 {} / {}，其余交给安装器处理",
+            ok,
+            total
+        );
+    }
+    Ok(ok)
+}
+
 /// Find generated version JSON files in installer output.
 fn find_generated_version_jsons(
     versions_dir: &Path,

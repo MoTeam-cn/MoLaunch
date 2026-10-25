@@ -347,6 +347,14 @@ pub fn run_forge_installer(
             tail.join(" | ")
         )
     };
+    // 镜像链路重定向过多是常见失败原因，补一句可操作的提示
+    if lines
+        .iter()
+        .any(|line| line.contains("Invalid number of redirects"))
+    {
+        message
+            .push_str("。原因是下载镜像的重定向次数超过安装器上限，可尝试在设置里切换下载源后重试");
+    }
     if let Some(path) = log_path {
         message.push_str(&format!("。完整日志：{}", path));
     }

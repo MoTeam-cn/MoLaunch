@@ -234,6 +234,11 @@ pub async fn install(
         cb(30.0);
     }
 
+    // 预取 install_profile 声明的库，绕开安装器的重定向次数限制
+    if let Err(e) = shared::prefetch_install_libraries(&installer_path, game_dir, config).await {
+        log_warn!("[NeoForge] 预取安装库失败（继续尝试安装）: {}", e);
+    }
+
     log_info!("[NeoForge] Using injector");
     let (injector_path, wrapper_path) = super::forge_installer::extract_embedded_resources()?;
 

@@ -120,6 +120,12 @@ async fn install_modern(
         cb(30.0);
     }
 
+    // 预取 install_profile 声明的库：安装器自身只跟随有限次重定向，
+    // 镜像链路一长就会报 Invalid number of redirects，先备好库可绕开
+    if let Err(e) = shared::prefetch_install_libraries(installer_path, game_dir, config).await {
+        log_warn!("[Forge] 预取安装库失败（继续尝试安装）: {}", e);
+    }
+
     log_info!("[Forge] Using injector for Forge {}", forge_version);
 
     let (injector_path, wrapper_path) =
