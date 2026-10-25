@@ -382,7 +382,8 @@ fn is_plain_command(text: &str) -> bool {
                 || c.is_ascii_digit()
                 || matches!(
                     c,
-                    '_' | '.'
+                    '/' | '_'
+                        | '.'
                         | ':'
                         | '-'
                         | '@'
