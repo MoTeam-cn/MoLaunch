@@ -6,6 +6,14 @@
 
 ### 重构
 
+#### 渐变文字数据模型与文档操作收敛
+
+- [`gradient-text/types.ts`](src/utils/gradient-text/types.ts)：输出格式标识改由 `GRADIENT_FORMATS` 表推导，文档模型与单元格类型分组注释。
+- [`gradient-text/document.ts`](src/utils/gradient-text/document.ts)：抽出 `mapRuns` / `knownFormats` / `normalizeRun` / `emptyDocument`，纯文本转换改 `reduce` 拼接。
+- [`gradient-text/state.ts`](src/utils/gradient-text/state.ts)：状态校验拆成 `pickColors` / `pickControl` / `pickAdapter` / `pickTimestamp` 四个取值器，旧字段兼容集中到 `LegacyFields`。
+
+### 重构
+
 #### 重写收敛：结构与数据分离
 
 - [`error.rs`](src-tauri/src/mod_translation/error.rs)：错误码由枚举改为常量表（字符串契约不变）。
