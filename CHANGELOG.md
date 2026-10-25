@@ -6,6 +6,15 @@
 
 ### 变更
 
+#### 致谢补充：Axolotl Launcher
+
+- [`README.md`](README.md) / [`README_EN.md`](README_EN.md)：「鸣谢 → 特别感谢」新增条目，说明三个功能早期参考其实现（GPL-3.0），现已按公开规范独立重写。
+- [`acknowledgements.txt`](src-tauri/resources/about/acknowledgements.txt)：应用内「关于 → 特别鸣谢」新增条目与 logo（`src/assets/AboutIcon/axolotl.png`）。
+- [`licenses.txt`](src-tauri/resources/about/licenses.txt)：新增版权与许可行，标注仅历史区间适用、现实现不派生自该项目。
+- [`ACKNOWLEDGEMENTS.md`](ACKNOWLEDGEMENTS.md)：三项功能状态更新为已完成，补充署名位置表与重写覆盖范围。
+
+### 变更
+
 #### 模组翻译：工作区内部文件名与续传身份改为项目自有前缀
 
 - [`resume.rs`](src-tauri/src/mod_translation/resume.rs)：续传标记与检查点文件名改为 `.molaunch-translation-*`。
