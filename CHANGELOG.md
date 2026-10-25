@@ -4,51 +4,21 @@
 
 ## [Unreleased]
 
+## [0.3.12-rc.6] - 2026-10-25
+
 ### 修复
 
 #### Forge / NeoForge 安装器失败时看不到原因（last lines: []）
 
 - [`forge_installer.rs`](src-tauri/src/minecraft/loaders/forge_installer.rs)：安装器输出改为按字节读取后解码，UTF-8 失败时回退 GBK。中文 Windows 上 JVM 的报错信息是 GBK 编码，原先按 UTF-8 逐行读会在第一行就失败并丢弃全部内容，用户只看到 `last lines: []`；现在能拿到真实原因。
+
 - [`forge_installer.rs`](src-tauri/src/minecraft/loaders/forge_installer.rs)：修复 wrapper 分支系统属性写法——`-Doolloo.jlw.tmpdir` 少了 `=`，JVM 会把后面的临时目录当成主类名，导致游戏目录含中文或空格时安装器根本没启动。
+
 - [`forge_installer.rs`](src-tauri/src/minecraft/loaders/forge_installer.rs)：stdout/stderr 合并收集（不再因 stderr 先读而丢失尾部），失败信息改为「退出码 + 最近输出 + 完整日志路径」，日志落到 `cache/forge_installer/installer-*.log`。
+
 - [`forge_installer.rs`](src-tauri/src/minecraft/loaders/forge_installer.rs)：成功判定改为「退出码为 0 或输出含成功标记」，避免安装其实成功却被判失败；启动前校验官方安装器与注入器文件存在；classpath 分隔符按平台取值；新增 15 分钟超时强杀，避免安装器卡死时一直等待。
+
 - [`forge_installer_test.rs`](src-tauri/src/minecraft/loaders/forge_installer_test.rs)（新增）：覆盖 GBK 解码、参数拼装（含 wrapper 的 `=` 写法）、Java 9+ 导出参数。
-
-### 新增
-
-#### Mod 安装前预检（加载器/版本不匹配直接拦下）
-
-- [`mod-precheck.ts`](src/utils/mod-precheck.ts)（新增）：纯函数预检——加载器不匹配、游戏版本不匹配为阻断项；同 modid 已装、同名文件将被覆盖、实例混装 Forge 系与 Fabric 系、OptiFine 与 Fabric 系冲突为警告项；兼容 `1.20` 与 `1.20.1` 的前缀关系。
-- [`DependencyConfirmDialog.vue`](src/components/community/DependencyConfirmDialog.vue)：弹窗顶部展示阻断项（红）与警告项（黄），有阻断项时「继续安装」按钮禁用并提示原因；标题按状态切换。
-- [`useResourceDownload.ts`](src/composables/useResourceDownload.ts) / [`ResourceDetail.vue`](src/components/community/ResourceDetail.vue)：下载前先跑本地预检（读已装 Mod 列表，不发网络请求），阻断项复用确认弹窗展示；仅有警告且无前置依赖时单独确认一次；预检失败降级为不阻断。
-
-### 新增
-
-#### 崩溃分析：定位到具体 Mod 并可一键修复
-
-- [`mod_index.rs`](src-tauri/src/minecraft/launch/watcher/analyzer/mod_index.rs)（新增）/ [`collect.rs`](src-tauri/src/minecraft/launch/watcher/analyzer/collect.rs) / [`detector_stack.rs`](src-tauri/src/minecraft/launch/watcher/analyzer/detector_stack.rs)：收集阶段扫描 mods 目录建立「名字 → jar」索引，堆栈分析猜出的 Mod 名对到具体文件名，结论直接给「禁用哪个文件」。
-- [`types.rs`](src-tauri/src/minecraft/launch/watcher/types.rs) / [`scorer.rs`](src-tauri/src/minecraft/launch/watcher/analyzer/scorer.rs)：`CrashInfo` 新增 `actions`（`FixAction`：禁用 Mod / 打开 mods 目录 / 跳转设置页），按崩溃类别与已定位的 Mod 生成。
-- [`CrashFixActions.vue`](src/components/common/crash/CrashFixActions.vue)（新增）/ [`CrashDialog.vue`](src/components/common/CrashDialog.vue)：崩溃弹窗底部新增一键修复按钮，禁用 Mod 直接调用 `toggle_mod`。
-
-#### 内存推荐与启动前自动备份
-
-- [`jvm-recommend.ts`](src/utils/jvm-recommend.ts)（新增）/ [`MemoryAllocation.vue`](src/views/settings/settings-launch/MemoryAllocation.vue)：按物理内存给出推荐堆大小（40%，夹在 2~8 GB）与通用参数，一键采用；GC 仍由后端按 Java 版本自动选择。
-- [`auto-backup.ts`](src/utils/auto-backup.ts)（新增）/ [`launch.ts`](src/stores/launch.ts) / [`SettingsLaunch.vue`](src/views/settings/SettingsLaunch.vue)：启动设置新增「启动前自动备份存档」，每个版本每天一次、只备份前 3 个存档并覆盖旧文件，失败不阻断启动。
-
-### 新增
-
-#### 启动耗时分析
-
-- [`timing.rs`](src-tauri/src/minecraft/launch/pipeline/timing.rs)（新增）/ [`runner.rs`](src-tauri/src/minecraft/launch/pipeline/runner.rs) / [`execute.rs`](src-tauri/src/minecraft/launch/pipeline/execute.rs)：每个启动阶段用 `StageClock` 计时，启动完成时通过 `launch-timing` 事件下发 `LaunchTimings`（各阶段毫秒数 + 合计 + 版本 ID）；Java 自动切换重试时重新计时。
-- [`launch-timing.ts`](src/utils/launch-timing.ts)（新增）/ [`launch.ts`](src/utils/api/launch.ts) / [`launch.ts`](src/stores/launch.ts)：阶段中文名映射、时长格式化、耗时排行，store 监听 `launch-timing` 保留最近一次结果。
-- [`OverviewTab.vue`](src/views/version-settings/OverviewTab.vue)：版本设置概览新增「最近一次启动耗时」卡片，按阶段耗时倒序列出条形图。
-
-#### 实例快照与回滚
-
-- [`snapshot.rs`](src-tauri/src/commands/version/mods/snapshot.rs)（新增）/ [`manager.rs`](src-tauri/src/commands/version/mods/manager.rs)：新增 `snapshot_create` / `snapshot_list` / `snapshot_diff` / `snapshot_restore` / `snapshot_delete` 五个 action。快照只记录 mods 目录清单（文件名 / 大小 / 启用状态）存于版本目录 `.molaunch-snapshots/`，保留最近 10 份；回滚按差异补回或禁用文件，无法找回的文件单独返回。
-- [`mod-snapshot.ts`](src/utils/api/mod-snapshot.ts)（新增）/ [`SnapshotPanel.vue`](src/views/version-settings/mod-snapshot/SnapshotPanel.vue)（新增）/ [`ModTab.vue`](src/views/version-settings/ModTab.vue)：Mod 页新增「快照与回滚」入口，支持创建、差异预览、一键回滚、删除。
-
-### 修复
 
 #### 背景图玻璃效果不再波及弹窗
 
@@ -57,35 +27,85 @@
 #### 暗色主题下社区列表与部分面板仍是浅底
 
 - [`Community.vue`](src/views/Community.vue)：搜索结果列表容器由内联 `#f5f7fa` 改为 `var(--surface-subtle)`，暗色主题下随主题变深。
+
 - 配方生成器（[`ItemPalette.vue`](src/views/tools/creation/recipe-generator/ItemPalette.vue)、[`RecipeDisplayPanel.vue`](src/views/tools/creation/recipe-generator/RecipeDisplayPanel.vue)、[`RecipeSettingsForm.vue`](src/views/tools/creation/recipe-generator/RecipeSettingsForm.vue)、[`RecipeSlotDrawer.vue`](src/views/tools/creation/recipe-generator/RecipeSlotDrawer.vue)、[`RecipeItemIcon.vue`](src/views/tools/creation/recipe-generator/RecipeItemIcon.vue)、[`RecipeTagPopup.vue`](src/views/tools/creation/recipe-generator/RecipeTagPopup.vue)、[`TagPalette.vue`](src/views/tools/creation/recipe-generator/TagPalette.vue)）样式块中的 `#1d2129` / `#4e5969` / `#86909c` / `#e5e6eb` 等硬编码颜色改为 `--text-*` / `--border-*` 语义变量。
+
 - 同类问题一并处理：[`ReleaseTimeline.vue`](src/components/about/ReleaseTimeline.vue)、[`ReleaseTimelineItem.vue`](src/components/about/ReleaseTimelineItem.vue)、[`ToolCallEntry.vue`](src/components/experimental/ToolCallEntry.vue)、[`LicenseTab.vue`](src/views/settings/more/LicenseTab.vue)、[`StructPopup.vue`](src/views/tools/data/StructPopup.vue)。
 
 #### 关闭窗口时退出确认框不置前
 
 - [`lib.rs`](src-tauri/src/lib.rs)：`close_behavior = ask` 分支在通知前端弹框前先 `unminimize` / `show` / `set_focus`，任务栏点关闭后窗口会回到前台，不再出现「点了关闭没反应」。
 
+### 新增
+
+#### Mod 安装前预检（加载器/版本不匹配直接拦下）
+
+- [`mod-precheck.ts`](src/utils/mod-precheck.ts)（新增）：纯函数预检——加载器不匹配、游戏版本不匹配为阻断项；同 modid 已装、同名文件将被覆盖、实例混装 Forge 系与 Fabric 系、OptiFine 与 Fabric 系冲突为警告项；兼容 `1.20` 与 `1.20.1` 的前缀关系。
+
+- [`DependencyConfirmDialog.vue`](src/components/community/DependencyConfirmDialog.vue)：弹窗顶部展示阻断项（红）与警告项（黄），有阻断项时「继续安装」按钮禁用并提示原因；标题按状态切换。
+
+- [`useResourceDownload.ts`](src/composables/useResourceDownload.ts) / [`ResourceDetail.vue`](src/components/community/ResourceDetail.vue)：下载前先跑本地预检（读已装 Mod 列表，不发网络请求），阻断项复用确认弹窗展示；仅有警告且无前置依赖时单独确认一次；预检失败降级为不阻断。
+
+#### 崩溃分析：定位到具体 Mod 并可一键修复
+
+- [`mod_index.rs`](src-tauri/src/minecraft/launch/watcher/analyzer/mod_index.rs)（新增）/ [`collect.rs`](src-tauri/src/minecraft/launch/watcher/analyzer/collect.rs) / [`detector_stack.rs`](src-tauri/src/minecraft/launch/watcher/analyzer/detector_stack.rs)：收集阶段扫描 mods 目录建立「名字 → jar」索引，堆栈分析猜出的 Mod 名对到具体文件名，结论直接给「禁用哪个文件」。
+
+- [`types.rs`](src-tauri/src/minecraft/launch/watcher/types.rs) / [`scorer.rs`](src-tauri/src/minecraft/launch/watcher/analyzer/scorer.rs)：`CrashInfo` 新增 `actions`（`FixAction`：禁用 Mod / 打开 mods 目录 / 跳转设置页），按崩溃类别与已定位的 Mod 生成。
+
+- [`CrashFixActions.vue`](src/components/common/crash/CrashFixActions.vue)（新增）/ [`CrashDialog.vue`](src/components/common/CrashDialog.vue)：崩溃弹窗底部新增一键修复按钮，禁用 Mod 直接调用 `toggle_mod`。
+
+#### 内存推荐与启动前自动备份
+
+- [`jvm-recommend.ts`](src/utils/jvm-recommend.ts)（新增）/ [`MemoryAllocation.vue`](src/views/settings/settings-launch/MemoryAllocation.vue)：按物理内存给出推荐堆大小（40%，夹在 2~8 GB）与通用参数，一键采用；GC 仍由后端按 Java 版本自动选择。
+
+- [`auto-backup.ts`](src/utils/auto-backup.ts)（新增）/ [`launch.ts`](src/stores/launch.ts) / [`SettingsLaunch.vue`](src/views/settings/SettingsLaunch.vue)：启动设置新增「启动前自动备份存档」，每个版本每天一次、只备份前 3 个存档并覆盖旧文件，失败不阻断启动。
+
+#### 启动耗时分析
+
+- [`timing.rs`](src-tauri/src/minecraft/launch/pipeline/timing.rs)（新增）/ [`runner.rs`](src-tauri/src/minecraft/launch/pipeline/runner.rs) / [`execute.rs`](src-tauri/src/minecraft/launch/pipeline/execute.rs)：每个启动阶段用 `StageClock` 计时，启动完成时通过 `launch-timing` 事件下发 `LaunchTimings`（各阶段毫秒数 + 合计 + 版本 ID）；Java 自动切换重试时重新计时。
+
+- [`launch-timing.ts`](src/utils/launch-timing.ts)（新增）/ [`launch.ts`](src/utils/api/launch.ts) / [`launch.ts`](src/stores/launch.ts)：阶段中文名映射、时长格式化、耗时排行，store 监听 `launch-timing` 保留最近一次结果。
+
+- [`OverviewTab.vue`](src/views/version-settings/OverviewTab.vue)：版本设置概览新增「最近一次启动耗时」卡片，按阶段耗时倒序列出条形图。
+
+#### 实例快照与回滚
+
+- [`snapshot.rs`](src-tauri/src/commands/version/mods/snapshot.rs)（新增）/ [`manager.rs`](src-tauri/src/commands/version/mods/manager.rs)：新增 `snapshot_create` / `snapshot_list` / `snapshot_diff` / `snapshot_restore` / `snapshot_delete` 五个 action。快照只记录 mods 目录清单（文件名 / 大小 / 启用状态）存于版本目录 `.molaunch-snapshots/`，保留最近 10 份；回滚按差异补回或禁用文件，无法找回的文件单独返回。
+
+- [`mod-snapshot.ts`](src/utils/api/mod-snapshot.ts)（新增）/ [`SnapshotPanel.vue`](src/views/version-settings/mod-snapshot/SnapshotPanel.vue)（新增）/ [`ModTab.vue`](src/views/version-settings/ModTab.vue)：Mod 页新增「快照与回滚」入口，支持创建、差异预览、一键回滚、删除。
+
 ### 变更
 
 #### 来源说明补充与致谢条目压缩
 
 - [`README.md`](README.md) / [`README_EN.md`](README_EN.md) / [`README_JA.md`](README_JA.md) / [`README_ZH-HANT.md`](README_ZH-HANT.md)：两条特别感谢改为单行表述，明确「早期参考、相关部分已重写」并指向 ACKNOWLEDGEMENTS.md；日文与繁体 README 补齐对应条目。
-- [`ACKNOWLEDGEMENTS.md`](ACKNOWLEDGEMENTS.md)：新增一节，说明早期移植范围、许可不授予派生权、以及重写与清理记录。
-- [`acknowledgements.txt`](src-tauri/resources/about/acknowledgements.txt)：应用内特别鸣谢条目改为「早期参考、已重写」表述。
-- [`licenses.txt`](src-tauri/resources/about/licenses.txt)：对应许可行标注「早期参考，相关代码已重写」与「仅历史区间适用」。
-- [`acknowledgements.txt`](src-tauri/resources/about/acknowledgements.txt)：补上作者头像，作者字段由占位名称改为实际开发者（`CodeZhangBorui.png`、`Mystic-Stars.png`）。
-- [`ACKNOWLEDGEMENTS.md`](ACKNOWLEDGEMENTS.md)：补充现状判定——按该指南属轻度使用，署名与不混淆两条义务均已满足，购买劝导已有实现。
 
-### 变更
+- [`ACKNOWLEDGEMENTS.md`](ACKNOWLEDGEMENTS.md)：新增一节，说明早期移植范围、许可不授予派生权、以及重写与清理记录。
+
+- [`acknowledgements.txt`](src-tauri/resources/about/acknowledgements.txt)：应用内特别鸣谢条目改为「早期参考、已重写」表述。
+
+- [`licenses.txt`](src-tauri/resources/about/licenses.txt)：对应许可行标注「早期参考，相关代码已重写」与「仅历史区间适用」。
+
+- [`acknowledgements.txt`](src-tauri/resources/about/acknowledgements.txt)：补上作者头像，作者字段由占位名称改为实际开发者（`CodeZhangBorui.png`、`Mystic-Stars.png`）。
+
+- [`ACKNOWLEDGEMENTS.md`](ACKNOWLEDGEMENTS.md)：补充现状判定——按该指南属轻度使用，署名与不混淆两条义务均已满足，购买劝导已有实现。
 
 #### 界面说明文案按自有措辞重写（降低与第三方项目表述雷同的风险）
 
 - 做法：把仓库内中文字符串与本地参考源码逐条比对（提取对方 12 字以上中文字面量，与 `src/`、`src-tauri/src/`、`src-tauri/resources/` 的字面量做完全匹配 + 14 字连续片段近似匹配），命中的说明性长句改写，术语保留。
+
 - [`SetupTab.vue`](src/views/version-settings/SetupTab.vue)：Java 兼容性、版本文件校验、Mod 更新锁定、窗口标题、Java Launch Wrapper / LWJGL Unsafe Agent 等 10 处说明与提示重写。
+
 - [`SettingsLaunch.vue`](src/views/settings/SettingsLaunch.vue)：Java Launch Wrapper、LWJGL Unsafe Agent、独立显卡三项说明重写。
+
 - [`AdvanceFieldsPanel.vue`](src/components/version-settings/AdvanceFieldsPanel.vue)：JVM 参数与游戏参数两条提示重写。
+
 - [`LoaderSelect.vue`](src/views/LoaderSelect.vue)：加载器版本加载中的禁用提示改为中性表述。
+
 - [`useVersionOverviewActions.ts`](src/composables/useVersionOverviewActions.ts)：版本描述编辑提示重写。
+
 - 后端导出选项说明：[`basic.rs`](src-tauri/src/commands/version/export/options/basic.rs)、[`mods.rs`](src-tauri/src/commands/version/export/options/mods.rs)、[`world.rs`](src-tauri/src/commands/version/export/options/world.rs)、[`misc.rs`](src-tauri/src/commands/version/export/options/misc.rs) 共 10 条描述改为自有措辞。
+
 - 结果：完全一致的字符串 34 → 18 条，剩余均为不可替代的术语（官方披风名、第三方组件名、「与 X 不兼容」等）。
 
 ## [0.3.12-rc.5] - 2026-10-25
