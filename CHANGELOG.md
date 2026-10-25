@@ -12,6 +12,7 @@
 - [`ACKNOWLEDGEMENTS.md`](ACKNOWLEDGEMENTS.md)：新增一节，说明早期移植范围、许可不授予派生权、以及重写与清理记录。
 - [`acknowledgements.txt`](src-tauri/resources/about/acknowledgements.txt)：应用内特别鸣谢条目改为「早期参考、已重写」表述。
 - [`licenses.txt`](src-tauri/resources/about/licenses.txt)：对应许可行标注「早期参考，相关代码已重写」与「仅历史区间适用」。
+- [`ACKNOWLEDGEMENTS.md`](ACKNOWLEDGEMENTS.md)：补充现状判定——按该指南属轻度使用，署名与不混淆两条义务均已满足，购买劝导已有实现。
 
 ### 变更
 
