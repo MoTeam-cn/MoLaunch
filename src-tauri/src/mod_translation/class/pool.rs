@@ -1,15 +1,11 @@
-//! class 常量池：只读游标解析，产出 Utf8 条目与 String 引用目标
+//! class 常量池解析（规格 §3.1 ~ §3.2，格式依据 JVMS 第 4.4 节）
 //!
-//! 只关心「哪些文本出现在常量池里」以及「它们各自占哪几个字节」，
-//! 其余 tag 按 JVM 规范的固定长度跳过；LONG/DOUBLE 占两个槽位。
+//! 只关心两类条目：UTF8（tag 1）与其被 String（tag 8）引用的文本。
+//! 解析用「顺序游标」推进：每读一个 tag 就按该 tag 的固定长度跳过或取内容，
+//! LONG/DOUBLE 额外占一个槽位，因此槽位号与真实索引必须分开维护。
 
-use std::collections::BTreeSet;
-
-/// class 文件魔数
-const MAGIC: [u8; 4] = [0xCA, 0xFE, 0xBA, 0xBE];
-
-/// 常量池 tag 编号（JVMS §4.4）
-mod tag {
+/// 常量池 tag（JVMS 4.4）
+pub mod tag {
     pub const UTF8: u8 = 1;
     pub const INTEGER: u8 = 3;
     pub const FLOAT: u8 = 4;
@@ -29,21 +25,21 @@ mod tag {
     pub const PACKAGE: u8 = 20;
 }
 
-/// 一条 Utf8 常量：槽位序号、解码文本、整条常量的字节区间
-#[derive(Debug, Clone, PartialEq, Eq)]
+const CLASS_MAGIC: u32 = 0xCAFE_BABE;
+
+/// 一个 UTF8 常量：槽位号、文本、字节区间（tag 到内容结束）
+#[derive(Debug, Clone, PartialEq)]
 pub struct Utf8Entry {
     pub index: u16,
     pub text: String,
-    /// (起始偏移, 结束偏移)，覆盖 tag + 长度 + 内容
     pub span: (usize, usize),
 }
 
-/// 常量池中与文本相关的视图
+/// 解析结果：UTF8 条目 + 被 String 引用的槽位号
 #[derive(Debug, Clone, Default)]
 pub struct ConstantPool {
     utf8: Vec<Utf8Entry>,
-    /// 被 String 常量指向的 Utf8 槽位
-    string_targets: BTreeSet<u16>,
+    string_slots: Vec<u16>,
 }
 
 impl ConstantPool {
@@ -51,109 +47,121 @@ impl ConstantPool {
         &self.utf8
     }
 
-    /// 运行时字符串：仅取被 String 常量引用的那些 Utf8
+    /// 被 String 常量引用的文本（按槽位顺序，未命中的引用忽略）
     pub fn strings(&self) -> Vec<String> {
+        self.string_slots
+            .iter()
+            .filter_map(|slot| self.text_at(*slot))
+            .collect()
+    }
+
+    fn text_at(&self, slot: u16) -> Option<String> {
         self.utf8
             .iter()
-            .filter(|entry| self.string_targets.contains(&entry.index))
+            .find(|entry| entry.index == slot)
             .map(|entry| entry.text.clone())
-            .collect()
     }
 }
 
-/// 带边界检查的顺序读取器，越界一律转成可读错误
+/// 顺序游标：所有读取都带边界检查，越界即报错
 struct Cursor<'a> {
     bytes: &'a [u8],
-    position: usize,
+    offset: usize,
 }
 
 impl<'a> Cursor<'a> {
     fn new(bytes: &'a [u8]) -> Self {
-        Self { bytes, position: 0 }
+        Self { bytes, offset: 0 }
     }
 
-    fn take(&mut self, length: usize, what: &str) -> Result<&'a [u8], String> {
-        let end = self
-            .position
-            .checked_add(length)
-            .ok_or_else(|| format!("class {what} offset overflow"))?;
-        if end > self.bytes.len() {
-            return Err(format!("class {what} is truncated"));
+    fn remaining(&self) -> usize {
+        self.bytes.len().saturating_sub(self.offset)
+    }
+
+    fn take(&mut self, count: usize) -> Result<&'a [u8], String> {
+        if self.remaining() < count {
+            return Err("class file is truncated".to_string());
         }
-        let slice = &self.bytes[self.position..end];
-        self.position = end;
+        let slice = &self.bytes[self.offset..self.offset + count];
+        self.offset += count;
         Ok(slice)
     }
 
-    fn skip(&mut self, length: usize, what: &str) -> Result<(), String> {
-        self.take(length, what).map(|_| ())
+    fn u8(&mut self) -> Result<u8, String> {
+        Ok(self.take(1)?[0])
     }
 
-    fn u8(&mut self, what: &str) -> Result<u8, String> {
-        Ok(self.take(1, what)?[0])
+    fn u16(&mut self) -> Result<u16, String> {
+        let slice = self.take(2)?;
+        Ok(u16::from_be_bytes([slice[0], slice[1]]))
     }
 
-    fn u16(&mut self, what: &str) -> Result<u16, String> {
-        let raw = self.take(2, what)?;
-        Ok(u16::from_be_bytes([raw[0], raw[1]]))
+    fn u32(&mut self) -> Result<u32, String> {
+        let slice = self.take(4)?;
+        Ok(u32::from_be_bytes([slice[0], slice[1], slice[2], slice[3]]))
+    }
+
+    fn skip(&mut self, count: usize) -> Result<(), String> {
+        self.take(count).map(|_| ())
     }
 }
 
-/// 解析常量池
-pub(super) fn read_pool(bytes: &[u8]) -> Result<ConstantPool, String> {
-    if bytes.len() < 10 {
-        return Err("class file is shorter than the 10-byte header".to_string());
-    }
-    if bytes[0..4] != MAGIC {
-        return Err("class file does not start with the 0xCAFEBABE magic".to_string());
-    }
-    let declared = u16::from_be_bytes([bytes[8], bytes[9]]);
+/// 解析常量池；返回全部 UTF8 条目与 String 引用
+pub fn read_pool(bytes: &[u8]) -> Result<ConstantPool, String> {
     let mut cursor = Cursor::new(bytes);
-    cursor.skip(10, "header")?;
+    if cursor.u32()? != CLASS_MAGIC {
+        return Err("the payload is not a class file".to_string());
+    }
+    cursor.skip(4)?; // minor + major version
+    let declared = cursor.u16()? as usize;
+    if declared == 0 {
+        return Err("the class constant pool is empty".to_string());
+    }
 
     let mut pool = ConstantPool::default();
     let mut slot: u16 = 1;
-    while slot < declared {
-        let entry_start = cursor.position;
-        let kind = cursor.u8("constant pool tag")?;
-        match kind {
+    while (slot as usize) < declared {
+        let tag_offset = cursor.offset;
+        let entry_tag = cursor.u8()?;
+        match entry_tag {
             tag::UTF8 => {
-                let length = cursor.u16("UTF-8 constant length")? as usize;
-                let raw = cursor.take(length, "UTF-8 constant body")?;
+                let length = cursor.u16()? as usize;
+                let content = cursor.take(length)?;
                 pool.utf8.push(Utf8Entry {
                     index: slot,
-                    text: String::from_utf8_lossy(raw).into_owned(),
-                    span: (entry_start, cursor.position),
+                    text: String::from_utf8_lossy(content).into_owned(),
+                    span: (tag_offset, cursor.offset),
                 });
             }
             tag::STRING => {
-                let target = cursor.u16("String constant reference")?;
-                pool.string_targets.insert(target);
+                pool.string_slots.push(cursor.u16()?);
             }
-            tag::LONG | tag::DOUBLE => {
-                cursor.skip(8, "8-byte constant")?;
-                // 8 字节常量占用两个槽位，后一个槽位不可寻址
-                slot += 1;
-            }
-            tag::INTEGER | tag::FLOAT => cursor.skip(4, "4-byte constant")?,
-            tag::CLASS | tag::METHOD_TYPE | tag::MODULE | tag::PACKAGE => {
-                cursor.skip(2, "2-byte constant")?;
-            }
-            tag::FIELD_REF
+            tag::INTEGER
+            | tag::FLOAT
+            | tag::FIELD_REF
             | tag::METHOD_REF
             | tag::INTERFACE_METHOD_REF
             | tag::NAME_AND_TYPE
             | tag::DYNAMIC
-            | tag::INVOKE_DYNAMIC => cursor.skip(4, "4-byte constant")?,
-            tag::METHOD_HANDLE => cursor.skip(3, "method handle constant")?,
-            other => return Err(format!("class constant pool tag {other} is not defined")),
+            | tag::INVOKE_DYNAMIC => cursor.skip(4)?,
+            tag::CLASS | tag::METHOD_TYPE | tag::MODULE | tag::PACKAGE => cursor.skip(2)?,
+            tag::METHOD_HANDLE => cursor.skip(3)?,
+            tag::LONG | tag::DOUBLE => {
+                cursor.skip(8)?;
+                // LONG/DOUBLE 各占两个槽位
+                slot = slot.saturating_add(1);
+            }
+            other => {
+                return Err(format!("unknown constant pool tag: {other}"));
+            }
         }
-        slot += 1;
+        slot = slot.saturating_add(1);
     }
+
     Ok(pool)
 }
 
-/// 常量池全部 Utf8 文本（含重复）及其字节区间
+/// UTF8 条目列表：(文本, 起始偏移, 结束偏移)
 pub fn parse_class_constant_pool(bytes: &[u8]) -> Result<Vec<(String, usize, usize)>, String> {
     Ok(read_pool(bytes)?
         .utf8()
@@ -162,7 +170,7 @@ pub fn parse_class_constant_pool(bytes: &[u8]) -> Result<Vec<(String, usize, usi
         .collect())
 }
 
-/// 被 String 常量引用的文本（运行时可见字符串），无法解析时返回空
+/// 运行时字符串常量（解析失败按空处理，供扫描阶段使用）
 pub fn class_string_constants(bytes: &[u8]) -> Vec<String> {
     read_pool(bytes)
         .map(|pool| pool.strings())

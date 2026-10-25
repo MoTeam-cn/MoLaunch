@@ -1,6 +1,9 @@
-//! class 候选发现（跨文件聚合）与确定性排除
+//! class 候选发现与确定性排除（规格 §3.3 §3.5 §3.6）
+//!
+//! 遍历工作区 `.class` 文件，把通过判定的文本按「文本 → 出现路径集合」聚合，
+//! 再按 sha256(首个路径 + NUL + 文本) 前 24 位生成稳定 id，最后按 id 排序。
 
-use std::collections::{BTreeSet, HashMap};
+use std::collections::{BTreeMap, BTreeSet};
 use std::path::Path;
 
 use sha2::{Digest, Sha256};
@@ -10,9 +13,12 @@ use super::super::types::ClassCandidate;
 use super::classify::classify_class_text;
 use super::pool::class_string_constants;
 
-/// 遍历工作区 .class 文件，按文本跨文件聚合候选
+/// 聚合结果：文本 → (首个路径, 全部路径)
+type Grouped = BTreeMap<String, (String, BTreeSet<String>)>;
+
 pub fn discover_class_candidates(workspace: &Path) -> Vec<ClassCandidate> {
-    let mut grouped: HashMap<String, (String, BTreeSet<String>)> = HashMap::new();
+    let mut grouped: Grouped = BTreeMap::new();
+
     for relative in jar::collect_files(workspace).unwrap_or_default() {
         if !relative.to_ascii_lowercase().ends_with(".class") {
             continue;
@@ -25,20 +31,21 @@ pub fn discover_class_candidates(workspace: &Path) -> Vec<ClassCandidate> {
                 continue;
             }
             let entry = grouped
-                .entry(text.clone())
+                .entry(text)
                 .or_insert_with(|| (relative.clone(), BTreeSet::new()));
             entry.1.insert(relative.clone());
         }
     }
+
     let mut candidates: Vec<ClassCandidate> = grouped
         .into_iter()
         .map(|(text, (path, paths))| {
-            let paths = paths.into_iter().collect::<Vec<_>>();
+            let paths: Vec<String> = paths.into_iter().collect();
             ClassCandidate {
                 id: candidate_id(&path, &text),
                 path: path.clone(),
-                paths: paths.clone(),
                 occurrences: paths.len(),
+                paths,
                 text,
             }
         })
@@ -52,44 +59,109 @@ fn candidate_id(path: &str, text: &str) -> String {
     hasher.update(path.as_bytes());
     hasher.update(b"\0");
     hasher.update(text.as_bytes());
-    format!("{:x}", hasher.finalize())[..24].to_string()
+    let digest = format!("{:x}", hasher.finalize());
+    digest[..24].to_string()
 }
 
-/// 确定性排除理由：java 类名 / 正则 / 内部诊断；UI 宿主路径保留
+/// 宿主路径里出现这些目录名时视为界面文案（不排除）
+const UI_SEGMENTS: [&str; 7] = [
+    "gui", "screen", "widget", "tooltip", "chat", "menu", "config",
+];
+/// 宿主路径里出现这些目录名时视为内部诊断宿主
+const DIAGNOSTIC_SEGMENTS: [&str; 8] = [
+    "file", "graphics", "server", "palette", "world", "misc", "region", "pool",
+];
+/// 诊断文案特征（小写匹配）
+const DIAGNOSTIC_PHRASES: [&str; 4] = ["ioexception", "failed to", "retrying", "unknown status"];
+
+/// 确定性排除理由：java 类名 / 正则 / 内部诊断；界面宿主路径一律保留
 pub fn deterministic_class_exclusion_reason(path: &str, text: &str) -> Option<&'static str> {
     let value = text.trim();
-    if regex::Regex::new(r"^(?:[a-z_][A-Za-z0-9_$]*\.)+[A-Z_$][A-Za-z0-9_$]*$")
-        .unwrap()
-        .is_match(value)
-    {
+    if is_java_class_name(value) {
         return Some("java_class_name");
     }
-    let looks_like_regex = value.starts_with('^')
-        && value.ends_with('$')
-        && regex::Regex::new(r"(?:\\[.dDsSwW]|\[[^\]]+\]|\{\d+(?:,\d*)?\}|\(\?:?)")
-            .unwrap()
-            .is_match(value);
-    if looks_like_regex {
+    if looks_like_regex(value) {
         return Some("regular_expression");
     }
-    let normalized = path.replace('\\', "/").to_ascii_lowercase();
-    if regex::Regex::new(r"(?:^|/)(?:gui|screen|widget|tooltip|chat|menu|config)(?:/|$)")
-        .unwrap()
-        .is_match(&normalized)
+
+    let segments: Vec<String> = path
+        .replace('\\', "/")
+        .to_ascii_lowercase()
+        .split('/')
+        .map(str::to_string)
+        .collect();
+    if segments
+        .iter()
+        .any(|segment| UI_SEGMENTS.contains(&segment.as_str()))
     {
         return None;
     }
-    let diagnostic_host = regex::Regex::new(
-        r"(?:^|/)(?:file|graphics|server|palette|world|misc|region|pool|core)(?:/|$)",
-    )
-    .unwrap()
-    .is_match(&normalized);
-    let diagnostic_text =
-        regex::Regex::new(r"(?i)\b(?:ioexception|failed to|retrying|unknown status)\b")
-            .unwrap()
-            .is_match(value);
-    if diagnostic_host && diagnostic_text {
-        return Some("internal_diagnostic");
+
+    let diagnostic_host = segments
+        .iter()
+        .any(|segment| DIAGNOSTIC_SEGMENTS.contains(&segment.as_str()));
+    if diagnostic_host {
+        let lowered = value.to_ascii_lowercase();
+        if DIAGNOSTIC_PHRASES
+            .iter()
+            .any(|phrase| lowered.contains(phrase))
+        {
+            return Some("internal_diagnostic");
+        }
     }
     None
+}
+
+/// 全限定类名：`com.example.Foo` / `com.example.Foo$Bar`
+fn is_java_class_name(value: &str) -> bool {
+    let segments: Vec<&str> = value.split('.').collect();
+    if segments.len() < 2 {
+        return false;
+    }
+    let Some((last, head)) = segments.split_last() else {
+        return false;
+    };
+    let tail_ok = last
+        .chars()
+        .next()
+        .map(|c| c.is_ascii_uppercase() || c == '$')
+        .unwrap_or(false)
+        && last
+            .chars()
+            .all(|c| c.is_ascii_alphanumeric() || matches!(c, '_' | '$'));
+    tail_ok
+        && head.iter().all(|segment| {
+            segment
+                .chars()
+                .next()
+                .map(|c| c.is_ascii_lowercase() || c == '_')
+                .unwrap_or(false)
+                && segment
+                    .chars()
+                    .all(|c| c.is_ascii_alphanumeric() || matches!(c, '_' | '$'))
+        })
+}
+
+/// 正则字面量：以 `^` 开头、`$` 结尾且含转义类/字符组/量词/分组
+fn looks_like_regex(value: &str) -> bool {
+    if !(value.starts_with('^') && value.ends_with('$')) {
+        return false;
+    }
+    let mut chars = value.chars().peekable();
+    while let Some(current) = chars.next() {
+        match current {
+            '\\' => {
+                if let Some(next) = chars.peek() {
+                    if "dDsSwW.".contains(*next) {
+                        return true;
+                    }
+                }
+            }
+            '[' => return true,
+            '(' => return true,
+            '{' => return true,
+            _ => {}
+        }
+    }
+    false
 }

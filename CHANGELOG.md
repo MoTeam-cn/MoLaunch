@@ -6,6 +6,17 @@
 
 ### 重构
 
+#### 模组翻译：JAR 工作区与 class 处理按净室规格重新实现
+
+- **工作区**（[`jar.rs`](src-tauri/src/mod_translation/jar.rs)）：解包上限收敛成 `Guard`（条目数 / 单条目 / 总量 / 压缩比），路径校验合并为 `safe_segments`；签名条目只记录不落盘（旧签名会让重打包后的 JAR 失效）。
+- **常量池**（[`class/pool.rs`](src-tauri/src/mod_translation/class/pool.rs)）：改为带边界检查的顺序游标 `Cursor`，按 JVMS 4.4 的 tag 长度表分发，`LONG`/`DOUBLE` 双槽位单独记账。
+- **候选判定**（[`class/classify.rs`](src-tauri/src/mod_translation/class/classify.rs)）：去掉正则，改为字符扫描 + 手写 JVM 描述符解析，判定顺序对齐规格 §3.4。
+- **候选聚合**（[`class/discover.rs`](src-tauri/src/mod_translation/class/discover.rs)）：改为 `BTreeMap` 聚合 + sha256 稳定 id，确定性排除改为路径段与文案特征匹配。
+- **改写**（[`class/rewrite.rs`](src-tauri/src/mod_translation/class/rewrite.rs)）：先收集全部目标区间再一次性重建字节，未命中直接返回原字节。
+- **测试**（[`class_test.rs`](src-tauri/src/mod_translation/class_test.rs)）：构造式 fixture 重写，覆盖槽位/区间、只取被引用文本、双槽位对齐、非 class/截断/未知 tag、改写与超长替换、判定形状、跨文件聚合、确定性排除、解包打包往返与越界路径拒绝。
+
+### 重构
+
 #### 合成配方生成器按净室规格重新实现
 
 - **版本能力表**（[`versions.ts`](src/utils/recipe-generator/versions.ts)）：19 个版本各一行能力开关（`namespacedType` / `objectIngredients` / `stringIngredients` / `resultUsesId` / `ingredientCount` / `category` / `trimPattern` / 各类 `notification`），其余模块只读开关。
