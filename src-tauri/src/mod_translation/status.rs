@@ -13,26 +13,30 @@ pub const EVENT_NAME: &str = "mod-translation-event";
 /// 当前任务状态快照（无任务时返回 idle）
 static STATUS: Mutex<Option<TaskSnapshot>> = Mutex::new(None);
 
-/// 当前任务状态快照（无任务时返回 idle）
+fn idle_snapshot() -> TaskSnapshot {
+    TaskSnapshot {
+        task_id: String::new(),
+        status: "idle".to_string(),
+        stage: String::new(),
+        progress: 0.0,
+        stage_progress: 0.0,
+        retry: None,
+        stages: Vec::new(),
+        message: String::new(),
+        output_path: None,
+        error: None,
+        mod_name: None,
+        report: None,
+    }
+}
+
+/// 当前任务状态快照
 pub fn current_status() -> TaskSnapshot {
     STATUS
         .lock()
         .ok()
-        .and_then(|g| g.clone())
-        .unwrap_or_else(|| TaskSnapshot {
-            task_id: String::new(),
-            status: "idle".to_string(),
-            stage: String::new(),
-            progress: 0.0,
-            stage_progress: 0.0,
-            retry: None,
-            stages: Vec::new(),
-            message: String::new(),
-            output_path: None,
-            error: None,
-            mod_name: None,
-            report: None,
-        })
+        .and_then(|guard| guard.clone())
+        .unwrap_or_else(idle_snapshot)
 }
 
 /// 失败终态快照（task_id 为空，finish 时补全）
@@ -47,7 +51,7 @@ pub(super) fn failed_snapshot(stage: &str, error: &str) -> TaskSnapshot {
     }
 }
 
-/// 更新状态并向前端 emit 进度事件（progress 为当前阶段分进度，总进度按权重计算）
+/// 更新状态并向前端 emit 进度事件
 pub(super) fn update_status(
     app: &AppHandle,
     stage: &str,
@@ -56,6 +60,7 @@ pub(super) fn update_status(
     retry: Option<RetryInfo>,
 ) {
     set_stage_progress(stage, progress);
+
     let mut snapshot = current_status();
     snapshot.stage = stage.to_string();
     snapshot.stage_progress = progress;
@@ -63,6 +68,7 @@ pub(super) fn update_status(
     snapshot.retry = retry;
     snapshot.stages = build_stages();
     snapshot.message = message.to_string();
+
     store_status(&snapshot);
     let _ = app.emit(EVENT_NAME, &snapshot);
 }
@@ -76,7 +82,7 @@ pub(super) fn finish(app: &AppHandle, mut snapshot: TaskSnapshot) {
     let _ = app.emit(EVENT_NAME, &snapshot);
 }
 
-/// 写入状态快照（命令入口与终态共用）
+/// 写入状态快照
 pub(super) fn store_status(snapshot: &TaskSnapshot) {
     if let Ok(mut slot) = STATUS.lock() {
         *slot = Some(snapshot.clone());

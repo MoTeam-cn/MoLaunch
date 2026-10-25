@@ -1,4 +1,7 @@
-//! 模组翻译：翻译记忆（跨模组缓存同源文本，JSON 落盘）
+//! 模组翻译：翻译记忆（跨模组复用同源文本，JSON 落盘）
+//!
+//! 记忆键 = sha256(排序去重后的 modId 列表 ␀ 小写命名空间 ␀ 原文)，
+//! 命中时还要过一遍「含中文 + 占位符一致」才可用，否则视为未命中。
 
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
@@ -10,8 +13,12 @@ use sha2::{Digest, Sha256};
 use crate::mod_translation::quality::validate_protected_tokens;
 use crate::mod_translation::types::has_chinese;
 
-/// 条目数上限，超出按 (updated_at 降序, hits 降序) 截断
+/// 条目数上限，超出按 (更新时间降序, 命中数降序) 截断
 const MAX_ENTRIES: usize = 100_000;
+/// 落盘文件名
+const MEMORY_FILE: &str = "translation-memory-v1.json";
+/// 落盘格式版本
+const MEMORY_VERSION: u32 = 1;
 
 /// 单条翻译记忆
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -21,19 +28,34 @@ pub struct MemoryEntry {
     pub hits: u64,
 }
 
-/// 落盘格式（带版本号便于后续迁移）
+/// 落盘格式（带版本号便于迁移）
 #[derive(Debug, Serialize, Deserialize)]
 struct MemoryFile {
     version: u32,
     entries: HashMap<String, MemoryEntry>,
 }
 
-/// 翻译记忆：key = SHA256(mod_ids + namespace + source)
+/// 翻译记忆
 #[derive(Debug)]
 pub struct TranslationMemory {
     pub path: PathBuf,
     pub entries: HashMap<String, MemoryEntry>,
     pub dirty: bool,
+}
+
+/// 记忆内容是否可用：非空、含中文、占位符一致
+fn is_usable(source: &str, translation: &str) -> bool {
+    let trimmed = translation.trim();
+    !trimmed.is_empty()
+        && has_chinese(trimmed)
+        && validate_protected_tokens(source, trimmed).is_none()
+}
+
+fn now_seconds() -> u64 {
+    SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .map(|value| value.as_secs())
+        .unwrap_or(0)
 }
 
 impl TranslationMemory {
@@ -51,7 +73,7 @@ impl TranslationMemory {
         }
     }
 
-    /// 记忆键：mod_ids 排序去重 + namespace 小写 + source
+    /// 记忆键：modId 排序去重 + 小写命名空间 + 原文
     pub fn memory_key(mod_ids: &[String], namespace: &str, source: &str) -> String {
         let mut ids = mod_ids.to_vec();
         ids.sort();
@@ -60,18 +82,16 @@ impl TranslationMemory {
         hasher.update(serde_json::to_string(&ids).unwrap_or_default());
         hasher.update(namespace.to_ascii_lowercase().as_bytes());
         hasher.update(source.as_bytes());
-        format!("{:x}", hasher.finalize())
+        let digest = format!("{:x}", hasher.finalize());
+        digest
     }
 
-    /// 命中须过中文 + 占位符校验，不过视为 miss
+    /// 命中：校验通过才返回译文，并累加命中数
     pub fn lookup(&mut self, mod_ids: &[String], namespace: &str, source: &str) -> Option<String> {
         let key = Self::memory_key(mod_ids, namespace, source);
         let entry = self.entries.get_mut(&key)?;
         let translation = entry.translation.trim().to_string();
-        if translation.is_empty()
-            || !has_chinese(&translation)
-            || validate_protected_tokens(source, &translation).is_some()
-        {
+        if !is_usable(source, &translation) {
             return None;
         }
         entry.hits += 1;
@@ -100,28 +120,34 @@ impl TranslationMemory {
         self.dirty = true;
     }
 
-    /// 落盘：dirty 才写；超限截断；临时文件 + rename 原子写
+    /// 超出上限时按热度截断
+    fn trim(&mut self) {
+        if self.entries.len() <= MAX_ENTRIES {
+            return;
+        }
+        let mut ranked: Vec<(String, MemoryEntry)> = self.entries.drain().collect();
+        ranked.sort_by(|left, right| {
+            right
+                .1
+                .updated_at
+                .cmp(&left.1.updated_at)
+                .then_with(|| right.1.hits.cmp(&left.1.hits))
+        });
+        ranked.truncate(MAX_ENTRIES);
+        self.entries = ranked.into_iter().collect();
+    }
+
+    /// 落盘：dirty 才写，原子替换
     pub fn flush(&mut self) -> Result<(), String> {
         if !self.dirty {
             return Ok(());
         }
-        if self.entries.len() > MAX_ENTRIES {
-            let mut entries = self.entries.drain().collect::<Vec<_>>();
-            entries.sort_by(|left, right| {
-                right
-                    .1
-                    .updated_at
-                    .cmp(&left.1.updated_at)
-                    .then_with(|| right.1.hits.cmp(&left.1.hits))
-            });
-            entries.truncate(MAX_ENTRIES);
-            self.entries = entries.into_iter().collect();
-        }
+        self.trim();
         if let Some(parent) = self.path.parent() {
             std::fs::create_dir_all(parent).map_err(|e| format!("无法创建翻译记忆目录: {e}"))?;
         }
         let file = MemoryFile {
-            version: 1,
+            version: MEMORY_VERSION,
             entries: self.entries.clone(),
         };
         let content =
@@ -132,70 +158,11 @@ impl TranslationMemory {
     }
 }
 
-fn now_seconds() -> u64 {
-    SystemTime::now()
-        .duration_since(UNIX_EPOCH)
-        .map(|value| value.as_secs())
-        .unwrap_or(0)
-}
-
-/// 记忆文件路径：`workspace_root/translation-memory-v1.json`
+/// 记忆文件路径
 pub fn memory_path(workspace_root: &Path) -> PathBuf {
-    workspace_root.join("translation-memory-v1.json")
+    workspace_root.join(MEMORY_FILE)
 }
 
 #[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn memory_key_normalizes_mod_ids_and_namespace() {
-        let key_a = TranslationMemory::memory_key(
-            &[
-                "mod-b".to_string(),
-                "mod-a".to_string(),
-                "mod-b".to_string(),
-            ],
-            "Namespace",
-            "Hello %s",
-        );
-        let key_b = TranslationMemory::memory_key(
-            &["mod-a".to_string(), "mod-b".to_string()],
-            "namespace",
-            "Hello %s",
-        );
-        assert_eq!(key_a, key_b);
-        assert_eq!(key_a.len(), 64);
-    }
-
-    #[test]
-    fn lookup_rejects_invalid_translation() {
-        let mut memory = TranslationMemory::load(PathBuf::from("unused.json"));
-        let mod_ids = vec!["mod-a".to_string()];
-        memory.record(&mod_ids, "ns", "Hello %s", "你好 %d".to_string());
-        assert!(memory.lookup(&mod_ids, "ns", "Hello %s").is_none());
-        memory.record(&mod_ids, "ns", "Hello %s", "你好 %s".to_string());
-        assert_eq!(
-            memory.lookup(&mod_ids, "ns", "Hello %s"),
-            Some("你好 %s".to_string())
-        );
-    }
-
-    #[test]
-    fn flush_persists_and_reloads() {
-        let path = std::env::temp_dir().join(format!(
-            "mo-translation-memory-test-{}.json",
-            std::process::id()
-        ));
-        let _ = std::fs::remove_file(&path);
-        let mut memory = TranslationMemory::load(path.clone());
-        memory.record(&["mod-a".to_string()], "ns", "Hello", "你好".to_string());
-        memory.flush().unwrap();
-        let mut reloaded = TranslationMemory::load(path.clone());
-        assert_eq!(
-            reloaded.lookup(&["mod-a".to_string()], "ns", "Hello"),
-            Some("你好".to_string())
-        );
-        let _ = std::fs::remove_file(&path);
-    }
-}
+#[path = "memory_test.rs"]
+mod tests;

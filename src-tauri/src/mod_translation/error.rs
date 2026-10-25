@@ -29,6 +29,7 @@ pub enum TranslateErrorCode {
 }
 
 impl TranslateErrorCode {
+    /// 稳定的字符串码（前端按此匹配提示文案）
     pub fn as_str(self) -> &'static str {
         match self {
             Self::UnsafeArchivePath => "unsafe-archive-path",
@@ -76,8 +77,8 @@ impl From<std::io::Error> for TranslateError {
 }
 
 impl fmt::Display for TranslateError {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "{}: {}", self.code.as_str(), self.message)
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(formatter, "{}: {}", self.code.as_str(), self.message)
     }
 }
 

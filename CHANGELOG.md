@@ -6,6 +6,19 @@
 
 ### 重构
 
+#### 模组翻译：任务编排、记忆、续传与基础设施按规格重新实现
+
+- **任务编排**（[`task/prepare.rs`](src-tauri/src/mod_translation/task/prepare.rs)、[`task/run.rs`](src-tauri/src/mod_translation/task/run.rs)）：续传复用抽成 `reuse_resumable`，阶段错误归类为 `classify_error`（`None` = 取消），检查点恢复与落盘抽成 `restore_*` / `persist`，打包报告抽成 `completed_snapshot`。
+- **翻译记忆**（[`memory.rs`](src-tauri/src/mod_translation/memory.rs)）：可用性判定抽成 `is_usable`，超限截断抽成 `trim`，测试移到 [`memory_test.rs`](src-tauri/src/mod_translation/memory_test.rs)。
+- **断点续传**（[`resume.rs`](src-tauri/src/mod_translation/resume.rs)）：工作区前缀与版本收敛为常量，测试移到 [`resume_test.rs`](src-tauri/src/mod_translation/resume_test.rs)。
+- **进度与状态**（[`progress.rs`](src-tauri/src/mod_translation/progress.rs)、[`status.rs`](src-tauri/src/mod_translation/status.rs)）：阶段权重与节拍收敛为常量，锁中毒统一由 `lock` 兜底；`status` 的 idle 快照抽成 `idle_snapshot`。
+- **提示词解析**（[`prompt.rs`](src-tauri/src/mod_translation/prompt.rs)）：JSON 提取改为 `JsonScanner` 状态机，模板兜底提为常量。
+- **命令入口**（[`controller.rs`](src-tauri/src/mod_translation/controller.rs)）：文件校验、缓存复用、模型解析、结果汇总各自抽成独立函数。
+- **错误类型**（[`error.rs`](src-tauri/src/mod_translation/error.rs)）：错误码表保持不变（前端按码匹配文案），仅整理实现。
+- **未改动**：[`types.rs`](src-tauri/src/mod_translation/types.rs) 为前后端共享的数据模型（字段名即 IPC 契约），不含算法逻辑。
+
+### 重构
+
 #### 模组翻译：语言与 class 翻译路由按规格重新实现
 
 - **语言路由**（[`translate_lang.rs`](src-tauri/src/mod_translation/translate_lang.rs)）：待译条目过滤抽成 `pending_entries`，批次上下文收敛为 `BatchCtx`（`translate` / `request` 两个方法），fast/deep 通道只保留一个队列。
