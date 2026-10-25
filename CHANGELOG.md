@@ -6,6 +6,15 @@
 
 ### 重构
 
+#### 模组翻译：JAR 分析按规格重新实现
+
+- **语言源**（[`analyze/sources.rs`](src-tauri/src/mod_translation/analyze/sources.rs)）：标准扩展名收敛为常量表，`en_us` 段判定与目标路径改写抽成 `has_english_segment` / `target_path_of`。
+- **加载器**（[`analyze/loader.rs`](src-tauri/src/mod_translation/analyze/loader.rs)）：探测顺序改为 `PROBES` 表，TOML 取值改为逐行扫描（不再用正则）。
+- **覆盖诊断**（[`analyze/coverage.rs`](src-tauri/src/mod_translation/analyze/coverage.rs)）：处置结论抽成 `Disposition` 结构 + `classify` 函数，媒体类型由扩展名统一推导。
+- **入口**（[`analyze.rs`](src-tauri/src/mod_translation/analyze.rs)）：`inspect_jar` 的提示信息抽成 `collect_warnings`。
+
+### 重构
+
 #### 模组翻译：质量审计与回修按规格重新实现
 
 - **质量审计**（[`quality.rs`](src-tauri/src/mod_translation/quality.rs)）：占位符提取改为字符扫描（printf / 花括号 / 格式码 / 转义 / 控制字符五个扫描器），术语表改为「词边界短语匹配」，透传与 credit 判定同样去正则；测试移到 [`quality_test.rs`](src-tauri/src/mod_translation/quality_test.rs)。
