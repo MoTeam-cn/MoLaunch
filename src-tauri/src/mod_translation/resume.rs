@@ -8,8 +8,8 @@ use serde::{Deserialize, Serialize};
 use crate::mod_translation::ledger::ClassDecision;
 use crate::mod_translation::types::JarInspection;
 
-pub const RESUME_FILE: &str = ".mod-translator-resume.json";
-pub const CHECKPOINT_FILE: &str = ".mod-translator-checkpoint.json";
+pub const RESUME_FILE: &str = ".molaunch-translation-resume.json";
+pub const CHECKPOINT_FILE: &str = ".molaunch-translation-checkpoint.json";
 /// 当前检查点版本（读取时过滤不兼容版本）
 const CHECKPOINT_VERSION: u32 = 1;
 /// 工作区目录前缀

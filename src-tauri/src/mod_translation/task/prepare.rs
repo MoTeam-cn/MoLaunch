@@ -13,7 +13,7 @@ use super::super::types::JarInspection;
 /// 缓存工作区根目录（`.Molaunch/cache/mod-translation`）
 const WORKSPACE_ROOT: &str = "mod-translation";
 /// 续传身份标识（写入 / 匹配 resume marker 用）
-const RESUME_IDENTITY: &str = "mod-translator-v1";
+const RESUME_IDENTITY: &str = "molaunch-mod-translation-v1";
 
 /// 已就绪的分析结果（analyze 与 start 之间传递工作区）
 #[derive(Clone)]

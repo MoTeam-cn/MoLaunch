@@ -15,8 +15,6 @@ use zip::ZipArchive;
 pub const WORKSPACE_META: &str = ".molaunch-jar-meta.json";
 /// 内部文件名前缀（元数据、续传标记），打包时跳过
 const INTERNAL_PREFIX: &str = ".molaunch-";
-/// 历史遗留前缀，旧工作区可能仍带这些文件
-const LEGACY_INTERNAL_PREFIX: &str = ".mod-translator-";
 const META_FORMAT: u32 = 1;
 
 /// 解包上限（规格 §1 表格）
@@ -159,9 +157,7 @@ pub fn is_signature_entry(name: &str) -> bool {
 
 /// 内部文件：元数据与续传标记，不写入输出 JAR
 pub fn is_internal_file(name: &str) -> bool {
-    name == WORKSPACE_META
-        || name.starts_with(INTERNAL_PREFIX)
-        || name.starts_with(LEGACY_INTERNAL_PREFIX)
+    name == WORKSPACE_META || name.starts_with(INTERNAL_PREFIX)
 }
 
 /// 递归收集工作区相对路径（正斜杠、升序）

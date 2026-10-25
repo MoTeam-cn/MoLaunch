@@ -52,7 +52,7 @@ fn marker(input_hash: &str, created_at: &str) -> ResumeMarker {
     ResumeMarker {
         version: 1,
         input_hash: input_hash.to_string(),
-        resume_identity: "mod-translator-v1".to_string(),
+        resume_identity: "molaunch-mod-translation-v1".to_string(),
         created_at: created_at.to_string(),
         inspection: sample_inspection(),
     }
@@ -66,11 +66,11 @@ fn test_find_resumable_workspace_matches_hash_and_identity() {
     write_resume_marker(&job, &marker("abc123", "2026-08-18T00:00:00Z")).expect("write marker");
 
     assert_eq!(
-        find_resumable_workspace(&root, "abc123", "mod-translator-v1"),
+        find_resumable_workspace(&root, "abc123", "molaunch-mod-translation-v1"),
         Some(job.clone())
     );
     assert_eq!(
-        find_resumable_workspace(&root, "other", "mod-translator-v1"),
+        find_resumable_workspace(&root, "other", "molaunch-mod-translation-v1"),
         None
     );
     let _ = std::fs::remove_dir_all(&root);
@@ -88,7 +88,7 @@ fn test_newest_matching_workspace_is_selected() {
         write_resume_marker(&job, &marker("abc123", created_at)).expect("write marker");
     }
     assert_eq!(
-        find_resumable_workspace(&root, "abc123", "mod-translator-v1"),
+        find_resumable_workspace(&root, "abc123", "molaunch-mod-translation-v1"),
         Some(root.join("job-new"))
     );
     let _ = std::fs::remove_dir_all(&root);

@@ -4,6 +4,14 @@
 
 ## [Unreleased]
 
+### 变更
+
+#### 模组翻译：工作区内部文件名与续传身份改为项目自有前缀
+
+- [`resume.rs`](src-tauri/src/mod_translation/resume.rs)：续传标记与检查点文件名改为 `.molaunch-translation-*`。
+- [`task/prepare.rs`](src-tauri/src/mod_translation/task/prepare.rs)：续传身份改为 `molaunch-mod-translation-v1`（旧工作区因 marker 不匹配自动重建）。
+- [`jar.rs`](src-tauri/src/mod_translation/jar.rs)：移除历史前缀常量，内部文件判定只认 `.molaunch-`。
+
 ### 重构
 
 #### 模组翻译：数据模型与模块入口整理
