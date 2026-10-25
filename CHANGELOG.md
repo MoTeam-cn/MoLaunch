@@ -4,6 +4,14 @@
 
 ## [Unreleased]
 
+### 变更
+
+#### 模组翻译：旧记忆与旧续传状态不再兼容
+
+- 翻译记忆落盘格式由对象映射改为行数组（[`memory.rs`](src-tauri/src/mod_translation/memory.rs)），旧文件读取失败时静默回落为空记忆，不影响已完成输出。
+- 续传标记与检查点文件名改为 `.molaunch-translation-*`（[`resume.rs`](src-tauri/src/mod_translation/resume.rs)），升级前未完成的翻译任务会重新开始。
+- 渐变文字本地状态键与旧字段名兼容保留，配方生成器本地存档结构不变，用户设置与预设不受影响。
+
 ### 重构
 
 #### 渐变文字数据模型与文档操作收敛
