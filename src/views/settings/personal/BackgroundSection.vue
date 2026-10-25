@@ -120,7 +120,7 @@ async function chooseImage() {
         <div class="flex items-center justify-between gap-4">
           <div class="min-w-0">
             <p class="text-sm font-medium text-gray-900">填充方式</p>
-            <p class="text-xs text-gray-500 mt-0.5">铺满裁剪会保持比例填满窗口；平铺适合小尺寸纹理图</p>
+            <p class="text-xs text-gray-500 mt-0.5">铺满裁剪会保持比例填满窗口（照片推荐这个）；平铺按原尺寸重复，大图会只显示中间一块</p>
           </div>
           <div class="flex-none w-40">
             <Select

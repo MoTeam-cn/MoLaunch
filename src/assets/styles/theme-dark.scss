@@ -415,7 +415,8 @@ html[data-theme='dark'],
   background-size: var(--ui-bg-size, cover);
   background-repeat: var(--ui-bg-repeat, no-repeat);
   background-position: center;
-  filter: blur(var(--ui-bg-blur, 0px));
+  /* 轻微提饱和：半透明白面板会压掉背景的颜色 */
+  filter: blur(var(--ui-bg-blur, 0px)) saturate(var(--ui-bg-saturate, 1));
   /* 模糊会吃掉边缘，稍微放大避免露白边 */
   transform: scale(1.06);
 }
@@ -440,8 +441,9 @@ html[data-theme='dark'],
 }
 
 [data-has-background='true'] .app-main {
+  /* 只让底色透明：背景模糊统一由「背景模糊」滑块作用在图片层，
+     面板再叠一层 backdrop-filter 会双重模糊，观感发灰 */
   background-color: transparent;
-  backdrop-filter: blur(var(--ui-panel-blur, 16px)) saturate(1.12);
 }
 
 [data-has-background='true'] .bg-white {

@@ -53,6 +53,6 @@ export const DEFAULT_UI_PREFS: UiPrefs = {
   appearance: 'system',
   density: 'normal',
   reduceMotion: false,
-  background: { image: '', blur: 0, mask: 0, panel: 70, fill: 'cover' },
+  background: { image: '', blur: 0, mask: 0, panel: 65, fill: 'cover' },
   hiddenPages: [],
 }
