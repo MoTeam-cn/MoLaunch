@@ -18,23 +18,14 @@ pub fn validate_translation(source: &str, translation: &str) -> bool {
 }
 
 /// 括号配对的 JSON 扫描器：跳过字符串内的花括号与转义
-struct JsonScanner<'a> {
-    bytes: &'a [u8],
+#[derive(Default)]
+struct JsonScanner {
     depth: i32,
     in_string: bool,
     escaped: bool,
 }
 
-impl<'a> JsonScanner<'a> {
-    fn new(bytes: &'a [u8]) -> Self {
-        Self {
-            bytes,
-            depth: 0,
-            in_string: false,
-            escaped: false,
-        }
-    }
-
+impl JsonScanner {
     /// 处理一个字节；返回 true 表示对象闭合
     fn step(&mut self, byte: u8) -> bool {
         if self.in_string {
@@ -68,7 +59,7 @@ impl<'a> JsonScanner<'a> {
 /// 提取第一个完整 JSON 对象（模型可能在对象后追加解释文本）
 pub fn extract_json_object(content: &str) -> Option<&str> {
     let start = content.find('{')?;
-    let mut scanner = JsonScanner::new(content.as_bytes());
+    let mut scanner = JsonScanner::default();
     for (index, byte) in content.as_bytes().iter().enumerate().skip(start) {
         if scanner.step(*byte) {
             return Some(&content[start..=index]);
