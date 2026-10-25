@@ -73,7 +73,7 @@ pub(super) async fn request_actions(
                 cap_progress,
                 cancel,
                 on_progress,
-                move |_p: f64| label,
+                move |_p: f64| label.clone(),
                 retry,
             ) => return Err("任务已取消".to_string()),
         } {
