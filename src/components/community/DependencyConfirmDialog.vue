@@ -11,6 +11,8 @@
  */
 import { computed, ref, watch, defineAsyncComponent } from 'vue'
 import type { ResolvedDependency } from '@/types/community'
+import type { PrecheckIssue } from '@/utils/mod-precheck'
+import { ExclamationTriangleIcon, ShieldExclamationIcon } from '@heroicons/vue/24/outline'
 const Tooltip = defineAsyncComponent(() => import('@/components/common/Tooltip.vue'))
 const Button = defineAsyncComponent(() => import('@/components/common/Button.vue'))
 const DependencyItem = defineAsyncComponent(() => import('./DependencyItem.vue'))
@@ -33,6 +35,8 @@ const props = defineProps<{
   installing: boolean
   /** 是否正在检查中（首次进入时） */
   checking: boolean
+  /** 安装前预检结论（阻断项 / 警告项） */
+  issues?: PrecheckIssue[]
 }>()
 
 const emit = defineEmits<{
@@ -50,6 +54,19 @@ const upToDateExpanded = ref(false)
 
 // 是否展示已满足区
 const hasUpToDate = computed(() => props.upToDate.length > 0)
+
+// 安装前预检结论
+const issueList = computed<PrecheckIssue[]>(() => props.issues ?? [])
+const blockers = computed(() => issueList.value.filter((issue) => issue.level === 'blocker'))
+const warnings = computed(() => issueList.value.filter((issue) => issue.level === 'warning'))
+/** 有阻断项时不允许继续安装 */
+const hasBlocker = computed(() => blockers.value.length > 0)
+/** 标题：阻断 > 缺失前置 > 仅提醒 */
+const dialogTitle = computed(() => {
+  if (hasBlocker.value) return '安装前检查未通过'
+  if (props.missing.length > 0) return `发现 ${props.missing.length} 个缺失前置`
+  return '安装前检查提醒'
+})
 
 // 可勾选的依赖（有兼容版本才能勾）
 const selectableDeps = computed(() => props.missing.filter(d => d.suggestedVersion !== null))
@@ -129,7 +146,7 @@ function handleClose() {
               <CheckCircleIcon class="w-5 h-5 text-primary-500 shrink-0" />
               <div class="min-w-0">
                 <div class="text-sm font-semibold text-gray-900 truncate">
-                  发现 {{ missing.length }} 个缺失前置
+                  {{ dialogTitle }}
                 </div>
                 <div class="text-xs text-gray-500 truncate">主 Mod：{{ mainName }}</div>
               </div>
@@ -154,8 +171,30 @@ function handleClose() {
 
           <!-- 列表区 -->
           <div v-else class="flex-1 overflow-y-auto px-4 py-3 space-y-2">
-            <!-- 全选/反选 -->
-            <div class="flex items-center justify-between px-1">
+            <!-- 安装前预检：阻断项 -->
+            <div v-if="blockers.length" class="rounded-md border border-red-200 bg-red-50 px-3 py-2">
+              <div v-for="issue in blockers" :key="issue.code" class="flex items-start gap-2">
+                <ShieldExclamationIcon class="mt-0.5 w-4 h-4 shrink-0 text-red-500" />
+                <div class="min-w-0">
+                  <p class="text-xs font-medium text-red-700">{{ issue.title }}</p>
+                  <p class="mt-0.5 text-xs text-red-600 break-all">{{ issue.detail }}</p>
+                </div>
+              </div>
+            </div>
+
+            <!-- 安装前预检：警告项 -->
+            <div v-if="warnings.length" class="rounded-md border border-amber-200 bg-amber-50 px-3 py-2">
+              <div v-for="issue in warnings" :key="issue.code" class="flex items-start gap-2">
+                <ExclamationTriangleIcon class="mt-0.5 w-4 h-4 shrink-0 text-amber-500" />
+                <div class="min-w-0">
+                  <p class="text-xs font-medium text-amber-700">{{ issue.title }}</p>
+                  <p class="mt-0.5 text-xs text-amber-600 break-all">{{ issue.detail }}</p>
+                </div>
+              </div>
+            </div>
+
+            <!-- 全选/反选（无缺失前置时隐藏） -->
+            <div v-if="missing.length" class="flex items-center justify-between px-1">
               <button
                 type="button"
                 class="text-xs text-primary-600 hover:text-primary-700 font-medium"
@@ -206,7 +245,11 @@ function handleClose() {
               <Button type="text" size="small" disabled>取消</Button>
             </Tooltip>
             <Button v-else type="text" size="small" @click="handleClose">取消</Button>
+            <Tooltip v-if="hasBlocker" text="存在阻断项，装了也无法加载" position="top">
+              <Button type="primary" size="small" disabled>无法继续安装</Button>
+            </Tooltip>
             <Button
+              v-else
               type="primary"
               size="small"
               :loading="installing"

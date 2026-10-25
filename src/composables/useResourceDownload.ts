@@ -14,7 +14,9 @@ import { isSafeFileName } from '@/utils/format'
 import { useVersionStore } from '@/stores/version'
 import { pickSavePath } from '@/utils/fileDialog'
 import { toastSuccess, toastError, toastInfo } from '@/utils/toast'
-import { showModal } from '@/utils/modal'
+import { showModal, showConfirmAsync } from '@/utils/modal'
+import { listMods } from '@/utils/api/personalization/mods'
+import { precheckModInstall, type PrecheckIssue } from '@/utils/mod-precheck'
 import { loaderToFlag } from '@/utils/mod-display'
 import { useDependencyCheck } from '@/composables/useDependencyCheck'
 import { useDownloadProgress } from './useResourceDownload/useDownloadProgress'
@@ -48,6 +50,9 @@ export function useResourceDownload(options: UseResourceDownloadOptions) {
     resetDeps: deps.reset,
     installDeps: deps.install,
   })
+
+  /** 安装前预检结论（阻断项 / 警告项），供确认弹窗展示 */
+  const precheckIssues = ref<PrecheckIssue[]>([])
 
   // 前置项目详情缓存（key=version_id），VersionGroupCard 展开前置列表时懒加载
   const depsMap = ref<Map<string, ResourceProject[]>>(new Map())
@@ -98,6 +103,38 @@ export function useResourceDownload(options: UseResourceDownloadOptions) {
   }
 
   /**
+   * 安装前预检：加载器/游戏版本不匹配、同 modid 已装、同名文件将被覆盖等
+   *
+   * 纯本地判断（已装 Mod 列表 + 目标文件元数据），不发网络请求；
+   * 任何异常都降级为「无结论」，不阻断安装。
+   */
+  async function runPrecheck(v: ResourceVersion, versionId: string): Promise<PrecheckIssue[]> {
+    if (!options.project) return []
+    try {
+      const installed = await listMods(versionId)
+      return precheckModInstall({
+        target: {
+          file_name: v.file_name,
+          mod_loaders: v.mod_loaders,
+          game_versions: v.game_versions,
+        },
+        installed: installed.map((item) => ({
+          file_name: item.file_name,
+          enabled_name: item.enabled_name,
+          is_enabled: item.is_enabled,
+          slug: item.slug,
+          loader_type: item.loader_type,
+        })),
+        instanceGameVersion: options.gameVersion || '',
+        projectSlug: options.project.slug,
+      })
+    } catch (e: unknown) {
+      console.debug('[ResourceDetail] 安装前预检失败，跳过:', e)
+      return []
+    }
+  }
+
+  /**
    * 下载资源版本到用户选择的路径
    *
    * 流程：
@@ -113,6 +150,8 @@ export function useResourceDownload(options: UseResourceDownloadOptions) {
     if (!options.project) return
     // 立即设 loading，防止用户在检查依赖期间重复点击
     progress.startDownload(v.id)
+    // 清掉上一轮的预检结论，避免弹窗残留
+    precheckIssues.value = []
 
     try {
       const finalFileName = await formatDownloadFilename(v.file_name, options.project.translated_name)
@@ -133,6 +172,33 @@ export function useResourceDownload(options: UseResourceDownloadOptions) {
           }
         } catch (e) {
           console.debug('[ResourceDetail] 检查文件存在性失败:', e)
+        }
+      }
+
+      // 安装前预检：加载器/游戏版本不匹配直接拦下；重复安装、覆盖等给警告
+      if (options.project.resource_type === 'Mod') {
+        const precheckVersionId = options.versionId || versionStore.selectedVersion || ''
+        if (precheckVersionId) {
+          const issues = await runPrecheck(v, precheckVersionId)
+          precheckIssues.value = issues
+          if (issues.some((issue) => issue.level === 'blocker')) {
+            // 阻断项：复用前置确认弹窗展示，确认按钮会被禁用
+            confirm.openDependencyDialog(v)
+            return
+          }
+          const warnings = issues.filter((issue) => issue.level === 'warning')
+          // 没有前置检查环节时（无 dependencies），警告单独确认一次
+          if (warnings.length > 0 && v.dependencies.length === 0) {
+            const proceed = await showConfirmAsync(
+              '安装前检查提醒',
+              warnings.map((issue) => `· ${issue.title}：${issue.detail}`).join('\n'),
+            )
+            if (!proceed) {
+              precheckIssues.value = []
+              progress.resetDownload()
+              return
+            }
+          }
         }
       }
 
@@ -272,6 +338,12 @@ export function useResourceDownload(options: UseResourceDownloadOptions) {
     return false
   }
 
+  /** 关闭前置确认弹窗时一并清空预检结论 */
+  function handleDependencyClose() {
+    precheckIssues.value = []
+    confirm.handleDependencyClose()
+  }
+
   return {
     downloading: progress.downloading,
     downloadStage: progress.downloadStage,
@@ -283,9 +355,10 @@ export function useResourceDownload(options: UseResourceDownloadOptions) {
     depsInstalling: deps.installing,
     depsMissing: deps.missing,
     depsUpToDate: deps.upToDate,
+    precheckIssues,
     handleDownload,
     handleDependencyConfirm: confirm.handleDependencyConfirm,
-    handleDependencyClose: confirm.handleDependencyClose,
+    handleDependencyClose,
     handleLoadDeps,
   }
 }

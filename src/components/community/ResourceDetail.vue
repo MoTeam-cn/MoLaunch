@@ -48,7 +48,7 @@ const { percent, slowMerging, stageText, start, finish, fail } = useSearchProgre
 const {
   downloading, downloadStage, showDependencyDialog, pendingMainVersion,
   depsMap, depsLoadingSet,
-  depsChecking, depsInstalling, depsMissing, depsUpToDate,
+  depsChecking, depsInstalling, depsMissing, depsUpToDate, precheckIssues,
   handleDownload, handleDependencyConfirm, handleDependencyClose, handleLoadDeps,
 } = useResourceDownload(props)
 
@@ -183,6 +183,7 @@ watch(
       :main-name="pendingMainVersion?.file_name || ''"
       :installing="depsInstalling"
       :checking="depsChecking"
+      :issues="precheckIssues"
       @close="handleDependencyClose"
       @confirm="handleDependencyConfirm"
     />
