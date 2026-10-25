@@ -9,8 +9,10 @@ mod natives;
 mod pre_launch;
 mod process_spawn;
 mod runner;
+mod timing;
 mod types;
 mod validate;
 
+pub use self::timing::{LaunchTimings, StageClock, StageTiming};
 pub use self::types::{LaunchConfig, LaunchError, LaunchProgress, LaunchResult, LaunchStage};
 pub use runner::LaunchPipeline;

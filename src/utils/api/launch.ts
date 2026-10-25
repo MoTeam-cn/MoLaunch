@@ -41,6 +41,24 @@ export async function launchGame(params: {
   })
 }
 
+/** 启动阶段耗时 */
+export interface StageTiming {
+  /** 阶段标识（后端 LaunchStage 枚举名） */
+  stage: string
+  /** 耗时（毫秒） */
+  ms: number
+}
+
+/** 一次启动的耗时明细（后端 launch-timing 事件 payload） */
+export interface LaunchTimings {
+  /** 各阶段耗时（按发生顺序） */
+  stages: StageTiming[]
+  /** 各阶段耗时之和（毫秒） */
+  total_ms: number
+  /** 版本 ID */
+  version_id: string
+}
+
 export interface LaunchProgress {
   stage: string
   stage_progress: number

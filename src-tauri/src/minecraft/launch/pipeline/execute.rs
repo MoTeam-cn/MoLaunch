@@ -16,7 +16,7 @@ const JAVA_FAILURE_SIGNATURES: [&str; 5] = [
 
 use std::path::PathBuf;
 
-use super::{LaunchError, LaunchPipeline, LaunchResult, LaunchStage};
+use super::{LaunchError, LaunchPipeline, LaunchResult, LaunchStage, StageClock};
 
 impl LaunchPipeline {
     /// 更新进度
@@ -65,6 +65,8 @@ impl LaunchPipeline {
     /// 自动换 Java 重试：首次启动因 Java 版本不兼容失败时，排除该 Java 后重新选择并再试一次
     /// （只重试一次，避免死循环）。用户手动指定的 Java（custom / folder 模式）不自动替换。
     pub async fn execute(&self) -> Result<LaunchResult, LaunchError> {
+        // 每次执行重新计时（Java 自动切换重试时避免累加）
+        self.reset_timings().await;
         let mut excluded: Vec<String> = Vec::new();
         let mut retried = false;
 
@@ -142,12 +144,14 @@ impl LaunchPipeline {
         }
 
         // 阶段1: 获取Java
+        let java_clock = StageClock::start();
         self.update_progress(LaunchStage::GetJava, 0.0, "正在检测Java...")
             .await;
         let java_path = self.detect_java_excluding(excluded).await?;
         *chosen_java = Some(java_path.clone());
         self.update_progress(LaunchStage::GetJava, 1.0, "Java检测完成")
             .await;
+        self.record_stage(LaunchStage::GetJava, java_clock).await;
 
         // 检查取消
         if self.is_cancelled() {
@@ -159,10 +163,13 @@ impl LaunchPipeline {
         }
 
         // 阶段2: 文件检查和补全
+        let validate_clock = StageClock::start();
         self.update_progress(LaunchStage::ValidateFiles, 0.0, "正在检查游戏文件...")
             .await;
         self.validate_and_fix_files().await?;
         self.update_progress(LaunchStage::ValidateFiles, 1.0, "文件检查完成")
+            .await;
+        self.record_stage(LaunchStage::ValidateFiles, validate_clock)
             .await;
 
         // 检查取消
@@ -175,11 +182,13 @@ impl LaunchPipeline {
         }
 
         // 阶段3: 构建参数（内包含语言设置）
+        let args_clock = StageClock::start();
         self.update_progress(LaunchStage::BuildArgs, 0.0, "正在构建启动参数...")
             .await;
         let launch_args = self.build_arguments(&java_path).await?;
         self.update_progress(LaunchStage::BuildArgs, 1.0, "参数构建完成")
             .await;
+        self.record_stage(LaunchStage::BuildArgs, args_clock).await;
 
         // 检查取消
         if self.is_cancelled() {
@@ -192,6 +201,7 @@ impl LaunchPipeline {
 
         // 阶段4: 启动前命令（advance_run_cmd）
         // 高性能显卡设置也在这一阶段执行
+        let pre_launch_clock = StageClock::start();
         if self.config.use_dedicated_gpu {
             self.update_progress(LaunchStage::PreLaunch, 0.0, "正在设置高性能显卡...")
                 .await;
@@ -206,15 +216,21 @@ impl LaunchPipeline {
             self.update_progress(LaunchStage::PreLaunch, 1.0, "启动前命令执行完成")
                 .await;
         }
+        self.record_stage(LaunchStage::PreLaunch, pre_launch_clock)
+            .await;
 
         // 阶段5: 解压Natives
+        let natives_clock = StageClock::start();
         self.update_progress(LaunchStage::ExtractNatives, 0.0, "正在解压原生库...")
             .await;
         self.extract_natives().await?;
         self.update_progress(LaunchStage::ExtractNatives, 1.0, "原生库解压完成")
             .await;
+        self.record_stage(LaunchStage::ExtractNatives, natives_clock)
+            .await;
 
         // 阶段6: 启动进程
+        let process_clock = StageClock::start();
         self.update_progress(LaunchStage::LaunchProcess, 0.0, "正在启动游戏...")
             .await;
         let result = self.launch_process(&java_path, &launch_args).await?;
@@ -224,6 +240,8 @@ impl LaunchPipeline {
             format!("游戏已启动 PID: {}", result.pid),
         )
         .await;
+        self.record_stage(LaunchStage::LaunchProcess, process_clock)
+            .await;
 
         // 阶段7: 等待窗口 (监控进程)
         self.update_progress(LaunchStage::WaitWindow, 0.0, "等待游戏加载...")
@@ -233,6 +251,11 @@ impl LaunchPipeline {
         // 完成
         self.update_progress(LaunchStage::Finished, 1.0, "启动完成")
             .await;
+
+        // 下发本次启动的耗时明细（前端用于展示各阶段耗时）
+        if let Some(app_handle) = self.config.app_handle.as_ref() {
+            let _ = app_handle.emit("launch-timing", &self.timings().await);
+        }
 
         Ok(result)
     }

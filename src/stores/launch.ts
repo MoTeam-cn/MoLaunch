@@ -45,6 +45,8 @@ const LAUNCH_PROGRESS_EVENT = 'launch-progress'
 const LAUNCH_JAVA_WARNING_EVENT = 'launch-java-warning'
 /** 自动换 Java 重试通知（后端 execute 重试前 emit） */
 const LAUNCH_JAVA_SWITCH_EVENT = 'launch-java-switch'
+/** 启动耗时明细（后端 pipeline 完成时 emit） */
+const LAUNCH_TIMING_EVENT = 'launch-timing'
 
 export const useLaunchStore = defineStore('launch', () => {
   // 启动状态
@@ -54,12 +56,36 @@ export const useLaunchStore = defineStore('launch', () => {
   const runningVersionId = ref<string | null>(null)
   const launchProgress = ref<tauri.LaunchProgress | null>(null)
   let launchProgressUnlisten: (() => void) | null = null
+  /** 最近一次启动的耗时明细（内存态，重启启动器后清空） */
+  const launchTimings = ref<tauri.LaunchTimings | null>(null)
+  let launchTimingUnlisten: (() => void) | null = null
 /** Java 提示事件监听器（过新提示 + 自动换 Java 通知） */
 let javaNoticeUnlisten: Array<() => void> = []
 
   // Java 自动下载进度（启动时自动下载 Java 用，与版本设置页的独立下载共享事件）
   const javaDownloadProgress = ref<tauri.JavaDownloadProgress | null>(null)
   let javaDownloadUnlisten: (() => void) | null = null
+
+  /** 监听启动耗时事件（仅保留最近一次） */
+  async function setupLaunchTimingListener() {
+    if (launchTimingUnlisten) return
+    const unlisten = await safeCall(
+      () => listen<tauri.LaunchTimings>(LAUNCH_TIMING_EVENT, (event) => {
+        launchTimings.value = event.payload
+      }),
+      'setup launch timing listener',
+    )
+    if (unlisten) launchTimingUnlisten = unlisten
+  }
+
+  function stopLaunchTimingListener() {
+    if (launchTimingUnlisten) {
+      launchTimingUnlisten()
+      launchTimingUnlisten = null
+    }
+  }
+
+  setupLaunchTimingListener()
 
   async function startJavaDownloadListener() {
     if (javaDownloadUnlisten) return
@@ -246,6 +272,7 @@ let javaNoticeUnlisten: Array<() => void> = []
     runningPid,
     runningVersionId,
     launchProgress,
+    launchTimings,
     launchStageName,
     javaDownloadProgress,
     launchGame,
@@ -253,5 +280,6 @@ let javaNoticeUnlisten: Array<() => void> = []
     cancelLaunch,
     checkRunningGame,
     cleanupGameExitListener,
+    stopLaunchTimingListener,
   }
 })

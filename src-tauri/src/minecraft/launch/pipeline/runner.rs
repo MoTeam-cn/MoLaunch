@@ -5,6 +5,7 @@ use std::sync::Arc;
 use tokio::sync::{Mutex, RwLock};
 
 use super::super::watcher::{ExitInfo, GameState, GameWatcher, LoadProgress, LogEntry};
+use super::timing::{LaunchTimings, StageClock, StageTiming};
 use super::types::{LaunchConfig, LaunchProgress, LaunchStage};
 
 /// 子进程句柄类型（外层 Mutex 用于 cancel 时抢占，内层 tokio Mutex 用于 await child）
@@ -20,6 +21,8 @@ pub struct LaunchPipeline {
     pub(super) cancel_flag: Arc<AtomicBool>,
     pub(super) watcher: Arc<Mutex<Option<GameWatcher>>>,
     pub(super) child_process: ChildProcessHandle,
+    /// 各阶段耗时（按发生顺序累积）
+    pub(super) timings: Arc<Mutex<Vec<StageTiming>>>,
 }
 
 impl LaunchPipeline {
@@ -37,6 +40,7 @@ impl LaunchPipeline {
             cancel_flag: Arc::new(AtomicBool::new(false)),
             watcher: Arc::new(Mutex::new(None)),
             child_process: Arc::new(Mutex::new(None)),
+            timings: Arc::new(Mutex::new(Vec::new())),
         }
     }
 
@@ -99,6 +103,31 @@ impl LaunchPipeline {
             if let Some(ref w) = *watcher {
                 w.stop(child).await;
             }
+        }
+    }
+
+    /// 记录一个阶段的耗时
+    pub(super) async fn record_stage(&self, stage: LaunchStage, clock: StageClock) {
+        let ms = clock.elapsed_ms();
+        self.timings.lock().await.push(StageTiming {
+            stage: format!("{stage:?}"),
+            ms,
+        });
+    }
+
+    /// 清空耗时记录（重试时重新计时）
+    pub(super) async fn reset_timings(&self) {
+        self.timings.lock().await.clear();
+    }
+
+    /// 取本次启动的耗时明细
+    pub async fn timings(&self) -> LaunchTimings {
+        let stages = self.timings.lock().await.clone();
+        let total_ms = stages.iter().map(|item| item.ms).sum();
+        LaunchTimings {
+            stages,
+            total_ms,
+            version_id: self.config.version_id.clone(),
         }
     }
 

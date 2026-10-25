@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { defineAsyncComponent } from 'vue'
+import { computed, defineAsyncComponent } from 'vue'
 /**
  * 版本设置 - 概览子页：版本展示、个性化、快捷方式、高级管理
  * 业务逻辑已抽取到 `@/composables/useVersionOverviewActions`，本文件仅负责模板组装。
@@ -7,6 +7,8 @@ import { defineAsyncComponent } from 'vue'
 import { useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
 import { useJavaStore } from '@/stores/java'
+import { useLaunchStore } from '@/stores/launch'
+import { formatDuration, timingRows } from '@/utils/launch-timing'
 const Select = defineAsyncComponent(() => import('@/components/common/Select.vue'))
 const Tooltip = defineAsyncComponent(() => import('@/components/common/Tooltip.vue'))
 const Button = defineAsyncComponent(() => import('@/components/common/Button.vue'))
@@ -18,6 +20,16 @@ const RepairLoaderDrawer = defineAsyncComponent(() => import('./repair-loader/Re
 const router = useRouter()
 const authStore = useAuthStore()
 const javaStore = useJavaStore()
+const launchStore = useLaunchStore()
+
+/** 本次版本最近一次启动的耗时明细（切到别的版本时不显示） */
+const lastTimings = computed(() => {
+  const timings = launchStore.launchTimings
+  if (!timings || timings.version_id !== selectedId.value) return null
+  return timings
+})
+const launchTimingRows = computed(() => timingRows(lastTimings.value))
+const launchTotalText = computed(() => (lastTimings.value ? formatDuration(lastTimings.value.total_ms) : ''))
 const {
   selectedId, personalization,
   versionFolder, savesFolder, modsFolder, resourcepacksFolder, shaderpacksFolder,
@@ -39,6 +51,23 @@ const {
 
 <template>
   <div class="mx-auto max-w-2xl space-y-5">
+    <!-- 最近一次启动耗时（有记录时显示） -->
+    <section v-if="launchTimingRows.length" class="rounded-xl border border-gray-200 bg-white p-5 shadow-xs">
+      <div class="flex items-center justify-between gap-3">
+        <h3 class="text-sm font-semibold text-gray-900">最近一次启动耗时</h3>
+        <span class="text-xs text-gray-500">合计 {{ launchTotalText }}</span>
+      </div>
+      <ul class="mt-3 space-y-1.5">
+        <li v-for="row in launchTimingRows" :key="row.stage" class="flex items-center gap-3 text-xs">
+          <span class="w-24 flex-none truncate text-gray-500">{{ row.label }}</span>
+          <div class="h-1.5 flex-1 overflow-hidden rounded-full bg-gray-100">
+            <div class="h-full rounded-full bg-primary-500" :style="{ width: row.percent + '%' }" />
+          </div>
+          <span class="w-14 flex-none text-right text-gray-700">{{ row.text }}</span>
+        </li>
+      </ul>
+      <p class="mt-2 text-xs text-gray-400">进程启动后加载 Mod 的耗时不在统计范围内</p>
+    </section>
     <!-- 版本展示卡片 -->
     <section class="rounded-xl border border-gray-200 bg-white p-5 shadow-xs">
       <div class="flex items-center gap-4">
