@@ -1,27 +1,24 @@
 /**
- * 渐变文字工具 - 类型定义
- *
- * 文档模型：文本按行切分，每行由若干带格式的 run 组成；渐变颜色按字符展开，
- * 空白字符不消耗色标。
+ * 渐变文字工具 - 数据模型（对应 specs/cleanroom/gradient-text.md §1）
  */
 
-/** 可叠加的文本格式（顺序即输出顺序） */
+/** 可叠加的文本格式，输出顺序即此顺序 */
 export const TEXT_FORMATS = ['bold', 'italic', 'underlined', 'strikethrough', 'obfuscated'] as const
 
 export type TextFormat = (typeof TEXT_FORMATS)[number]
 
-/** 文档中的一段同格式文本 */
+/** 一段同格式文本 */
 export type GradientTextRun = {
   text: string
   formats: TextFormat[]
 }
 
-/** 整篇文档 */
+/** 整篇文档：行 → run */
 export type GradientTextDocument = {
   lines: GradientTextRun[][]
 }
 
-/** 支持的输出格式标识 */
+/** 输出格式标识（§5） */
 export type GradientFormatId =
   | 'vanilla'
   | 'vanilla-compatible'
@@ -43,36 +40,29 @@ export type GradientFormatId =
   | 'csv'
   | 'terraria'
 
-/** 输出选项 */
+/** 输出选项（§1） */
 export type GradientOutputOptions = {
-  /** Vanilla 系格式使用的控制字符 */
-  vanillaCharacter: '&' | '§'
+  /** 原版系格式使用的控制字符 */
+  control: '&' | '§'
   /** 渐变类格式只保留首尾两个色标 */
-  simplifyGradients: boolean
+  simplifyGradient: boolean
 }
 
-/** 输出格式元数据 */
-export type GradientFormatAdapter = {
+/** 展开后的字符单元（§2） */
+export type GradientCell = {
+  character: string
+  color: string | null
+  formats: TextFormat[]
+  newline: boolean
+}
+
+/** 输出格式元数据（供界面下拉与示例展示） */
+export type GradientFormatInfo = {
   id: GradientFormatId
   label: string
   sample: string
   mimeType: string
   extension: string
-  supportsVanillaCharacter?: boolean
+  usesControl?: boolean
   supportsSimplify?: boolean
-}
-
-/** 展开后的单字符单元 */
-export type GradientCharacter = {
-  character: string
-  color: string | null
-  formats: TextFormat[]
-  newline?: boolean
-}
-
-/** RGB 三元组（0-255） */
-export type GradientColor = {
-  red: number
-  green: number
-  blue: number
 }

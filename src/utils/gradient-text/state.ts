@@ -1,12 +1,11 @@
 /**
- * 渐变文字工具 - 本地状态与预设
+ * 渐变文字工具 - 本地状态与预设（对应 specs/cleanroom/gradient-text.md §8）
  *
- * 状态（文档 / 色标 / 输出配置 / 预设）存在 localStorage；读取时逐字段校验，
- * 脏数据一律回落默认值，避免坏数据把页面顶掉。
+ * 状态存在 localStorage；读取时逐字段校验，脏数据回落默认值。
  */
-import { gradientFormatAdapters } from './adapters'
-import { normalizeHexColor } from './color'
-import { DEFAULT_GRADIENT_COLORS, DEFAULT_GRADIENT_DOCUMENT, cloneGradientDocument, normalizeGradientDocument } from './document'
+import { normalizeHexColor } from './colors'
+import { DEFAULT_COLORS, DEFAULT_DOCUMENT, cloneDocument, normalizeDocument } from './document'
+import { gradientFormatAdapters } from './formats'
 import type { GradientFormatId, GradientTextDocument } from './types'
 
 export type GradientPreset = {
@@ -21,8 +20,8 @@ export type GradientTextState = {
   document: GradientTextDocument
   colors: string[]
   adapterId: GradientFormatId
-  vanillaCharacter: '&' | '§'
-  simplifyGradients: boolean
+  control: '&' | '§'
+  simplifyGradient: boolean
   presets: GradientPreset[]
 }
 
@@ -30,21 +29,21 @@ type StorageLike = Pick<Storage, 'getItem' | 'setItem'>
 
 export const GRADIENT_TEXT_STORAGE_KEY = 'molaunch.lab.gradient-text.v1'
 
-const PRESET_NAME_LIMIT = 80
+const NAME_LIMIT = 80
 
-export function createDefaultGradientTextState(): GradientTextState {
+export function createDefaultState(): GradientTextState {
   return {
     version: 1,
-    document: cloneGradientDocument(DEFAULT_GRADIENT_DOCUMENT),
-    colors: [...DEFAULT_GRADIENT_COLORS],
+    document: cloneDocument(DEFAULT_DOCUMENT),
+    colors: [...DEFAULT_COLORS],
     adapterId: 'vanilla',
-    vanillaCharacter: '§',
-    simplifyGradients: false,
+    control: '§',
+    simplifyGradient: false,
     presets: [],
   }
 }
 
-function browserStorage(): StorageLike | null {
+function storageOrNull(): StorageLike | null {
   return typeof window === 'undefined' ? null : window.localStorage
 }
 
@@ -55,6 +54,7 @@ function sanitizeColors(value: unknown): string[] {
     .filter((color): color is string => color !== null)
 }
 
+/** 预设导入：只接受带有效色标的条目 */
 export function parseGradientPresets(value: unknown): GradientPreset[] {
   if (!Array.isArray(value)) return []
   const presets: GradientPreset[] = []
@@ -66,7 +66,7 @@ export function parseGradientPresets(value: unknown): GradientPreset[] {
     const name = typeof record.name === 'string' ? record.name.trim() : ''
     presets.push({
       id: typeof record.id === 'string' && record.id ? record.id : `imported-${index}-${Date.now()}`,
-      name: name ? name.slice(0, PRESET_NAME_LIMIT) : `Preset ${index + 1}`,
+      name: name ? name.slice(0, NAME_LIMIT) : `Preset ${index + 1}`,
       colors,
       createdAt:
         typeof record.createdAt === 'string' && !Number.isNaN(Date.parse(record.createdAt))
@@ -79,34 +79,30 @@ export function parseGradientPresets(value: unknown): GradientPreset[] {
 
 /** 预设导出：只保留可迁移字段 */
 export function serializeGradientPresets(presets: GradientPreset[]): string {
-  return JSON.stringify(
-    presets.map((preset) => ({ name: preset.name, colors: preset.colors })),
-    null,
-    2,
-  )
+  return JSON.stringify(presets.map((preset) => ({ name: preset.name, colors: preset.colors })), null, 2)
 }
 
 function sanitizeState(value: unknown, fallback: GradientTextState): GradientTextState {
   if (!value || typeof value !== 'object') return fallback
-  const record = value as Partial<GradientTextState>
-  const knownAdapter = gradientFormatAdapters.some((adapter) => adapter.id === record.adapterId)
+  const record = value as Partial<GradientTextState> & { vanillaCharacter?: '&' | '§'; simplifyGradients?: boolean }
   const colors = sanitizeColors(record.colors)
+  const knownAdapter = gradientFormatAdapters.some((adapter) => adapter.id === record.adapterId)
+  // 兼容旧字段名（control ← vanillaCharacter、simplifyGradient ← simplifyGradients）
+  const control = record.control ?? record.vanillaCharacter
+  const simplify = record.simplifyGradient ?? record.simplifyGradients
   return {
     version: 1,
-    document: record.document ? normalizeGradientDocument(record.document) : fallback.document,
+    document: record.document ? normalizeDocument(record.document) : fallback.document,
     colors: colors.length > 0 ? colors : fallback.colors,
     adapterId: knownAdapter ? (record.adapterId as GradientFormatId) : fallback.adapterId,
-    vanillaCharacter:
-      record.vanillaCharacter === '&' || record.vanillaCharacter === '§'
-        ? record.vanillaCharacter
-        : fallback.vanillaCharacter,
-    simplifyGradients: record.simplifyGradients === true,
+    control: control === '&' || control === '§' ? control : fallback.control,
+    simplifyGradient: simplify === true,
     presets: parseGradientPresets(record.presets),
   }
 }
 
-export function loadGradientTextState(storage: StorageLike | null = browserStorage()): GradientTextState {
-  const fallback = createDefaultGradientTextState()
+export function loadGradientTextState(storage: StorageLike | null = storageOrNull()): GradientTextState {
+  const fallback = createDefaultState()
   if (!storage) return fallback
   try {
     const raw = storage.getItem(GRADIENT_TEXT_STORAGE_KEY)
@@ -117,10 +113,7 @@ export function loadGradientTextState(storage: StorageLike | null = browserStora
   }
 }
 
-export function saveGradientTextState(
-  state: GradientTextState,
-  storage: StorageLike | null = browserStorage(),
-): void {
+export function saveGradientTextState(state: GradientTextState, storage: StorageLike | null = storageOrNull()): void {
   if (!storage) return
-  storage.setItem(GRADIENT_TEXT_STORAGE_KEY, JSON.stringify(sanitizeState(state, createDefaultGradientTextState())))
+  storage.setItem(GRADIENT_TEXT_STORAGE_KEY, JSON.stringify(sanitizeState(state, createDefaultState())))
 }

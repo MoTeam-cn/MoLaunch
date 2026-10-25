@@ -9,7 +9,7 @@ const Checkbox = defineAsyncComponent(() => import('@/components/common/Checkbox
 const SegmentedButtons = defineAsyncComponent(() => import('@/components/common/SegmentedButtons.vue'))
 const Button = defineAsyncComponent(() => import('@/components/common/Button.vue'))
 import {
-  buildGradientCharacters,
+  buildCells,
   generateGradientOutput,
   getMinecraftTextShadow,
   gradientFormatAdapters,
@@ -22,24 +22,24 @@ const props = defineProps<{
   document: GradientTextDocument
   colors: string[]
   adapterId: GradientFormatId
-  vanillaCharacter: '&' | '§'
-  simplifyGradients: boolean
+  control: '&' | '§'
+  simplifyGradient: boolean
 }>()
 
 const emit = defineEmits<{
   'update:adapter-id': [id: GradientFormatId]
-  'update:vanilla-character': [char: '&' | '§']
-  'update:simplify-gradients': [value: boolean]
+  'update:control': [char: '&' | '§']
+  'update:simplify-gradient': [value: boolean]
 }>()
 
 const previewCharacters = computed(() =>
-  buildGradientCharacters(props.document, props.colors),
+  buildCells(props.document, props.colors),
 )
 
 const output = computed(() =>
   generateGradientOutput(props.document, props.colors, props.adapterId, {
-    vanillaCharacter: props.vanillaCharacter,
-    simplifyGradients: props.simplifyGradients,
+    control: props.control,
+    simplifyGradient: props.simplifyGradient,
   }),
 )
 
@@ -108,18 +108,18 @@ function downloadOutput() {
         </div>
         <div class="space-y-2">
           <SegmentedButtons
-            v-if="currentAdapter?.supportsVanillaCharacter"
-            :model-value="vanillaCharacter"
+            v-if="currentAdapter?.usesControl"
+            :model-value="control"
             :options="[
               { label: '&', value: '&' },
               { label: '§', value: '§' },
             ]"
-            @update:model-value="emit('update:vanilla-character', $event as '&' | '§')"
+            @update:model-value="emit('update:control', $event as '&' | '§')"
           />
           <Checkbox
             v-if="currentAdapter?.supportsSimplify"
-            :model-value="simplifyGradients"
-            @update:model-value="emit('update:simplify-gradients', $event)"
+            :model-value="simplifyGradient"
+            @update:model-value="emit('update:simplify-gradient', $event)"
           >
             <span class="text-xs text-gray-600">简化渐变</span>
           </Checkbox>

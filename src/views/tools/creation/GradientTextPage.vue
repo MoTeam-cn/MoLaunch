@@ -57,11 +57,11 @@ watch(
         :document="state.document"
         :colors="state.colors"
         :adapter-id="state.adapterId"
-        :vanilla-character="state.vanillaCharacter"
-        :simplify-gradients="state.simplifyGradients"
+        :control="state.control"
+        :simplify-gradient="state.simplifyGradient"
         @update:adapter-id="state.adapterId = $event"
-        @update:vanilla-character="state.vanillaCharacter = $event"
-        @update:simplify-gradients="state.simplifyGradients = $event"
+        @update:control="state.control = $event"
+        @update:simplify-gradient="state.simplifyGradient = $event"
       />
     </div>
 

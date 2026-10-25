@@ -4,7 +4,7 @@
  */
 import { computed, ref, defineAsyncComponent } from 'vue'
 const Tooltip = defineAsyncComponent(() => import('@/components/common/Tooltip.vue'))
-import { plainTextFromDocument } from '@/utils/gradient-text'
+import { textFromDocument } from '@/utils/gradient-text'
 import type { GradientTextDocument, TextFormat } from '@/utils/gradient-text'
 
 const props = defineProps<{
@@ -15,7 +15,7 @@ const emit = defineEmits<{
   'update:document': [document: GradientTextDocument]
 }>()
 
-const plainText = ref(plainTextFromDocument(props.document))
+const plainText = ref(textFromDocument(props.document))
 const textareaRef = ref<HTMLTextAreaElement | null>(null)
 
 function syncDocumentFromPlainText(text: string) {
@@ -23,7 +23,7 @@ function syncDocumentFromPlainText(text: string) {
   emit('update:document', {
     lines: text.split('\n').map((lineText, index) => {
       const oldRuns = oldLines[index] ?? []
-      if (oldRuns.length && plainTextFromDocument({ lines: [oldRuns] }) === lineText) {
+      if (oldRuns.length && textFromDocument({ lines: [oldRuns] }) === lineText) {
         return oldRuns
       }
       return [{ text: lineText, formats: oldRuns.length ? oldRuns[0].formats : [] }]
