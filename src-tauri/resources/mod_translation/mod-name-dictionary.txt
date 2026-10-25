@@ -1,0 +1,32 @@
+# 模组中文名词表（mod_name.rs 读取，TAB 分隔）
+# known <TAB> 归一化名称（小写去空白） <TAB> 中文名
+known	macaw'swindows	Macaw 的窗户
+known	mcwwindows	Macaw 的窗户
+known	iron'sspells'nspellbooks	铁魔法与法术书
+known	irons_spellbooks	铁魔法与法术书
+known	farmer'sdelight	农夫乐事
+known	farmersdelight	农夫乐事
+known	alex'scaves	Alex 的洞穴
+known	alexscaves	Alex 的洞穴
+known	mekanism	通用机械
+known	jei	JEI 物品管理器
+# word <TAB> 英文词 <TAB> 中文（直译用）
+word	window	窗户
+word	windows	窗户
+word	cave	洞穴
+word	caves	洞穴
+word	spell	法术
+word	spells	法术
+word	spellbook	法术书
+word	spellbooks	法术书
+word	loot	战利品
+word	mate	助手
+word	farmer	农夫
+word	farmers	农夫
+word	delight	乐事
+word	magic	魔法
+word	iron	铁
+word	tool	工具
+word	tools	工具
+word	door	门
+word	doors	门

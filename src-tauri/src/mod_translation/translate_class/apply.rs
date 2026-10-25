@@ -3,12 +3,9 @@
 use std::path::Path;
 
 use super::super::class;
-use super::super::ledger::{ClassDecision, ClassDecisionLedger};
+use super::super::ledger::{ClassDecisionLedger, VERDICT_EXCLUDE, VERDICT_TRANSLATE};
 use super::super::types::ClassCandidate;
 use super::prompt::DecisionEntry;
-
-const EXCLUDE_ACTION: &str = "exclude";
-const TRANSLATE_ACTION: &str = "translate";
 
 pub(crate) fn apply_decision(
     workspace: &Path,
@@ -23,17 +20,17 @@ pub(crate) fn apply_decision(
         .ok_or_else(|| format!("未知候选：{}", decision.id))?;
 
     match decision.action.as_str() {
-        EXCLUDE_ACTION => {
+        VERDICT_EXCLUDE => {
             record_decision(
                 ledger,
                 &candidate.id,
-                EXCLUDE_ACTION,
+                VERDICT_EXCLUDE,
                 None,
                 decision.reason.as_deref(),
             );
             Ok(())
         }
-        TRANSLATE_ACTION => {
+        VERDICT_TRANSLATE => {
             let translation = decision
                 .translation
                 .clone()
@@ -54,57 +51,48 @@ fn apply_translation(
         record_decision(
             ledger,
             &candidate.id,
-            EXCLUDE_ACTION,
+            VERDICT_EXCLUDE,
             None,
             Some("译文与原文一致"),
         );
         return Ok(());
     }
 
-    let paths: Vec<String> = if candidate.paths.is_empty() {
-        vec![candidate.path.clone()]
+    let targets: Vec<&String> = if candidate.paths.is_empty() {
+        vec![&candidate.path]
     } else {
-        candidate.paths.clone()
+        candidate.paths.iter().collect()
     };
 
-    for relative in &paths {
-        let target_path = workspace.join(relative);
-        let bytes = std::fs::read(&target_path)
-            .map_err(|e| format!("无法读取 {}: {e}", target_path.display()))?;
-        let rewritten = class::replace_class_utf8(&bytes, &candidate.text, translation)?;
-        if rewritten == bytes {
+    for relative in &targets {
+        let path = workspace.join(relative);
+        let original =
+            std::fs::read(&path).map_err(|e| format!("无法读取 {}: {e}", path.display()))?;
+        let rewritten = class::replace_class_utf8(&original, &candidate.text, translation)?;
+        if rewritten == original {
             return Err(format!("class 候选在声明路径中不存在：{relative}"));
         }
-        crate::utils::fs::write_atomic(&target_path, &rewritten)?;
-        if !ledger.replaced_files.contains(relative) {
-            ledger.replaced_files.push(relative.clone());
-        }
+        crate::utils::fs::write_atomic(&path, &rewritten)?;
+        ledger.mark_touched(relative);
     }
 
     record_decision(
         ledger,
         &candidate.id,
-        TRANSLATE_ACTION,
+        VERDICT_TRANSLATE,
         Some(translation),
         None,
     );
-    ledger.replacement_count += paths.len();
+    ledger.rewritten_occurrences += targets.len();
     Ok(())
 }
 
 pub(crate) fn record_decision(
     ledger: &mut ClassDecisionLedger,
     id: &str,
-    action: &str,
-    translation: Option<&str>,
-    reason: Option<&str>,
+    verdict: &str,
+    text: Option<&str>,
+    note: Option<&str>,
 ) {
-    ledger.decisions.insert(
-        id.to_string(),
-        ClassDecision {
-            action: action.to_string(),
-            translation: translation.map(str::to_string),
-            reason: reason.map(str::to_string),
-        },
-    );
+    ledger.record(id, verdict, text, note);
 }

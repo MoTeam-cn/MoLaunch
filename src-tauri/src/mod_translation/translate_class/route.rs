@@ -7,7 +7,7 @@ use crate::ai_core::{self, PromptKind};
 use crate::log_warn;
 
 use super::super::class;
-use super::super::ledger::ClassDecisionLedger;
+use super::super::ledger::{ClassDecisionLedger, VERDICT_EXCLUDE};
 use super::super::progress;
 use super::super::types::{ClassCandidate, JarInspection, ProgressFn, RetryInfo};
 use super::apply::{apply_decision, record_decision};
@@ -31,7 +31,7 @@ pub(crate) async fn run_class_route(
     }
 
     resolve_deterministic_exclusions(inspection, class_ledger);
-    let candidates = class_ledger.unresolved(&inspection.class_candidates);
+    let candidates = class_ledger.pending(&inspection.class_candidates);
     let total = candidates.len();
     if total == 0 {
         on_progress(100.0, "class 文本无待判定候选", None);
@@ -43,7 +43,7 @@ pub(crate) async fn run_class_route(
         if cancel.load(Ordering::Relaxed) {
             return Err("任务已取消".to_string());
         }
-        let batch_refs: Vec<&ClassCandidate> = batch.iter().collect();
+        let batch_refs: Vec<&ClassCandidate> = batch.to_vec();
         let base = 100.0 * (handled as f64 / total as f64);
         let cap = 100.0 * ((handled + batch.len()).min(total) as f64 / total as f64);
 
@@ -87,7 +87,13 @@ pub(crate) fn resolve_deterministic_exclusions(
         else {
             continue;
         };
-        record_decision(class_ledger, &candidate.id, "exclude", None, Some(reason));
+        record_decision(
+            class_ledger,
+            &candidate.id,
+            VERDICT_EXCLUDE,
+            None,
+            Some(reason),
+        );
     }
 }
 

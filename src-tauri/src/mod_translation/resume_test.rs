@@ -98,18 +98,19 @@ fn test_newest_matching_workspace_is_selected() {
 fn test_checkpoint_round_trips_and_filters_version() {
     let dir = temp_dir("checkpoint");
     let mut checkpoint = Checkpoint::fresh("task-1".to_string());
-    checkpoint.completed_language_batches = vec!["assets/x/lang/zh_cn.json".to_string()];
-    checkpoint.class_replacement_count = 3;
+    checkpoint.language.finished = vec!["assets/x/lang/zh_cn.json".to_string()];
+    checkpoint.class.occurrences = 3;
     checkpoint.stage = "language".to_string();
-    checkpoint.work_graph = Some(serde_json::json!({"done": true}));
+    checkpoint.graph = Some(serde_json::json!({ "done": true }));
     save_checkpoint(&dir, &checkpoint).expect("save checkpoint");
 
     let restored = read_checkpoint(&dir).expect("checkpoint should be readable");
     assert_eq!(restored.version, 1);
     assert_eq!(restored.task_id, "task-1");
-    assert_eq!(restored.completed_language_batches.len(), 1);
+    assert_eq!(restored.language.finished.len(), 1);
+    assert_eq!(restored.class.occurrences, 3);
     assert_eq!(restored.stage, "language");
-    assert_eq!(restored.work_graph, Some(serde_json::json!({"done": true})));
+    assert_eq!(restored.graph, Some(serde_json::json!({ "done": true })));
 
     let mut future = checkpoint.clone();
     future.version = 99;

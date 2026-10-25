@@ -58,14 +58,21 @@ fn test_deterministic_exclusions_skip_model_for_structural_text() {
 
     resolve_deterministic_exclusions(&inspection, &mut ledger);
 
-    assert_eq!(ledger.decisions["c1"].action, "exclude");
     assert_eq!(
-        ledger.decisions["c1"].reason.as_deref(),
+        ledger
+            .decision("c1")
+            .map(|decision| decision.verdict.as_str()),
+        Some("exclude")
+    );
+    assert_eq!(
+        ledger
+            .decision("c1")
+            .and_then(|decision| decision.note.as_deref()),
         Some("java_class_name")
     );
     // 界面宿主路径保留，交给 AI 判定
-    assert!(!ledger.decisions.contains_key("c2"));
-    assert_eq!(ledger.unresolved(&inspection.class_candidates).len(), 1);
+    assert!(ledger.decision("c2").is_none());
+    assert_eq!(ledger.pending(&inspection.class_candidates).len(), 1);
 }
 
 #[test]

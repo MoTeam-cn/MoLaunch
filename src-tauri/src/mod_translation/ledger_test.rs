@@ -147,15 +147,14 @@ fn test_class_decision_ledger_tracks_unresolved_and_exclusions() {
         },
     ];
     let mut ledger = ClassDecisionLedger::default();
-    ledger.decisions.insert(
-        "a".to_string(),
-        ClassDecision {
-            action: "exclude".to_string(),
-            translation: None,
-            reason: Some("internal".to_string()),
-        },
-    );
+    ledger.record("a", VERDICT_EXCLUDE, None, Some("internal"));
 
-    assert_eq!(ledger.unresolved(&candidates).len(), 1);
-    assert_eq!(ledger.snapshot_exclusions(), vec!["a".to_string()]);
+    assert_eq!(ledger.pending(&candidates).len(), 1);
+    assert_eq!(ledger.excluded_ids(), vec!["a".to_string()]);
+    assert_eq!(
+        ledger
+            .decision("a")
+            .map(|decision| decision.verdict.as_str()),
+        Some(VERDICT_EXCLUDE)
+    );
 }

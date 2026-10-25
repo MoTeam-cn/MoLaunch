@@ -1,51 +1,17 @@
 //! 模组中文名：分层决策（内嵌中文 → AI 推荐 → 已知表 → 直译 → 文件名 → 显示名 → modId）
 //!
-//! 决策链实现为一串「候选生成器」，按顺序取第一个可用结果，
-//! 每个生成器只关心自己那一步，来源标签即步骤名。
+//! 词表数据外置在 resources/mod_translation/mod-name-dictionary.txt（数据与代码分离），
+//! 决策链是一串候选生成器，按顺序取第一个可用结果。
 
 use std::path::Path;
+use std::sync::OnceLock;
 
 use crate::mod_translation::types::{has_chinese, ModNameResult};
 
 /// 名称长度上限（字符）
 const NAME_LIMIT: usize = 64;
-
-/// 已知模组中文名表（归一化后匹配）
-const KNOWN_NAMES: &[(&str, &str)] = &[
-    ("macaw'swindows", "Macaw 的窗户"),
-    ("mcwwindows", "Macaw 的窗户"),
-    ("iron'sspells'nspellbooks", "铁魔法与法术书"),
-    ("irons_spellbooks", "铁魔法与法术书"),
-    ("farmer'sdelight", "农夫乐事"),
-    ("farmersdelight", "农夫乐事"),
-    ("alex'scaves", "Alex 的洞穴"),
-    ("alexscaves", "Alex 的洞穴"),
-    ("mekanism", "通用机械"),
-    ("jei", "JEI 物品管理器"),
-];
-
-/// 英文词 → 中文（直译用）
-const WORD_TRANSLATIONS: &[(&str, &str)] = &[
-    ("window", "窗户"),
-    ("windows", "窗户"),
-    ("cave", "洞穴"),
-    ("caves", "洞穴"),
-    ("spell", "法术"),
-    ("spells", "法术"),
-    ("spellbook", "法术书"),
-    ("spellbooks", "法术书"),
-    ("loot", "战利品"),
-    ("mate", "助手"),
-    ("farmer", "农夫"),
-    ("farmers", "农夫"),
-    ("delight", "乐事"),
-    ("magic", "魔法"),
-    ("iron", "铁"),
-    ("tool", "工具"),
-    ("tools", "工具"),
-    ("door", "门"),
-    ("doors", "门"),
-];
+/// 词表资源路径
+const DICTIONARY_RESOURCE: &str = "mod_translation/mod-name-dictionary.txt";
 
 /// 通用名（不可作为模组名）
 const GENERIC_NAMES: &[&str] = &[
@@ -69,20 +35,64 @@ const NOISE_WORDS: &[&str] = &["mc", "forge", "fabric", "neoforge", "mod"];
 /// 通用下载名（不能当模组名）
 const PLACEHOLDER_STEMS: &[&str] = &["download", "mod", "file", "unknown"];
 
+/// 词表：known（归一化名称 → 中文）与 word（英文词 → 中文）
+struct Dictionary {
+    known: Vec<(String, String)>,
+    words: Vec<(String, String)>,
+}
+
+impl Dictionary {
+    fn known_name(&self, key: &str) -> Option<&str> {
+        self.known
+            .iter()
+            .find(|(alias, _)| alias == key)
+            .map(|(_, chinese)| chinese.as_str())
+    }
+
+    fn word(&self, word: &str) -> Option<&str> {
+        self.words
+            .iter()
+            .find(|(english, _)| english == word)
+            .map(|(_, chinese)| chinese.as_str())
+    }
+}
+
+/// 解析词表资源（进程内只解析一次）
+fn dictionary() -> &'static Dictionary {
+    static CELL: OnceLock<Dictionary> = OnceLock::new();
+    CELL.get_or_init(|| {
+        let raw = crate::resources::read_resource(DICTIONARY_RESOURCE).unwrap_or_default();
+        let mut known: Vec<(String, String)> = Vec::new();
+        let mut words: Vec<(String, String)> = Vec::new();
+        for line in raw.lines() {
+            let trimmed = line.trim();
+            if trimmed.is_empty() || trimmed.starts_with('#') {
+                continue;
+            }
+            let mut fields = trimmed.split('\t');
+            let (Some(kind), Some(key), Some(value)) =
+                (fields.next(), fields.next(), fields.next())
+            else {
+                continue;
+            };
+            let entry = (key.trim().to_string(), value.trim().to_string());
+            match kind {
+                "known" => known.push(entry),
+                "word" => words.push(entry),
+                _ => {}
+            }
+        }
+        Dictionary { known, words }
+    })
+}
+
 /// 归一化：小写 + 去空白
-fn identity_key(value: &str) -> String {
+fn fold_key(value: &str) -> String {
     value
         .to_ascii_lowercase()
         .chars()
         .filter(|c| !c.is_whitespace())
         .collect()
-}
-
-fn word_map(word: &str) -> Option<&'static str> {
-    WORD_TRANSLATIONS
-        .iter()
-        .find(|(english, _)| *english == word)
-        .map(|(_, chinese)| *chinese)
 }
 
 /// 可用中文名：≥2 字符、含 CJK、非通用名
@@ -95,64 +105,66 @@ pub fn usable_chinese_mod_name(value: &str) -> bool {
 
 /// 已知表查询：modId 优先，其次项目显示名
 pub fn known_chinese_mod_name(project_names: &[String], mod_ids: &[String]) -> Option<String> {
+    let dictionary = dictionary();
     mod_ids
         .iter()
         .chain(project_names.iter())
-        .find_map(|value| {
-            let key = identity_key(value);
-            KNOWN_NAMES
-                .iter()
-                .find(|(known, _)| *known == key)
-                .map(|(_, chinese)| chinese.to_string())
-        })
+        .find_map(|value| dictionary.known_name(&fold_key(value)).map(str::to_string))
 }
 
 /// 逐词直译；一个词都没命中时返回 None
-fn translate_words(words: &[&str]) -> Option<String> {
+fn render_words(words: &[&str]) -> Option<String> {
     let mut hit = false;
-    let translated: String = words
-        .iter()
-        .filter(|word| !NOISE_WORDS.contains(&word.to_ascii_lowercase().as_str()))
-        .map(|word| match word_map(&word.to_ascii_lowercase()) {
+    let mut rendered = String::new();
+    for word in words {
+        let lowered = word.to_ascii_lowercase();
+        if NOISE_WORDS.contains(&lowered.as_str()) {
+            continue;
+        }
+        match dictionary().word(&lowered) {
             Some(chinese) => {
                 hit = true;
-                chinese.to_string()
+                rendered.push_str(chinese);
             }
-            None => (*word).to_string(),
-        })
-        .collect();
-    hit.then_some(translated)
+            None => rendered.push_str(word),
+        }
+    }
+    hit.then_some(rendered)
 }
 
-/// 直译英文标签：`X's Y` → 「X 的Y」；否则逐词翻译
+/// 拆分所有格：X's Y → (X, Y)
+fn split_possessive(joined: &str) -> Option<(&str, &str)> {
+    let (position, width) = joined
+        .find("'s")
+        .map(|index| (index, 2))
+        .or_else(|| joined.find('’').map(|index| (index, '’'.len_utf8() + 1)))?;
+    let head = joined[..position].trim();
+    let tail = joined[position + width..].trim();
+    (!head.is_empty() && !tail.is_empty()).then_some((head, tail))
+}
+
+/// 直译英文标签：所有格形式译为「X 的Y」，否则逐词翻译
 pub fn translate_english_label(value: &str) -> Option<String> {
     let cleaned = value.replace(['_', '-'], " ");
     let words: Vec<&str> = cleaned.split_whitespace().collect();
-    let joined = words.join(" ");
-
-    let possessive = joined
-        .find("'s")
-        .map(|position| (position, 2))
-        .or_else(|| joined.find('’').map(|position| (position, 4)));
-    if let Some((position, width)) = possessive {
-        let head = joined[..position].trim();
-        let tail = joined[position + width..].trim();
-        if !head.is_empty() && !tail.is_empty() {
-            let translated_tail: String = tail
-                .split_whitespace()
-                .map(|word| word_map(&word.to_ascii_lowercase()).unwrap_or(word))
-                .collect();
-            if has_chinese(&translated_tail) {
-                return Some(format!("{head} 的{translated_tail}"));
-            }
+    if let Some((head, tail)) = split_possessive(&words.join(" ")) {
+        let translated: String = tail
+            .split_whitespace()
+            .map(|word| {
+                dictionary()
+                    .word(&word.to_ascii_lowercase())
+                    .unwrap_or(word)
+            })
+            .collect();
+        if has_chinese(&translated) {
+            return Some(format!("{head} 的{translated}"));
         }
     }
-
-    translate_words(&words)
+    render_words(&words)
 }
 
-/// 去掉版本号后缀（`-1.20.1` / `_mc1.20.1` 等）
-fn strip_version(value: &str) -> String {
+/// 去掉版本号后缀（-1.20.1 / _mc1.20.1 等）
+fn drop_version_suffix(value: &str) -> String {
     for (index, ch) in value.char_indices() {
         if !matches!(ch, '-' | '_' | ' ') {
             continue;
@@ -166,7 +178,7 @@ fn strip_version(value: &str) -> String {
 }
 
 /// 从文件名提取可读标签（去版本号、过滤通用下载名）
-fn original_project_label(original_name: &str) -> Option<String> {
+fn label_from_filename(original_name: &str) -> Option<String> {
     let stem = Path::new(original_name)
         .file_stem()
         .and_then(|value| value.to_str())
@@ -185,7 +197,7 @@ fn original_project_label(original_name: &str) -> Option<String> {
         return None;
     }
 
-    let label = strip_version(&stem)
+    let label = drop_version_suffix(&stem)
         .replace('_', " ")
         .split_whitespace()
         .collect::<Vec<_>>()
@@ -197,9 +209,6 @@ fn clipped(value: &str) -> String {
     value.trim().chars().take(NAME_LIMIT).collect()
 }
 
-/// 决策链的一步：返回名称，来源标签由表里的字符串给出
-type StepFn = fn(&Chain<'_>) -> Option<String>;
-
 /// 决策链输入
 struct Chain<'a> {
     project_names: &'a [String],
@@ -207,6 +216,9 @@ struct Chain<'a> {
     original_name: &'a str,
     recommended_name: Option<&'a str>,
 }
+
+/// 决策链的一步：返回名称，来源标签由表里的字符串给出
+type StepFn = fn(&Chain<'_>) -> Option<String>;
 
 fn embedded_chinese(chain: &Chain<'_>) -> Option<String> {
     chain
@@ -235,13 +247,13 @@ fn translated_display_name(chain: &Chain<'_>) -> Option<String> {
 }
 
 fn translated_filename(chain: &Chain<'_>) -> Option<String> {
-    let label = original_project_label(chain.original_name)?;
+    let label = label_from_filename(chain.original_name)?;
     let translated = translate_english_label(&label)?;
     usable_chinese_mod_name(&translated).then_some(translated)
 }
 
 fn original_filename(chain: &Chain<'_>) -> Option<String> {
-    original_project_label(chain.original_name)
+    label_from_filename(chain.original_name)
 }
 
 fn display_name(chain: &Chain<'_>) -> Option<String> {

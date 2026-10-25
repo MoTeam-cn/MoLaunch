@@ -4,7 +4,7 @@ mod class_decision;
 mod task_memory;
 mod work_graph;
 
-pub use class_decision::{ClassDecision, ClassDecisionLedger};
+pub use class_decision::{ClassDecision, ClassDecisionLedger, VERDICT_EXCLUDE, VERDICT_TRANSLATE};
 pub use task_memory::TaskMemory;
 pub use work_graph::{Attempt, WorkGraph, WorkGraphSnapshot, WorkItem, WorkKind, WorkStatus};
 

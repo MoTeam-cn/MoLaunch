@@ -89,7 +89,7 @@ fn completed_snapshot(
             mod_name,
             language_attempted,
             language_accepted,
-            class_resolved: class_ledger.decisions.len(),
+            class_resolved: class_ledger.len(),
             class_total: inspection.class_candidates.len(),
             warnings: inspection.warnings.clone(),
         }),

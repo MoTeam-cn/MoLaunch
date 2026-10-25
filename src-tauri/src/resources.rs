@@ -16,6 +16,10 @@ fn embedded_text(path: &str) -> Option<&'static str> {
         "defaults/instance.ini" => Some(include_str!("../resources/defaults/instance.ini")),
         "defaults/setup.ini" => Some(include_str!("../resources/defaults/setup.ini")),
         "moddata.txt" => Some(include_str!("../resources/moddata.txt")),
+        // 模组中文名词表（mod_translation/mod_name.rs 解析）
+        "mod_translation/mod-name-dictionary.txt" => Some(include_str!(
+            "../resources/mod_translation/mod-name-dictionary.txt"
+        )),
         // 崩溃分析规则库（由 commands/tools/crash_rules 解析；改规则后重新编译即生效）
         "crash_rules.json" => Some(include_str!("../resources/crash_rules.json")),
         // 关于页面数据（markdown 表格格式，由 commands/system/about.rs 解析）

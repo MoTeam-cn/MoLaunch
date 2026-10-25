@@ -1,56 +1,38 @@
 //! 模组翻译：统一错误类型（稳定错误码 + 可读消息）
+//!
+//! 错误码以字符串形式对前端暴露，改动等同于破坏兼容，只能新增。
 
 use std::fmt;
 
-use serde::{Deserialize, Serialize};
+use serde::Serialize;
 
-/// 抛给前端的稳定错误码（kebab-case 序列化）
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(rename_all = "kebab-case")]
-pub enum TranslateErrorCode {
-    UnsafeArchivePath,
-    SignedModRefused,
-    InvalidArchive,
-    MissingApiKey,
-    ModelNotFound,
-    EmptyModelResponse,
-    InvalidModelResponse,
-    PlaceholderMismatch,
-    WritebackVerificationFailed,
-    QualityHardErrors,
-    WorkGraphNoExit,
-    UnsupportedResource,
-    Cancelled,
-    Io,
-    Config,
-    AiDisabled,
-    AiModelNotSelected,
-    AiRequestFailed,
-}
+/// 稳定错误码（序列化后即该字符串）
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
+#[serde(transparent)]
+pub struct TranslateErrorCode(&'static str);
 
 impl TranslateErrorCode {
-    /// 稳定的字符串码（前端按此匹配提示文案）
+    pub const UNSAFE_ARCHIVE_PATH: Self = Self("unsafe-archive-path");
+    pub const SIGNED_MOD_REFUSED: Self = Self("signed-mod-refused");
+    pub const INVALID_ARCHIVE: Self = Self("invalid-archive");
+    pub const MISSING_API_KEY: Self = Self("missing-api-key");
+    pub const MODEL_NOT_FOUND: Self = Self("model-not-found");
+    pub const EMPTY_MODEL_RESPONSE: Self = Self("empty-model-response");
+    pub const INVALID_MODEL_RESPONSE: Self = Self("invalid-model-response");
+    pub const PLACEHOLDER_MISMATCH: Self = Self("placeholder-mismatch");
+    pub const WRITEBACK_VERIFICATION_FAILED: Self = Self("writeback-verification-failed");
+    pub const QUALITY_HARD_ERRORS: Self = Self("quality-hard-errors");
+    pub const WORK_GRAPH_NO_EXIT: Self = Self("work-graph-no-exit");
+    pub const UNSUPPORTED_RESOURCE: Self = Self("unsupported-resource");
+    pub const CANCELLED: Self = Self("cancelled");
+    pub const IO: Self = Self("io");
+    pub const CONFIG: Self = Self("config");
+    pub const AI_DISABLED: Self = Self("ai-disabled");
+    pub const AI_MODEL_NOT_SELECTED: Self = Self("ai-model-not-selected");
+    pub const AI_REQUEST_FAILED: Self = Self("ai-request-failed");
+
     pub fn as_str(self) -> &'static str {
-        match self {
-            Self::UnsafeArchivePath => "unsafe-archive-path",
-            Self::SignedModRefused => "signed-mod-refused",
-            Self::InvalidArchive => "invalid-archive",
-            Self::MissingApiKey => "missing-api-key",
-            Self::ModelNotFound => "model-not-found",
-            Self::EmptyModelResponse => "empty-model-response",
-            Self::InvalidModelResponse => "invalid-model-response",
-            Self::PlaceholderMismatch => "placeholder-mismatch",
-            Self::WritebackVerificationFailed => "writeback-verification-failed",
-            Self::QualityHardErrors => "quality-hard-errors",
-            Self::WorkGraphNoExit => "work-graph-no-exit",
-            Self::UnsupportedResource => "unsupported-resource",
-            Self::Cancelled => "cancelled",
-            Self::Io => "io",
-            Self::Config => "config",
-            Self::AiDisabled => "ai-disabled",
-            Self::AiModelNotSelected => "ai-model-not-selected",
-            Self::AiRequestFailed => "ai-request-failed",
-        }
+        self.0
     }
 }
 
@@ -72,7 +54,7 @@ impl TranslateError {
 
 impl From<std::io::Error> for TranslateError {
     fn from(error: std::io::Error) -> Self {
-        Self::new(TranslateErrorCode::Io, error.to_string())
+        Self::new(TranslateErrorCode::IO, error.to_string())
     }
 }
 

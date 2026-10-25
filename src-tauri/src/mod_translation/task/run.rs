@@ -79,7 +79,7 @@ pub(crate) async fn run_task(
 
     let mut work_graph = restore_graph(&checkpoint, &task_id);
     let mut class_ledger = restore_ledger(&checkpoint);
-    let mut completed_batches = checkpoint.completed_language_batches.clone();
+    let mut completed_batches = checkpoint.language.finished.clone();
 
     // 翻译记忆：全局共享（工作区根目录），任务结束统一 flush
     let memory_root = workspace
@@ -132,7 +132,7 @@ pub(crate) async fn run_task(
                 },
             }
             if !cancelled && fatal.is_none() {
-                checkpoint.completed_language_batches = completed_batches.clone();
+                checkpoint.language.finished = completed_batches.clone();
                 checkpoint.stage = "language".to_string();
                 persist(&workspace, &mut checkpoint, &work_graph);
             }
@@ -293,7 +293,7 @@ fn mark_completed_stages(stage: &str) {
 
 fn restore_graph(checkpoint: &Checkpoint, task_id: &str) -> WorkGraph {
     checkpoint
-        .work_graph
+        .graph
         .as_ref()
         .and_then(|value| serde_json::from_value::<WorkGraphSnapshot>(value.clone()).ok())
         .map(WorkGraph::from_snapshot)
@@ -301,23 +301,22 @@ fn restore_graph(checkpoint: &Checkpoint, task_id: &str) -> WorkGraph {
 }
 
 fn restore_ledger(checkpoint: &Checkpoint) -> ClassDecisionLedger {
-    ClassDecisionLedger {
-        decisions: checkpoint.class_decisions.clone().into_iter().collect(),
-        replaced_files: checkpoint.class_changed_files.clone(),
-        replacement_count: checkpoint.class_replacement_count,
-    }
+    let mut ledger = ClassDecisionLedger::from_map(checkpoint.class.decisions.clone());
+    ledger.touched_files = checkpoint.class.replaced.clone();
+    ledger.rewritten_occurrences = checkpoint.class.occurrences;
+    ledger
 }
 
 fn save_class_state(checkpoint: &mut Checkpoint, ledger: &ClassDecisionLedger) {
-    checkpoint.class_decisions = ledger.decisions.clone().into_iter().collect();
-    checkpoint.class_exclusions = ledger.snapshot_exclusions();
-    checkpoint.class_changed_files = ledger.replaced_files.clone();
-    checkpoint.class_replacement_count = ledger.replacement_count;
+    checkpoint.class.decisions = ledger.to_map();
+    checkpoint.class.excluded = ledger.excluded_ids();
+    checkpoint.class.replaced = ledger.touched_files.clone();
+    checkpoint.class.occurrences = ledger.rewritten_occurrences;
 }
 
 /// 落盘检查点（失败只记录，不中断任务）
 fn persist(workspace: &Path, checkpoint: &mut Checkpoint, work_graph: &WorkGraph) {
-    checkpoint.work_graph = Some(serde_json::to_value(work_graph.snapshot()).unwrap_or_default());
+    checkpoint.graph = Some(serde_json::to_value(work_graph.snapshot()).unwrap_or_default());
     if let Err(error) = resume::save_checkpoint(workspace, checkpoint) {
         log_warn!("[ModTranslation] 保存检查点失败: {error}");
     }
