@@ -70,7 +70,7 @@ function toggleCollapsed(index: number): void {
   margin: 0.5rem 0 0.25rem;
   font-size: 0.8125rem;
   font-weight: 600;
-  color: #1d2129;
+  color: var(--text-1);
 }
 
 .markdown-body :deep(ul),

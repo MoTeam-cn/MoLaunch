@@ -113,7 +113,7 @@ watch(() => props.resourceType, () => {
     </div>
 
     <!-- 结果区域 -->
-    <div class="flex-1 overflow-y-auto p-3" style="background-color: #f5f7fa">
+    <div class="flex-1 overflow-y-auto p-3" style="background-color: var(--surface-subtle)">
       <!-- 加载中：进度条展示（参考 LaunchLog.vue） -->
       <div v-if="loading" class="flex flex-col items-center justify-center py-20">
         <svg class="mb-5 h-10 w-10 animate-spin text-primary-500" viewBox="0 0 24 24" fill="none">

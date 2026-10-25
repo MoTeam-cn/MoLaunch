@@ -67,10 +67,10 @@ const backgroundStyle = computed(() => {
   justify-content: center;
   width: 100%;
   height: 100%;
-  border: 1px dashed #c9cdd4;
+  border: 1px dashed var(--border-strong);
   border-radius: 2px;
   background: var(--surface-1);
-  color: #86909c;
+  color: var(--text-3);
   font-size: 12px;
 }
 </style>

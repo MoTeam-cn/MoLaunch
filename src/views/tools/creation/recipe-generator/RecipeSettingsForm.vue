@@ -100,7 +100,7 @@ function onCookingTimeChange(value: string | number) {
 
 <style lang="scss" scoped>
 .recipe-panel {
-  border: 1px solid #e5e6eb;
+  border: 1px solid var(--border-subtle);
   border-radius: 8px;
   background: var(--surface-0);
   overflow: hidden;
@@ -109,10 +109,10 @@ function onCookingTimeChange(value: string | number) {
 .recipe-panel-title {
   margin: 0;
   padding: 0.75rem 1rem;
-  border-bottom: 1px solid #f0f1f3;
+  border-bottom: 1px solid var(--border-subtle);
   font-size: 0.85rem;
   font-weight: 600;
-  color: #1d2129;
+  color: var(--text-1);
 }
 
 .recipe-form {
@@ -129,7 +129,7 @@ function onCookingTimeChange(value: string | number) {
 }
 
 .recipe-field-label {
-  color: #4e5969;
+  color: var(--text-2);
   font-size: 0.75rem;
 }
 
@@ -137,7 +137,7 @@ function onCookingTimeChange(value: string | number) {
   display: flex;
   align-items: center;
   gap: 0.5rem;
-  color: #4e5969;
+  color: var(--text-2);
   font-size: 0.75rem;
 }
 

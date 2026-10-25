@@ -102,7 +102,7 @@ async function onCopyTp() {
   border-radius: 6px;
   padding: 10px 12px;
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
-  border: 1px solid #e5e7eb;
+  border: 1px solid var(--border-subtle);
   min-width: 220px;
   pointer-events: auto;
 }

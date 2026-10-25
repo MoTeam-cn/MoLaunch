@@ -81,7 +81,7 @@ const emit = defineEmits<{
 
 <style lang="scss" scoped>
 .recipe-panel {
-  border: 1px solid #e5e6eb;
+  border: 1px solid var(--border-subtle);
   border-radius: 8px;
   background: var(--surface-0);
   overflow: hidden;
@@ -117,10 +117,10 @@ const emit = defineEmits<{
   margin: 0;
   padding: 0.75rem;
   overflow: auto;
-  border: 1px solid #e5e6eb;
+  border: 1px solid var(--border-subtle);
   border-radius: 6px;
   background: var(--surface-subtle);
-  color: #4e5969;
+  color: var(--text-2);
   font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
   font-size: 0.72rem;
   line-height: 1.5;
@@ -129,9 +129,9 @@ const emit = defineEmits<{
 
 .recipe-preview-empty {
   padding: 2rem 0;
-  border: 1px dashed #e5e6eb;
+  border: 1px dashed var(--border-subtle);
   border-radius: 6px;
-  color: #86909c;
+  color: var(--text-3);
   font-size: 0.75rem;
   text-align: center;
 }

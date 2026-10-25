@@ -114,7 +114,7 @@ onBeforeUnmount(() => {
   width: 320px;
   max-width: min(80vw, 380px);
   padding: 8px 10px;
-  border: 1px solid #e5e6eb;
+  border: 1px solid var(--border-subtle);
   border-radius: 8px;
   background: var(--surface-0);
   box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12);
@@ -139,7 +139,7 @@ onBeforeUnmount(() => {
 
 .recipe-tag-popup-count {
   flex-shrink: 0;
-  color: #86909c;
+  color: var(--text-3);
   font-size: 0.7rem;
 }
 

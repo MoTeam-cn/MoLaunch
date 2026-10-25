@@ -108,7 +108,7 @@ function pick(item: AssetItem) {
 }
 
 .item-palette-count {
-  color: #86909c;
+  color: var(--text-3);
   font-size: 0.7rem;
   text-align: right;
 }
@@ -134,7 +134,7 @@ function pick(item: AssetItem) {
   gap: 0.2rem;
   min-width: 0;
   padding: 0.3rem 0.15rem;
-  border: 1px solid #e5e6eb;
+  border: 1px solid var(--border-subtle);
   border-radius: 4px;
   background: var(--surface-0);
   cursor: pointer;
@@ -149,7 +149,7 @@ function pick(item: AssetItem) {
 .item-palette-name {
   width: 100%;
   overflow: hidden;
-  color: #4e5969;
+  color: var(--text-2);
   font-size: 0.65rem;
   line-height: 1.1;
   text-align: center;

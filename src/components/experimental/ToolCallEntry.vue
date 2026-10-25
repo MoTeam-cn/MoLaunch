@@ -133,7 +133,7 @@ function toggleDetail(i: number) {
   left: 0.125rem;
   top: 0.875rem;
   bottom: 0;
-  border-left: 1px dashed #d0d5dd;
+  border-left: 1px dashed var(--border-strong);
 }
 
 .tool-item:last-child::before {
@@ -148,7 +148,7 @@ function toggleDetail(i: number) {
   height: 0.3125rem;
   border-radius: 9999px;
   background-color: var(--surface-0);
-  border: 1.5px solid #d0d5dd;
+  border: 1.5px solid var(--border-strong);
   box-sizing: border-box;
 }
 

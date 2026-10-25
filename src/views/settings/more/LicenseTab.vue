@@ -113,7 +113,7 @@ onMounted(async () => {
 :deep(.license-markdown strong) {
   font-weight: 700;
   letter-spacing: 0.03em;
-  color: #374151;
+  color: var(--text-2);
 }
 
 /* 段落间距：空行分段拆出的 <p> 留白，避免正文挤成一片 */

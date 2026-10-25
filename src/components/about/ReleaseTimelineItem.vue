@@ -71,17 +71,17 @@ const emit = defineEmits<{
 .timeline-head { display: flex; align-items: center; gap: 0.375rem; margin-bottom: 0.375rem; cursor: pointer; user-select: none; border-radius: 0.375rem; padding: 0.125rem 0; transition: background-color 0.15s; }
 .timeline-head:hover { background-color: var(--surface-subtle); }
 .timeline-head:focus-visible { outline: 2px solid var(--color-primary-500, #165dff); outline-offset: 1px; }
-.timeline-chevron { display: inline-flex; flex: none; color: #c0c4cc; }
+.timeline-chevron { display: inline-flex; flex: none; color: var(--text-3); }
 .timeline-version { font-weight: 600; }
 .commit-list { list-style: none; margin: 0; padding: 0; }
 .commit-item { display: flex; align-items: flex-start; gap: 0.375rem; margin-bottom: 0.25rem; }
-.commit-item::before { content: ''; flex: none; width: 0.25rem; height: 0.25rem; margin-top: 0.4375rem; border-radius: 9999px; background-color: #c0c4cc; }
+.commit-item::before { content: ''; flex: none; width: 0.25rem; height: 0.25rem; margin-top: 0.4375rem; border-radius: 9999px; background-color: var(--text-3); }
 .commit-item:last-child { margin-bottom: 0; }
 .commit-item .markdown-body { flex: 1; min-width: 0; }
 .commit-item :deep(.tag) { flex: none; margin-top: 0.125rem; }
 .markdown-body :deep(p) { margin: 0 0 0.375rem; }
 .markdown-body :deep(p:last-child) { margin-bottom: 0; }
-.markdown-body :deep(h1), .markdown-body :deep(h2), .markdown-body :deep(h3), .markdown-body :deep(h4) { margin: 0.5rem 0 0.25rem; font-size: 0.8125rem; font-weight: 600; color: #1d2129; }
+.markdown-body :deep(h1), .markdown-body :deep(h2), .markdown-body :deep(h3), .markdown-body :deep(h4) { margin: 0.5rem 0 0.25rem; font-size: 0.8125rem; font-weight: 600; color: var(--text-1); }
 .markdown-body :deep(ul), .markdown-body :deep(ol) { margin: 0.125rem 0 0.375rem; padding-left: 1.125rem; list-style: disc; }
 .markdown-body :deep(ol) { list-style: decimal; }
 .markdown-body :deep(li) { margin: 0.125rem 0; }

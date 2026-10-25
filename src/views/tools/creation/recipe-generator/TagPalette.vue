@@ -99,7 +99,7 @@ function pick(id: string) {
 }
 
 .tag-palette-summary {
-  color: #86909c;
+  color: var(--text-3);
   font-size: 0.7rem;
   text-align: right;
 }
@@ -123,7 +123,7 @@ function pick(id: string) {
   gap: 0.3rem;
   min-width: 0;
   padding: 0 0.5rem;
-  border: 1px solid #e5e6eb;
+  border: 1px solid var(--border-subtle);
   border-radius: 4px;
   background: var(--surface-0);
   cursor: pointer;
@@ -139,7 +139,7 @@ function pick(id: string) {
   min-width: 0;
   flex: 1;
   overflow: hidden;
-  color: #4e5969;
+  color: var(--text-2);
   font-size: 0.72rem;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -150,7 +150,7 @@ function pick(id: string) {
   padding: 0 6px;
   border-radius: 999px;
   background: var(--surface-1);
-  color: #86909c;
+  color: var(--text-3);
   font-size: 0.65rem;
   line-height: 1.4rem;
 }

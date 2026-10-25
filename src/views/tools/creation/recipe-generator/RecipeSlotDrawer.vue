@@ -178,7 +178,7 @@ function moveEditing(direction: 'up' | 'down' | 'left' | 'right') {
 }
 
 .recipe-drawer-hint {
-  color: #86909c;
+  color: var(--text-3);
   font-size: 0.75rem;
 }
 
@@ -193,10 +193,10 @@ function moveEditing(direction: 'up' | 'down' | 'left' | 'right') {
   justify-content: center;
   width: 1.5rem;
   height: 1.5rem;
-  border: 1px solid #e5e6eb;
+  border: 1px solid var(--border-subtle);
   border-radius: 4px;
   background: var(--surface-0);
-  color: #4e5969;
+  color: var(--text-2);
   cursor: pointer;
   transition:
     border-color 0.15s ease,
