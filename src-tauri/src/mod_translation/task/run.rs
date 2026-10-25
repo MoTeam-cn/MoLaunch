@@ -278,7 +278,7 @@ pub(crate) async fn run_task(
 }
 
 /// 每个阶段的进度回调
-fn stage_progress(app: AppHandle, stage: &'static str) -> ProgressFn {
+fn stage_progress(app: AppHandle, stage: &'static str) -> Box<ProgressFn> {
     Box::new(
         move |progress: f64, message: &str, retry: Option<RetryInfo>| {
             update_status(&app, stage, progress, message, retry)
