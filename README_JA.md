@@ -124,7 +124,8 @@ Minecraft は Mojang Synergies AB の商標です。MoLaunch は Mojang、Micros
 
 - **[Arco Design Vue](https://github.com/arco-design/arco-design-vue)** — フロントエンドのコアコンポーネント（Button / Input / Select / Drawer / Slider など）の実装を参考に、ソースコードを抽出して Vue SFC + Tailwind 形式に書き直しています。著作権表示は各ソースファイルの先頭に記載
 - **[Element Plus Icons](https://github.com/element-plus/element-plus-icons)** — SVG パスデータを抽出して使用（`src/utils/element-icons.ts`）。アイコンのみで実行時依存はなし
-- **[Plain Craft Launcher 2 (PCL2)](https://github.com/Meloong-Git/PCL)** — 広く使われている Minecraft ランチャー。MoLaunch は当初ゼロから開発を始めましたが、一部の起動ロジックで参考にさせていただきました
+- **[Plain Craft Launcher 2 (PCL2)](https://github.com/Meloong-Git/PCL)** — Minecraft ランチャー。初期に起動処理とクラッシュ解析の実装を参考にし、該当部分は書き直し済みです（詳細は [ACKNOWLEDGEMENTS.md](./ACKNOWLEDGEMENTS.md)）
+- **[Axolotl Launcher](https://github.com/Axolotl-Launcher/Axolotl)** — Minecraft ランチャー。レシピ生成・グラデーションテキスト生成・AI Mod 翻訳で初期に実装を参考にし（GPL-3.0）、現在は独自に書き直し済みです（詳細は [ACKNOWLEDGEMENTS.md](./ACKNOWLEDGEMENTS.md)）
 - **[Scaffolding-MC](https://github.com/Scaffolding-MC/Scaffolding-MC)** — Minecraft オンラインのクライアント間データ交換プロトコル（EasyTier ベース）で、ルームコード・仮想ネットワーク・ネットワーク情報取得などの標準フローを定義。MoLaunch のオンラインモジュールは同一仕様に基づく EasyTier による独立実装で、Scaffolding 準拠ランチャーとルームコード互換
 
 ### コア依存

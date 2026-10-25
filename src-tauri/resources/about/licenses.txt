@@ -68,7 +68,7 @@
 | Cubiomes | Copyright (c) 2019-2024 Cubitect | MIT License | https://github.com/Cubitect/cubiomes | https://github.com/Cubitect/cubiomes/blob/master/LICENSE |
 | McSDK | MoTeam | Apache-2.0 | https://github.com/MoTeam-cn/Mc_SDK | https://github.com/MoTeam-cn/Mc_SDK/blob/main/LICENSE |
 | Cubiomes (xpple fork) | Cubitect, xpple | MIT License | https://github.com/MoTeam-cn/cubiomes | https://github.com/MoTeam-cn/cubiomes/blob/master/LICENSE |
-| Plain Craft Launcher 2 (PCL2) | 成都瓜皮龙科技有限公司（龙腾猫跃） | PCL 分发有限许可（自定义许可） | https://github.com/Meloong-Git/PCL | https://github.com/Meloong-Git/PCL/blob/main/LICENCE |
+| Plain Craft Launcher 2 (PCL2)（早期参考，相关代码已重写） | 成都瓜皮龙科技有限公司（龙腾猫跃） | PCL 分发有限许可（自定义许可；仅历史区间适用，现实现不派生自该项目） | https://github.com/Meloong-Git/PCL | https://github.com/Meloong-Git/PCL/blob/main/LICENCE |
 | Java Launch Wrapper | 00ll00 | MIT License | https://github.com/00ll00/java_launch_wrapper | https://github.com/00ll00/java_launch_wrapper/blob/master/LICENCE |
 | lwjgl-unsafe-agent | Glavo | Apache-2.0 | https://github.com/HMCL-dev/lwjgl-unsafe-agent | https://github.com/HMCL-dev/lwjgl-unsafe-agent/blob/main/LICENSE |
 | Tokio | Tokio Contributors | MIT License | https://tokio.rs | https://github.com/tokio-rs/tokio/blob/master/LICENSE |

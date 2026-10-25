@@ -124,7 +124,8 @@ Minecraft 為 Mojang Synergies AB 的商標。MoLaunch 不隸屬於 Mojang、Mic
 
 - **[Arco Design Vue](https://github.com/arco-design/arco-design-vue)** — 前端核心元件（Button / Input / Select / Drawer / Slider 等）參考其特色與實作，提取原始碼複刻改寫為 Vue SFC + Tailwind 形式，版權聲明註解見各原始檔頂部
 - **[Element Plus Icons](https://github.com/element-plus/element-plus-icons)** — 依需求提取 SVG path 資料（`src/utils/element-icons.ts`），僅引入圖示未引入執行期依賴
-- **[Plain Craft Launcher 2 (PCL2)](https://github.com/Meloong-Git/PCL)** — 一款被廣泛使用的 Minecraft 啟動器；MoLaunch 前期從零開始開發，為相關啟動邏輯提供了實作參考
+- **[Plain Craft Launcher 2 (PCL2)](https://github.com/Meloong-Git/PCL)** — Minecraft 啟動器；早期參考過其啟動與崩潰分析實作，相關部分已重寫，詳見 [ACKNOWLEDGEMENTS.md](./ACKNOWLEDGEMENTS.md)
+- **[Axolotl Launcher](https://github.com/Axolotl-Launcher/Axolotl)** — Minecraft 啟動器；合成配方生成器、漸變文字生成器與 AI 模組翻譯早期參考過其實作（GPL-3.0），現已獨立重寫，詳見 [ACKNOWLEDGEMENTS.md](./ACKNOWLEDGEMENTS.md)
 - **[Scaffolding-MC](https://github.com/Scaffolding-MC/Scaffolding-MC)** — Minecraft 聯機用戶端資料交換協定（基於 EasyTier），定義房間碼、聯機網路與聯機資訊獲取等標準流程；MoLaunch 聯機模組基於與其一致的規範與 EasyTier 獨立實作，與其他基於陶瓦聯機（Scaffolding）的啟動器房間碼互通
 
 ### 核心依賴

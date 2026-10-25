@@ -6,6 +6,15 @@
 
 ### 变更
 
+#### 来源说明补充与致谢条目压缩
+
+- [`README.md`](README.md) / [`README_EN.md`](README_EN.md) / [`README_JA.md`](README_JA.md) / [`README_ZH-HANT.md`](README_ZH-HANT.md)：两条特别感谢改为单行表述，明确「早期参考、相关部分已重写」并指向 ACKNOWLEDGEMENTS.md；日文与繁体 README 补齐对应条目。
+- [`ACKNOWLEDGEMENTS.md`](ACKNOWLEDGEMENTS.md)：新增一节，说明早期移植范围、许可不授予派生权、以及重写与清理记录。
+- [`acknowledgements.txt`](src-tauri/resources/about/acknowledgements.txt)：应用内特别鸣谢条目改为「早期参考、已重写」表述。
+- [`licenses.txt`](src-tauri/resources/about/licenses.txt)：对应许可行标注「早期参考，相关代码已重写」与「仅历史区间适用」。
+
+### 变更
+
 #### 界面说明文案按自有措辞重写（降低与第三方项目表述雷同的风险）
 
 - 做法：把仓库内中文字符串与本地参考源码逐条比对（提取对方 12 字以上中文字面量，与 `src/`、`src-tauri/src/`、`src-tauri/resources/` 的字面量做完全匹配 + 14 字连续片段近似匹配），命中的说明性长句改写，术语保留。
