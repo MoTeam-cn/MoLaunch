@@ -16,6 +16,9 @@ const INSTALLER_TIMEOUT_SECS: u64 = 15 * 60;
 /// 保留的输出行数上限（避免安装器刷屏吃内存）
 const MAX_CAPTURED_LINES: usize = 500;
 
+/// 逐行回调（stdout 进度转发用）
+type LineHandler = Box<dyn Fn(&str) + Send + 'static>;
+
 /// Forge 安装进度事件
 #[derive(Debug, Clone, serde::Serialize)]
 pub struct ForgeInstallProgress {
@@ -60,8 +63,7 @@ pub(super) fn decode_output_line(bytes: &[u8]) -> String {
             let (decoded, _, _) = encoding_rs::GBK.decode(bytes);
             decoded.into_owned()
         });
-    text.trim_end_matches(|c| c == '\r' || c == '\n')
-        .to_string()
+    text.trim_end_matches(['\r', '\n']).to_string()
 }
 
 /// 构建安装器启动参数
@@ -109,7 +111,7 @@ fn spawn_output_reader<R: std::io::Read + Send + 'static>(
     reader: R,
     sink: Arc<Mutex<Vec<String>>>,
     tag: &'static str,
-    on_line: Option<Box<dyn Fn(&str) + Send + 'static>>,
+    on_line: Option<LineHandler>,
 ) -> std::thread::JoinHandle<()> {
     std::thread::spawn(move || {
         let mut buffered = BufReader::new(reader);
@@ -277,18 +279,17 @@ pub fn run_forge_installer(
 
     let sink: Arc<Mutex<Vec<String>>> = Arc::new(Mutex::new(Vec::new()));
     // stdout 上的进度行转发给调用方，stderr 只做收集
-    let progress_handler: Option<Box<dyn Fn(&str) + Send + 'static>> =
-        progress_callback.map(|callback| {
-            let handler = move |line: &str| {
-                if let Some(progress) = parse_progress_line(line) {
-                    callback(ForgeInstallProgress {
-                        stage: line.to_string(),
-                        progress,
-                    });
-                }
-            };
-            Box::new(handler) as Box<dyn Fn(&str) + Send>
-        });
+    let progress_handler: Option<LineHandler> = progress_callback.map(|callback| {
+        let handler = move |line: &str| {
+            if let Some(progress) = parse_progress_line(line) {
+                callback(ForgeInstallProgress {
+                    stage: line.to_string(),
+                    progress,
+                });
+            }
+        };
+        Box::new(handler) as Box<dyn Fn(&str) + Send>
+    });
     let stdout_handle = spawn_output_reader(stdout, Arc::clone(&sink), "stdout", progress_handler);
     let stderr_handle = spawn_output_reader(stderr, Arc::clone(&sink), "stderr", None);
 
