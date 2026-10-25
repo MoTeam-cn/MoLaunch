@@ -27,7 +27,7 @@ fn test_format_codes_and_escapes_must_survive() {
 #[test]
 fn test_protected_tokens_are_sorted_with_duplicates_preserved() {
     let tokens = extract_protected_tokens("§a%s and %s and ${name}");
-    assert_eq!(tokens, vec!["%s", "%s", "${name}", "§a"]);
+    assert_eq!(tokens, vec!["${name}", "%s", "%s", "§a"]);
 }
 
 #[test]

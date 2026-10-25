@@ -206,6 +206,7 @@ pub(crate) fn validate_response(
         .collect();
 
     let mut seen: HashSet<&str> = HashSet::new();
+    let mut covered: HashSet<&str> = HashSet::new();
     let mut accepted: Vec<RepairAction> = Vec::new();
     let mut dropped = false;
 
@@ -231,10 +232,11 @@ pub(crate) fn validate_response(
         let mut accepted_action = action.clone();
         accepted_action.issue_id = issue_id.to_string();
         accepted.push(accepted_action);
+        covered.insert(issue_id);
     }
 
     for issue in issues {
-        if seen.contains(issue.id.as_str()) {
+        if covered.contains(issue.id.as_str()) {
             continue;
         }
         dropped = true;
