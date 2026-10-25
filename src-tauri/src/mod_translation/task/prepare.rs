@@ -12,7 +12,7 @@ use super::super::types::JarInspection;
 
 /// 缓存工作区根目录（`.Molaunch/cache/mod-translation`）
 const WORKSPACE_ROOT: &str = "mod-translation";
-/// 续传身份标识（写入/匹配 resume marker 用）
+/// 续传身份标识（写入 / 匹配 resume marker 用）
 const RESUME_IDENTITY: &str = "mod-translator-v1";
 
 /// 已就绪的分析结果（analyze 与 start 之间传递工作区）
@@ -24,23 +24,16 @@ pub(crate) struct Prepared {
     pub checkpoint: Option<Checkpoint>,
 }
 
-/// 解包到缓存工作区并分析；优先复用可续传工作区，否则新建 `job-<hash>` 并写续传标记
+/// 解包到缓存工作区并分析；优先复用可续传工作区，否则新建 `job-<hash>`
 pub(crate) fn prepare(jar_path: &Path) -> Result<Prepared, String> {
     let hash = analyze::file_hash(jar_path)?;
     let root = Cache::instance()
         .ensure_dir(WORKSPACE_ROOT)
         .map_err(|e| format!("无法创建模组翻译缓存目录: {e}"))?;
 
-    // 断点续传：命中同 hash + 身份的工作区则复用（跳过已翻译批次）
-    if let Some(workspace) = resume::find_resumable_workspace(&root, &hash, RESUME_IDENTITY) {
-        if let Some(marker) = resume::read_resume_marker(&workspace) {
-            log_info!("[ModTranslation] 发现可续传工作区，跳过已翻译批次");
-            return Ok(Prepared {
-                checkpoint: resume::read_checkpoint(&workspace),
-                workspace,
-                inspection: marker.inspection,
-            });
-        }
+    if let Some(prepared) = reuse_resumable(&root, &hash) {
+        log_info!("[ModTranslation] 发现可续传工作区，跳过已翻译批次");
+        return Ok(prepared);
     }
 
     let workspace = root.join(format!("job-{}", &hash[..16]));
@@ -53,6 +46,7 @@ pub(crate) fn prepare(jar_path: &Path) -> Result<Prepared, String> {
     if extracted.signed {
         log_warn!("[ModTranslation] JAR 含签名文件，重打包后签名将失效");
     }
+
     let inspection = analyze::inspect_jar(&workspace, jar_path, extracted.signed);
     log_info!(
         "[ModTranslation] 分析完成：{}（{} 个语言源，{} 条目）",
@@ -60,6 +54,7 @@ pub(crate) fn prepare(jar_path: &Path) -> Result<Prepared, String> {
         inspection.language_sources.len(),
         inspection.language_entries
     );
+
     let _ = resume::write_resume_marker(
         &workspace,
         &resume::ResumeMarker {
@@ -70,9 +65,21 @@ pub(crate) fn prepare(jar_path: &Path) -> Result<Prepared, String> {
             inspection: inspection.clone(),
         },
     );
+
     Ok(Prepared {
         checkpoint: None,
         workspace,
         inspection,
+    })
+}
+
+/// 命中「同 hash + 同身份 + 有 marker」的工作区时复用
+fn reuse_resumable(root: &Path, hash: &str) -> Option<Prepared> {
+    let workspace = resume::find_resumable_workspace(root, hash, RESUME_IDENTITY)?;
+    let marker = resume::read_resume_marker(&workspace)?;
+    Some(Prepared {
+        checkpoint: resume::read_checkpoint(&workspace),
+        workspace,
+        inspection: marker.inspection,
     })
 }
