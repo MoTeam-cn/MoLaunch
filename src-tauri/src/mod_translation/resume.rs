@@ -96,7 +96,7 @@ pub fn find_resumable_workspace(
         }
         if newest
             .as_ref()
-            .map_or(true, |(created_at, _)| marker.created_at > *created_at)
+            .is_none_or(|(created_at, _)| marker.created_at > *created_at)
         {
             newest = Some((marker.created_at, path));
         }
