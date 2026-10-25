@@ -16,6 +16,9 @@ mod types;
 pub mod update;
 pub mod watcher;
 
+#[cfg(test)]
+mod snapshot_test;
+
 // 对外暴露类型和辅助函数（保持向后兼容路径）
 // ModMetadata 定义已下沉至 minecraft::community::types（消除架构倒置），此处 re-export 保持旧路径
 #[allow(unused_imports)] // 向后兼容 re-export：preload 已直接引用领域层，保留旧路径供外部引用

@@ -12,4 +12,7 @@ mod rules;
 mod scorer;
 mod util;
 
+#[cfg(test)]
+mod mod_index_test;
+
 pub(crate) use analyze::analyze_crash;

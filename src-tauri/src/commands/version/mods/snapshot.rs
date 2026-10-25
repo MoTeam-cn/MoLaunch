@@ -252,7 +252,7 @@ pub async fn list_snapshots(
             list.push(meta);
         }
     }
-    list.sort_by(|a, b| b.created_at.cmp(&a.created_at));
+    list.sort_by_key(|item| std::cmp::Reverse(item.created_at));
     Ok(list)
 }
 
@@ -368,6 +368,3 @@ pub async fn delete_snapshot(
     }
     Ok(())
 }
-
-#[cfg(test)]
-mod snapshot_test;

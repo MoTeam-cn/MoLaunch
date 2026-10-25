@@ -56,7 +56,7 @@ impl ModIndex {
             list.push(ModEntry { key, file_name });
         }
         // 长名字优先匹配，避免 create 抢走 createaddition
-        list.sort_by(|a, b| b.key.len().cmp(&a.key.len()));
+        list.sort_by_key(|entry| std::cmp::Reverse(entry.key.len()));
         Self { entries: list }
     }
 
@@ -74,12 +74,9 @@ impl ModIndex {
 }
 
 /// 归一化：只保留 ASCII 字母数字并转小写
-fn normalize(text: &str) -> String {
+pub(super) fn normalize(text: &str) -> String {
     text.chars()
         .filter(|ch| ch.is_ascii_alphanumeric())
         .map(|ch| ch.to_ascii_lowercase())
         .collect()
 }
-
-#[cfg(test)]
-mod mod_index_test;

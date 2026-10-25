@@ -1,6 +1,6 @@
 //! 快照纯逻辑测试（扫描 / 差异）
 
-use super::{diff_files, scan_mods, SnapshotFile};
+use super::snapshot::{diff_files, scan_mods, SnapshotFile};
 
 fn file(name: &str, size: u64, enabled: bool) -> SnapshotFile {
     SnapshotFile {

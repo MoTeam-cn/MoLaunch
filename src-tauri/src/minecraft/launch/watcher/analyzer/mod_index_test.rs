@@ -1,6 +1,6 @@
 //! Mod 索引测试
 
-use super::{normalize, ModIndex};
+use super::mod_index::{normalize, ModIndex};
 
 #[test]
 fn test_normalize_strips_separators_and_lowercases() {
