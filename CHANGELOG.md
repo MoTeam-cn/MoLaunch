@@ -4,6 +4,19 @@
 
 ## [Unreleased]
 
+### 新增
+
+#### 启动耗时分析
+
+- [`timing.rs`](src-tauri/src/minecraft/launch/pipeline/timing.rs)（新增）/ [`runner.rs`](src-tauri/src/minecraft/launch/pipeline/runner.rs) / [`execute.rs`](src-tauri/src/minecraft/launch/pipeline/execute.rs)：每个启动阶段用 `StageClock` 计时，启动完成时通过 `launch-timing` 事件下发 `LaunchTimings`（各阶段毫秒数 + 合计 + 版本 ID）；Java 自动切换重试时重新计时。
+- [`launch-timing.ts`](src/utils/launch-timing.ts)（新增）/ [`launch.ts`](src/utils/api/launch.ts) / [`launch.ts`](src/stores/launch.ts)：阶段中文名映射、时长格式化、耗时排行，store 监听 `launch-timing` 保留最近一次结果。
+- [`OverviewTab.vue`](src/views/version-settings/OverviewTab.vue)：版本设置概览新增「最近一次启动耗时」卡片，按阶段耗时倒序列出条形图。
+
+#### 实例快照与回滚
+
+- [`snapshot.rs`](src-tauri/src/commands/version/mods/snapshot.rs)（新增）/ [`manager.rs`](src-tauri/src/commands/version/mods/manager.rs)：新增 `snapshot_create` / `snapshot_list` / `snapshot_diff` / `snapshot_restore` / `snapshot_delete` 五个 action。快照只记录 mods 目录清单（文件名 / 大小 / 启用状态）存于版本目录 `.molaunch-snapshots/`，保留最近 10 份；回滚按差异补回或禁用文件，无法找回的文件单独返回。
+- [`mod-snapshot.ts`](src/utils/api/mod-snapshot.ts)（新增）/ [`SnapshotPanel.vue`](src/views/version-settings/mod-snapshot/SnapshotPanel.vue)（新增）/ [`ModTab.vue`](src/views/version-settings/ModTab.vue)：Mod 页新增「快照与回滚」入口，支持创建、差异预览、一键回滚、删除。
+
 ### 修复
 
 #### 背景图玻璃效果不再波及弹窗
