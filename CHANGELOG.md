@@ -6,6 +6,13 @@
 
 ### 重构
 
+#### 模组翻译：数据模型与模块入口整理
+
+- **数据模型**（[`types.rs`](src-tauri/src/mod_translation/types.rs)）：按「展示辅助 / 枚举 / 流水线 / 命令层」四段重排，字段名与 serde 属性保持完全一致（IPC 契约不变）。
+- **模块入口**（[`mod.rs`](src-tauri/src/mod_translation/mod.rs)、[`lang.rs`](src-tauri/src/mod_translation/lang.rs)、[`ledger.rs`](src-tauri/src/mod_translation/ledger.rs)、[`task.rs`](src-tauri/src/mod_translation/task.rs)、[`translate_class.rs`](src-tauri/src/mod_translation/translate_class.rs)）：补充职责注释，导出清单按子模块职责排列。
+
+### 重构
+
 #### 模组翻译：测试用例按规格重写
 
 - **测试文件**（[`ledger_test.rs`](src-tauri/src/mod_translation/ledger_test.rs)、[`prompt_test.rs`](src-tauri/src/mod_translation/prompt_test.rs)、[`translate_class_test.rs`](src-tauri/src/mod_translation/translate_class/translate_class_test.rs)、[`translate_lang_test.rs`](src-tauri/src/mod_translation/translate_lang_test.rs)、[`repair_test.rs`](src-tauri/src/mod_translation/repair_test.rs)）：统一 `test_<功能>_<场景>_<预期>` 命名，fixture 收敛为构造函数，覆盖项按规格 §7 重排（工作图状态机、提示词解析、class 判定容错、语言路由、回修覆盖与写回）。

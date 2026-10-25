@@ -1,4 +1,4 @@
-//! 模组翻译：任务状态中枢（工作图、任务记忆、class 处置账本）
+//! 任务账本：工作图、任务记忆、class 处置决策
 
 mod class_decision;
 mod task_memory;

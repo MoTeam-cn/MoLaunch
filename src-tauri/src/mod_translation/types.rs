@@ -1,11 +1,17 @@
-//! 模组翻译：数据结构定义
+//! 模组翻译：数据结构定义（字段名即前后端 IPC 契约，改动需同步前端）
+//!
+//! 分三组：命令层（AnalyzeParams / AnalyzeResult / StartParams / TaskSnapshot）、
+//! 流水线（JarInspection / LanguageSource / ClassCandidate / Quote / ResourceCoverage）、
+//! 展示辅助（RetryInfo / StageProgress / ModNameResult / TranslationReport）。
 
 use std::collections::BTreeMap;
 use std::path::PathBuf;
 
 use serde::{Deserialize, Serialize};
 
-/// 重试信息（前端展示"第 x/y 次重试"）
+// ───────────────────────── 展示辅助 ─────────────────────────
+
+/// 重试信息（前端展示「第 x/y 次重试」）
 #[derive(Debug, Clone, Copy, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct RetryInfo {
@@ -24,10 +30,35 @@ pub struct StageProgress {
     pub progress: f64,
 }
 
-/// 进度回调（分进度 0-100 + 消息 + 重试信息），供各翻译路由共用
+/// 进度回调（分进度 + 消息 + 重试信息），各翻译路由共用
 pub type ProgressFn = dyn Fn(f64, &str, Option<RetryInfo>) + Send + Sync;
 
-/// 模组加载器（用于翻译提示词上下文）
+/// 模组中文名决策结果
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ModNameResult {
+    pub name: String,
+    pub source: String,
+}
+
+/// 任务完成报告（终态快照携带）
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct TranslationReport {
+    pub task_id: String,
+    pub ok: bool,
+    pub output_path: String,
+    pub mod_name: Option<ModNameResult>,
+    pub language_attempted: usize,
+    pub language_accepted: usize,
+    pub class_resolved: usize,
+    pub class_total: usize,
+    pub warnings: Vec<String>,
+}
+
+// ───────────────────────── 枚举 ─────────────────────────
+
+/// 模组加载器（用于提示词上下文）
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "kebab-case")]
 pub enum Loader {
@@ -74,6 +105,8 @@ impl LanguageKind {
     }
 }
 
+// ───────────────────────── 流水线数据 ─────────────────────────
+
 /// 一个可翻译的语言源（对应 JAR 内一个 en_us 文件）
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct LanguageSource {
@@ -84,8 +117,8 @@ pub struct LanguageSource {
     pub source_path: String,
     /// 工作区相对路径（目标 zh_cn 文件）
     pub target_path: String,
-    /// 待翻译条目：key -> 源文本
-    /// - Json/KeyValue：语言键
+    /// 待翻译条目：键 → 源文本
+    /// - Json / KeyValue：语言键
     /// - StructuredJson：JSON Pointer（如 `/foo/bar`）
     /// - FreeText：行号字符串
     pub entries: BTreeMap<String, String>,
@@ -100,14 +133,15 @@ impl LanguageSource {
             .iter()
             .filter(|(key, source)| {
                 let existing = self.existing_target.get(*key).map(String::as_str);
-                !existing.is_some_and(|t| !t.trim().is_empty() && has_chinese(t))
-                    && !source.trim().is_empty()
+                let translated =
+                    existing.is_some_and(|text| !text.trim().is_empty() && has_chinese(text));
+                !translated && !source.trim().is_empty()
             })
             .count()
     }
 }
 
-/// 判断文本是否含简体中文字符
+/// 文本是否含简体中文
 pub fn has_chinese(text: &str) -> bool {
     text.chars().any(|c| matches!(c, '\u{4e00}'..='\u{9fff}'))
 }
@@ -121,63 +155,6 @@ pub struct ExistingChinese {
     /// 语言标识（zh_cn / zh_tw）
     pub locale: String,
     /// 条目数
-    pub entries: usize,
-}
-
-/// JAR 分析结果
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct JarInspection {
-    pub input_path: PathBuf,
-    pub original_filename: String,
-    pub loader: Loader,
-    pub mod_ids: Vec<String>,
-    pub project_names: Vec<String>,
-    pub version: Option<String>,
-    pub signed: bool,
-    pub language_sources: Vec<LanguageSource>,
-    pub language_entries: usize,
-    pub class_candidates: Vec<ClassCandidate>,
-    pub coverage: Vec<ResourceCoverage>,
-    pub quote: Quote,
-    pub mod_name: Option<ModNameResult>,
-    pub existing_chinese: Vec<ExistingChinese>,
-    pub warnings: Vec<String>,
-}
-
-/// 分析请求参数
-#[derive(Debug, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub struct AnalyzeParams {
-    pub jar_path: String,
-}
-
-/// 分析结果（返回前端展示）
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub struct AnalyzeResult {
-    pub filename: String,
-    pub loader: String,
-    pub mod_ids: Vec<String>,
-    pub project_names: Vec<String>,
-    pub version: Option<String>,
-    pub signed: bool,
-    pub sources: Vec<SourceSummary>,
-    pub total_entries: usize,
-    pub class_candidates: Vec<ClassCandidate>,
-    pub quote: Quote,
-    pub coverage: Vec<ResourceCoverage>,
-    pub mod_name: Option<ModNameResult>,
-    pub existing_chinese: Vec<ExistingChinese>,
-    pub warnings: Vec<String>,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub struct SourceSummary {
-    pub kind: String,
-    pub namespace: String,
-    pub source_path: String,
-    pub target_path: String,
     pub entries: usize,
 }
 
@@ -219,27 +196,67 @@ pub struct ResourceCoverage {
     pub reason: String,
 }
 
-/// 模组中文名决策结果
+/// JAR 分析结果（流水线内部流转）
 #[derive(Debug, Clone, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub struct ModNameResult {
-    pub name: String,
-    pub source: String,
+pub struct JarInspection {
+    pub input_path: PathBuf,
+    pub original_filename: String,
+    pub loader: Loader,
+    pub mod_ids: Vec<String>,
+    pub project_names: Vec<String>,
+    pub version: Option<String>,
+    pub signed: bool,
+    pub language_sources: Vec<LanguageSource>,
+    pub language_entries: usize,
+    pub class_candidates: Vec<ClassCandidate>,
+    pub coverage: Vec<ResourceCoverage>,
+    pub quote: Quote,
+    pub mod_name: Option<ModNameResult>,
+    pub existing_chinese: Vec<ExistingChinese>,
+    pub warnings: Vec<String>,
 }
 
-/// 任务完成报告（终态快照携带）
+// ───────────────────────── 命令层 ─────────────────────────
+
+/// 分析请求参数
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct AnalyzeParams {
+    pub jar_path: String,
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
-pub struct TranslationReport {
-    pub task_id: String,
-    pub ok: bool,
-    pub output_path: String,
+pub struct SourceSummary {
+    pub kind: String,
+    pub namespace: String,
+    pub source_path: String,
+    pub target_path: String,
+    pub entries: usize,
+}
+
+/// 分析结果（返回前端展示）
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct AnalyzeResult {
+    pub filename: String,
+    pub loader: String,
+    pub mod_ids: Vec<String>,
+    pub project_names: Vec<String>,
+    pub version: Option<String>,
+    pub signed: bool,
+    pub sources: Vec<SourceSummary>,
+    pub total_entries: usize,
+    pub class_candidates: Vec<ClassCandidate>,
+    pub quote: Quote,
+    pub coverage: Vec<ResourceCoverage>,
     pub mod_name: Option<ModNameResult>,
-    pub language_attempted: usize,
-    pub language_accepted: usize,
-    pub class_resolved: usize,
-    pub class_total: usize,
+    pub existing_chinese: Vec<ExistingChinese>,
     pub warnings: Vec<String>,
+}
+
+fn default_true() -> bool {
+    true
 }
 
 /// 启动翻译请求参数
@@ -249,7 +266,7 @@ pub struct StartParams {
     pub jar_path: String,
     /// 显式指定模型；为空使用默认模型
     pub model: String,
-    /// 每批翻译条目数（20/40/80）
+    /// 每批翻译条目数（20 / 40 / 80）
     pub batch_size: u32,
     /// 是否生成模组中文名（默认开）
     #[serde(default = "default_true")]
@@ -262,11 +279,7 @@ pub struct StartParams {
     pub class_text_enabled: bool,
 }
 
-fn default_true() -> bool {
-    true
-}
-
-/// 任务状态快照（前端轮询/事件共用）
+/// 任务状态快照（前端事件与轮询共用）
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct TaskSnapshot {
@@ -275,13 +288,13 @@ pub struct TaskSnapshot {
     pub status: String,
     /// analyze / research / language / repair / class / validation / package
     pub stage: String,
-    /// 总进度（0-100，按阶段权重加权计算）
+    /// 总进度（0-100，按阶段权重加权）
     pub progress: f64,
     /// 当前阶段分进度（0-100）
     pub stage_progress: f64,
     /// 重试信息（重试时携带）
     pub retry: Option<RetryInfo>,
-    /// 各阶段进度（前端分进度折叠区展示）
+    /// 各阶段进度（前端分进度折叠区）
     pub stages: Vec<StageProgress>,
     pub message: String,
     pub output_path: Option<String>,

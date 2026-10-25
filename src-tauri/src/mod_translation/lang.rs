@@ -1,4 +1,4 @@
-//! 模组翻译：语言文件读写（JSON / key-value / 结构化 JSON / 自由文本）
+//! 语言文件读写：标准 JSON / 结构化 JSON / key-value / 自由文本（规格 §2）
 
 mod free_text;
 mod json;
