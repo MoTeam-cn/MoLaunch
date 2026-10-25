@@ -30,6 +30,7 @@ const ModListItem = defineAsyncComponent(() => import('./mod-tab/ModListItem.vue
 const ModToolbar = defineAsyncComponent(() => import('./mod-tab/ModToolbar.vue'))
 const ModEmptyState = defineAsyncComponent(() => import('./mod-tab/ModEmptyState.vue'))
 const ModUpdateDialog = defineAsyncComponent(() => import('./mod-tab/ModUpdateDialog.vue'))
+const SnapshotPanel = defineAsyncComponent(() => import('./mod-snapshot/SnapshotPanel.vue'))
 
 const router = useRouter()
 const { selectedId, isModable } = useVersionSettings()
@@ -116,6 +117,11 @@ onUnmounted(() => {
         @open-dir="handleOpenModsDir"
         @refresh="loadMods"
       />
+
+      <!-- 快照与回滚（安装 Mod 前的安全网） -->
+      <div class="px-6 pt-3">
+        <SnapshotPanel :version-id="selectedId || ''" @restored="loadMods" />
+      </div>
 
       <!-- 多选操作栏：浮动在视口底部中央，由组件自身 teleport + fixed 定位，不占列表空间 -->
       <MultiSelectBar

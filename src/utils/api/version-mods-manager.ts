@@ -40,6 +40,12 @@ export const VERSION_MODS_ACTIONS = {
   WATCH_MODS_DIR: 'watch_mods_dir',
   UNWATCH_MODS_DIR: 'unwatch_mods_dir',
   // dependency_resolver.rs（2 个，前置 mod 检查与安装）
+  // snapshot.rs（5 个，实例快照与回滚）
+  SNAPSHOT_CREATE: 'snapshot_create',
+  SNAPSHOT_LIST: 'snapshot_list',
+  SNAPSHOT_DIFF: 'snapshot_diff',
+  SNAPSHOT_RESTORE: 'snapshot_restore',
+  SNAPSHOT_DELETE: 'snapshot_delete',
   CHECK_MOD_DEPENDENCIES: 'check_mod_dependencies',
   INSTALL_MOD_WITH_DEPENDENCIES: 'install_mod_with_dependencies',
 } as const

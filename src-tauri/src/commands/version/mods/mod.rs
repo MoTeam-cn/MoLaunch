@@ -11,6 +11,7 @@ pub mod list;
 pub mod manage;
 mod manager;
 mod metadata;
+pub mod snapshot;
 mod types;
 pub mod update;
 pub mod watcher;

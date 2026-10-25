@@ -12,7 +12,7 @@ use super::dependency_resolver::{
     check_mod_dependencies, install_mod_with_dependencies, DependencyCheckResult, InstallResult,
     ResolvedDependency,
 };
-use super::{install, list, manage, update, watcher};
+use super::{install, list, manage, snapshot, update, watcher};
 use crate::handler;
 use crate::minecraft::community::types::{Platform, ResourceVersion};
 use crate::state::AppState;
@@ -100,6 +100,25 @@ struct InstallModWithDepsParams {
     main_version: ResourceVersion,
     /// 用户勾选要安装的前置（含 suggested_version）
     deps: Vec<ResolvedDependency>,
+}
+
+/// snapshot_create 参数
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct SnapshotCreateParams {
+    version_id: String,
+    /// 触发方式：manual / auto-before-install / auto-before-update / auto-before-delete
+    kind: String,
+    /// 备注（仅写日志）
+    note: Option<String>,
+}
+
+/// snapshot_diff / snapshot_restore / snapshot_delete 参数
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct SnapshotIdParams {
+    version_id: String,
+    id: String,
 }
 
 /// 解析平台名字符串到 Platform 枚举
@@ -264,6 +283,56 @@ static DISPATCHER: Lazy<Dispatcher> = Lazy::new(|| {
             )
             .await?;
             serde_json::to_value(result).map_err(|e| e.to_string())
+        }),
+    );
+
+    d.register(
+        "snapshot_create",
+        handler!(state, _app, params, {
+            let p: SnapshotCreateParams =
+                serde_json::from_value(params).map_err(|e| format!("参数解析失败: {}", e))?;
+            let r = snapshot::create_snapshot(&state, p.version_id, p.kind, p.note).await?;
+            serde_json::to_value(r).map_err(|e| e.to_string())
+        }),
+    );
+
+    d.register(
+        "snapshot_list",
+        handler!(state, _app, params, {
+            let p: VersionIdParams =
+                serde_json::from_value(params).map_err(|e| format!("参数解析失败: {}", e))?;
+            let r = snapshot::list_snapshots(&state, p.version_id).await?;
+            serde_json::to_value(r).map_err(|e| e.to_string())
+        }),
+    );
+
+    d.register(
+        "snapshot_diff",
+        handler!(state, _app, params, {
+            let p: SnapshotIdParams =
+                serde_json::from_value(params).map_err(|e| format!("参数解析失败: {}", e))?;
+            let r = snapshot::snapshot_diff(&state, p.version_id, p.id).await?;
+            serde_json::to_value(r).map_err(|e| e.to_string())
+        }),
+    );
+
+    d.register(
+        "snapshot_restore",
+        handler!(state, _app, params, {
+            let p: SnapshotIdParams =
+                serde_json::from_value(params).map_err(|e| format!("参数解析失败: {}", e))?;
+            let r = snapshot::restore_snapshot(&state, p.version_id, p.id).await?;
+            serde_json::to_value(r).map_err(|e| e.to_string())
+        }),
+    );
+
+    d.register(
+        "snapshot_delete",
+        handler!(state, _app, params, {
+            let p: SnapshotIdParams =
+                serde_json::from_value(params).map_err(|e| format!("参数解析失败: {}", e))?;
+            snapshot::delete_snapshot(&state, p.version_id, p.id).await?;
+            serde_json::to_value(()).map_err(|e| e.to_string())
         }),
     );
 
