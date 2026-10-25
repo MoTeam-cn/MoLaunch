@@ -12,7 +12,7 @@
 
 | name | copyright | license | sourceUrl | licenseUrl |
 | --- | --- | --- | --- | --- |
-| MoLaunch 自有代码与原创资源 | Copyright (c) 2026 MoTeam | MoLaunch 分发有限许可证（禁止商业使用；二次开发必须公开源代码） | https://github.com/MoTeam-cn/MoLaunch | https://github.com/MoTeam-cn/MoLaunch/blob/main/LICENSE |
+| MoLaunch 自有代码与原创资源（不含 2026-08 引入、现已按公开规范重写的三个功能：合成配方生成器、渐变文字生成器、AI 模组翻译，相关历史说明见仓库根目录 ACKNOWLEDGEMENTS.md） | Copyright (c) 2026 MoTeam | MoLaunch 分发有限许可证（禁止商业使用；二次开发必须公开源代码） | https://github.com/MoTeam-cn/MoLaunch | https://github.com/MoTeam-cn/MoLaunch/blob/main/LICENSE |
 | Axolotl Launcher（早期参考，代码已重写） | Copyright (c) Axolotl Launcher Dev | GPL-3.0（仅历史区间适用；现实现不派生自该项目） | https://github.com/Axolotl-Launcher/Axolotl | https://www.gnu.org/licenses/gpl-3.0.html |
 | Vue 3 | Copyright (c) 2014-present Yuxi (Evan) You | MIT License | https://vuejs.org | https://opensource.org/licenses/MIT |
 | Vue Router | Copyright (c) 2014-present Evan You | MIT License | https://router.vuejs.org | https://opensource.org/licenses/MIT |
