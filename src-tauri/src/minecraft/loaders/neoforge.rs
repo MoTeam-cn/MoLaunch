@@ -247,45 +247,44 @@ pub async fn install(
         cb(50.0);
     }
 
-    let mut install_result = super::forge_installer::run_forge_installer(
-        &java_path,
-        &installer_path.to_string_lossy(),
-        &injector_path,
-        &wrapper_path,
-        &game_dir.to_string_lossy(),
-        true,
-        None,
-    );
+    // 安装器进度（0~1）映射到 50%~80% 区间
+    let installer_progress = progress_callback.clone().map(|cb| {
+        let handler: super::forge_installer::ProgressHandler =
+            std::sync::Arc::new(move |fraction: f64| cb(50.0 + fraction.clamp(0.0, 1.0) * 30.0));
+        handler
+    });
 
-    // 失败时预取库再试一次（镜像重定向超限的常见解法）；成功路径不受影响
-    let mut first_error_message: Option<String> = None;
-    if let Some(first_error) = install_result.as_ref().err().map(ToString::to_string) {
-        log_warn!("[NeoForge] 安装器失败，尝试预取库后重试: {}", first_error);
-        match shared::prefetch_install_libraries(&installer_path, game_dir, config).await {
-            Ok(count) if count > 0 => {
-                log_info!("[NeoForge] 已预取 {} 个库，重试安装器", count);
-                first_error_message = Some(first_error);
-                install_result = super::forge_installer::run_forge_installer(
-                    &java_path,
-                    &installer_path.to_string_lossy(),
-                    &injector_path,
-                    &wrapper_path,
-                    &game_dir.to_string_lossy(),
-                    true,
-                    None,
-                );
-            }
-            Ok(_) => log_warn!("[NeoForge] 没有可预取的库，保留原始错误"),
-            Err(e) => log_warn!("[NeoForge] 预取安装库失败，保留原始错误: {}", e),
+    let java_path_str = java_path.to_string();
+    let installer_path_str = installer_path.to_string_lossy().to_string();
+    let game_dir_str = game_dir.to_string_lossy().to_string();
+
+    // 首选官方安装器：走官方 maven，重定向链最短；失败再走注入器（镜像加速）兜底
+    match super::forge_installer::run_official_installer(
+        &java_path_str,
+        &installer_path_str,
+        &game_dir_str,
+        installer_progress.clone(),
+    ) {
+        Ok(()) => {}
+        Err(official_error) => {
+            log_warn!(
+                "[NeoForge] 官方安装器失败，改用注入器重试: {}",
+                official_error
+            );
+            super::forge_installer::run_forge_installer(
+                &java_path_str,
+                &installer_path_str,
+                &injector_path,
+                &wrapper_path,
+                &game_dir_str,
+                true,
+                installer_progress,
+            )
+            .map_err(|injector_error| {
+                anyhow::anyhow!("官方安装器：{}；注入器：{}", official_error, injector_error)
+            })?;
         }
     }
-    if let Err(error) = install_result {
-        return Err(match first_error_message {
-            Some(first) => anyhow::anyhow!("{}；预取库重试前的错误：{}", error, first),
-            None => error,
-        });
-    }
-
     if let Some(ref cb) = progress_callback {
         cb(80.0);
     }

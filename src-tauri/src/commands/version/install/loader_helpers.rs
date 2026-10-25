@@ -120,14 +120,32 @@ pub(crate) async fn install_single_loader(
     // 构造下载配置（读 meta_source，保持 installer 历史行为）
     let config = DownloadManagerConfig::from_state_for_meta(state).await;
 
-    // 安装加载器（progress_callback 传 None，进度由 ticker 统一管理）
+    // 真实进度：安装器输出映射成百分比后写入当前阶段并广播；
+    // ticker 只做保底，不会把已经更高的真实进度改小
+    let real_progress: Option<Arc<dyn Fn(f64) + Send + Sync>> = {
+        let download_state = state.download_state.clone();
+        let app_state = state.clone();
+        Some(Arc::new(move |percent: f64| {
+            let value = (percent / 100.0).clamp(0.0, 1.0);
+            {
+                let mut ds = download_state.lock().unwrap();
+                if let Some(stage) = ds.stages.last_mut() {
+                    if value > stage.progress {
+                        stage.progress = value;
+                    }
+                }
+            }
+            crate::commands::version::download::broadcast_current(&app_state);
+        }))
+    };
+
     match loaders::install_loader(
         loader_type,
         mc_version,
         loader_version,
         game_dir,
         mirror_url,
-        None,
+        real_progress,
         &config,
     )
     .await
@@ -199,7 +217,11 @@ pub(crate) fn start_progress_ticker(
                     None => ds.stages.last_mut(),
                 };
                 if let Some(stage) = stage {
-                    stage.progress = current / 100.0;
+                    // 真实进度优先：只有伪进度更高时才覆盖
+                    let simulated = current / 100.0;
+                    if simulated > stage.progress {
+                        stage.progress = simulated;
+                    }
                 }
             }
             // 广播到 WS，让前端实时看到伪进度动画

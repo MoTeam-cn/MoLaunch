@@ -1,5 +1,7 @@
-//! Forge Installer 注入器模块
-//! 使用 bangbang93 的 forge_installer.jar 进行 Forge/NeoForge 安装
+//! 加载器安装器（Forge / NeoForge）执行模块
+//!
+//! 两条路径：官方 installer.jar 的 `--installClient`（首选，走官方 maven、进度真实），
+//! 以及 bangbang93 注入器（国内镜像加速，官方路径失败时兜底）。
 
 use crate::resources;
 use crate::utils::cache;
@@ -19,6 +21,9 @@ const MAX_CAPTURED_LINES: usize = 500;
 /// 逐行回调（stdout 进度转发用）
 type LineHandler = Box<dyn Fn(&str) + Send + 'static>;
 
+/// 安装进度回调（0.0 ~ 1.0，来自安装器自身的输出）；用 Arc 便于两条安装路径共用
+pub type ProgressHandler = Arc<dyn Fn(f64) + Send + Sync>;
+
 /// Forge 安装进度事件
 #[derive(Debug, Clone, serde::Serialize)]
 pub struct ForgeInstallProgress {
@@ -28,7 +33,6 @@ pub struct ForgeInstallProgress {
 
 /// 释放嵌入的资源文件到缓存目录
 pub fn extract_embedded_resources() -> anyhow::Result<(String, String)> {
-    // 确保 cache 子目录存在
     let cache_dir = cache::ensure_dir("forge_installer")?;
 
     let installer_path = cache_dir.join("forge-installer.jar");
@@ -66,7 +70,7 @@ pub(super) fn decode_output_line(bytes: &[u8]) -> String {
     text.trim_end_matches(['\r', '\n']).to_string()
 }
 
-/// 构建安装器启动参数
+/// 构建注入器启动参数
 ///
 /// `use_wrapper` 为真时（游戏目录含中文或空格）以 java-wrapper 为主 Jar 启动，
 /// 绕开 JVM 在非 ASCII 路径下找不到主类的问题。
@@ -80,14 +84,13 @@ pub(super) fn build_installer_args(
 ) -> Vec<String> {
     let mut args: Vec<String> = Vec::new();
 
-    // Java 9+ 需要开放 bootstraplauncher 的导出包
     if java_major >= 9 {
         args.push("--add-exports".to_string());
         args.push("cpw.mods.bootstraplauncher/cpw.mods.bootstraplauncher=ALL-UNNAMED".to_string());
     }
 
     if use_wrapper {
-        // 注意：系统属性必须写成 -Dkey=value 单个参数，
+        // 系统属性必须写成 -Dkey=value 单个参数，
         // 拆成两个参数会被 JVM 当成主类名，安装器根本不会启动。
         args.push(format!("-Doolloo.jlw.tmpdir={}", tmp_dir));
         args.push("-cp".to_string());
@@ -104,6 +107,17 @@ pub(super) fn build_installer_args(
     }
 
     args
+}
+
+/// 构建官方安装器参数：`java -jar <installer> --installClient`
+///
+/// 官方安装器按当前工作目录找 `.minecraft`，因此运行时必须把 cwd 设为游戏目录。
+pub(super) fn build_official_args(installer_path: &str) -> Vec<String> {
+    vec![
+        "-jar".to_string(),
+        installer_path.to_string(),
+        "--installClient".to_string(),
+    ]
 }
 
 /// 在独立线程里持续读取输出流，按行写入共享缓冲
@@ -163,7 +177,7 @@ fn wait_with_timeout(child: &mut Child, timeout_secs: u64) -> anyhow::Result<Exi
 
 /// 把安装器完整输出落盘，便于用户回传排查（失败不影响安装流程）
 fn write_installer_log(
-    loader_name: &str,
+    tag: &str,
     java_path: &str,
     args: &[String],
     lines: &[String],
@@ -173,11 +187,7 @@ fn write_installer_log(
         .duration_since(std::time::UNIX_EPOCH)
         .map(|d| d.as_secs())
         .unwrap_or(0);
-    let log_path = cache_dir.join(format!(
-        "installer-{}-{}.log",
-        loader_name.to_lowercase(),
-        stamp
-    ));
+    let log_path = cache_dir.join(format!("installer-{}-{}.log", tag, stamp));
     let mut content = String::new();
     content.push_str(&format!(
         "java: {}\nargs: {}\n\n",
@@ -197,74 +207,26 @@ fn write_installer_log(
     }
 }
 
-/// 运行 Forge 安装器
+/// 执行安装器进程并收集输出（两条安装路径共用）
 ///
-/// # Arguments
-/// * `java_path` - Java 可执行文件路径（需能产生控制台输出）
-/// * `installer_path` - 官方 Forge installer.jar 路径
-/// * `injector_path` - bangbang93 的 forge_installer.jar 路径
-/// * `wrapper_path` - java-wrapper.jar 路径
-/// * `mc_dir` - Minecraft 游戏目录
-/// * `is_neoforge` - 是否为 NeoForge
-/// * `progress_callback` - 进度回调
-pub fn run_forge_installer(
+/// `on_progress` 接收安装器输出的 0.0~1.0 进度；`working_dir` 用于官方安装器定位游戏目录。
+fn run_installer_process(
     java_path: &str,
-    installer_path: &str,
-    injector_path: &str,
-    wrapper_path: &str,
-    mc_dir: &str,
-    is_neoforge: bool,
-    progress_callback: Option<Box<dyn Fn(ForgeInstallProgress) + Send>>,
+    args: &[String],
+    working_dir: Option<&Path>,
+    log_tag: &str,
+    progress: Option<ProgressHandler>,
 ) -> anyhow::Result<()> {
-    let loader_name = if is_neoforge { "NeoForge" } else { "Forge" };
-
-    // 启动前先确认两个 jar 都在，缺文件时给出明确提示而不是让 JVM 报找不到主类
-    for (label, path) in [("官方安装器", installer_path), ("注入器", injector_path)] {
-        if !Path::new(path).exists() {
-            return Err(anyhow::anyhow!(
-                "{} 文件缺失: {}，请重试安装（若反复失败请检查下载源）",
-                label,
-                path
-            ));
-        }
+    let mut command = Command::new(java_path);
+    command
+        .args(args)
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped());
+    if let Some(dir) = working_dir {
+        command.current_dir(dir);
     }
 
-    let java_major = crate::minecraft::java::detect_java_version(java_path).unwrap_or(8);
-    let classpath = format!(
-        "{}{}{}",
-        injector_path,
-        classpath_separator(),
-        installer_path
-    );
-
-    // 游戏目录含中文或空格时用 wrapper 绕开路径问题
-    let use_wrapper = mc_dir.chars().any(|c| !c.is_ascii() || c == ' ');
-    let tmp_dir = Path::new(mc_dir)
-        .parent()
-        .unwrap_or(Path::new(mc_dir))
-        .to_string_lossy()
-        .to_string();
-
-    let args = build_installer_args(
-        java_major,
-        &classpath,
-        wrapper_path,
-        mc_dir,
-        &tmp_dir,
-        use_wrapper,
-    );
-
-    log_info!(
-        "[{}] Starting installer: {} {}",
-        loader_name,
-        java_path,
-        args.join(" ")
-    );
-
-    let mut child = Command::new(java_path)
-        .args(&args)
-        .stdout(Stdio::piped())
-        .stderr(Stdio::piped())
+    let mut child = command
         .spawn()
         .map_err(|e| anyhow::anyhow!("无法启动 Java 安装器（{}）：{}", java_path, e))?;
 
@@ -278,57 +240,45 @@ pub fn run_forge_installer(
         .ok_or_else(|| anyhow::anyhow!("无法读取安装器错误输出"))?;
 
     let sink: Arc<Mutex<Vec<String>>> = Arc::new(Mutex::new(Vec::new()));
-    // stdout 上的进度行转发给调用方，stderr 只做收集
-    let progress_handler: Option<LineHandler> = progress_callback.map(|callback| {
-        let handler = move |line: &str| {
-            if let Some(progress) = parse_progress_line(line) {
-                callback(ForgeInstallProgress {
-                    stage: line.to_string(),
-                    progress,
-                });
+    let progress_handler: Option<LineHandler> = progress.map(|handler| {
+        let boxed: LineHandler = Box::new(move |line: &str| {
+            if let Some(value) = parse_progress_line(line) {
+                handler(value);
             }
-        };
-        Box::new(handler) as Box<dyn Fn(&str) + Send>
+        });
+        boxed
     });
+
     let stdout_handle = spawn_output_reader(stdout, Arc::clone(&sink), "stdout", progress_handler);
     let stderr_handle = spawn_output_reader(stderr, Arc::clone(&sink), "stderr", None);
 
     let status = wait_with_timeout(&mut child, INSTALLER_TIMEOUT_SECS);
 
-    // 进程退出后管道会关闭，读取线程随即结束
     let _ = stdout_handle.join();
     let _ = stderr_handle.join();
 
     let lines: Vec<String> = sink.lock().map(|guard| guard.clone()).unwrap_or_default();
-    let log_path = write_installer_log(loader_name, java_path, &args, &lines);
+    let log_path = write_installer_log(log_tag, java_path, args, &lines);
 
     let status = status?;
 
-    // 成功判定：退出码为 0，或输出里出现了安装器的成功标记
     let has_success_marker = lines.iter().rev().take(20).any(|l| l.trim() == "true");
     if status.success() {
         if !has_success_marker {
-            log_warn!(
-                "[{}] 安装器退出码为 0 但未输出成功标记，按成功处理",
-                loader_name
-            );
+            log_info!("[{}] 安装器退出码为 0", log_tag);
         }
-        log_info!("[{}] Installation successful", loader_name);
         return Ok(());
     }
     if has_success_marker {
-        log_warn!(
-            "[{}] 安装器退出码异常但输出了成功标记，按成功处理",
-            loader_name
-        );
+        log_warn!("[{}] 安装器退出码异常但输出了成功标记，按成功处理", log_tag);
         return Ok(());
     }
 
-    // 失败：把可读的原因拼进错误信息，别让用户只看到空数组
-    log_error!("[{}] Installation failed. Full output:", loader_name);
-    for (i, line) in lines.iter().enumerate() {
-        log_error!("[{}]   {}: {}", loader_name, i, line);
+    log_error!("[{}] Installation failed. Full output:", log_tag);
+    for (index, line) in lines.iter().enumerate() {
+        log_error!("[{}]   {}: {}", log_tag, index, line);
     }
+
     let exit_code = status
         .code()
         .map(|code| code.to_string())
@@ -347,7 +297,6 @@ pub fn run_forge_installer(
             tail.join(" | ")
         )
     };
-    // 镜像链路重定向过多是常见失败原因，补一句可操作的提示
     if lines
         .iter()
         .any(|line| line.contains("Invalid number of redirects"))
@@ -361,6 +310,100 @@ pub fn run_forge_installer(
     Err(anyhow::anyhow!(message))
 }
 
+/// 用官方 installer.jar 安装（首选路径）
+///
+/// 走 Forge 官方 maven，不经过镜像改写，重定向链最短；进度直接来自安装器输出。
+pub fn run_official_installer(
+    java_path: &str,
+    installer_path: &str,
+    mc_dir: &str,
+    on_progress: Option<ProgressHandler>,
+) -> anyhow::Result<()> {
+    if !Path::new(installer_path).exists() {
+        return Err(anyhow::anyhow!(
+            "官方安装器文件缺失: {}，请重试安装（若反复失败请检查下载源）",
+            installer_path
+        ));
+    }
+
+    let args = build_official_args(installer_path);
+    log_info!(
+        "[Official] Starting installer: {} {} (cwd={})",
+        java_path,
+        args.join(" "),
+        mc_dir
+    );
+
+    run_installer_process(
+        java_path,
+        &args,
+        Some(Path::new(mc_dir)),
+        "official",
+        on_progress,
+    )
+}
+
+/// 用注入器安装（镜像加速路径）
+pub fn run_forge_installer(
+    java_path: &str,
+    installer_path: &str,
+    injector_path: &str,
+    wrapper_path: &str,
+    mc_dir: &str,
+    is_neoforge: bool,
+    on_progress: Option<ProgressHandler>,
+) -> anyhow::Result<()> {
+    let loader_name = if is_neoforge { "NeoForge" } else { "Forge" };
+
+    for (label, path) in [("官方安装器", installer_path), ("注入器", injector_path)] {
+        if !Path::new(path).exists() {
+            return Err(anyhow::anyhow!(
+                "{} 文件缺失: {}，请重试安装（若反复失败请检查下载源）",
+                label,
+                path
+            ));
+        }
+    }
+
+    let java_major = crate::minecraft::java::detect_java_version(java_path).unwrap_or(8);
+    let classpath = format!(
+        "{}{}{}",
+        injector_path,
+        classpath_separator(),
+        installer_path
+    );
+
+    let use_wrapper = mc_dir.chars().any(|c| !c.is_ascii() || c == ' ');
+    let tmp_dir = Path::new(mc_dir)
+        .parent()
+        .unwrap_or(Path::new(mc_dir))
+        .to_string_lossy()
+        .to_string();
+
+    let args = build_installer_args(
+        java_major,
+        &classpath,
+        wrapper_path,
+        mc_dir,
+        &tmp_dir,
+        use_wrapper,
+    );
+
+    log_info!(
+        "[{}] Starting injector: {} {}",
+        loader_name,
+        java_path,
+        args.join(" ")
+    );
+
+    run_installer_process(
+        java_path,
+        &args,
+        None,
+        &loader_name.to_lowercase(),
+        on_progress,
+    )
+}
 /// 解析进度行
 fn parse_progress_line(line: &str) -> Option<f64> {
     match line.trim() {

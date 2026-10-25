@@ -6,11 +6,12 @@
 
 ### 修复
 
-#### 安装 Forge / NeoForge 时报「Invalid number of redirects」
+#### Forge / NeoForge 安装改走官方安装器，并恢复安装进度
 
-- [`shared.rs`](src-tauri/src/minecraft/loaders/shared.rs)：新增 `prefetch_install_libraries`，解析 `install_profile.json` 中声明了下载地址的库，用启动器自己的下载器（跟随重定向、支持多源与重试）预取到 `libraries/`；只处理主 artifact、不猜地址、不碰安装器生成物，上限 400 个，单个失败不阻断。
-- [`install.rs`](src-tauri/src/minecraft/loaders/forge/install.rs) / [`neoforge.rs`](src-tauri/src/minecraft/loaders/neoforge.rs)：安装器失败后自动预取库并重试一次，成功路径完全不经过这段逻辑；重试仍失败时把两次错误都写进提示，预取本身失败则原样返回首次错误。
-- [`forge_installer.rs`](src-tauri/src/minecraft/loaders/forge_installer.rs)：失败信息中识别到重定向超限时补一句可操作提示（切换下载源后重试）。
+- [`forge_installer.rs`](src-tauri/src/minecraft/loaders/forge_installer.rs)：新增 `run_official_installer`，用 `java -jar <installer> --installClient`（工作目录设为游戏目录）走官方 maven 安装，不再被注入器强制改写到镜像；注入器保留为兜底。两条路径共用同一套输出采集（GBK 回退解码、stdout/stderr 合并、15 分钟超时强杀、日志落盘）。
+- [`install.rs`](src-tauri/src/minecraft/loaders/forge/install.rs) / [`neoforge.rs`](src-tauri/src/minecraft/loaders/neoforge.rs)：安装顺序改为「先官方安装器，失败再用注入器」，两个错误都写进提示；注入器资源改为只在兜底时解压。
+- [`loader_helpers.rs`](src-tauri/src/commands/version/install/loader_helpers.rs)：把安装器输出的真实进度写入阶段进度并广播，伪进度 ticker 改为「只补不覆盖」，不再出现一直 0% 然后直接跳 100%。
+- 移除上一版引入的库预取兜底（改走官方安装器后不再需要）。
 
 ## [0.3.12-rc.6] - 2026-10-25
 
