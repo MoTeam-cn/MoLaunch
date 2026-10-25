@@ -1,196 +1,234 @@
-//! 递归下降 JSON 解析器（按首字节分派）
+//! 保序 JSON 解析器（规格 §2 语言源识别）
+//!
+//! 按首字节分派：对象 / 数组 / 字符串 / 数字 / 字面量。
+//! 全部读取走带边界检查的 `Reader`，非法输入返回中文错误，不 panic。
 
 use super::value::JsonValue;
 
-/// 递归下降解析器（按首字节分派）
-pub(super) struct Parser<'a> {
-    pub(super) bytes: &'a [u8],
-    pub(super) pos: usize,
+/// 解析完整文档，拒绝尾随内容
+pub(super) fn parse_document(input: &str) -> Result<JsonValue, String> {
+    let mut reader = Reader::new(input);
+    let value = reader.value()?;
+    reader.skip_whitespace();
+    if !reader.at_end() {
+        return Err("JSON 文档存在尾随内容".to_string());
+    }
+    Ok(value)
 }
 
-impl<'a> Parser<'a> {
-    pub(super) fn skip_ws(&mut self) {
-        while matches!(self.bytes.get(self.pos), Some(b' ' | b'\t' | b'\n' | b'\r')) {
-            self.pos += 1;
+/// 字节游标
+struct Reader<'a> {
+    bytes: &'a [u8],
+    pos: usize,
+}
+
+impl<'a> Reader<'a> {
+    fn new(input: &'a str) -> Self {
+        Self {
+            bytes: input.as_bytes(),
+            pos: 0,
         }
+    }
+
+    fn at_end(&self) -> bool {
+        self.pos >= self.bytes.len()
     }
 
     fn peek(&self) -> Option<u8> {
         self.bytes.get(self.pos).copied()
     }
 
-    pub(super) fn parse_value(&mut self) -> Result<JsonValue, String> {
-        self.skip_ws();
+    fn next_byte(&mut self) -> Option<u8> {
+        let byte = self.peek()?;
+        self.pos += 1;
+        Some(byte)
+    }
+
+    fn skip_whitespace(&mut self) {
+        while matches!(self.peek(), Some(b' ' | b'\t' | b'\n' | b'\r')) {
+            self.pos += 1;
+        }
+    }
+
+    fn expect_byte(&mut self, expected: u8) -> Result<(), String> {
+        if self.next_byte() == Some(expected) {
+            return Ok(());
+        }
+        Err(format!("JSON 期望字符 {}", expected as char))
+    }
+
+    fn value(&mut self) -> Result<JsonValue, String> {
+        self.skip_whitespace();
         match self.peek() {
-            Some(b'{') => self.parse_object(),
-            Some(b'[') => self.parse_array(),
-            Some(b'"') => Ok(JsonValue::String(self.parse_string()?)),
+            Some(b'{') => self.object(),
+            Some(b'[') => self.array(),
+            Some(b'"') => Ok(JsonValue::String(self.string()?)),
             Some(b't') => self.literal("true", JsonValue::Bool(true)),
             Some(b'f') => self.literal("false", JsonValue::Bool(false)),
             Some(b'n') => self.literal("null", JsonValue::Null),
-            Some(_) => self.parse_number(),
+            Some(_) => self.number(),
             None => Err("JSON 文档意外结束".to_string()),
         }
     }
 
     fn literal(&mut self, text: &str, value: JsonValue) -> Result<JsonValue, String> {
-        self.expect(text)?;
+        if !self.bytes[self.pos..].starts_with(text.as_bytes()) {
+            return Err(format!("JSON 期望字面量 {text}"));
+        }
+        self.pos += text.len();
         Ok(value)
     }
 
-    fn parse_object(&mut self) -> Result<JsonValue, String> {
-        self.pos += 1;
-        let mut entries = Vec::new();
+    fn object(&mut self) -> Result<JsonValue, String> {
+        self.expect_byte(b'{')?;
+        let mut entries: Vec<(String, JsonValue)> = Vec::new();
+        self.skip_whitespace();
         if self.peek() == Some(b'}') {
             self.pos += 1;
             return Ok(JsonValue::Object(entries));
         }
         loop {
-            self.skip_ws();
+            self.skip_whitespace();
             if self.peek() != Some(b'"') {
                 return Err("JSON 对象键必须是字符串".to_string());
             }
-            let key = self.parse_string()?;
-            self.skip_ws();
-            if self.peek() != Some(b':') {
-                return Err("JSON 对象键缺少冒号".to_string());
-            }
-            self.pos += 1;
-            entries.push((key, self.parse_value()?));
-            self.skip_ws();
-            match self.peek() {
-                Some(b',') => self.pos += 1,
-                Some(b'}') => {
-                    self.pos += 1;
-                    return Ok(JsonValue::Object(entries));
-                }
+            let key = self.string()?;
+            self.skip_whitespace();
+            self.expect_byte(b':')?;
+            let value = self.value()?;
+            entries.push((key, value));
+            self.skip_whitespace();
+            match self.next_byte() {
+                Some(b',') => continue,
+                Some(b'}') => return Ok(JsonValue::Object(entries)),
                 _ => return Err("JSON 对象缺少右花括号".to_string()),
             }
         }
     }
 
-    fn parse_array(&mut self) -> Result<JsonValue, String> {
-        self.pos += 1;
-        let mut items = Vec::new();
+    fn array(&mut self) -> Result<JsonValue, String> {
+        self.expect_byte(b'[')?;
+        let mut items: Vec<JsonValue> = Vec::new();
+        self.skip_whitespace();
         if self.peek() == Some(b']') {
             self.pos += 1;
             return Ok(JsonValue::Array(items));
         }
         loop {
-            items.push(self.parse_value()?);
-            self.skip_ws();
-            match self.peek() {
-                Some(b',') => self.pos += 1,
-                Some(b']') => {
-                    self.pos += 1;
-                    return Ok(JsonValue::Array(items));
-                }
+            items.push(self.value()?);
+            self.skip_whitespace();
+            match self.next_byte() {
+                Some(b',') => continue,
+                Some(b']') => return Ok(JsonValue::Array(items)),
                 _ => return Err("JSON 数组缺少右方括号".to_string()),
             }
         }
     }
 
-    fn parse_string(&mut self) -> Result<String, String> {
-        self.pos += 1;
+    fn string(&mut self) -> Result<String, String> {
+        self.expect_byte(b'"')?;
         let mut out = String::new();
         loop {
-            let Some(byte) = self.bytes.get(self.pos).copied() else {
-                return Err("JSON 字符串未闭合".to_string());
-            };
-            self.pos += 1;
+            let byte = self
+                .next_byte()
+                .ok_or_else(|| "JSON 字符串未闭合".to_string())?;
             match byte {
                 b'"' => return Ok(out),
-                b'\\' => {
-                    let esc = self
-                        .bytes
-                        .get(self.pos)
-                        .copied()
-                        .ok_or("JSON 转义序列未闭合")?;
-                    self.pos += 1;
-                    match esc {
-                        b'"' => out.push('"'),
-                        b'\\' => out.push('\\'),
-                        b'/' => out.push('/'),
-                        b'b' => out.push('\u{0008}'),
-                        b'f' => out.push('\u{000c}'),
-                        b'n' => out.push('\n'),
-                        b'r' => out.push('\r'),
-                        b't' => out.push('\t'),
-                        b'u' => {
-                            let Some(hex) = self.bytes.get(self.pos..self.pos + 4) else {
-                                return Err("JSON \\u 转义被截断".to_string());
-                            };
-                            let code = u16::from_str_radix(std::str::from_utf8(hex).unwrap(), 16)
-                                .unwrap_or(0xfffd);
-                            self.pos += 4;
-                            // 代理对：高代理（0xD800-0xDBFF）后紧跟 \u 低代理（0xDC00-0xDFFF）时合并
-                            if (0xD800..=0xDBFF).contains(&code) {
-                                let next = self.bytes.get(self.pos..self.pos + 6);
-                                let low = next
-                                    .filter(|n| n.starts_with(b"\\u"))
-                                    .and_then(|n| {
-                                        u16::from_str_radix(
-                                            std::str::from_utf8(&n[2..6]).unwrap_or(""),
-                                            16,
-                                        )
-                                        .ok()
-                                    })
-                                    .filter(|n| (0xDC00..=0xDFFF).contains(n));
-                                if let Some(low) = low {
-                                    let combined = 0x10000
-                                        + ((code as u32 - 0xD800) << 10)
-                                        + (low as u32 - 0xDC00);
-                                    out.push(char::from_u32(combined).unwrap_or('\u{fffd}'));
-                                    self.pos += 6;
-                                    continue;
-                                }
-                                out.push('\u{fffd}');
-                            } else {
-                                out.push(char::from_u32(code as u32).unwrap_or('\u{fffd}'));
-                            }
-                        }
-                        _ => return Err(format!("JSON 未知转义: \\{}", esc as char)),
-                    }
-                }
-                byte if byte < 0x20 => return Err("JSON 字符串包含控制字符".to_string()),
+                b'\\' => self.escape(&mut out)?,
+                0x00..=0x1f => return Err("JSON 字符串包含控制字符".to_string()),
+                0x20..=0x7f => out.push(byte as char),
                 _ => {
-                    let ch = std::str::from_utf8(&self.bytes[self.pos - 1..])
-                        .unwrap()
+                    // 多字节字符：回退后按字符边界读取
+                    self.pos -= 1;
+                    let rest = std::str::from_utf8(&self.bytes[self.pos..])
+                        .map_err(|_| "JSON 字符串不是合法 UTF-8".to_string())?;
+                    let ch = rest
                         .chars()
                         .next()
-                        .unwrap();
+                        .ok_or_else(|| "JSON 字符串未闭合".to_string())?;
                     out.push(ch);
-                    self.pos += ch.len_utf8() - 1;
+                    self.pos += ch.len_utf8();
                 }
             }
         }
     }
 
-    fn parse_number(&mut self) -> Result<JsonValue, String> {
+    fn escape(&mut self, out: &mut String) -> Result<(), String> {
+        let marker = self
+            .next_byte()
+            .ok_or_else(|| "JSON 转义序列未闭合".to_string())?;
+        match marker {
+            b'"' => out.push('"'),
+            b'\\' => out.push('\\'),
+            b'/' => out.push('/'),
+            b'b' => out.push('\u{0008}'),
+            b'f' => out.push('\u{000c}'),
+            b'n' => out.push('\n'),
+            b'r' => out.push('\r'),
+            b't' => out.push('\t'),
+            b'u' => {
+                let high = self.hex4()?;
+                match surrogate_pair(high, self.peek_low_surrogate()) {
+                    Some((ch, skip)) => {
+                        out.push(ch);
+                        self.pos += skip;
+                    }
+                    None => out.push(char::from_u32(high as u32).unwrap_or('\u{fffd}')),
+                }
+            }
+            other => return Err(format!("JSON 未知转义: \\{}", other as char)),
+        }
+        Ok(())
+    }
+
+    /// 读 4 位十六进制
+    fn hex4(&mut self) -> Result<u16, String> {
+        let slice = self
+            .bytes
+            .get(self.pos..self.pos + 4)
+            .ok_or_else(|| "JSON \\u 转义被截断".to_string())?;
+        let text = std::str::from_utf8(slice).map_err(|_| "JSON \\u 转义非法".to_string())?;
+        let code = u16::from_str_radix(text, 16).map_err(|_| "JSON \\u 转义非法".to_string())?;
+        self.pos += 4;
+        Ok(code)
+    }
+
+    /// 紧随其后的低代理项（`\\uDC00` ~ `\\uDFFF`）偏移
+    fn peek_low_surrogate(&self) -> Option<u16> {
+        let slice = self.bytes.get(self.pos..self.pos + 6)?;
+        if !slice.starts_with(b"\\u") {
+            return None;
+        }
+        let text = std::str::from_utf8(&slice[2..6]).ok()?;
+        let code = u16::from_str_radix(text, 16).ok()?;
+        (0xDC00..=0xDFFF).contains(&code).then_some(code)
+    }
+
+    fn number(&mut self) -> Result<JsonValue, String> {
         let start = self.pos;
-        while self.pos < self.bytes.len()
-            && matches!(
-                self.bytes[self.pos],
-                b'0'..=b'9' | b'-' | b'+' | b'.' | b'e' | b'E'
-            )
-        {
+        while matches!(
+            self.peek(),
+            Some(b'0'..=b'9' | b'-' | b'+' | b'.' | b'e' | b'E')
+        ) {
             self.pos += 1;
         }
         if self.pos == start {
             return Err("JSON 包含非法 token".to_string());
         }
-        std::str::from_utf8(&self.bytes[start..self.pos])
-            .ok()
-            .and_then(|s| s.parse::<f64>().ok())
+        let text = std::str::from_utf8(&self.bytes[start..self.pos])
+            .map_err(|_| "JSON 数字非法".to_string())?;
+        text.parse::<f64>()
             .map(JsonValue::Number)
-            .ok_or_else(|| "JSON 数字非法".to_string())
+            .map_err(|_| "JSON 数字非法".to_string())
     }
+}
 
-    fn expect(&mut self, literal: &str) -> Result<(), String> {
-        if !self.bytes[self.pos..].starts_with(literal.as_bytes()) {
-            return Err(format!("JSON 期望字面量 {literal}"));
-        }
-        self.pos += literal.len();
-        Ok(())
+/// 高代理 + 低代理 → 合并字符（返回合并结果与需跳过的字节数）
+fn surrogate_pair(high: u16, low: Option<u16>) -> Option<(char, usize)> {
+    if !(0xD800..=0xDBFF).contains(&high) {
+        return None;
     }
+    let low = low?;
+    let combined = 0x10000 + ((high as u32 - 0xD800) << 10) + (low as u32 - 0xDC00);
+    char::from_u32(combined).map(|ch| (ch, 6))
 }

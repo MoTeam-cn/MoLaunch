@@ -1,65 +1,88 @@
-//! 语言文件读写单元测试（经 lang.rs 的 #[path] 子模块引入）
+//! 语言文件读写测试（规格 §2）
 
 use std::collections::BTreeMap;
 
-use super::*;
+use super::free_text::{align_free_text, render_localized_text, snapshot_free_text};
+use super::json::{read_json_lang, write_json_lang};
+use super::keyvalue::{parse_keyvalue, write_keyvalue};
+use super::structured::{apply_structured_strings, collect_structured_strings};
 
 #[test]
-fn structured_json_keeps_key_order_and_scalars() {
-    let original = "{\"z\": \"Hello\", \"a\": {\"n\": 10, \"b\": true, \"title\": \"Hi\"}}";
-    let translations = BTreeMap::from([
-        ("/z".to_string(), "你好".to_string()),
-        ("/a/title".to_string(), "标题".to_string()),
-    ]);
-    let out = apply_structured_strings(original, &translations).unwrap();
-    assert!(
-        out.find("\"z\"").unwrap() < out.find("\"a\"").unwrap(),
-        "{out}"
-    );
-    assert!(
-        out.contains("\"n\": 10") && out.contains("\"b\": true"),
-        "{out}"
-    );
-    assert!(out.contains("\"z\": \"你好\"") && out.contains("\"title\": \"标题\""));
+fn test_json_lang_flattens_nested_strings() {
+    let content = r#"{"a":"one","nested":{"b":"two","num":3},"arr":["x"]}"#;
+    let entries = read_json_lang(content).expect("read");
+    assert_eq!(entries.get("a").map(String::as_str), Some("one"));
+    assert_eq!(entries.get("nested.b").map(String::as_str), Some("two"));
+    assert!(!entries.contains_key("nested.num"));
+    assert!(!entries.contains_key("arr"));
 }
 
 #[test]
-fn free_text_snapshot_round_trips_bom_eol() {
+fn test_json_lang_write_keeps_untouched_fields() {
+    let content = r#"{"a":"one","nested":{"b":"two","num":3}}"#;
+    let mut translations = BTreeMap::new();
+    translations.insert("nested.b".to_string(), "二".to_string());
+    let output = write_json_lang(content, &translations).expect("write");
+    let reparsed = read_json_lang(&output).expect("reparse");
+    assert_eq!(reparsed.get("nested.b").map(String::as_str), Some("二"));
+    assert_eq!(reparsed.get("a").map(String::as_str), Some("one"));
+    assert!(output.contains("\"num\": 3"));
+}
+
+#[test]
+fn test_structured_strings_use_json_pointer_and_escape_keys() {
+    let content = r#"{"a/b":{"c~d":"text"}}"#;
+    let entries = collect_structured_strings(content).expect("collect");
+    assert_eq!(entries.get("/a~1b/c~0d").map(String::as_str), Some("text"));
+
+    let mut translations = BTreeMap::new();
+    translations.insert("/a~1b/c~0d".to_string(), "中文".to_string());
+    let output = apply_structured_strings(content, &translations).expect("apply");
+    assert!(output.contains("\"中文\""));
+}
+
+#[test]
+fn test_keyvalue_parsing_skips_comments_and_handles_escaped_separator() {
+    let content = "# comment\n\nkey=value\n  other :  spaced \npath\\=key=1\n";
+    let (entries, lines) = parse_keyvalue(content);
+    assert_eq!(lines.len(), 5);
+    let keys: Vec<&str> = entries.iter().map(|(key, _)| key.as_str()).collect();
+    assert_eq!(keys, vec!["key", "other"]);
+    assert_eq!(entries[1].1, "spaced");
+}
+
+#[test]
+fn test_keyvalue_write_preserves_layout() {
+    let content = "# keep me\n  greeting=hello\nplain=value";
+    let (_, lines) = parse_keyvalue(content);
+    let mut translations = BTreeMap::new();
+    translations.insert("greeting".to_string(), "你好".to_string());
+    let output = write_keyvalue(&lines, &translations);
+    assert!(output.contains("# keep me"));
+    assert!(output.contains("  greeting=你好"));
+    assert!(output.contains("plain=value"));
+}
+
+#[test]
+fn test_free_text_snapshot_detects_bom_and_crlf() {
     let content = "\u{feff}line1\r\nline2\r\n";
-    let snap = snapshot_free_text(content);
-    assert!(snap.has_bom);
-    assert_eq!(snap.eol, "\r\n");
-    assert!(snap.trailing_newline);
-    assert_eq!(snap.source_lines, vec!["line1", "line2"]);
-    assert_eq!(render_localized_text(&snap), content);
+    let snapshot = snapshot_free_text(content);
+    assert!(snapshot.has_bom);
+    assert_eq!(snapshot.eol, "\r\n");
+    assert!(snapshot.trailing_newline);
+    assert_eq!(snapshot.source_lines, vec!["line1", "line2"]);
+    assert_eq!(render_localized_text(&snapshot), content);
 }
 
 #[test]
-fn render_localized_text_falls_back_to_source() {
-    let mut snap = snapshot_free_text("a\nb\nc\n");
-    snap.target_lines = vec!["甲".to_string(), String::new()];
-    assert_eq!(render_localized_text(&snap), "甲\nb\nc\n");
-}
-
-#[test]
-fn read_localized_target_maps_lines_to_keys() {
-    let dir = std::env::temp_dir();
-    let target = dir.join("mo_launch_test_zh_cn.txt");
-    std::fs::write(&target, "\u{feff}甲\n\n乙\n").unwrap();
-    let map = read_localized_target(&dir, &target);
-    std::fs::remove_file(&target).ok();
-    assert_eq!(map.get("/lines/000000").map(String::as_str), Some("甲"));
-    assert_eq!(map.get("/lines/000002").map(String::as_str), Some("乙"));
-    assert!(!map.contains_key("/lines/000001"));
-}
-
-#[test]
-fn parse_keyvalue_handles_escaped_separators() {
-    let content = "a=1\nb:two\nc\\=x=3\nd\\:y=4\n";
-    let (kv, _) = parse_keyvalue(content);
-    let map: BTreeMap<String, String> = kv.into_iter().collect();
-    assert_eq!(map.get("a").map(String::as_str), Some("1"));
-    assert_eq!(map.get("b").map(String::as_str), Some("two"));
-    assert_eq!(map.get("c\\=x").map(String::as_str), Some("3"));
-    assert_eq!(map.get("d\\:y").map(String::as_str), Some("4"));
+fn test_free_text_align_only_replaces_translated_lines() {
+    let lines = vec!["first".to_string(), "".to_string(), "third".to_string()];
+    let mut translations = BTreeMap::new();
+    translations.insert("/lines/000000".to_string(), "第一".to_string());
+    translations.insert("/lines/000001".to_string(), "不该写入".to_string());
+    translations.insert("/lines/000002".to_string(), "  ".to_string());
+    let aligned = align_free_text(&lines, &translations);
+    assert_eq!(aligned[0], "第一");
+    assert_eq!(aligned[1], "");
+    assert_eq!(aligned[2], "third");
 }

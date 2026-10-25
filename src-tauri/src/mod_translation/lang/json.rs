@@ -1,67 +1,67 @@
-//! 标准 JSON 语言文件读写（扁平映射，保留原结构）
+//! 标准 JSON 语言文件读写（规格 §2）
+//!
+//! 读取时把嵌套对象摊平成 `点分路径 → 字符串`，写回时按同样路径回填，
+//! 数字/布尔/数组等非字符串叶子保持原样。
 
 use std::collections::BTreeMap;
 
 use serde_json::Value;
 
-/// 读取标准 JSON 语言文件为扁平映射（仅字符串值可译；其余原样保留）
+/// 拼接点分路径
+fn join(prefix: &str, key: &str) -> String {
+    if prefix.is_empty() {
+        key.to_string()
+    } else {
+        format!("{prefix}.{key}")
+    }
+}
+
+/// 读取：仅收集字符串叶子
 pub fn read_json_lang(content: &str) -> Result<BTreeMap<String, String>, String> {
     let value: Value =
         serde_json::from_str(content).map_err(|e| format!("invalid JSON language file: {e}"))?;
-    let mut map = BTreeMap::new();
-    collect_flat_strings(&value, "", &mut map);
-    Ok(map)
+    let mut entries = BTreeMap::new();
+    collect(&value, "", &mut entries);
+    Ok(entries)
 }
 
-fn collect_flat_strings(value: &Value, prefix: &str, out: &mut BTreeMap<String, String>) {
+fn collect(value: &Value, prefix: &str, out: &mut BTreeMap<String, String>) {
     match value {
-        Value::Object(obj) => {
-            for (key, v) in obj {
-                let path = if prefix.is_empty() {
-                    key.clone()
-                } else {
-                    format!("{prefix}.{key}")
-                };
-                collect_flat_strings(v, &path, out);
+        Value::Object(map) => {
+            for (key, child) in map {
+                collect(child, &join(prefix, key), out);
             }
         }
-        Value::String(s) => {
-            out.insert(prefix.to_string(), s.clone());
+        Value::String(text) => {
+            out.insert(prefix.to_string(), text.clone());
         }
         _ => {}
     }
 }
 
-/// 写回标准 JSON 语言文件：保留原结构，仅替换已翻译的字符串叶子
+/// 写回：只替换命中路径的字符串叶子
 pub fn write_json_lang(
     original: &str,
     translations: &BTreeMap<String, String>,
 ) -> Result<String, String> {
     let mut value: Value =
         serde_json::from_str(original).map_err(|e| format!("invalid JSON language file: {e}"))?;
-    apply_flat_translations(&mut value, "", translations);
+    apply(&mut value, "", translations);
     serde_json::to_string_pretty(&value).map_err(|e| format!("serialize zh_cn.json failed: {e}"))
 }
 
-fn apply_flat_translations(
-    value: &mut Value,
-    prefix: &str,
-    translations: &BTreeMap<String, String>,
-) {
-    if let Value::Object(obj) = value {
-        for (key, v) in obj.iter_mut() {
-            let path = if prefix.is_empty() {
-                key.clone()
-            } else {
-                format!("{prefix}.{key}")
-            };
-            if let Some(t) = translations.get(&path) {
-                if let Value::String(s) = v {
-                    *s = t.clone();
-                    continue;
-                }
+fn apply(value: &mut Value, prefix: &str, translations: &BTreeMap<String, String>) {
+    let Value::Object(map) = value else {
+        return;
+    };
+    for (key, child) in map.iter_mut() {
+        let path = join(prefix, key);
+        if let Value::String(text) = child {
+            if let Some(translated) = translations.get(&path) {
+                *text = translated.clone();
+                continue;
             }
-            apply_flat_translations(v, &path, translations);
         }
+        apply(child, &path, translations);
     }
 }

@@ -1,83 +1,84 @@
-//! key-value 语言文件解析与写回（.lang / .properties）
+//! key-value 语言文件解析与写回（.lang / .properties，规格 §2）
+//!
+//! 分隔符取第一个未被反斜杠转义的 `=` 或 `:`；写回时保留缩进、分隔符与
+//! 注释/空行，只替换命中键的值。
 
 use std::collections::BTreeMap;
 
-/// 解析 key-value 语言文件（.lang / .properties），保留注释与空白行供写回
-pub fn parse_keyvalue(content: &str) -> (Vec<(String, String)>, Vec<String>) {
-    // lines: 原文逐行（注释/空白/键值），kv: 可翻译键值对
-    let mut kv: Vec<(String, String)> = Vec::new();
-    for line in content.lines() {
-        let trimmed = line.trim_start();
-        if trimmed.is_empty() || trimmed.starts_with('#') || trimmed.starts_with('!') {
-            continue;
-        }
-        // 分隔符取第一个未转义的 =/:，转义分隔符（\= 或 \:）视为键的一部分
-        if let Some(sep) = find_unescaped_separator(line) {
-            let key = line[..sep].trim().to_string();
-            let value = line[sep + 1..].trim().to_string();
-            if !key.is_empty() {
-                kv.push((key, value));
-            }
-        }
-    }
-    (kv, content.lines().map(|l| l.to_string()).collect())
+/// 一行键值：缩进长度、键、分隔符、值
+struct Entry<'a> {
+    indent: usize,
+    key: &'a str,
+    separator: &'a str,
+    value: &'a str,
 }
 
-/// 查找第一个未被反斜杠转义的分隔符（= 或 :）
-fn find_unescaped_separator(line: &str) -> Option<usize> {
+/// 定位第一个未转义的分隔符
+fn separator_index(line: &str) -> Option<usize> {
     let mut escaped = false;
-    for (i, ch) in line.char_indices() {
-        if ch == '\\' {
-            escaped = !escaped;
-            continue;
+    for (index, ch) in line.char_indices() {
+        match ch {
+            '\\' => escaped = !escaped,
+            '=' | ':' if !escaped => return Some(index),
+            _ => escaped = false,
         }
-        if (ch == '=' || ch == ':') && !escaped {
-            return Some(i);
-        }
-        escaped = false;
     }
     None
 }
 
-/// 写回 key-value 语言文件：逐行替换已翻译值，保留注释/EOL 结构
+fn is_comment(line: &str) -> bool {
+    let trimmed = line.trim_start();
+    trimmed.is_empty() || trimmed.starts_with('#') || trimmed.starts_with('!')
+}
+
+fn parse_entry(line: &str) -> Option<Entry<'_>> {
+    if is_comment(line) {
+        return None;
+    }
+    let index = separator_index(line)?;
+    let indent = line.len() - line.trim_start().len();
+    let key = line[..index].trim();
+    if key.is_empty() {
+        return None;
+    }
+    let separator = &line[index..index + 1];
+    Some(Entry {
+        indent,
+        key,
+        separator,
+        value: line[index + 1..].trim(),
+    })
+}
+
+/// 解析：返回可翻译键值对与原文行（写回用）
+pub fn parse_keyvalue(content: &str) -> (Vec<(String, String)>, Vec<String>) {
+    let lines: Vec<String> = content.lines().map(str::to_string).collect();
+    let entries = lines
+        .iter()
+        .filter_map(|line| parse_entry(line))
+        .map(|entry| (entry.key.to_string(), entry.value.to_string()))
+        .collect();
+    (entries, lines)
+}
+
+/// 写回：逐行替换命中键，保留原有缩进与分隔符
 pub fn write_keyvalue(
     original_lines: &[String],
     translations: &BTreeMap<String, String>,
 ) -> String {
     let mut out = String::new();
     for line in original_lines {
-        let trimmed = line.trim_start();
-        let replaced = if trimmed.is_empty() || trimmed.starts_with('#') || trimmed.starts_with('!')
-        {
-            false
-        } else {
-            let (key, eq_pos, sep_len) = if let Some(sep) = find_unescaped_separator(line) {
-                let sep_char = line[sep..].chars().next().unwrap_or('=');
-                (line[..sep].trim(), Some(sep), sep_char.len_utf8())
-            } else {
-                (line.trim(), None, 0)
-            };
-            if let Some(eq_pos) = eq_pos {
-                if let Some(t) = translations.get(key) {
-                    // 保留原分隔符与缩进：重建为 "key=value"
-                    let indent = line.len() - line.trim_start().len();
-                    let prefix = if indent > 0 {
-                        " ".repeat(indent)
-                    } else {
-                        String::new()
-                    };
-                    let sep = line[eq_pos..eq_pos + sep_len].to_string();
-                    out.push_str(&format!("{prefix}{key}{sep}{t}"));
-                    true
-                } else {
-                    false
+        match parse_entry(line) {
+            Some(entry) => match translations.get(entry.key) {
+                Some(translated) => {
+                    out.push_str(&" ".repeat(entry.indent));
+                    out.push_str(entry.key);
+                    out.push_str(entry.separator);
+                    out.push_str(translated);
                 }
-            } else {
-                false
-            }
-        };
-        if !replaced {
-            out.push_str(line);
+                None => out.push_str(line),
+            },
+            None => out.push_str(line),
         }
         out.push('\n');
     }

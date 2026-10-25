@@ -6,6 +6,14 @@
 
 ### 重构
 
+#### 模组翻译：保序 JSON 与语言文件读写按规格重新实现
+
+- **保序 JSON**（[`json_value/`](src-tauri/src/mod_translation/json_value)）：解析拆成 `parser`（带边界检查的 `Reader` + 代理对合并）、渲染拆成 `writer`（缩进与转义），`JsonValue` 只保留解析/指针写入/渲染三个入口。
+- **语言文件**（[`lang/`](src-tauri/src/mod_translation/lang)）：`json` 与 `structured` 共用「路径拼接 + 递归收集/回填」结构；`keyvalue` 改为 `Entry` 借用视图，写回保留缩进与分隔符；`free_text` 按 BOM/CRLF/尾换行还原布局。
+- **测试**（[`json_value_test.rs`](src-tauri/src/mod_translation/json_value_test.rs)、[`lang_test.rs`](src-tauri/src/mod_translation/lang_test.rs)）：覆盖键序保持、渲染往返、整数写法、转义与代理对、尾随内容拒绝、Pointer 写入、语言文件摊平/回填、注释与缩进保留、自由文本布局还原。
+
+### 重构
+
 #### 模组翻译：JAR 工作区与 class 处理按净室规格重新实现
 
 - **工作区**（[`jar.rs`](src-tauri/src/mod_translation/jar.rs)）：解包上限收敛成 `Guard`（条目数 / 单条目 / 总量 / 压缩比），路径校验合并为 `safe_segments`；签名条目只记录不落盘（旧签名会让重打包后的 JAR 失效）。

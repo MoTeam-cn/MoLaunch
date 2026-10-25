@@ -1,7 +1,8 @@
-//! 模组翻译：保序 JSON 解析/渲染/指针写入（结构化资源写回用）
+//! 模组翻译：保序 JSON 解析 / 渲染 / 指针写入（结构化资源写回用）
 
 mod parser;
 mod value;
+mod writer;
 
 pub use value::JsonValue;
 

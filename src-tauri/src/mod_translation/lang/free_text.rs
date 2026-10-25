@@ -1,9 +1,12 @@
-//! 自由文本布局快照与按行对齐写回
+//! 自由文本布局快照与按行对齐写回（规格 §2）
 
 use std::collections::BTreeMap;
 use std::path::Path;
 
-/// 自由文本文件布局快照：BOM / EOL / 尾换行 / 源行 / 已有目标行
+const BOM: char = '\u{feff}';
+const LINE_KEY_PREFIX: &str = "/lines/";
+
+/// 布局快照：BOM / 换行符 / 尾换行 / 源行 / 已翻译行
 #[derive(Debug, Clone)]
 pub struct FreeTextSnapshot {
     pub has_bom: bool,
@@ -13,22 +16,20 @@ pub struct FreeTextSnapshot {
     pub target_lines: Vec<String>,
 }
 
-/// 解析自由文本：检测 BOM、EOL（优先 \r\n）、尾换行，按 EOL 分行
+/// 解析自由文本：检测 BOM、换行风格（优先 CRLF）、尾换行
 pub fn snapshot_free_text(content: &str) -> FreeTextSnapshot {
-    let body = content.strip_prefix('\u{feff}').unwrap_or(content);
-    let has_bom = body.len() != content.len();
+    let body = content.strip_prefix(BOM).unwrap_or(content);
     let eol = if body.contains("\r\n") { "\r\n" } else { "\n" };
-    let trailing_newline = body.ends_with("\r\n") || body.ends_with('\n');
+    let trailing_newline = body.ends_with('\n');
     let mut source_lines: Vec<String> = body
-        .split("\r\n")
-        .flat_map(|part| part.split('\n'))
-        .map(str::to_string)
+        .split('\n')
+        .map(|line| line.strip_suffix('\r').unwrap_or(line).to_string())
         .collect();
     if trailing_newline {
         source_lines.pop();
     }
     FreeTextSnapshot {
-        has_bom,
+        has_bom: body.len() != content.len(),
         eol: eol.to_string(),
         trailing_newline,
         source_lines,
@@ -36,69 +37,72 @@ pub fn snapshot_free_text(content: &str) -> FreeTextSnapshot {
     }
 }
 
-/// 按布局重建文本：target_lines 为基底，空（未翻译）行回退 source_lines
+/// 按布局重建文本：已翻译行优先，空行回退原文
 pub fn render_localized_text(snapshot: &FreeTextSnapshot) -> String {
     let mut out = String::new();
     if snapshot.has_bom {
-        out.push('\u{feff}');
+        out.push(BOM);
     }
-    let count = snapshot.source_lines.len().max(snapshot.target_lines.len());
-    for i in 0..count {
-        if i > 0 {
+    let total = snapshot.source_lines.len().max(snapshot.target_lines.len());
+    for index in 0..total {
+        if index > 0 {
             out.push_str(&snapshot.eol);
         }
-        let text = snapshot
+        let translated = snapshot
             .target_lines
-            .get(i)
-            .filter(|l| !l.trim().is_empty())
-            .or_else(|| snapshot.source_lines.get(i))
+            .get(index)
+            .filter(|line| !line.trim().is_empty());
+        let text = translated
+            .or_else(|| snapshot.source_lines.get(index))
             .map(String::as_str)
             .unwrap_or("");
         out.push_str(text);
     }
-    if snapshot.trailing_newline && count > 0 {
+    if snapshot.trailing_newline && total > 0 {
         out.push_str(&snapshot.eol);
     }
     out
 }
 
-/// 行号 -> /lines/000000 形式键
 fn line_key(index: usize) -> String {
-    format!("/lines/{index:06}")
+    format!("{LINE_KEY_PREFIX}{index:06}")
 }
 
-/// 解析 /lines/NNNNNN 形式键（兼容纯行号字符串）
-fn parse_line_key(key: &str) -> Option<usize> {
-    key.strip_prefix("/lines/")
-        .or(Some(key))
-        .and_then(|s| s.parse::<usize>().ok())
+fn line_index(key: &str) -> Option<usize> {
+    key.strip_prefix(LINE_KEY_PREFIX)
+        .unwrap_or(key)
+        .parse::<usize>()
+        .ok()
 }
 
-/// 读取已有 zh_cn 自由文本（存在时）按行号解析为 /lines/NNNNNN 键，供断点续传合并
+/// 读取已有 zh_cn 自由文本，按行号给出 `/lines/NNNNNN` 键（续传合并用）
 pub fn read_localized_target(workspace: &Path, target_path: &Path) -> BTreeMap<String, String> {
-    let mut map = BTreeMap::new();
+    let mut entries = BTreeMap::new();
     let Ok(content) = std::fs::read_to_string(workspace.join(target_path)) else {
-        return map;
+        return entries;
     };
-    for (i, line) in snapshot_free_text(&content).source_lines.iter().enumerate() {
+    for (index, line) in snapshot_free_text(&content).source_lines.iter().enumerate() {
         if !line.trim().is_empty() {
-            map.insert(line_key(i), line.clone());
+            entries.insert(line_key(index), line.clone());
         }
     }
-    map
+    entries
 }
 
-/// 自由文本按行对齐：仅替换非空行（跳过空翻译与空源行），保持行数
+/// 按行对齐：只替换非空行，行数保持不变
 pub fn align_free_text(lines: &[String], translations: &BTreeMap<String, String>) -> Vec<String> {
-    let mut out: Vec<String> = lines.to_vec();
+    let mut out = lines.to_vec();
     for (key, text) in translations {
-        let Some(index) = parse_line_key(key) else {
+        let Some(index) = line_index(key) else {
             continue;
         };
-        if text.trim().is_empty() || index >= out.len() || out[index].trim().is_empty() {
+        let Some(slot) = out.get_mut(index) else {
+            continue;
+        };
+        if text.trim().is_empty() || slot.trim().is_empty() {
             continue;
         }
-        out[index] = text.clone();
+        *slot = text.clone();
     }
     out
 }
