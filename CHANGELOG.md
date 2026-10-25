@@ -8,9 +8,9 @@
 
 #### 配方工作台面板、渐变文字、class 常量池与 JAR 打包改为独立实现
 
-针对仓库收到的版权异议（issue #17），被指认的三处实现连同其依赖的图片资源全部重写，不再保留原实现的结构、命名与测试用例：
+针对仓库收到的版权异议（issue #17），被指认的三处**代码实现**全部重写，不再保留原实现的结构、命名与测试用例：
 
-- **配方工作台面板**（[`recipe-layouts.ts`](src/views/tools/creation/recipe-generator/recipe-layouts.ts)）：删除 `src/assets/Syn/*.png` 占位图，改为由槽位几何在运行时渲染 SVG（data URL）。3×3 网格由「原点 + 步进」算出，其余面板按盒声明；示意图与可点击热点同源，不会漂移。
+- **配方工作台面板**（[`recipe-layouts.ts`](src/views/tools/creation/recipe-generator/recipe-layouts.ts)）：槽位盒不再逐条罗列，3×3 合成网格改由「原点 + 步进」推导，其余面板按盒声明；界面截图沿用仓库既有资源（工作台界面截图不属于代码实现，且槽位盒与原图逐像素一致，已加几何回归断言）。
 - **渐变文字**（[`src/utils/gradient-text/`](src/utils/gradient-text/)）：拆成 `color`（颜色运算与阴影色）、`document`（文档模型）、`render`（字符展开）、`adapters`（19 种格式编码器按 id 注册）、`presets`（本地状态与预设）五个模块，替换原 `core`/`formats`/`storage` 三文件；19 种格式的输出语义与既有用例全部保留，另补预设解析与渐变简化用例。
 - **class 常量池与 JAR**（[`class/pool.rs`](src-tauri/src/mod_translation/class/pool.rs) / [`jar.rs`](src-tauri/src/mod_translation/jar.rs) / [`class_test.rs`](src-tauri/src/mod_translation/class_test.rs)）：常量池改用带边界检查的顺序游标 + 结构化视图（`ConstantPool`/`Utf8Entry`）；JAR 解包改为按相对路径镜像工作区、取消条目清单文件，重打包直接遍历工作区还原条目名；单元测试改用构造式 fixture 重写。
 - **验证**：`typecheck` / `lint` / `vite build` 全绿，渐变文字 12 项单测与配方面板几何断言通过（9 种配方类型、槽位不越界不重叠）；Rust 侧由 CI 编译与 `cargo test --lib` 验证。
