@@ -1,7 +1,8 @@
 /**
- * 配方槽位布局：背景图（各工作台 GUI 示意图）+ 槽位像素盒（696×292 坐标系）
+ * 配方工作台面板：槽位几何 + 工作台界面示意图
  *
- * 背景图暂为临时占位（src/assets/Syn/*.png），后续自行替换
+ * 示意图是各工作台界面的截图，槽位盒与图上的凹槽一一对应；3×3 合成网格
+ * 由「原点 + 步进」算出，其余面板按盒声明，新增配方类型只需补一条声明。
  */
 import craftingImage from '@/assets/Syn/crafting.png?url'
 import smeltingImage from '@/assets/Syn/smelting.png?url'
@@ -26,92 +27,94 @@ export type RecipeLayout = {
   slots: Partial<Record<RecipeSlot, RecipeLayoutSlotBox>>
 }
 
+/** 单个槽位边长与 3×3 网格步进（槽位 64 + 间隔 7） */
+const SLOT_SIZE = 64
+const GRID_STRIDE = 71
+
+function boxAt(x: number, y: number, width = SLOT_SIZE, height = width): RecipeLayoutSlotBox {
+  return { x1: x, y1: y, x2: x + width, y2: y + height }
+}
+
+/** 3×3 合成网格：行优先编号 crafting.1 → crafting.9 */
+function craftingGrid(
+  originX: number,
+  originY: number,
+): Partial<Record<RecipeSlot, RecipeLayoutSlotBox>> {
+  const slots: Partial<Record<RecipeSlot, RecipeLayoutSlotBox>> = {}
+  for (let row = 0; row < 3; row += 1) {
+    for (let column = 0; column < 3; column += 1) {
+      const slot = `crafting.${row * 3 + column + 1}` as RecipeSlot
+      slots[slot] = boxAt(originX + column * GRID_STRIDE, originY + row * GRID_STRIDE)
+    }
+  }
+  return slots
+}
+
+type PanelSpec = {
+  image: string
+  slots: Partial<Record<RecipeSlot, RecipeLayoutSlotBox>>
+}
+
+/** 工作台：3×3 输入格 + 右侧产出 */
+const CRAFTING: PanelSpec = {
+  image: craftingImage,
+  slots: { ...craftingGrid(117, 64), 'crafting.result': boxAt(476, 121, 95, 94) },
+}
+
+/** 熔炉系（熔炼 / 高炉 / 烟熏）共用一张界面：上投入、下燃料、右侧产出 */
+const COOKING: PanelSpec = {
+  image: smeltingImage,
+  slots: {
+    'cooking.ingredient': boxAt(220, 64, 63),
+    'cooking.result': boxAt(444, 120, 95),
+  },
+}
+
+const CAMPFIRE: PanelSpec = {
+  image: campfireImage,
+  slots: {
+    'cooking.ingredient': boxAt(142, 132, 61, 63),
+    'cooking.result': boxAt(512, 132, 63),
+  },
+}
+
+const STONECUTTER: PanelSpec = {
+  image: stonecutterImage,
+  slots: {
+    'stonecutter.ingredient': boxAt(76, 129, 63, 62),
+    'stonecutter.result': boxAt(552, 112, 95),
+  },
+}
+
+/** 锻造台：模板 / 底材 / 附加（修剪配方无产出位） */
+const SMITHING: PanelSpec = {
+  image: smithingImage,
+  slots: {
+    'smithing.template': boxAt(28, 188),
+    'smithing.base': boxAt(99, 188),
+    'smithing.addition': boxAt(170, 188),
+  },
+}
+
+const SMITHING_WITH_RESULT: PanelSpec = {
+  image: smithingImage,
+  slots: { ...SMITHING.slots, 'smithing.result': boxAt(388, 188, 63) },
+}
+
+function layoutOf(recipeType: RecipeType, panel: PanelSpec): RecipeLayout {
+  return { recipeType, image: panel.image, slots: panel.slots }
+}
+
 export const RECIPE_LAYOUTS: readonly RecipeLayout[] = [
-  {
-    recipeType: 'crafting',
-    image: craftingImage,
-    slots: {
-      'crafting.1': { x1: 117, y1: 64, x2: 181, y2: 128 },
-      'crafting.2': { x1: 188, y1: 64, x2: 252, y2: 128 },
-      'crafting.3': { x1: 259, y1: 64, x2: 323, y2: 128 },
-      'crafting.4': { x1: 117, y1: 135, x2: 181, y2: 199 },
-      'crafting.5': { x1: 188, y1: 135, x2: 252, y2: 199 },
-      'crafting.6': { x1: 259, y1: 135, x2: 323, y2: 199 },
-      'crafting.7': { x1: 117, y1: 206, x2: 181, y2: 270 },
-      'crafting.8': { x1: 188, y1: 206, x2: 252, y2: 270 },
-      'crafting.9': { x1: 259, y1: 206, x2: 323, y2: 270 },
-      'crafting.result': { x1: 476, y1: 121, x2: 571, y2: 215 },
-    },
-  },
-  {
-    recipeType: 'smelting',
-    image: smeltingImage,
-    slots: {
-      'cooking.ingredient': { x1: 220, y1: 64, x2: 283, y2: 127 },
-      'cooking.result': { x1: 444, y1: 120, x2: 539, y2: 215 },
-    },
-  },
-  {
-    recipeType: 'blasting',
-    image: smeltingImage,
-    slots: {
-      'cooking.ingredient': { x1: 220, y1: 64, x2: 283, y2: 127 },
-      'cooking.result': { x1: 444, y1: 120, x2: 539, y2: 215 },
-    },
-  },
-  {
-    recipeType: 'smoking',
-    image: smeltingImage,
-    slots: {
-      'cooking.ingredient': { x1: 220, y1: 64, x2: 283, y2: 127 },
-      'cooking.result': { x1: 444, y1: 120, x2: 539, y2: 215 },
-    },
-  },
-  {
-    recipeType: 'campfire_cooking',
-    image: campfireImage,
-    slots: {
-      'cooking.ingredient': { x1: 142, y1: 132, x2: 203, y2: 195 },
-      'cooking.result': { x1: 512, y1: 132, x2: 575, y2: 195 },
-    },
-  },
-  {
-    recipeType: 'stonecutter',
-    image: stonecutterImage,
-    slots: {
-      'stonecutter.ingredient': { x1: 76, y1: 129, x2: 139, y2: 191 },
-      'stonecutter.result': { x1: 552, y1: 112, x2: 647, y2: 207 },
-    },
-  },
-  {
-    recipeType: 'smithing',
-    image: smithingImage,
-    slots: {
-      'smithing.template': { x1: 28, y1: 188, x2: 92, y2: 252 },
-      'smithing.base': { x1: 99, y1: 188, x2: 163, y2: 252 },
-      'smithing.addition': { x1: 170, y1: 188, x2: 234, y2: 252 },
-      'smithing.result': { x1: 388, y1: 188, x2: 451, y2: 251 },
-    },
-  },
-  {
-    recipeType: 'smithing_trim',
-    image: smithingImage,
-    slots: {
-      'smithing.template': { x1: 28, y1: 188, x2: 92, y2: 252 },
-      'smithing.base': { x1: 99, y1: 188, x2: 163, y2: 252 },
-      'smithing.addition': { x1: 170, y1: 188, x2: 234, y2: 252 },
-    },
-  },
-  {
-    recipeType: 'smithing_transform',
-    image: smithingImage,
-    slots: {
-      'smithing.template': { x1: 28, y1: 188, x2: 92, y2: 252 },
-      'smithing.base': { x1: 99, y1: 188, x2: 163, y2: 252 },
-      'smithing.addition': { x1: 170, y1: 188, x2: 234, y2: 252 },
-      'smithing.result': { x1: 388, y1: 188, x2: 451, y2: 251 },
-    },
-  },
+  layoutOf('crafting', CRAFTING),
+  layoutOf('smelting', COOKING),
+  layoutOf('blasting', COOKING),
+  layoutOf('smoking', COOKING),
+  layoutOf('campfire_cooking', CAMPFIRE),
+  layoutOf('stonecutter', STONECUTTER),
+  layoutOf('smithing', SMITHING_WITH_RESULT),
+  layoutOf('smithing_trim', SMITHING),
+  layoutOf('smithing_transform', SMITHING_WITH_RESULT),
 ]
 
 export function getRecipeLayout(recipeType: RecipeType): RecipeLayout | null {

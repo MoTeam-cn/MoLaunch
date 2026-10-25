@@ -49,7 +49,7 @@ pub(crate) fn prepare(jar_path: &Path) -> Result<Prepared, String> {
     }
     std::fs::create_dir_all(&workspace).map_err(|e| format!("无法创建工作区: {e}"))?;
 
-    let extracted = jar::extract_archive(jar_path, &workspace, &jar::ExtractionLimits::default())?;
+    let extracted = jar::extract_archive(jar_path, &workspace, &jar::Limits::default())?;
     if extracted.signed {
         log_warn!("[ModTranslation] JAR 含签名文件，重打包后签名将失效");
     }
