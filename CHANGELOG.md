@@ -2,28 +2,28 @@
 
 本项目所有重要变更均会记录在此文件中。格式参考 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/)。
 
-## [Unreleased]
+## [0.3.12-rc.4] - 2026-10-25
 
 ### 修复
 
 #### 自定义背景图内容区玻璃化（背景不再被纯白卡片挡住）
 
 - [`theme-dark.scss`](src/assets/styles/theme-dark.scss)：开启背景图时 `body` 与主区域底色让空，`.app-main` 加 `backdrop-filter` 背景模糊，`.bg-white` 卡片按 `--ui-panel-alpha` 半透明，浮层同步。
-- [`ui-prefs.ts`](src/utils/ui-prefs.ts) / [`types/ui-prefs.ts`](src/types/ui-prefs.ts)：新增 `background.panel`（内容区不透明度，默认 70），写入 `--ui-panel-alpha` / `--ui-panel-blur`。
-- [`BackgroundSection.vue`](src/views/settings/personal/BackgroundSection.vue)：新增「内容区不透明度」滑块，模糊与遮罩说明补充配合方式。
-- [`TopNavLayout.vue`](src/components/layout/TopNavLayout.vue)：主内容区加 `app-main` 类名作为玻璃层挂点。
 
-### 修复
+- [`ui-prefs.ts`](src/utils/ui-prefs.ts) / [`types/ui-prefs.ts`](src/types/ui-prefs.ts)：新增 `background.panel`（内容区不透明度，默认 70），写入 `--ui-panel-alpha` / `--ui-panel-blur`。
+
+- [`BackgroundSection.vue`](src/views/settings/personal/BackgroundSection.vue)：新增「内容区不透明度」滑块，模糊与遮罩说明补充配合方式。
+
+- [`TopNavLayout.vue`](src/components/layout/TopNavLayout.vue)：主内容区加 `app-main` 类名作为玻璃层挂点。
 
 #### 告示牌商店朝向显示中文
 
 - [`command/data.ts`](src/views/tools/command/data.ts)：`SIGN_FACINGS` 显示名改为「北 / 南 / 东 / 西」，取值仍为 `north/south/east/west`。
 
-### 修复
-
 #### 告示牌商店的「告示牌类型」显示为中文
 
 - [`command/data.ts`](src/views/tools/command/data.ts)：`SIGN_IDS` 由方块 ID 列表改为「ID + 中文名」表（橡木告示牌、云杉木告示牌等 12 项）。
+
 - [`command/SignShop.vue`](src/views/tools/command/SignShop.vue)：下拉改用中文名做显示、方块 ID 做取值，生成的 `/setblock` 指令不变。
 
 ### 变更
@@ -31,152 +31,172 @@
 #### 模组翻译：旧记忆与旧续传状态不再兼容
 
 - 翻译记忆落盘格式由对象映射改为行数组（[`memory.rs`](src-tauri/src/mod_translation/memory.rs)），旧文件读取失败时静默回落为空记忆，不影响已完成输出。
+
 - 续传标记与检查点文件名改为 `.molaunch-translation-*`（[`resume.rs`](src-tauri/src/mod_translation/resume.rs)），升级前未完成的翻译任务会重新开始。
+
 - 渐变文字本地状态键与旧字段名兼容保留，配方生成器本地存档结构不变，用户设置与预设不受影响。
+
+#### 致谢补充：Axolotl Launcher
+
+- [`README.md`](README.md) / [`README_EN.md`](README_EN.md)：「鸣谢 → 特别感谢」新增条目，说明三个功能早期参考其实现（GPL-3.0），现已按公开规范独立重写。
+
+- [`acknowledgements.txt`](src-tauri/resources/about/acknowledgements.txt)：应用内「关于 → 特别鸣谢」新增条目与 logo（`src/assets/AboutIcon/axolotl.png`）。
+
+- [`licenses.txt`](src-tauri/resources/about/licenses.txt)：新增版权与许可行，标注仅历史区间适用、现实现不派生自该项目；「自有代码与原创资源」一行补充适用范围，排除三个已重写功能。
+
+- [`ACKNOWLEDGEMENTS.md`](ACKNOWLEDGEMENTS.md)：三项功能状态更新为已完成，补充署名位置表与重写覆盖范围。
+
+#### 模组翻译：工作区内部文件名与续传身份改为项目自有前缀
+
+- [`resume.rs`](src-tauri/src/mod_translation/resume.rs)：续传标记与检查点文件名改为 `.molaunch-translation-*`。
+
+- [`task/prepare.rs`](src-tauri/src/mod_translation/task/prepare.rs)：续传身份改为 `molaunch-mod-translation-v1`（旧工作区因 marker 不匹配自动重建）。
+
+- [`jar.rs`](src-tauri/src/mod_translation/jar.rs)：移除历史前缀常量，内部文件判定只认 `.molaunch-`。
+
+#### 渐变文字按净室规格重新实现
+
+- **规格**（[`specs/cleanroom/`](specs/cleanroom/) 新增）：三个受版权异议影响的功能各写一份行为规格（`README.md` 记录流程），内容只依据公开规范（JVMS 第 4 章、ZIP 格式、Minecraft 配方文档、各插件公开语法、界面截图实测坐标）。
+
+- **实现**（[`src/utils/gradient-text/`](src/utils/gradient-text/)）：按规格重写为 `types` / `colors` / `document` / `cells` / `formats` / `state`，格式渲染改为「规格表格 + 渲染器注册表」，19 种格式语法逐条对应规格 §5。
+
+- **接口**（[GradientOutputPanel.vue](src/views/tools/creation/gradient-text/GradientOutputPanel.vue)、[GradientTextPage.vue](src/views/tools/creation/GradientTextPage.vue)、[GradientTextEditor.vue](src/views/tools/creation/gradient-text/GradientTextEditor.vue)）：选项字段统一为 `control` / `simplifyGradient`，读取旧存档时兼容旧字段名。
+
+- **致谢**（[`ACKNOWLEDGEMENTS.md`](ACKNOWLEDGEMENTS.md) 新增）：如实记录三个功能最初参考 Axolotl Launcher 实现，以及删除来源注释那次提交的错误处理。
+
+- **验证**：`typecheck` / `lint` / `vite build` 全绿，渐变文字 12 项验收测试对应规格 §7 用例。
+
+#### 主窗口默认尺寸与最小尺寸调整为 1105×585
+
+- **尺寸**（[`tauri.conf.json`](src-tauri/tauri.conf.json)）：main 窗口 `width` / `height` 与 `minWidth` / `minHeight` 统一为 1105×585——主页左右两栏在这个宽度下留白更均衡，横向比原 1096 多 9px。
 
 ### 重构
 
 #### 渐变文字数据模型与文档操作收敛
 
 - [`gradient-text/types.ts`](src/utils/gradient-text/types.ts)：输出格式标识改由 `GRADIENT_FORMATS` 表推导，文档模型与单元格类型分组注释。
-- [`gradient-text/document.ts`](src/utils/gradient-text/document.ts)：抽出 `mapRuns` / `knownFormats` / `normalizeRun` / `emptyDocument`，纯文本转换改 `reduce` 拼接。
-- [`gradient-text/state.ts`](src/utils/gradient-text/state.ts)：状态校验拆成 `pickColors` / `pickControl` / `pickAdapter` / `pickTimestamp` 四个取值器，旧字段兼容集中到 `LegacyFields`。
 
-### 重构
+- [`gradient-text/document.ts`](src/utils/gradient-text/document.ts)：抽出 `mapRuns` / `knownFormats` / `normalizeRun` / `emptyDocument`，纯文本转换改 `reduce` 拼接。
+
+- [`gradient-text/state.ts`](src/utils/gradient-text/state.ts)：状态校验拆成 `pickColors` / `pickControl` / `pickAdapter` / `pickTimestamp` 四个取值器，旧字段兼容集中到 `LegacyFields`。
 
 #### 重写收敛：结构与数据分离
 
 - [`error.rs`](src-tauri/src/mod_translation/error.rs)：错误码由枚举改为常量表（字符串契约不变）。
+
 - [`memory.rs`](src-tauri/src/mod_translation/memory.rs)：翻译记忆改为「行数组」落盘，记忆键改长度前缀拼接，截断逻辑按命中热度重排。
+
 - [`resume.rs`](src-tauri/src/mod_translation/resume.rs)：检查点按阶段分组（`language` / `class` / `graph`），工作区选择改为单次扫描取最新。
+
 - [`ledger/class_decision.rs`](src-tauri/src/mod_translation/ledger/class_decision.rs)：处置账本改为私有记录表 + 方法访问（`record` / `pending` / `excluded_ids` / `mark_touched`）。
+
 - [`mod_name.rs`](src-tauri/src/mod_translation/mod_name.rs)：译名词表外置为 [`mod-name-dictionary.txt`](src-tauri/resources/mod_translation/mod-name-dictionary.txt)，解析结果进程内缓存。
+
 - [`recipe-generator/types.ts`](src/utils/recipe-generator/types.ts)：类型按域拆分到 `types/` 目录，槽位名改模板字面量类型，面板选项抽成独立类型。
-
-### 变更
-
-#### 致谢补充：Axolotl Launcher
-
-- [`README.md`](README.md) / [`README_EN.md`](README_EN.md)：「鸣谢 → 特别感谢」新增条目，说明三个功能早期参考其实现（GPL-3.0），现已按公开规范独立重写。
-- [`acknowledgements.txt`](src-tauri/resources/about/acknowledgements.txt)：应用内「关于 → 特别鸣谢」新增条目与 logo（`src/assets/AboutIcon/axolotl.png`）。
-- [`licenses.txt`](src-tauri/resources/about/licenses.txt)：新增版权与许可行，标注仅历史区间适用、现实现不派生自该项目；「自有代码与原创资源」一行补充适用范围，排除三个已重写功能。
-- [`ACKNOWLEDGEMENTS.md`](ACKNOWLEDGEMENTS.md)：三项功能状态更新为已完成，补充署名位置表与重写覆盖范围。
-
-### 变更
-
-#### 模组翻译：工作区内部文件名与续传身份改为项目自有前缀
-
-- [`resume.rs`](src-tauri/src/mod_translation/resume.rs)：续传标记与检查点文件名改为 `.molaunch-translation-*`。
-- [`task/prepare.rs`](src-tauri/src/mod_translation/task/prepare.rs)：续传身份改为 `molaunch-mod-translation-v1`（旧工作区因 marker 不匹配自动重建）。
-- [`jar.rs`](src-tauri/src/mod_translation/jar.rs)：移除历史前缀常量，内部文件判定只认 `.molaunch-`。
-
-### 重构
 
 #### 模组翻译：数据模型与模块入口整理
 
 - **数据模型**（[`types.rs`](src-tauri/src/mod_translation/types.rs)）：按「展示辅助 / 枚举 / 流水线 / 命令层」四段重排，字段名与 serde 属性保持完全一致（IPC 契约不变）。
-- **模块入口**（[`mod.rs`](src-tauri/src/mod_translation/mod.rs)、[`lang.rs`](src-tauri/src/mod_translation/lang.rs)、[`ledger.rs`](src-tauri/src/mod_translation/ledger.rs)、[`task.rs`](src-tauri/src/mod_translation/task.rs)、[`translate_class.rs`](src-tauri/src/mod_translation/translate_class.rs)）：补充职责注释，导出清单按子模块职责排列。
 
-### 重构
+- **模块入口**（[`mod.rs`](src-tauri/src/mod_translation/mod.rs)、[`lang.rs`](src-tauri/src/mod_translation/lang.rs)、[`ledger.rs`](src-tauri/src/mod_translation/ledger.rs)、[`task.rs`](src-tauri/src/mod_translation/task.rs)、[`translate_class.rs`](src-tauri/src/mod_translation/translate_class.rs)）：补充职责注释，导出清单按子模块职责排列。
 
 #### 模组翻译：测试用例按规格重写
 
 - **测试文件**（[`ledger_test.rs`](src-tauri/src/mod_translation/ledger_test.rs)、[`prompt_test.rs`](src-tauri/src/mod_translation/prompt_test.rs)、[`translate_class_test.rs`](src-tauri/src/mod_translation/translate_class/translate_class_test.rs)、[`translate_lang_test.rs`](src-tauri/src/mod_translation/translate_lang_test.rs)、[`repair_test.rs`](src-tauri/src/mod_translation/repair_test.rs)）：统一 `test_<功能>_<场景>_<预期>` 命名，fixture 收敛为构造函数，覆盖项按规格 §7 重排（工作图状态机、提示词解析、class 判定容错、语言路由、回修覆盖与写回）。
 
-### 重构
-
 #### 模组翻译：任务编排、记忆、续传与基础设施按规格重新实现
 
 - **任务编排**（[`task/prepare.rs`](src-tauri/src/mod_translation/task/prepare.rs)、[`task/run.rs`](src-tauri/src/mod_translation/task/run.rs)）：续传复用抽成 `reuse_resumable`，阶段错误归类为 `classify_error`（`None` = 取消），检查点恢复与落盘抽成 `restore_*` / `persist`，打包报告抽成 `completed_snapshot`。
-- **翻译记忆**（[`memory.rs`](src-tauri/src/mod_translation/memory.rs)）：可用性判定抽成 `is_usable`，超限截断抽成 `trim`，测试移到 [`memory_test.rs`](src-tauri/src/mod_translation/memory_test.rs)。
-- **断点续传**（[`resume.rs`](src-tauri/src/mod_translation/resume.rs)）：工作区前缀与版本收敛为常量，测试移到 [`resume_test.rs`](src-tauri/src/mod_translation/resume_test.rs)。
-- **进度与状态**（[`progress.rs`](src-tauri/src/mod_translation/progress.rs)、[`status.rs`](src-tauri/src/mod_translation/status.rs)）：阶段权重与节拍收敛为常量，锁中毒统一由 `lock` 兜底；`status` 的 idle 快照抽成 `idle_snapshot`。
-- **提示词解析**（[`prompt.rs`](src-tauri/src/mod_translation/prompt.rs)）：JSON 提取改为 `JsonScanner` 状态机，模板兜底提为常量。
-- **命令入口**（[`controller.rs`](src-tauri/src/mod_translation/controller.rs)）：文件校验、缓存复用、模型解析、结果汇总各自抽成独立函数。
-- **错误类型**（[`error.rs`](src-tauri/src/mod_translation/error.rs)）：错误码表保持不变（前端按码匹配文案），仅整理实现。
-- **未改动**：[`types.rs`](src-tauri/src/mod_translation/types.rs) 为前后端共享的数据模型（字段名即 IPC 契约），不含算法逻辑。
 
-### 重构
+- **翻译记忆**（[`memory.rs`](src-tauri/src/mod_translation/memory.rs)）：可用性判定抽成 `is_usable`，超限截断抽成 `trim`，测试移到 [`memory_test.rs`](src-tauri/src/mod_translation/memory_test.rs)。
+
+- **断点续传**（[`resume.rs`](src-tauri/src/mod_translation/resume.rs)）：工作区前缀与版本收敛为常量，测试移到 [`resume_test.rs`](src-tauri/src/mod_translation/resume_test.rs)。
+
+- **进度与状态**（[`progress.rs`](src-tauri/src/mod_translation/progress.rs)、[`status.rs`](src-tauri/src/mod_translation/status.rs)）：阶段权重与节拍收敛为常量，锁中毒统一由 `lock` 兜底；`status` 的 idle 快照抽成 `idle_snapshot`。
+
+- **提示词解析**（[`prompt.rs`](src-tauri/src/mod_translation/prompt.rs)）：JSON 提取改为 `JsonScanner` 状态机，模板兜底提为常量。
+
+- **命令入口**（[`controller.rs`](src-tauri/src/mod_translation/controller.rs)）：文件校验、缓存复用、模型解析、结果汇总各自抽成独立函数。
+
+- **错误类型**（[`error.rs`](src-tauri/src/mod_translation/error.rs)）：错误码表保持不变（前端按码匹配文案），仅整理实现。
+
+- **未改动**：[`types.rs`](src-tauri/src/mod_translation/types.rs) 为前后端共享的数据模型（字段名即 IPC 契约），不含算法逻辑。
 
 #### 模组翻译：语言与 class 翻译路由按规格重新实现
 
 - **语言路由**（[`translate_lang.rs`](src-tauri/src/mod_translation/translate_lang.rs)）：待译条目过滤抽成 `pending_entries`，批次上下文收敛为 `BatchCtx`（`translate` / `request` 两个方法），fast/deep 通道只保留一个队列。
-- **class 路由**（[`translate_class/route.rs`](src-tauri/src/mod_translation/translate_class/route.rs)）：`judge_batch` 负责重试与兜底，`request` 负责 select 与进度，`apply_decisions` 统一处置计数。
-- **判定解析**（[`translate_class/prompt.rs`](src-tauri/src/mod_translation/translate_class/prompt.rs)）：单条 decision 校验抽成 `evaluate`，覆盖集合由采纳结果推导。
-- **处置应用**（[`translate_class/apply.rs`](src-tauri/src/mod_translation/translate_class/apply.rs)）：动作名收敛为常量，路径列表用 `is_empty` 判定。
 
-### 重构
+- **class 路由**（[`translate_class/route.rs`](src-tauri/src/mod_translation/translate_class/route.rs)）：`judge_batch` 负责重试与兜底，`request` 负责 select 与进度，`apply_decisions` 统一处置计数。
+
+- **判定解析**（[`translate_class/prompt.rs`](src-tauri/src/mod_translation/translate_class/prompt.rs)）：单条 decision 校验抽成 `evaluate`，覆盖集合由采纳结果推导。
+
+- **处置应用**（[`translate_class/apply.rs`](src-tauri/src/mod_translation/translate_class/apply.rs)）：动作名收敛为常量，路径列表用 `is_empty` 判定。
 
 #### 模组翻译：JAR 分析按规格重新实现
 
 - **语言源**（[`analyze/sources.rs`](src-tauri/src/mod_translation/analyze/sources.rs)）：标准扩展名收敛为常量表，`en_us` 段判定与目标路径改写抽成 `has_english_segment` / `target_path_of`。
-- **加载器**（[`analyze/loader.rs`](src-tauri/src/mod_translation/analyze/loader.rs)）：探测顺序改为 `PROBES` 表，TOML 取值改为逐行扫描（不再用正则）。
-- **覆盖诊断**（[`analyze/coverage.rs`](src-tauri/src/mod_translation/analyze/coverage.rs)）：处置结论抽成 `Disposition` 结构 + `classify` 函数，媒体类型由扩展名统一推导。
-- **入口**（[`analyze.rs`](src-tauri/src/mod_translation/analyze.rs)）：`inspect_jar` 的提示信息抽成 `collect_warnings`。
 
-### 重构
+- **加载器**（[`analyze/loader.rs`](src-tauri/src/mod_translation/analyze/loader.rs)）：探测顺序改为 `PROBES` 表，TOML 取值改为逐行扫描（不再用正则）。
+
+- **覆盖诊断**（[`analyze/coverage.rs`](src-tauri/src/mod_translation/analyze/coverage.rs)）：处置结论抽成 `Disposition` 结构 + `classify` 函数，媒体类型由扩展名统一推导。
+
+- **入口**（[`analyze.rs`](src-tauri/src/mod_translation/analyze.rs)）：`inspect_jar` 的提示信息抽成 `collect_warnings`。
 
 #### 模组翻译：质量审计与回修按规格重新实现
 
 - **质量审计**（[`quality.rs`](src-tauri/src/mod_translation/quality.rs)）：占位符提取改为字符扫描（printf / 花括号 / 格式码 / 转义 / 控制字符五个扫描器），术语表改为「词边界短语匹配」，透传与 credit 判定同样去正则；测试移到 [`quality_test.rs`](src-tauri/src/mod_translation/quality_test.rs)。
-- **回修编排**（[`repair.rs`](src-tauri/src/mod_translation/repair.rs)）：收集阶段抽成 `collect_with_progress`，批次切分抽成 `batches_by_target`，轮次推进只维护一个 `progress` 游标。
-- **修复方案**（[`repair_ai.rs`](src-tauri/src/mod_translation/repair_ai.rs)）：校验改为 `match_issue_id` + `action_is_valid` 两段，采纳时回填解析后的 issue id。
-- **写回**（[`repair_apply.rs`](src-tauri/src/mod_translation/repair_apply.rs)）：先解析全部 issue → 汇总译文 → 一次性写回 → 统一记账。
 
-### 重构
+- **回修编排**（[`repair.rs`](src-tauri/src/mod_translation/repair.rs)）：收集阶段抽成 `collect_with_progress`，批次切分抽成 `batches_by_target`，轮次推进只维护一个 `progress` 游标。
+
+- **修复方案**（[`repair_ai.rs`](src-tauri/src/mod_translation/repair_ai.rs)）：校验改为 `match_issue_id` + `action_is_valid` 两段，采纳时回填解析后的 issue id。
+
+- **写回**（[`repair_apply.rs`](src-tauri/src/mod_translation/repair_apply.rs)）：先解析全部 issue → 汇总译文 → 一次性写回 → 统一记账。
 
 #### 模组翻译：任务账本与模组名决策按规格重新实现
 
 - **工作图**（[`ledger/work_graph.rs`](src-tauri/src/mod_translation/ledger/work_graph.rs)）：模型类尝试收敛为 `MODEL_ACTIONS` 常量 + `is_model_action`，状态推进统一为「取到项 → 改字段 → 推进 version/revision」，`WorkKind` 自带来源标签。
-- **任务记忆**（[`ledger/task_memory.rs`](src-tauri/src/mod_translation/ledger/task_memory.rs)）：各字段上限提为常量，截断与裁剪抽成 `clip` / `keep_last`，数组解析合并为 `strings_of`。
-- **处置账本**（[`ledger/class_decision.rs`](src-tauri/src/mod_translation/ledger/class_decision.rs)）：排除动作收敛为常量 + `excluded()` 判定。
-- **模组名**（[`mod_name.rs`](src-tauri/src/mod_translation/mod_name.rs)）：决策链改为「候选生成器数组」，每个步骤只负责自己那一步，来源标签即步骤名；测试移到 [`mod_name_test.rs`](src-tauri/src/mod_translation/mod_name_test.rs) 并补齐 AI 推荐优先与通用名拒绝用例。
 
-### 重构
+- **任务记忆**（[`ledger/task_memory.rs`](src-tauri/src/mod_translation/ledger/task_memory.rs)）：各字段上限提为常量，截断与裁剪抽成 `clip` / `keep_last`，数组解析合并为 `strings_of`。
+
+- **处置账本**（[`ledger/class_decision.rs`](src-tauri/src/mod_translation/ledger/class_decision.rs)）：排除动作收敛为常量 + `excluded()` 判定。
+
+- **模组名**（[`mod_name.rs`](src-tauri/src/mod_translation/mod_name.rs)）：决策链改为「候选生成器数组」，每个步骤只负责自己那一步，来源标签即步骤名；测试移到 [`mod_name_test.rs`](src-tauri/src/mod_translation/mod_name_test.rs) 并补齐 AI 推荐优先与通用名拒绝用例。
 
 #### 模组翻译：保序 JSON 与语言文件读写按规格重新实现
 
 - **保序 JSON**（[`json_value/`](src-tauri/src/mod_translation/json_value)）：解析拆成 `parser`（带边界检查的 `Reader` + 代理对合并）、渲染拆成 `writer`（缩进与转义），`JsonValue` 只保留解析/指针写入/渲染三个入口。
-- **语言文件**（[`lang/`](src-tauri/src/mod_translation/lang)）：`json` 与 `structured` 共用「路径拼接 + 递归收集/回填」结构；`keyvalue` 改为 `Entry` 借用视图，写回保留缩进与分隔符；`free_text` 按 BOM/CRLF/尾换行还原布局。
-- **测试**（[`json_value_test.rs`](src-tauri/src/mod_translation/json_value_test.rs)、[`lang_test.rs`](src-tauri/src/mod_translation/lang_test.rs)）：覆盖键序保持、渲染往返、整数写法、转义与代理对、尾随内容拒绝、Pointer 写入、语言文件摊平/回填、注释与缩进保留、自由文本布局还原。
 
-### 重构
+- **语言文件**（[`lang/`](src-tauri/src/mod_translation/lang)）：`json` 与 `structured` 共用「路径拼接 + 递归收集/回填」结构；`keyvalue` 改为 `Entry` 借用视图，写回保留缩进与分隔符；`free_text` 按 BOM/CRLF/尾换行还原布局。
+
+- **测试**（[`json_value_test.rs`](src-tauri/src/mod_translation/json_value_test.rs)、[`lang_test.rs`](src-tauri/src/mod_translation/lang_test.rs)）：覆盖键序保持、渲染往返、整数写法、转义与代理对、尾随内容拒绝、Pointer 写入、语言文件摊平/回填、注释与缩进保留、自由文本布局还原。
 
 #### 模组翻译：JAR 工作区与 class 处理按净室规格重新实现
 
 - **工作区**（[`jar.rs`](src-tauri/src/mod_translation/jar.rs)）：解包上限收敛成 `Guard`（条目数 / 单条目 / 总量 / 压缩比），路径校验合并为 `safe_segments`；签名条目只记录不落盘（旧签名会让重打包后的 JAR 失效）。
-- **常量池**（[`class/pool.rs`](src-tauri/src/mod_translation/class/pool.rs)）：改为带边界检查的顺序游标 `Cursor`，按 JVMS 4.4 的 tag 长度表分发，`LONG`/`DOUBLE` 双槽位单独记账。
-- **候选判定**（[`class/classify.rs`](src-tauri/src/mod_translation/class/classify.rs)）：去掉正则，改为字符扫描 + 手写 JVM 描述符解析，判定顺序对齐规格 §3.4。
-- **候选聚合**（[`class/discover.rs`](src-tauri/src/mod_translation/class/discover.rs)）：改为 `BTreeMap` 聚合 + sha256 稳定 id，确定性排除改为路径段与文案特征匹配。
-- **改写**（[`class/rewrite.rs`](src-tauri/src/mod_translation/class/rewrite.rs)）：先收集全部目标区间再一次性重建字节，未命中直接返回原字节。
-- **测试**（[`class_test.rs`](src-tauri/src/mod_translation/class_test.rs)）：构造式 fixture 重写，覆盖槽位/区间、只取被引用文本、双槽位对齐、非 class/截断/未知 tag、改写与超长替换、判定形状、跨文件聚合、确定性排除、解包打包往返与越界路径拒绝。
 
-### 重构
+- **常量池**（[`class/pool.rs`](src-tauri/src/mod_translation/class/pool.rs)）：改为带边界检查的顺序游标 `Cursor`，按 JVMS 4.4 的 tag 长度表分发，`LONG`/`DOUBLE` 双槽位单独记账。
+
+- **候选判定**（[`class/classify.rs`](src-tauri/src/mod_translation/class/classify.rs)）：去掉正则，改为字符扫描 + 手写 JVM 描述符解析，判定顺序对齐规格 §3.4。
+
+- **候选聚合**（[`class/discover.rs`](src-tauri/src/mod_translation/class/discover.rs)）：改为 `BTreeMap` 聚合 + sha256 稳定 id，确定性排除改为路径段与文案特征匹配。
+
+- **改写**（[`class/rewrite.rs`](src-tauri/src/mod_translation/class/rewrite.rs)）：先收集全部目标区间再一次性重建字节，未命中直接返回原字节。
+
+- **测试**（[`class_test.rs`](src-tauri/src/mod_translation/class_test.rs)）：构造式 fixture 重写，覆盖槽位/区间、只取被引用文本、双槽位对齐、非 class/截断/未知 tag、改写与超长替换、判定形状、跨文件聚合、确定性排除、解包打包往返与越界路径拒绝。
 
 #### 合成配方生成器按净室规格重新实现
 
 - **版本能力表**（[`versions.ts`](src/utils/recipe-generator/versions.ts)）：19 个版本各一行能力开关（`namespacedType` / `objectIngredients` / `stringIngredients` / `resultUsesId` / `ingredientCount` / `category` / `trimPattern` / 各类 `notification`），其余模块只读开关。
+
 - **配方输出**（[`formatter.ts`](src/utils/recipe-generator/formatter.ts)）：按配方类型拆成 `emitCrafting` / `emitCooking` / `emitStonecutter` / `emitSmithing`，pattern 的 key 分配改用等价键 + Map。
+
 - **校验**（[`validation.ts`](src/utils/recipe-generator/validation.ts)）：改为规则列表（类型可用 / 输入必填 / 产物必填 / 槽位合法 / 纹饰图案 / 合成非空），问题码去重。
+
 - **数据包**（[`datapack.ts`](src/utils/recipe-generator/datapack.ts)、[`exporter.ts`](src/utils/recipe-generator/exporter.ts)、[`recipe-engine.ts`](src/utils/recipe-generator/recipe-engine.ts)、[`tag-resolve.ts`](src/utils/recipe-generator/tag-resolve.ts)）：目录名与 pack_format 全部取自能力表，导出按是否支持数据包分流。
+
 - **资源加载**（[`resources.ts`](src/utils/recipe-generator/resources.ts)）：纹理图集改为惰性加载，模块导入不再发起请求。
+
 - **测试**：[`__tests__/recipe-generator.test.ts`](src/utils/recipe-generator/__tests__/recipe-generator.test.ts) 按规格 §6 验收用例重写（45 项），新增 [`recipe-layouts.test.ts`](src/views/tools/creation/recipe-generator/__tests__/recipe-layouts.test.ts) 校验槽位盒几何、越界与重叠。
-
-### 变更
-
-#### 渐变文字按净室规格重新实现
-
-- **规格**（[`specs/cleanroom/`](specs/cleanroom/) 新增）：三个受版权异议影响的功能各写一份行为规格（`README.md` 记录流程），内容只依据公开规范（JVMS 第 4 章、ZIP 格式、Minecraft 配方文档、各插件公开语法、界面截图实测坐标）。
-- **实现**（[`src/utils/gradient-text/`](src/utils/gradient-text/)）：按规格重写为 `types` / `colors` / `document` / `cells` / `formats` / `state`，格式渲染改为「规格表格 + 渲染器注册表」，19 种格式语法逐条对应规格 §5。
-- **接口**（[GradientOutputPanel.vue](src/views/tools/creation/gradient-text/GradientOutputPanel.vue)、[GradientTextPage.vue](src/views/tools/creation/GradientTextPage.vue)、[GradientTextEditor.vue](src/views/tools/creation/gradient-text/GradientTextEditor.vue)）：选项字段统一为 `control` / `simplifyGradient`，读取旧存档时兼容旧字段名。
-- **致谢**（[`ACKNOWLEDGEMENTS.md`](ACKNOWLEDGEMENTS.md) 新增）：如实记录三个功能最初参考 Axolotl Launcher 实现，以及删除来源注释那次提交的错误处理。
-- **验证**：`typecheck` / `lint` / `vite build` 全绿，渐变文字 12 项验收测试对应规格 §7 用例。
-
-### 变更
-
-#### 主窗口默认尺寸与最小尺寸调整为 1105×585
-
-- **尺寸**（[`tauri.conf.json`](src-tauri/tauri.conf.json)）：main 窗口 `width` / `height` 与 `minWidth` / `minHeight` 统一为 1105×585——主页左右两栏在这个宽度下留白更均衡，横向比原 1096 多 9px。
 
 ## [0.3.12-rc.3] - 2026-10-25
 
@@ -12199,4 +12219,4 @@ oom_heartbeat\ 心跳上报时房主侧查询在线人数随请求体携带 \pla
 
 ---
 
-*本文档最后更新于 2026-08-22*
+*本文档最后更新于 2026-10-25*
