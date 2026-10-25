@@ -4,6 +4,12 @@
 
 ## [Unreleased]
 
+### 变更
+
+#### 主窗口默认尺寸与最小尺寸调整为 1105×585
+
+- **尺寸**（[`tauri.conf.json`](src-tauri/tauri.conf.json)）：main 窗口 `width` / `height` 与 `minWidth` / `minHeight` 统一为 1105×585——主页左右两栏在这个宽度下留白更均衡，横向比原 1096 多 9px。
+
 ## [0.3.12-rc.3] - 2026-10-25
 
 ### 变更
