@@ -163,11 +163,13 @@ async fn install_modern(
     // 安装器失败时再预取库重试一次：安装器自身只跟随有限次重定向，
     // 镜像链路一长就会报 Invalid number of redirects，库备好即可跳过下载。
     // 只在失败后执行，安装成功的路径不受影响。
+    let mut first_error_message: Option<String> = None;
     if let Some(first_error) = install_result.as_ref().err().map(ToString::to_string) {
         log_warn!("[Forge] 安装器失败，尝试预取库后重试: {}", first_error);
         match shared::prefetch_install_libraries(installer_path, game_dir, config).await {
             Ok(count) if count > 0 => {
                 log_info!("[Forge] 已预取 {} 个库，重试安装器", count);
+                first_error_message = Some(first_error);
                 install_result = tokio::task::spawn_blocking({
                     let (java, installer, injector, wrapper, dir) = (
                         java_path_owned,
@@ -189,7 +191,12 @@ async fn install_modern(
             Err(e) => log_warn!("[Forge] 预取安装库失败，保留原始错误: {}", e),
         }
     }
-    install_result?;
+    if let Err(error) = install_result {
+        return Err(match first_error_message {
+            Some(first) => anyhow::anyhow!("{}；预取库重试前的错误：{}", error, first),
+            None => error,
+        });
+    }
 
     if let Some(ref cb) = progress_callback {
         cb(80.0);

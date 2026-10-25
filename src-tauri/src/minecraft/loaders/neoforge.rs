@@ -258,11 +258,13 @@ pub async fn install(
     );
 
     // 失败时预取库再试一次（镜像重定向超限的常见解法）；成功路径不受影响
+    let mut first_error_message: Option<String> = None;
     if let Some(first_error) = install_result.as_ref().err().map(ToString::to_string) {
         log_warn!("[NeoForge] 安装器失败，尝试预取库后重试: {}", first_error);
         match shared::prefetch_install_libraries(&installer_path, game_dir, config).await {
             Ok(count) if count > 0 => {
                 log_info!("[NeoForge] 已预取 {} 个库，重试安装器", count);
+                first_error_message = Some(first_error);
                 install_result = super::forge_installer::run_forge_installer(
                     &java_path,
                     &installer_path.to_string_lossy(),
@@ -277,7 +279,12 @@ pub async fn install(
             Err(e) => log_warn!("[NeoForge] 预取安装库失败，保留原始错误: {}", e),
         }
     }
-    install_result?;
+    if let Err(error) = install_result {
+        return Err(match first_error_message {
+            Some(first) => anyhow::anyhow!("{}；预取库重试前的错误：{}", error, first),
+            None => error,
+        });
+    }
 
     if let Some(ref cb) = progress_callback {
         cb(80.0);
