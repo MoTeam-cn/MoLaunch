@@ -6,6 +6,14 @@
 
 ### 新增
 
+#### Mod 安装前预检（加载器/版本不匹配直接拦下）
+
+- [`mod-precheck.ts`](src/utils/mod-precheck.ts)（新增）：纯函数预检——加载器不匹配、游戏版本不匹配为阻断项；同 modid 已装、同名文件将被覆盖、实例混装 Forge 系与 Fabric 系、OptiFine 与 Fabric 系冲突为警告项；兼容 `1.20` 与 `1.20.1` 的前缀关系。
+- [`DependencyConfirmDialog.vue`](src/components/community/DependencyConfirmDialog.vue)：弹窗顶部展示阻断项（红）与警告项（黄），有阻断项时「继续安装」按钮禁用并提示原因；标题按状态切换。
+- [`useResourceDownload.ts`](src/composables/useResourceDownload.ts) / [`ResourceDetail.vue`](src/components/community/ResourceDetail.vue)：下载前先跑本地预检（读已装 Mod 列表，不发网络请求），阻断项复用确认弹窗展示；仅有警告且无前置依赖时单独确认一次；预检失败降级为不阻断。
+
+### 新增
+
 #### 崩溃分析：定位到具体 Mod 并可一键修复
 
 - [`mod_index.rs`](src-tauri/src/minecraft/launch/watcher/analyzer/mod_index.rs)（新增）/ [`collect.rs`](src-tauri/src/minecraft/launch/watcher/analyzer/collect.rs) / [`detector_stack.rs`](src-tauri/src/minecraft/launch/watcher/analyzer/detector_stack.rs)：收集阶段扫描 mods 目录建立「名字 → jar」索引，堆栈分析猜出的 Mod 名对到具体文件名，结论直接给「禁用哪个文件」。
