@@ -114,8 +114,8 @@ export const SIGN_IDS = [
 
 /** 告示牌朝向（facing 方块状态） */
 export const SIGN_FACINGS = [
-  { id: 'north', name: '北 (north)' },
-  { id: 'south', name: '南 (south)' },
-  { id: 'east', name: '东 (east)' },
-  { id: 'west', name: '西 (west)' },
+  { id: 'north', name: '北' },
+  { id: 'south', name: '南' },
+  { id: 'east', name: '东' },
+  { id: 'west', name: '西' },
 ]

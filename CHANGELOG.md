@@ -6,6 +6,21 @@
 
 ### 修复
 
+#### 自定义背景图内容区玻璃化（背景不再被纯白卡片挡住）
+
+- [`theme-dark.scss`](src/assets/styles/theme-dark.scss)：开启背景图时 `body` 与主区域底色让空，`.app-main` 加 `backdrop-filter` 背景模糊，`.bg-white` 卡片按 `--ui-panel-alpha` 半透明，浮层同步。
+- [`ui-prefs.ts`](src/utils/ui-prefs.ts) / [`types/ui-prefs.ts`](src/types/ui-prefs.ts)：新增 `background.panel`（内容区不透明度，默认 70），写入 `--ui-panel-alpha` / `--ui-panel-blur`。
+- [`BackgroundSection.vue`](src/views/settings/personal/BackgroundSection.vue)：新增「内容区不透明度」滑块，模糊与遮罩说明补充配合方式。
+- [`TopNavLayout.vue`](src/components/layout/TopNavLayout.vue)：主内容区加 `app-main` 类名作为玻璃层挂点。
+
+### 修复
+
+#### 告示牌商店朝向显示中文
+
+- [`command/data.ts`](src/views/tools/command/data.ts)：`SIGN_FACINGS` 显示名改为「北 / 南 / 东 / 西」，取值仍为 `north/south/east/west`。
+
+### 修复
+
 #### 告示牌商店的「告示牌类型」显示为中文
 
 - [`command/data.ts`](src/views/tools/command/data.ts)：`SIGN_IDS` 由方块 ID 列表改为「ID + 中文名」表（橡木告示牌、云杉木告示牌等 12 项）。

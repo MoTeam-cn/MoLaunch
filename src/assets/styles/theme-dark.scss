@@ -428,10 +428,37 @@ html[data-theme='dark'],
   background-color: rgb(15 17 21 / var(--ui-bg-mask, 0));
 }
 
-/* 开背景图后让卡片半透明，否则背景被完全盖住看不出效果 */
-[data-has-background='true'] .bg-white {
-  background-color: rgb(255 255 255 / 0.88);
+/* ============================================================
+   自定义背景图：内容区玻璃化
+   ------------------------------------------------------------
+   背景图铺在最底层，若 body / 主区域仍是不透明底色、卡片又是纯白，
+   背景就只剩模糊轮廓。这里把页面底色让空、主区域加背景模糊，
+   卡片按 --ui-panel-alpha 半透明，形成磨砂玻璃效果。
+   ============================================================ */
+[data-has-background='true'] body {
+  background-color: transparent;
 }
+
+[data-has-background='true'] .app-main {
+  background-color: transparent;
+  backdrop-filter: blur(var(--ui-panel-blur, 16px)) saturate(1.12);
+}
+
+[data-has-background='true'] .bg-white {
+  background-color: rgb(255 255 255 / var(--ui-panel-alpha, 0.7));
+}
+
 [data-has-background='true'][data-theme='dark'] .bg-white {
-  background-color: rgb(23 26 31 / 0.88);
+  background-color: rgb(23 26 31 / var(--ui-panel-alpha, 0.7));
+}
+
+/* 浮层跟随同一透明度，避免下拉/弹窗比卡片更实 */
+[data-has-background='true'] [class*='shadow-lg'],
+[data-has-background='true'] .bg-surface-pop {
+  background-color: rgb(255 255 255 / var(--ui-panel-alpha, 0.7));
+}
+
+[data-has-background='true'][data-theme='dark'] [class*='shadow-lg'],
+[data-has-background='true'][data-theme='dark'] .bg-surface-pop {
+  background-color: rgb(23 26 31 / var(--ui-panel-alpha, 0.7));
 }

@@ -21,6 +21,8 @@ export interface BackgroundPrefs {
   blur: number
   /** 遮罩不透明度（0-100，越大背景越淡、内容越清晰） */
   mask: number
+  /** 内容区不透明度（0-100，越小卡片越透、背景越明显；100 为完全不透明） */
+  panel: number
   /** 填充方式 */
   fill: BackgroundFill
 }
@@ -51,6 +53,6 @@ export const DEFAULT_UI_PREFS: UiPrefs = {
   appearance: 'system',
   density: 'normal',
   reduceMotion: false,
-  background: { image: '', blur: 0, mask: 0, fill: 'cover' },
+  background: { image: '', blur: 0, mask: 0, panel: 70, fill: 'cover' },
   hiddenPages: [],
 }

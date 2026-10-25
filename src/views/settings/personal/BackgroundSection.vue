@@ -66,7 +66,7 @@ async function chooseImage() {
         <div class="flex items-center justify-between gap-4">
           <div class="min-w-0">
             <p class="text-sm font-medium text-gray-900">背景模糊</p>
-            <p class="text-xs text-gray-500 mt-0.5">模糊越强，背景越柔和，文字也越易读</p>
+            <p class="text-xs text-gray-500 mt-0.5">模糊越强，背景越柔和，文字也越易读；配合下方「内容区不透明度」一起调</p>
           </div>
           <div class="flex-none w-40">
             <Slider
@@ -84,7 +84,7 @@ async function chooseImage() {
         <div class="flex items-center justify-between gap-4">
           <div class="min-w-0">
             <p class="text-sm font-medium text-gray-900">背景遮罩</p>
-            <p class="text-xs text-gray-500 mt-0.5">数值越大背景越淡、界面越清晰</p>
+            <p class="text-xs text-gray-500 mt-0.5">数值越大背景越淡、界面越清晰；0 为完全不加遮罩</p>
           </div>
           <div class="flex-none w-40">
             <Slider
@@ -93,6 +93,24 @@ async function chooseImage() {
               :max="100"
               :step="1"
               @update:model-value="uiStore.setBackground({ mask: Number($event) })"
+            />
+          </div>
+        </div>
+      </div>
+      <!-- 内容区不透明度 -->
+      <div class="px-5 py-4">
+        <div class="flex items-center justify-between gap-4">
+          <div class="min-w-0">
+            <p class="text-sm font-medium text-gray-900">内容区不透明度</p>
+            <p class="text-xs text-gray-500 mt-0.5">调低后卡片变半透明，背景图更明显；过低会影响文字可读性</p>
+          </div>
+          <div class="flex-none w-40">
+            <Slider
+              :model-value="uiStore.background.panel"
+              :min="20"
+              :max="100"
+              :step="1"
+              @update:model-value="uiStore.setBackground({ panel: Number($event) })"
             />
           </div>
         </div>

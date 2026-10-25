@@ -87,6 +87,10 @@ export function applyUiPrefs(prefs: UiPrefs, backgroundImageUrl?: string): void 
   root.style.setProperty('--ui-bg-mask', `${background.mask / 100}`)
   root.style.setProperty('--ui-bg-size', background.fill === 'repeat' ? 'auto' : background.fill)
   root.style.setProperty('--ui-bg-repeat', background.fill === 'repeat' ? 'repeat' : 'no-repeat')
+  // 内容区玻璃层：卡片透明度与主区域背景模糊（背景图模式下才生效）
+  const panel = Number.isFinite(background.panel) ? background.panel : 70
+  root.style.setProperty('--ui-panel-alpha', String(Math.min(100, Math.max(0, panel)) / 100))
+  root.style.setProperty('--ui-panel-blur', '16px')
 }
 
 /** 监听系统配色/动效变化，变化时回调（返回取消函数） */
