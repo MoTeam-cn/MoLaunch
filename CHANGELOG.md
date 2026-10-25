@@ -4,6 +4,16 @@
 
 ## [Unreleased]
 
+### 修复
+
+#### Forge / NeoForge 安装器失败时看不到原因（last lines: []）
+
+- [`forge_installer.rs`](src-tauri/src/minecraft/loaders/forge_installer.rs)：安装器输出改为按字节读取后解码，UTF-8 失败时回退 GBK。中文 Windows 上 JVM 的报错信息是 GBK 编码，原先按 UTF-8 逐行读会在第一行就失败并丢弃全部内容，用户只看到 `last lines: []`；现在能拿到真实原因。
+- [`forge_installer.rs`](src-tauri/src/minecraft/loaders/forge_installer.rs)：修复 wrapper 分支系统属性写法——`-Doolloo.jlw.tmpdir` 少了 `=`，JVM 会把后面的临时目录当成主类名，导致游戏目录含中文或空格时安装器根本没启动。
+- [`forge_installer.rs`](src-tauri/src/minecraft/loaders/forge_installer.rs)：stdout/stderr 合并收集（不再因 stderr 先读而丢失尾部），失败信息改为「退出码 + 最近输出 + 完整日志路径」，日志落到 `cache/forge_installer/installer-*.log`。
+- [`forge_installer.rs`](src-tauri/src/minecraft/loaders/forge_installer.rs)：成功判定改为「退出码为 0 或输出含成功标记」，避免安装其实成功却被判失败；启动前校验官方安装器与注入器文件存在；classpath 分隔符按平台取值；新增 15 分钟超时强杀，避免安装器卡死时一直等待。
+- [`forge_installer_test.rs`](src-tauri/src/minecraft/loaders/forge_installer_test.rs)（新增）：覆盖 GBK 解码、参数拼装（含 wrapper 的 `=` 写法）、Java 9+ 导出参数。
+
 ### 新增
 
 #### Mod 安装前预检（加载器/版本不匹配直接拦下）
