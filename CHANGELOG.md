@@ -4,6 +4,17 @@
 
 ## [Unreleased]
 
+### 重构
+
+#### 重写收敛：结构与数据分离
+
+- [`error.rs`](src-tauri/src/mod_translation/error.rs)：错误码由枚举改为常量表（字符串契约不变）。
+- [`memory.rs`](src-tauri/src/mod_translation/memory.rs)：翻译记忆改为「行数组」落盘，记忆键改长度前缀拼接，截断逻辑按命中热度重排。
+- [`resume.rs`](src-tauri/src/mod_translation/resume.rs)：检查点按阶段分组（`language` / `class` / `graph`），工作区选择改为单次扫描取最新。
+- [`ledger/class_decision.rs`](src-tauri/src/mod_translation/ledger/class_decision.rs)：处置账本改为私有记录表 + 方法访问（`record` / `pending` / `excluded_ids` / `mark_touched`）。
+- [`mod_name.rs`](src-tauri/src/mod_translation/mod_name.rs)：译名词表外置为 [`mod-name-dictionary.txt`](src-tauri/resources/mod_translation/mod-name-dictionary.txt)，解析结果进程内缓存。
+- [`recipe-generator/types.ts`](src/utils/recipe-generator/types.ts)：类型按域拆分到 `types/` 目录，槽位名改模板字面量类型，面板选项抽成独立类型。
+
 ### 变更
 
 #### 致谢补充：Axolotl Launcher
