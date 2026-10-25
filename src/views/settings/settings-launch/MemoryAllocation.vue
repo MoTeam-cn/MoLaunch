@@ -9,7 +9,7 @@
  *
  * 配置加载与防抖保存复用 useConfigPage composable，独立维护 loaded 守卫。
  */
-import { ref, watch, defineAsyncComponent } from 'vue'
+import { computed, ref, watch, defineAsyncComponent } from 'vue'
 import * as tauri from '@/utils/tauri'
 import { formatMemoryMB } from '@/utils/format'
 import { useConfigPage } from '@/composables/useConfigPage'
@@ -19,6 +19,7 @@ const Slider = defineAsyncComponent(() => import('@/components/common/Slider.vue
 const MemoryUsageBar = defineAsyncComponent(() => import('@/components/settings/MemoryUsageBar.vue'))
 import { safeCall } from '@/utils/async'
 import { toastError } from '@/utils/toast'
+import { recommendJvm } from '@/utils/jvm-recommend'
 
 const minMemory = ref(512)
 const maxMemory = ref(2048)
@@ -75,6 +76,16 @@ watch(memoryMode, (mode) => {
   markDirty('memoryMode', mode)
 })
 
+/** 按物理内存给出的推荐值 */
+const recommendation = computed(() => recommendJvm(totalMemoryMB.value))
+
+/** 采用推荐值：切到自定义模式并写入推荐内存 */
+function useRecommendation() {
+  memoryMode.value = 'custom'
+  maxMemory.value = recommendation.value.memoryMB
+  if (minMemory.value > maxMemory.value) minMemory.value = maxMemory.value
+}
+
 // 内存配置的防抖保存由 useDebouncedSave 在组件卸载时自动 flush；
 // 轮询由 usePolling 在 onUnmounted 自动 stop。
 </script>
@@ -93,6 +104,21 @@ watch(memoryMode, (mode) => {
         :used-percent="usedPercent"
         :game-percent="gamePercent"
       />
+    </div>
+
+    <!-- 推荐值 -->
+    <div class="mx-5 mb-4 rounded-md bg-gray-50 px-3 py-2.5">
+      <div class="flex items-center justify-between gap-3">
+        <p class="text-xs text-gray-600">
+          推荐 {{ formatMemoryMB(recommendation.memoryMB) }}：{{ recommendation.reason }}
+        </p>
+        <Button size="small" type="outline" class="flex-none" @click="useRecommendation">
+          用推荐值
+        </Button>
+      </div>
+      <p class="mt-1 text-xs text-gray-400">
+        通用参数：{{ recommendation.extraArgs.join(' ') }}（GC 由启动器按 Java 版本自动选择）
+      </p>
     </div>
 
     <div class="divide-y divide-gray-200">

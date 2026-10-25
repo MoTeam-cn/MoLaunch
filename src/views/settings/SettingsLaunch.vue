@@ -9,6 +9,7 @@
  */
 import { ref, watch, defineAsyncComponent } from 'vue'
 import { useConfigPage } from '@/composables/useConfigPage'
+import { loadAutoBackupSetting, saveAutoBackupSetting } from '@/utils/auto-backup'
 const Select = defineAsyncComponent(() => import('@/components/common/Select.vue'))
 const ToggleRow = defineAsyncComponent(() => import('@/components/settings/ToggleRow.vue'))
 const JavaPathSelector = defineAsyncComponent(() => import('./settings-launch/JavaPathSelector.vue'))
@@ -20,6 +21,13 @@ const isolationMode = ref(4)
 const launchDisableJlw = ref(false)
 const launchDisableLua = ref(false)
 const launchUseDedicatedGpu = ref(false)
+/** 启动前自动备份存档（纯前端偏好，存 localStorage） */
+const autoBackupEnabled = ref(loadAutoBackupSetting().enabled)
+
+function saveAutoBackup(enabled: boolean) {
+  autoBackupEnabled.value = enabled
+  saveAutoBackupSetting({ enabled })
+}
 
 const isolationOptions = [
   { label: '关闭', value: 0 },
@@ -112,6 +120,13 @@ function saveLaunchSwitch(key: 'launchDisableJlw' | 'launchDisableLua' | 'launch
           description="在 Windows 图形设置里为 Java 指定独立显卡，减少核显瓶颈"
           :hover="false"
           @update:model-value="(v) => saveLaunchSwitch('launchUseDedicatedGpu', v)"
+        />
+        <ToggleRow
+          v-model="autoBackupEnabled"
+          label="启动前自动备份存档"
+          description="每个版本每天备份一次，只备份前 3 个存档并覆盖旧文件；备份失败不影响启动"
+          :hover="false"
+          @update:model-value="saveAutoBackup"
         />
       </div>
     </div>

@@ -12,6 +12,7 @@ import * as tauri from '@/utils/tauri'
 import { toastSuccess, toastError, toastWarning, toastInfo } from '@/utils/toast'
 import { showCrashDialog } from '@/utils/crashDialog'
 import { maybeTriggerLaunchHints } from '@/utils/buyHint'
+import { runAutoBackup } from '@/utils/auto-backup'
 import { safeCall } from '@/utils/async'
 import { useOnlineStore } from '@/stores/online'
 import type { CrashInfo } from '@/types/version'
@@ -114,7 +115,7 @@ let javaNoticeUnlisten: Array<() => void> = []
         toastSuccess('游戏已退出')
       } else if (crash_info) {
         // 弹出崩溃分析对话框
-        showCrashDialog(crash_info)
+        showCrashDialog(crash_info, event.payload.version_id)
       } else {
         toastError(`游戏已退出（代码: ${exit_code}）`)
       }
@@ -147,6 +148,8 @@ let javaNoticeUnlisten: Array<() => void> = []
      *  用途：联机模块启动 MC 时追加 -Djava.net.preferIPv4Stack=true */
     extraJvmArgs?: string[]
   }): Promise<number> {
+    // 启动前自动备份存档（设置里开启后每个版本每天一次；失败不阻断启动）
+    await safeCall(() => runAutoBackup(params.versionId), 'auto backup worlds')
     launching.value = true
     launchingVersionId.value = params.versionId
     launchProgress.value = null
