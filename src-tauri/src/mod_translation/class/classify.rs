@@ -261,7 +261,11 @@ fn is_pure_command(value: &str) -> bool {
 }
 
 fn is_command_argument(token: &str) -> bool {
-    let plain = |c: char| c.is_ascii_alphanumeric() || matches!(c, '_' | '.' | ':' | '-');
+    // 命令参数常见形态：普通字面量、选择器（@p / @e[type=x]）、坐标（~ ~1 ~）、通配符
+    let plain = |c: char| {
+        c.is_ascii_alphanumeric()
+            || matches!(c, '_' | '.' | ':' | '-' | '@' | '~' | '^' | '*' | '!')
+    };
     if token.chars().all(plain) {
         return true;
     }
