@@ -29,21 +29,12 @@ use super::prepare::Prepared;
 /// 取消哨兵错误消息（各路由内部返回，据此判定为用户取消）
 const CANCEL_MSG: &str = "任务已取消";
 
-/// 阶段结果
-enum StageResult {
-    Done,
-    Cancelled,
-    Fatal(String),
-}
-
-impl StageResult {
-    /// 把路由返回的错误归类为取消或致命错误
-    fn from_error(error: String, cancel: &AtomicBool) -> Self {
-        if error == CANCEL_MSG || cancel.load(Ordering::Relaxed) {
-            StageResult::Cancelled
-        } else {
-            StageResult::Fatal(error)
-        }
+/// 路由错误归类：`None` 表示用户取消，`Some` 为致命错误
+fn classify_error(error: String, cancel: &AtomicBool) -> Option<String> {
+    if error == CANCEL_MSG || cancel.load(Ordering::Relaxed) {
+        None
+    } else {
+        Some(error)
     }
 }
 
@@ -132,13 +123,12 @@ pub(crate) async fn run_task(
                             .map(|source| source.target_path.clone()),
                     );
                 }
-                Err(error) => match StageResult::from_error(error, &cancel_flag) {
-                    StageResult::Cancelled => cancelled = true,
-                    StageResult::Fatal(error) => {
+                Err(error) => match classify_error(error, &cancel_flag) {
+                    Some(error) => {
                         log_error!("[ModTranslation] 语言翻译失败: {error}");
                         fatal = Some(error);
                     }
-                    StageResult::Done => {}
+                    None => cancelled = true,
                 },
             }
             if !cancelled && fatal.is_none() {
@@ -170,13 +160,12 @@ pub(crate) async fn run_task(
         .await;
         match outcome {
             Ok(()) => {}
-            Err(error) => match StageResult::from_error(error, &cancel_flag) {
-                StageResult::Cancelled => cancelled = true,
-                StageResult::Fatal(error) => {
+            Err(error) => match classify_error(error, &cancel_flag) {
+                Some(error) => {
                     log_error!("[ModTranslation] class 文本翻译失败: {error}");
                     fatal = Some(error);
                 }
-                StageResult::Done => {}
+                None => cancelled = true,
             },
         }
         if !cancelled && fatal.is_none() {
@@ -210,13 +199,12 @@ pub(crate) async fn run_task(
             match outcome {
                 Ok(true) => {}
                 Ok(false) => log_warn!("[ModTranslation] 质量回修存在残留问题，继续打包"),
-                Err(error) => match StageResult::from_error(error, &cancel_flag) {
-                    StageResult::Cancelled => cancelled = true,
-                    StageResult::Fatal(error) => {
+                Err(error) => match classify_error(error, &cancel_flag) {
+                    Some(error) => {
                         log_error!("[ModTranslation] 质量回修失败: {error}");
                         fatal = Some(error);
                     }
-                    StageResult::Done => {}
+                    None => cancelled = true,
                 },
             }
             if !cancelled && fatal.is_none() {
