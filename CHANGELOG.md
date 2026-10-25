@@ -2,6 +2,21 @@
 
 本项目所有重要变更均会记录在此文件中。格式参考 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/)。
 
+## [Unreleased]
+
+### 变更
+
+#### 界面说明文案按自有措辞重写（降低与第三方项目表述雷同的风险）
+
+- 做法：把仓库内中文字符串与本地参考源码逐条比对（提取对方 12 字以上中文字面量，与 `src/`、`src-tauri/src/`、`src-tauri/resources/` 的字面量做完全匹配 + 14 字连续片段近似匹配），命中的说明性长句改写，术语保留。
+- [`SetupTab.vue`](src/views/version-settings/SetupTab.vue)：Java 兼容性、版本文件校验、Mod 更新锁定、窗口标题、Java Launch Wrapper / LWJGL Unsafe Agent 等 10 处说明与提示重写。
+- [`SettingsLaunch.vue`](src/views/settings/SettingsLaunch.vue)：Java Launch Wrapper、LWJGL Unsafe Agent、独立显卡三项说明重写。
+- [`AdvanceFieldsPanel.vue`](src/components/version-settings/AdvanceFieldsPanel.vue)：JVM 参数与游戏参数两条提示重写。
+- [`LoaderSelect.vue`](src/views/LoaderSelect.vue)：加载器版本加载中的禁用提示改为中性表述。
+- [`useVersionOverviewActions.ts`](src/composables/useVersionOverviewActions.ts)：版本描述编辑提示重写。
+- 后端导出选项说明：[`basic.rs`](src-tauri/src/commands/version/export/options/basic.rs)、[`mods.rs`](src-tauri/src/commands/version/export/options/mods.rs)、[`world.rs`](src-tauri/src/commands/version/export/options/world.rs)、[`misc.rs`](src-tauri/src/commands/version/export/options/misc.rs) 共 10 条描述改为自有措辞。
+- 结果：完全一致的字符串 34 → 18 条，剩余均为不可替代的术语（官方披风名、第三方组件名、「与 X 不兼容」等）。
+
 ## [0.3.12-rc.5] - 2026-10-25
 
 ### 修复

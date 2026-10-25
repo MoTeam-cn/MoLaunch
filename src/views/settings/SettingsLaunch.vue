@@ -95,21 +95,21 @@ function saveLaunchSwitch(key: 'launchDisableJlw' | 'launchDisableLua' | 'launch
         <ToggleRow
           v-model="launchDisableJlw"
           label="禁用 Java Launch Wrapper"
-          description="JLW 用于修复 Java 18- 在中文路径下可能无法正常启动的问题，若启动异常可尝试关闭"
+          description="Java Launch Wrapper：规避 Java 18 起在中文路径下启动失败的问题；出现异常可关闭"
           :hover="false"
           @update:model-value="(v) => saveLaunchSwitch('launchDisableJlw', v)"
         />
         <ToggleRow
           v-model="launchDisableLua"
           label="禁用 LWJGL Unsafe Agent"
-          description="LUA 用于修复 LWJGL 3.4.1 的性能问题，若游戏卡顿可尝试关闭"
+          description="LWJGL Unsafe Agent：规避 LWJGL 3.4.1 的性能缺陷；出现异常可关闭"
           :hover="false"
           @update:model-value="(v) => saveLaunchSwitch('launchDisableLua', v)"
         />
         <ToggleRow
           v-model="launchUseDedicatedGpu"
           label="使用高性能显卡"
-          description="自动在 Windows 设置中将 Java 改为使用独立显卡，提升游戏帧率"
+          description="在 Windows 图形设置里为 Java 指定独立显卡，减少核显瓶颈"
           :hover="false"
           @update:model-value="(v) => saveLaunchSwitch('launchUseDedicatedGpu', v)"
         />

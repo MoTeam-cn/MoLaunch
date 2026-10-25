@@ -68,7 +68,7 @@ export function useVersionOverviewActions(options: UseVersionOverviewActionsOpti
     const oldDesc = personalization.value?.customInfo ?? ''
     showPrompt(
       '修改版本描述',
-      '修改版本的描述文本，留空则使用默认描述。',
+      '填写该版本的说明文字，留空则显示默认说明。',
       async (newDesc: string) => {
         if (!selectedId.value) return
         try {

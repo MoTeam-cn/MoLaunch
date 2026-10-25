@@ -131,7 +131,7 @@ onMounted(loadSetup)
 
         <div class="flex items-center gap-3">
           <label class="w-28 flex-none text-xs text-gray-500">游戏窗口标题</label>
-          <Tooltip text="自定义游戏窗口的标题，若留空则跟随全局设置的值。" position="top" :delay="0" class="flex-1">
+          <Tooltip text="设置该版本启动时的窗口标题；留空则沿用全局设置。" position="top" :delay="0" class="flex-1">
             <Input v-model="windowTitle" placeholder="跟随全局设置" @blur="savePersonalField('windowTitle', windowTitle, '窗口标题')" />
           </Tooltip>
         </div>
@@ -192,36 +192,36 @@ onMounted(loadSetup)
         <ToggleRow
           v-model="advanceDisableModUpdate"
           label="禁止更新 Mod"
-          description="禁止为此版本更新 Mod，防止整合包玩家误操作"
-          tooltip-text="禁止为此版本更新 Mod，以防止整合包玩家误操作。"
+          description="锁定该版本的 Mod 目录，避免玩家误删或误换"
+          tooltip-text="开启后不允许通过启动器修改该版本的 Mod，适合把整合包分发给玩家时使用。"
           @update:model-value="(v) => saveAdvanceSwitch('advanceDisableModUpdate', v, '禁止更新 Mod')"
         />
         <ToggleRow
           v-model="advanceIgnoreJavaWarning"
           label="忽略 Java 兼容性警告"
-          description="跳过兼容性警告弹窗，强制使用手动选择的 Java"
-          tooltip-text="如果手动选择了与当前版本不兼容的 Java，则自动跳过兼容性警告弹窗，强制使用手动选择的 Java。"
+          description="手动指定的 Java 不再弹兼容性提醒"
+          tooltip-text="开启后，即使手动选择的 Java 与当前版本不匹配，也直接启动、不再弹出提醒。"
           @update:model-value="(v) => saveAdvanceSwitch('advanceIgnoreJavaWarning', v, '忽略 Java 警告')"
         />
         <ToggleRow
           v-model="advanceDisableAssetsVerify"
           label="关闭文件校验"
-          description="不校验 libraries、assets、主 jar 文件是否被修改"
-          tooltip-text="完全不更改 assets；不校验 libraries、第三方登录库与版本主 jar 文件是否被修改。&#10;如果你没有修改相关文件，请勿勾选此项。"
+          description="启动前不再校验版本文件完整性"
+          tooltip-text="开启后跳过 libraries、assets、登录库与主 jar 的完整性检查，也不会自动补全这些文件。&#10;没有改动过版本文件时请不要开启。"
           @update:model-value="(v) => saveAdvanceSwitch('advanceDisableAssetsVerify', v, '文件校验')"
         />
         <ToggleRow
           v-model="advanceDisableJlw"
           label="禁用 Java Launch Wrapper"
           description="JLW 修复 Java 18- 中文路径启动问题，异常时可关闭"
-          tooltip-text="是否使用 Java Launch Wrapper 修复 Java 18- 在中文路径下可能无法正常启动的问题。&#10;详见：https://github.com/00ll00/java_launch_wrapper"
+          tooltip-text="Java Launch Wrapper 用于绕开 Java 18 起在含中文的路径下启动失败的问题。&#10;详见：https://github.com/00ll00/java_launch_wrapper"
           @update:model-value="(v) => saveAdvanceSwitch('advanceDisableJlw', v, 'JLW')"
         />
         <ToggleRow
           v-model="advanceDisableLua"
           label="禁用 LWJGL Unsafe Agent"
-          description="LUA 修复 LWJGL 3.4.1 性能问题，卡顿时可关闭"
-          tooltip-text="是否使用 LWJGL Unsafe Agent 修复 LWJGL 3.4.1 的一个性能问题。&#10;详见：https://github.com/HMCL-dev/lwjgl-unsafe-agent"
+          description="LWJGL Unsafe Agent 修复 LWJGL 3.4.1 的性能问题"
+          tooltip-text="LWJGL Unsafe Agent 用于规避 LWJGL 3.4.1 的一个性能缺陷。&#10;详见：https://github.com/HMCL-dev/lwjgl-unsafe-agent"
           @update:model-value="(v) => saveAdvanceSwitch('advanceDisableLua', v, 'LUA')"
         />
       </div>
