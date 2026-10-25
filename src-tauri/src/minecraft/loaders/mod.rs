@@ -17,4 +17,7 @@ pub use api::{
     install_loader, list_fabric_versions, list_forge_versions, list_liteloader_versions,
     list_neoforge_versions, list_optifine_versions,
 };
+#[cfg(test)]
+mod forge_installer_test;
+
 pub use types::{LoaderType, LoaderVersion};
