@@ -6,6 +6,15 @@
 
 ### 重构
 
+#### 模组翻译：质量审计与回修按规格重新实现
+
+- **质量审计**（[`quality.rs`](src-tauri/src/mod_translation/quality.rs)）：占位符提取改为字符扫描（printf / 花括号 / 格式码 / 转义 / 控制字符五个扫描器），术语表改为「词边界短语匹配」，透传与 credit 判定同样去正则；测试移到 [`quality_test.rs`](src-tauri/src/mod_translation/quality_test.rs)。
+- **回修编排**（[`repair.rs`](src-tauri/src/mod_translation/repair.rs)）：收集阶段抽成 `collect_with_progress`，批次切分抽成 `batches_by_target`，轮次推进只维护一个 `progress` 游标。
+- **修复方案**（[`repair_ai.rs`](src-tauri/src/mod_translation/repair_ai.rs)）：校验改为 `match_issue_id` + `action_is_valid` 两段，采纳时回填解析后的 issue id。
+- **写回**（[`repair_apply.rs`](src-tauri/src/mod_translation/repair_apply.rs)）：先解析全部 issue → 汇总译文 → 一次性写回 → 统一记账。
+
+### 重构
+
 #### 模组翻译：任务账本与模组名决策按规格重新实现
 
 - **工作图**（[`ledger/work_graph.rs`](src-tauri/src/mod_translation/ledger/work_graph.rs)）：模型类尝试收敛为 `MODEL_ACTIONS` 常量 + `is_model_action`，状态推进统一为「取到项 → 改字段 → 推进 version/revision」，`WorkKind` 自带来源标签。
