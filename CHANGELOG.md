@@ -6,6 +6,15 @@
 
 ### 重构
 
+#### 模组翻译：任务账本与模组名决策按规格重新实现
+
+- **工作图**（[`ledger/work_graph.rs`](src-tauri/src/mod_translation/ledger/work_graph.rs)）：模型类尝试收敛为 `MODEL_ACTIONS` 常量 + `is_model_action`，状态推进统一为「取到项 → 改字段 → 推进 version/revision」，`WorkKind` 自带来源标签。
+- **任务记忆**（[`ledger/task_memory.rs`](src-tauri/src/mod_translation/ledger/task_memory.rs)）：各字段上限提为常量，截断与裁剪抽成 `clip` / `keep_last`，数组解析合并为 `strings_of`。
+- **处置账本**（[`ledger/class_decision.rs`](src-tauri/src/mod_translation/ledger/class_decision.rs)）：排除动作收敛为常量 + `excluded()` 判定。
+- **模组名**（[`mod_name.rs`](src-tauri/src/mod_translation/mod_name.rs)）：决策链改为「候选生成器数组」，每个步骤只负责自己那一步，来源标签即步骤名；测试移到 [`mod_name_test.rs`](src-tauri/src/mod_translation/mod_name_test.rs) 并补齐 AI 推荐优先与通用名拒绝用例。
+
+### 重构
+
 #### 模组翻译：保序 JSON 与语言文件读写按规格重新实现
 
 - **保序 JSON**（[`json_value/`](src-tauri/src/mod_translation/json_value)）：解析拆成 `parser`（带边界检查的 `Reader` + 代理对合并）、渲染拆成 `writer`（缩进与转义），`JsonValue` 只保留解析/指针写入/渲染三个入口。

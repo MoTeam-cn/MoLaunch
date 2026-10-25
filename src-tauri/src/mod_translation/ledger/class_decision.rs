@@ -6,12 +6,21 @@ use serde::{Deserialize, Serialize};
 
 use crate::mod_translation::types::ClassCandidate;
 
+/// 排除动作标识：命中即不进输出 JAR
+const EXCLUDE_ACTION: &str = "exclude";
+
 /// class 候选处置决策
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ClassDecision {
     pub action: String,
     pub translation: Option<String>,
     pub reason: Option<String>,
+}
+
+impl ClassDecision {
+    fn excluded(&self) -> bool {
+        self.action == EXCLUDE_ACTION
+    }
 }
 
 /// class 处置账本
@@ -36,7 +45,7 @@ impl ClassDecisionLedger {
     pub fn snapshot_exclusions(&self) -> Vec<String> {
         self.decisions
             .iter()
-            .filter(|(_, decision)| decision.action == "exclude")
+            .filter(|(_, decision)| decision.excluded())
             .map(|(id, _)| id.clone())
             .collect()
     }
