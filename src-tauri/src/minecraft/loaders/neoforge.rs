@@ -247,17 +247,6 @@ pub async fn install(
     // 注入器资源（与第三方启动器同一份 jar，走镜像加速）
     let (injector_path, wrapper_path) = super::forge_installer::extract_embedded_resources()?;
 
-    // 先用启动器自己的下载器把库备好，绕开安装器的重定向次数限制；失败不阻断
-    match shared::prefetch_install_libraries(&installer_path, game_dir, config).await {
-        Ok(count) if count > 0 => log_info!("[NeoForge] 已预下载 {} 个库", count),
-        Ok(_) => {}
-        Err(e) => log_warn!("[NeoForge] 预下载库失败（继续安装）: {}", e),
-    }
-
-    if let Some(ref cb) = progress_callback {
-        cb(45.0);
-    }
-
     // 安装器进度（0~1）映射到 50%~80% 区间
     let installer_progress = progress_callback.clone().map(|cb| {
         let handler: super::forge_installer::ProgressHandler =
@@ -269,15 +258,48 @@ pub async fn install(
     let installer_path_str = installer_path.to_string_lossy().to_string();
     let game_dir_str = game_dir.to_string_lossy().to_string();
 
-    super::forge_installer::run_forge_installer(
+    // 主路径：注入器
+    let mut install_result = super::forge_installer::run_forge_installer(
         &java_path_str,
         &installer_path_str,
         &injector_path,
         &wrapper_path,
         &game_dir_str,
         true,
-        installer_progress,
-    )?;
+        installer_progress.clone(),
+    );
+
+    // 兜底：注入器失败时由启动器补全库再试一次
+    let mut first_error_message: Option<String> = None;
+    if let Some(first_error) = install_result.as_ref().err().map(ToString::to_string) {
+        log_warn!(
+            "[NeoForge] 安装器失败，改由启动器补全库后重试: {}",
+            first_error
+        );
+        match shared::prefetch_install_libraries(&installer_path, game_dir, config).await {
+            Ok(count) if count > 0 => {
+                log_info!("[NeoForge] 已补全 {} 个库，重试安装器", count);
+                first_error_message = Some(first_error);
+                install_result = super::forge_installer::run_forge_installer(
+                    &java_path_str,
+                    &installer_path_str,
+                    &injector_path,
+                    &wrapper_path,
+                    &game_dir_str,
+                    true,
+                    installer_progress,
+                );
+            }
+            Ok(_) => log_warn!("[NeoForge] 没有需要补全的库，保留原始错误"),
+            Err(e) => log_warn!("[NeoForge] 补全库失败，保留原始错误: {}", e),
+        }
+    }
+    if let Err(error) = install_result {
+        return Err(match first_error_message {
+            Some(first) => anyhow::anyhow!("{}；补全库重试前的错误：{}", error, first),
+            None => error,
+        });
+    }
     if let Some(ref cb) = progress_callback {
         cb(80.0);
     }

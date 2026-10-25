@@ -6,14 +6,15 @@
 
 ### 修复
 
-#### 加载器安装：注入器单路径 + 安装前预下载库
+#### 加载器安装：注入器主路径，失败时由启动器补全库
 
-主路径与第三方启动器保持一致（使用同一份注入器 jar），并去掉官方安装器兜底（官方 maven 在国内下载过慢）：
+主路径与第三方启动器保持一致（同一份注入器 jar），官方安装器路径已移除（官方 maven 在国内下载过慢）：
 
-- [`shared.rs`](src-tauri/src/minecraft/loaders/shared.rs)：新增 `prefetch_install_libraries`，解析 `install_profile.json` 中声明了下载地址的库，用启动器自己的下载器（多源 + 重试）预下载到 `libraries/`，安装器命中「文件已存在，校验通过」后不再走镜像重定向；只处理主 artifact、不猜地址、上限 400 个，失败不阻断。
-- [`install.rs`](src-tauri/src/minecraft/loaders/forge/install.rs) / [`neoforge.rs`](src-tauri/src/minecraft/loaders/neoforge.rs)：安装前调用预下载，随后直接运行注入器；移除官方 `--installClient` 兜底路径。
+- [`install.rs`](src-tauri/src/minecraft/loaders/forge/install.rs) / [`neoforge.rs`](src-tauri/src/minecraft/loaders/neoforge.rs)：直接运行注入器；仅当注入器失败时，才由启动器自己补全库并重试一次，两次错误都写进提示。
+- [`shared.rs`](src-tauri/src/minecraft/loaders/shared.rs)：新增 `prefetch_install_libraries`，解析 `install_profile.json` 中声明了下载地址的库，用启动器自己的下载器（多源 + 重试）补到 `libraries/`；只处理主 artifact、不猜地址、上限 400 个，失败不阻断。
 - [`forge_installer.rs`](src-tauri/src/minecraft/loaders/forge_installer.rs)：移除 `run_official_installer` 与 `build_official_args`，只保留注入器；输出采集（GBK 回退解码、stdout/stderr 合并、15 分钟超时强杀、日志落盘）保持不变。
 - [`loader_helpers.rs`](src-tauri/src/commands/version/install/loader_helpers.rs)：安装器输出的真实进度写入阶段进度并广播，伪进度 ticker 改为「只补不覆盖」，不再出现一直 0% 然后直接跳 100%。
+
 
 ## [0.3.12-rc.6] - 2026-10-25
 
