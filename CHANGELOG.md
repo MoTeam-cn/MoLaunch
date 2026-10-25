@@ -6,12 +6,13 @@
 
 ### 修复
 
-#### Forge / NeoForge 安装改走官方安装器，并恢复安装进度
+#### 加载器安装回到注入器主路径，并恢复真实进度
 
-- [`forge_installer.rs`](src-tauri/src/minecraft/loaders/forge_installer.rs)：新增 `run_official_installer`，用 `java -jar <installer> --installClient`（工作目录设为游戏目录）走官方 maven 安装，不再被注入器强制改写到镜像；注入器保留为兜底。两条路径共用同一套输出采集（GBK 回退解码、stdout/stderr 合并、15 分钟超时强杀、日志落盘）。
-- [`install.rs`](src-tauri/src/minecraft/loaders/forge/install.rs) / [`neoforge.rs`](src-tauri/src/minecraft/loaders/neoforge.rs)：安装顺序改为「先官方安装器，失败再用注入器」，两个错误都写进提示；注入器资源改为只在兜底时解压。
+参考第三方启动器做法（其仓库内置的 `forge-installer.jar` 与本项目为同一文件，字节一致），主路径保持注入器 + 镜像加速不变：
+
+- [`forge_installer.rs`](src-tauri/src/minecraft/loaders/forge_installer.rs)：新增 `run_official_installer`（`java -jar <installer> --installClient`，工作目录设为游戏目录），仅作为注入器失败后的兜底；两条路径共用同一套输出采集（GBK 回退解码、stdout/stderr 合并、15 分钟超时强杀、日志落盘）。
+- [`install.rs`](src-tauri/src/minecraft/loaders/forge/install.rs) / [`neoforge.rs`](src-tauri/src/minecraft/loaders/neoforge.rs)：安装顺序为「注入器 → 官方安装器兜底」，两个错误都写进提示。
 - [`loader_helpers.rs`](src-tauri/src/commands/version/install/loader_helpers.rs)：把安装器输出的真实进度写入阶段进度并广播，伪进度 ticker 改为「只补不覆盖」，不再出现一直 0% 然后直接跳 100%。
-- 移除上一版引入的库预取兜底（改走官方安装器后不再需要）。
 
 ## [0.3.12-rc.6] - 2026-10-25
 

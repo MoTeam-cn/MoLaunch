@@ -247,6 +247,9 @@ pub async fn install(
         cb(50.0);
     }
 
+    // 注入器资源（与第三方启动器同款 jar，走镜像加速）
+    let (injector_path, wrapper_path) = super::forge_installer::extract_embedded_resources()?;
+
     // 安装器进度（0~1）映射到 50%~80% 区间
     let installer_progress = progress_callback.clone().map(|cb| {
         let handler: super::forge_installer::ProgressHandler =
@@ -258,30 +261,30 @@ pub async fn install(
     let installer_path_str = installer_path.to_string_lossy().to_string();
     let game_dir_str = game_dir.to_string_lossy().to_string();
 
-    // 首选官方安装器：走官方 maven，重定向链最短；失败再走注入器（镜像加速）兜底
-    match super::forge_installer::run_official_installer(
+    // 主路径：注入器；失败再改用官方安装器兜底，两个错误都保留
+    match super::forge_installer::run_forge_installer(
         &java_path_str,
         &installer_path_str,
+        &injector_path,
+        &wrapper_path,
         &game_dir_str,
+        true,
         installer_progress.clone(),
     ) {
         Ok(()) => {}
-        Err(official_error) => {
+        Err(injector_error) => {
             log_warn!(
-                "[NeoForge] 官方安装器失败，改用注入器重试: {}",
-                official_error
+                "[NeoForge] 注入器安装失败，改用官方安装器重试: {}",
+                injector_error
             );
-            super::forge_installer::run_forge_installer(
+            super::forge_installer::run_official_installer(
                 &java_path_str,
                 &installer_path_str,
-                &injector_path,
-                &wrapper_path,
                 &game_dir_str,
-                true,
                 installer_progress,
             )
-            .map_err(|injector_error| {
-                anyhow::anyhow!("官方安装器：{}；注入器：{}", official_error, injector_error)
+            .map_err(|official_error| {
+                anyhow::anyhow!("注入器：{}；官方安装器：{}", injector_error, official_error)
             })?;
         }
     }

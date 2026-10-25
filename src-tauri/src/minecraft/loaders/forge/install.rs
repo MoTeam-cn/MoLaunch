@@ -130,6 +130,10 @@ async fn install_modern(
         cb(50.0);
     }
 
+    // 注入器资源（与第三方启动器同款 jar，走镜像加速）
+    let (injector_path, wrapper_path) =
+        super::super::forge_installer::extract_embedded_resources()?;
+
     // 安装器进度（0~1）映射到 50%~80% 区间，由上层写进阶段进度
     let installer_progress = progress_callback.clone().map(|cb| {
         let handler: super::super::forge_installer::ProgressHandler =
@@ -139,50 +143,54 @@ async fn install_modern(
 
     let java_path_owned = java_path.to_string();
     let installer_path_str = installer_path.to_string_lossy().to_string();
+    let injector_path_owned = injector_path.to_string();
+    let wrapper_path_owned = wrapper_path.to_string();
     let game_dir_str = game_dir.to_string_lossy().to_string();
 
-    // 首选官方安装器：走官方 maven，不经镜像改写，重定向链最短，进度也来自安装器输出
-    let official_result = tokio::task::spawn_blocking({
-        let (java, installer, dir, handler) = (
+    // 主路径：注入器（与第三方启动器做法一致，走镜像加速）
+    let injector_result = tokio::task::spawn_blocking({
+        let (java, installer, injector, wrapper, dir, handler) = (
             java_path_owned.clone(),
             installer_path_str.clone(),
+            injector_path_owned.clone(),
+            wrapper_path_owned.clone(),
             game_dir_str.clone(),
             installer_progress.clone(),
         );
         move || {
-            super::super::forge_installer::run_official_installer(&java, &installer, &dir, handler)
+            super::super::forge_installer::run_forge_installer(
+                &java, &installer, &injector, &wrapper, &dir, false, handler,
+            )
         }
     })
     .await
     .map_err(|e| anyhow::anyhow!("Forge installer task panicked: {}", e))?;
 
-    // 官方路径失败时改用注入器（国内镜像加速）兜底，两条错误都保留
-    let install_result = match official_result {
+    // 兜底：注入器失败时改用官方安装器（走官方 maven，不经镜像改写）
+    let install_result = match injector_result {
         Ok(()) => Ok(()),
-        Err(official_error) => {
-            log_warn!("[Forge] 官方安装器失败，改用注入器重试: {}", official_error);
-            // 注入器资源只在需要兜底时才解压
-            let (injector_path_owned, wrapper_path_owned) =
-                super::super::forge_installer::extract_embedded_resources()?;
+        Err(injector_error) => {
+            log_warn!(
+                "[Forge] 注入器安装失败，改用官方安装器重试: {}",
+                injector_error
+            );
             tokio::task::spawn_blocking({
-                let (java, installer, injector, wrapper, dir, handler) = (
+                let (java, installer, dir, handler) = (
                     java_path_owned,
                     installer_path_str,
-                    injector_path_owned,
-                    wrapper_path_owned,
                     game_dir_str,
                     installer_progress,
                 );
                 move || {
-                    super::super::forge_installer::run_forge_installer(
-                        &java, &installer, &injector, &wrapper, &dir, false, handler,
+                    super::super::forge_installer::run_official_installer(
+                        &java, &installer, &dir, handler,
                     )
                 }
             })
             .await
             .map_err(|e| anyhow::anyhow!("Forge installer task panicked: {}", e))?
-            .map_err(|injector_error| {
-                anyhow::anyhow!("官方安装器：{}；注入器：{}", official_error, injector_error)
+            .map_err(|official_error| {
+                anyhow::anyhow!("注入器：{}；官方安装器：{}", injector_error, official_error)
             })
         }
     };
