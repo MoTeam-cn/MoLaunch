@@ -21,10 +21,14 @@ pub(super) struct CollectedSources {
     pub(super) hs_err_text: String,
     /// latest.log 尾部行
     pub(super) latest_log_tail: Vec<String>,
+    /// mods 目录索引（用于把堆栈名字映射到具体 jar）
+    pub(super) mod_index: super::mod_index::ModIndex,
 }
 
 /// 收集各源文本
 pub(super) fn collect_sources(logs: &[LogEntry], game_dir: &Path) -> CollectedSources {
+    let mod_index = super::mod_index::ModIndex::load(&game_dir.join("mods"));
+
     let runtime_log: String = logs
         .iter()
         .map(|e| format!("[{:?}] {}", e.level, e.message))
@@ -73,6 +77,7 @@ pub(super) fn collect_sources(logs: &[LogEntry], game_dir: &Path) -> CollectedSo
         crash_report_text,
         hs_err_text,
         latest_log_tail,
+        mod_index,
     }
 }
 

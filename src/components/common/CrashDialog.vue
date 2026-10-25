@@ -111,7 +111,9 @@
     </div>
 
     <template #footer>
-      <div class="flex justify-end gap-2">
+      <div class="flex flex-wrap items-center gap-2">
+        <CrashFixActions :actions="fixActions" :version-id="versionId" @close="visible = false" />
+        <div class="ml-auto flex justify-end gap-2">
         <Button v-if="crashReportPath" type="outline" size="small" @click="openCrashReport">
           查看报告
         </Button>
@@ -144,6 +146,7 @@
           </div>
         </div>
         <Button type="primary" size="small" @click="visible = false">关闭</Button>
+        </div>
       </div>
     </template>
   </Drawer>
@@ -161,13 +164,14 @@ const Drawer = defineAsyncComponent(() => import('@/components/common/Drawer.vue
 const Button = defineAsyncComponent(() => import('@/components/common/Button.vue'))
 const Tag = defineAsyncComponent(() => import('@/components/common/Tag.vue'))
 const Collapse = defineAsyncComponent(() => import('@/components/common/Collapse.vue'))
+const CrashFixActions = defineAsyncComponent(() => import('@/components/common/crash/CrashFixActions.vue'))
 import { pickSavePath } from '@/utils/fileDialog'
 import { openPath, writeTextFile } from '@/utils/api/system'
 import { toastError, toastSuccess, toastInfo } from '@/utils/toast'
 import { open } from '@tauri-apps/plugin-shell'
 import { sanitizeShareLog, uploadLogShare, LOG_SHARE_PROVIDERS, analyseLogShare } from '@/utils/logShare'
 import type { LogShareProvider, MclogsAnalysis } from '@/utils/logShare'
-import type { CrashCategory, CrashInfo } from '@/types/version'
+import type { CrashAction, CrashCategory, CrashInfo } from '@/types/version'
 
 /** 崩溃类别展示元数据：标签文案、Tag 颜色、原因横幅的左侧色条与底色 */
 interface CategoryMeta {
@@ -190,6 +194,8 @@ const CATEGORY_META: Record<CrashCategory, CategoryMeta> = {
 }
 
 const visible = ref(false)
+/** 崩溃对应的版本 ID（修复动作需要它） */
+const versionId = ref<string | null>(null)
 const showDetails = ref(false)
 const crashInfo = ref<CrashInfo | null>(null)
 const shareMenuOpen = ref(false)
@@ -246,7 +252,11 @@ const categoryLabel = computed(() => categoryMeta.value.label)
 const categoryTagColor = computed(() => categoryMeta.value.tagColor)
 const bannerClass = computed(() => categoryMeta.value.bannerClass)
 
-function show(info: CrashInfo) {
+/** 可一键执行的修复动作 */
+const fixActions = computed<CrashAction[]>(() => lastCrash.value.actions ?? [])
+
+function show(info: CrashInfo, vid?: string) {
+  versionId.value = vid ?? null
   crashInfo.value = info
   showDetails.value = false
   visible.value = true

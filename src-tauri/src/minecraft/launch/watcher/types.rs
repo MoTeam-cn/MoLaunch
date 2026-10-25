@@ -47,6 +47,34 @@ pub struct CrashInfo {
     /// 游戏日志尾部（最近 N 行，供弹窗展示）
     #[serde(default)]
     pub log_tail: Vec<String>,
+    /// 可一键执行的修复动作（弹窗底部按钮）
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub actions: Vec<FixAction>,
+}
+
+/// 崩溃弹窗里可一键执行的修复动作
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(tag = "kind", rename_all = "snake_case")]
+pub enum FixAction {
+    /// 禁用指定 Mod 文件（改为 .disabled，可随时恢复）
+    DisableMod {
+        /// 按钮文案
+        label: String,
+        /// mods 目录下的文件名
+        file_name: String,
+    },
+    /// 打开该版本的 mods 目录
+    OpenModsDir {
+        /// 按钮文案
+        label: String,
+    },
+    /// 跳转到启动器内的设置页面
+    OpenRoute {
+        /// 按钮文案
+        label: String,
+        /// 前端路由（如 /apps/versions/setup）
+        route: String,
+    },
 }
 
 /// 崩溃类别

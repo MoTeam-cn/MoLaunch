@@ -7,6 +7,7 @@ mod analyze;
 mod collect;
 mod detector;
 mod detector_stack;
+mod mod_index;
 mod rules;
 mod scorer;
 mod util;

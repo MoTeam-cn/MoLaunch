@@ -78,6 +78,7 @@ pub(super) async fn handle_launch_failure(
             problematic_mod: None,
             crash_report_path: None,
             log_tail: Vec::new(),
+            actions: Vec::new(),
         }
     });
 

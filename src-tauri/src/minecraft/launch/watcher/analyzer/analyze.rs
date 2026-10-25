@@ -61,6 +61,7 @@ pub(crate) async fn analyze_crash(
             .as_ref()
             .map(|(p, _)| p.to_string_lossy().to_string()),
         log_tail,
+        actions: Vec::new(),
     })
 }
 

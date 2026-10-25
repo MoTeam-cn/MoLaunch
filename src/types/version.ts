@@ -34,6 +34,12 @@ export type CrashCategory =
   | 'Unknown'
 
 /** 崩溃详情（与后端 CrashInfo 结构对应） */
+/** 崩溃弹窗里可一键执行的修复动作（与后端 FixAction 对应） */
+export type CrashAction =
+  | { kind: 'disable_mod'; label: string; file_name: string }
+  | { kind: 'open_mods_dir'; label: string }
+  | { kind: 'open_route'; label: string; route: string }
+
 export interface CrashInfo {
   reason: string
   category: CrashCategory
@@ -42,4 +48,6 @@ export interface CrashInfo {
   problematic_mod: string | null
   crash_report_path?: string
   log_tail: string[]
+  /** 可一键执行的修复动作 */
+  actions?: CrashAction[]
 }

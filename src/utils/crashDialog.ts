@@ -12,7 +12,7 @@ export type { CrashCategory, CrashInfo } from '@/types/version'
 
 /** CrashDialog 组件实例对外暴露的接口 */
 export interface CrashDialogInstance {
-  show: (info: CrashInfo) => void
+  show: (info: CrashInfo, versionId?: string) => void
 }
 
 const crashDialogRef = ref<CrashDialogInstance | null>(null)
@@ -25,6 +25,6 @@ export function setCrashDialogRef(ref: CrashDialogInstance | null) {
  * 显示崩溃弹窗
  * 自动触发崩溃分析后弹出
  */
-export function showCrashDialog(info: CrashInfo) {
-  crashDialogRef.value?.show(info)
+export function showCrashDialog(info: CrashInfo, versionId?: string) {
+  crashDialogRef.value?.show(info, versionId)
 }

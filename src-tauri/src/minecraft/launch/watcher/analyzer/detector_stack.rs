@@ -60,17 +60,37 @@ impl Detector for StackDetector {
 
         let mod_names = analyze_mod_name(&keywords);
         mod_names.map_or_else(Vec::new, |names| {
+            // 把堆栈里猜出的名字对到 mods 目录里的 jar，弹窗才能给出「禁用哪个文件」
+            let resolved: Vec<String> = names
+                .iter()
+                .filter_map(|name| sources.mod_index.resolve(name))
+                .collect();
             let names_str = names.join(", ");
+            let (display, extracted) = match resolved.first() {
+                Some(file_name) => (
+                    format!("{}（堆栈关键字：{}）", resolved.join(", "), names_str),
+                    file_name.clone(),
+                ),
+                None => (names_str.clone(), names_str),
+            };
+            let suggestion = if resolved.is_empty() {
+                format!(
+                    "崩溃堆栈中出现了以下 Mod 的相关代码：{}\n可以尝试逐个禁用这些 Mod，观察游戏能否恢复正常。",
+                    display
+                )
+            } else {
+                format!(
+                    "崩溃堆栈指向 {}。\n可以先禁用该 Mod 再启动，确认问题是否消失；Mod 页的「快照与回滚」可以一键恢复。",
+                    display
+                )
+            };
             vec![Evidence {
                 confidence: 0.80,
                 category: CrashCategory::Mod,
                 source: SourceKind::RuntimeLog,
-                reason: format!("堆栈分析发现可能的 Mod: {}", names_str),
-                suggestion: format!(
-                    "崩溃堆栈中出现了以下 Mod 的相关代码：{}\n可以尝试逐个禁用这些 Mod，观察游戏能否恢复正常。",
-                    names_str
-                ),
-                extracted_mod: Some(names_str),
+                reason: format!("堆栈分析定位到 Mod: {}", display),
+                suggestion,
+                extracted_mod: Some(extracted),
             }]
         })
     }
