@@ -164,5 +164,7 @@ pub fn parse_class_constant_pool(bytes: &[u8]) -> Result<Vec<(String, usize, usi
 
 /// 被 String 常量引用的文本（运行时可见字符串），无法解析时返回空
 pub fn class_string_constants(bytes: &[u8]) -> Vec<String> {
-    read_pool(bytes).map(|pool| pool.strings()).unwrap_or_default()
+    read_pool(bytes)
+        .map(|pool| pool.strings())
+        .unwrap_or_default()
 }

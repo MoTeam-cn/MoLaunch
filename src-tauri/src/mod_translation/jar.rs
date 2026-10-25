@@ -152,7 +152,11 @@ pub fn collect_files(root: &Path) -> Result<Vec<String>, String> {
 }
 
 /// 把 `input` 的每个条目解到已存在的 `workspace`
-pub fn extract_archive(input: &Path, workspace: &Path, limits: &Limits) -> Result<Extraction, String> {
+pub fn extract_archive(
+    input: &Path,
+    workspace: &Path,
+    limits: &Limits,
+) -> Result<Extraction, String> {
     let metadata =
         std::fs::metadata(input).map_err(|e| format!("unable to stat the input archive: {e}"))?;
     if !metadata.is_file() {
@@ -211,8 +215,9 @@ pub fn extract_archive(input: &Path, workspace: &Path, limits: &Limits) -> Resul
 
         let target = resolve_inside(workspace, &raw_name)?;
         if let Some(parent) = target.parent() {
-            std::fs::create_dir_all(parent)
-                .map_err(|e| format!("unable to create a workspace directory for {raw_name}: {e}"))?;
+            std::fs::create_dir_all(parent).map_err(|e| {
+                format!("unable to create a workspace directory for {raw_name}: {e}")
+            })?;
         }
         let mut sink = File::create(&target)
             .map_err(|e| format!("unable to create the workspace file for {raw_name}: {e}"))?;
@@ -228,7 +233,10 @@ pub fn extract_archive(input: &Path, workspace: &Path, limits: &Limits) -> Resul
     .write(workspace)
     .map_err(|e| format!("unable to write the workspace metadata: {e}"))?;
 
-    Ok(Extraction { signed, entries: extracted })
+    Ok(Extraction {
+        signed,
+        entries: extracted,
+    })
 }
 
 /// 把工作区重新打成 JAR；条目名取自相对路径
@@ -251,7 +259,8 @@ pub fn package_archive(workspace: &Path, output: &Path) -> Result<(), String> {
         let handle =
             File::create(temporary).map_err(|e| format!("unable to create the output JAR: {e}"))?;
         let mut writer = zip::ZipWriter::new(handle);
-        let options = SimpleFileOptions::default().compression_method(zip::CompressionMethod::Deflated);
+        let options =
+            SimpleFileOptions::default().compression_method(zip::CompressionMethod::Deflated);
 
         for relative in collect_files(workspace)? {
             if is_internal_file(&relative) {

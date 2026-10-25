@@ -107,7 +107,7 @@ fn test_two_slot_constant_keeps_slot_accounting() {
 
 #[test]
 fn test_rejects_non_class_payload() {
-    let error = parse_class_constant_pool(b"PK\u{3}\u{4}not-a-class").unwrap_err();
+    let error = parse_class_constant_pool(b"PK\x03\x04not-a-class").unwrap_err();
     assert!(error.contains("magic"), "unexpected error: {error}");
     assert!(parse_class_constant_pool(&[]).is_err());
 }
@@ -132,7 +132,8 @@ fn test_rejects_unknown_constant_tag() {
 #[test]
 fn test_replace_utf8_rewrites_target_only() {
     let bytes = sword_class();
-    let rewritten = replace_class_utf8(&bytes, "Diamond Sword", "钻石剑").expect("rewrite should work");
+    let rewritten =
+        replace_class_utf8(&bytes, "Diamond Sword", "钻石剑").expect("rewrite should work");
 
     assert!(rewritten.starts_with(&[0xCA, 0xFE, 0xBA, 0xBE]));
     assert_eq!(class_string_constants(&rewritten), vec!["钻石剑"]);
@@ -142,14 +143,23 @@ fn test_replace_utf8_rewrites_target_only() {
     assert_eq!(entries[1].0, "Diamond");
     assert_eq!(entries[2].0, "Mythril Blade");
     // 只重建被替换条目，其余字节逐字节一致
-    assert_eq!(&rewritten[rewritten.len() - 14..], &bytes[bytes.len() - 14..]);
+    assert_eq!(
+        &rewritten[rewritten.len() - 14..],
+        &bytes[bytes.len() - 14..]
+    );
 }
 
 #[test]
 fn test_replace_utf8_is_noop_for_unknown_text() {
     let bytes = sword_class();
-    assert_eq!(replace_class_utf8(&bytes, "Iron Ingot", "铁锭").unwrap(), bytes);
-    assert_eq!(replace_class_utf8(&bytes, "Diamond", "Diamond").unwrap(), bytes);
+    assert_eq!(
+        replace_class_utf8(&bytes, "Iron Ingot", "铁锭").unwrap(),
+        bytes
+    );
+    assert_eq!(
+        replace_class_utf8(&bytes, "Diamond", "Diamond").unwrap(),
+        bytes
+    );
 }
 
 #[test]
@@ -161,11 +171,20 @@ fn test_replace_utf8_rejects_oversized_replacement() {
 
 #[test]
 fn test_classify_candidate_text_shapes() {
-    assert_eq!(classify_class_text("Diamond Sword"), (true, "natural_language"));
+    assert_eq!(
+        classify_class_text("Diamond Sword"),
+        (true, "natural_language")
+    );
     assert_eq!(classify_class_text("MythrilAxe"), (true, "display_word"));
-    assert_eq!(classify_class_text("minecraft:diamond_sword"), (false, "structural"));
+    assert_eq!(
+        classify_class_text("minecraft:diamond_sword"),
+        (false, "structural")
+    );
     assert_eq!(classify_class_text("DIAMOND_TIER"), (false, "constant"));
-    assert_eq!(classify_class_text("已本地化"), (false, "already_localized"));
+    assert_eq!(
+        classify_class_text("已本地化"),
+        (false, "already_localized")
+    );
     assert_eq!(classify_class_text("%d / %d"), (false, "format_only"));
 }
 
