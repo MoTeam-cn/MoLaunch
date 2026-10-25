@@ -9,7 +9,7 @@ use std::collections::BTreeMap;
 struct Entry<'a> {
     indent: usize,
     key: &'a str,
-    separator: &'a str,
+    separator: char,
     value: &'a str,
 }
 
@@ -41,7 +41,7 @@ fn parse_entry(line: &str) -> Option<Entry<'_>> {
     if key.is_empty() {
         return None;
     }
-    let separator = &line[index..index + 1];
+    let separator = line[index..].chars().next().unwrap_or('=');
     Some(Entry {
         indent,
         key,
@@ -73,7 +73,7 @@ pub fn write_keyvalue(
                 Some(translated) => {
                     out.push_str(&" ".repeat(entry.indent));
                     out.push_str(entry.key);
-                    out.push_str(entry.separator);
+                    out.push(entry.separator);
                     out.push_str(translated);
                 }
                 None => out.push_str(line),

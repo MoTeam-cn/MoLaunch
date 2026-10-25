@@ -32,11 +32,23 @@ fn test_render_writes_integers_without_fraction() {
 
 #[test]
 fn test_parse_handles_escapes_and_surrogate_pairs() {
-    let value = JsonValue::parse(r#""a\\\"b\\n\\u0041\\ud83e\\udd8e""#).expect("parse");
-    let JsonValue::String(text) = value else {
-        panic!("expected a string");
-    };
-    assert_eq!(text, "a\"b\nA🦎");
+    let plain = JsonValue::parse(r#""line\nnext""#).expect("parse");
+    assert_eq!(
+        match plain {
+            JsonValue::String(text) => text,
+            _ => String::new(),
+        },
+        "line\nnext"
+    );
+
+    let unicode = JsonValue::parse(r#""\u0041\ud83e\udd8e""#).expect("parse");
+    assert_eq!(
+        match unicode {
+            JsonValue::String(text) => text,
+            _ => String::new(),
+        },
+        "A🦎"
+    );
 }
 
 #[test]

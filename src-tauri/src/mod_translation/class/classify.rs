@@ -15,7 +15,7 @@ pub fn classify_class_text(text: &str) -> (bool, &'static str) {
         return (false, "already_localized");
     }
     let length = value.chars().count();
-    if length < 3 || length > 500 || !value.chars().any(|c| c.is_ascii_alphabetic()) {
+    if !(3..=500).contains(&length) || !value.chars().any(|c| c.is_ascii_alphabetic()) {
         return (false, "invalid");
     }
     if value.contains('\0') {
