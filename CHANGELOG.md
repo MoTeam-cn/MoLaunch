@@ -6,6 +6,16 @@
 
 ### 变更
 
+#### 渐变文字按净室规格重新实现
+
+- **规格**（[`specs/cleanroom/`](specs/cleanroom/) 新增）：三个受版权异议影响的功能各写一份行为规格（`README.md` 记录流程），内容只依据公开规范（JVMS 第 4 章、ZIP 格式、Minecraft 配方文档、各插件公开语法、界面截图实测坐标）。
+- **实现**（[`src/utils/gradient-text/`](src/utils/gradient-text/)）：按规格重写为 `types` / `colors` / `document` / `cells` / `formats` / `state`，格式渲染改为「规格表格 + 渲染器注册表」，19 种格式语法逐条对应规格 §5。
+- **接口**（[GradientOutputPanel.vue](src/views/tools/creation/gradient-text/GradientOutputPanel.vue)、[GradientTextPage.vue](src/views/tools/creation/GradientTextPage.vue)、[GradientTextEditor.vue](src/views/tools/creation/gradient-text/GradientTextEditor.vue)）：选项字段统一为 `control` / `simplifyGradient`，读取旧存档时兼容旧字段名。
+- **致谢**（[`ACKNOWLEDGEMENTS.md`](ACKNOWLEDGEMENTS.md) 新增）：如实记录三个功能最初参考 Axolotl Launcher 实现，以及删除来源注释那次提交的错误处理。
+- **验证**：`typecheck` / `lint` / `vite build` 全绿，渐变文字 12 项验收测试对应规格 §7 用例。
+
+### 变更
+
 #### 主窗口默认尺寸与最小尺寸调整为 1105×585
 
 - **尺寸**（[`tauri.conf.json`](src-tauri/tauri.conf.json)）：main 窗口 `width` / `height` 与 `minWidth` / `minHeight` 统一为 1105×585——主页左右两栏在这个宽度下留白更均衡，横向比原 1096 多 9px。
