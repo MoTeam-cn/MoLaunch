@@ -1,8 +1,6 @@
 //! Forge 安装器参数与输出解码测试
 
-use super::forge_installer::{
-    build_installer_args, build_official_args, classpath_separator, decode_output_line,
-};
+use super::forge_installer::{build_installer_args, classpath_separator, decode_output_line};
 
 #[test]
 fn test_decode_output_line_passes_through_utf8() {
@@ -58,12 +56,4 @@ fn test_build_args_adds_exports_for_java_9_and_above() {
         args[1],
         "cpw.mods.bootstraplauncher/cpw.mods.bootstraplauncher=ALL-UNNAMED"
     );
-}
-
-#[test]
-fn test_build_official_args_uses_install_client() {
-    let args = build_official_args("C:/tmp/forge-installer.jar");
-    assert_eq!(args[0], "-jar");
-    assert_eq!(args[1], "C:/tmp/forge-installer.jar");
-    assert_eq!(args[2], "--installClient");
 }

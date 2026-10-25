@@ -244,8 +244,19 @@ pub async fn install(
         cb(50.0);
     }
 
-    // 注入器资源（与第三方启动器同款 jar，走镜像加速）
+    // 注入器资源（与第三方启动器同一份 jar，走镜像加速）
     let (injector_path, wrapper_path) = super::forge_installer::extract_embedded_resources()?;
+
+    // 先用启动器自己的下载器把库备好，绕开安装器的重定向次数限制；失败不阻断
+    match shared::prefetch_install_libraries(&installer_path, game_dir, config).await {
+        Ok(count) if count > 0 => log_info!("[NeoForge] 已预下载 {} 个库", count),
+        Ok(_) => {}
+        Err(e) => log_warn!("[NeoForge] 预下载库失败（继续安装）: {}", e),
+    }
+
+    if let Some(ref cb) = progress_callback {
+        cb(45.0);
+    }
 
     // 安装器进度（0~1）映射到 50%~80% 区间
     let installer_progress = progress_callback.clone().map(|cb| {
@@ -258,33 +269,15 @@ pub async fn install(
     let installer_path_str = installer_path.to_string_lossy().to_string();
     let game_dir_str = game_dir.to_string_lossy().to_string();
 
-    // 主路径：注入器；失败再改用官方安装器兜底，两个错误都保留
-    match super::forge_installer::run_forge_installer(
+    super::forge_installer::run_forge_installer(
         &java_path_str,
         &installer_path_str,
         &injector_path,
         &wrapper_path,
         &game_dir_str,
         true,
-        installer_progress.clone(),
-    ) {
-        Ok(()) => {}
-        Err(injector_error) => {
-            log_warn!(
-                "[NeoForge] 注入器安装失败，改用官方安装器重试: {}",
-                injector_error
-            );
-            super::forge_installer::run_official_installer(
-                &java_path_str,
-                &installer_path_str,
-                &game_dir_str,
-                installer_progress,
-            )
-            .map_err(|official_error| {
-                anyhow::anyhow!("注入器：{}；官方安装器：{}", injector_error, official_error)
-            })?;
-        }
-    }
+        installer_progress,
+    )?;
     if let Some(ref cb) = progress_callback {
         cb(80.0);
     }

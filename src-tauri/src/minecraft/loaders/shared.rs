@@ -142,6 +142,106 @@ pub async fn download_mojang_mappings(
     Ok(())
 }
 
+/// 预下载库数量上限（防止极端 profile 拉长安装时间）
+const MAX_PREFETCH_LIBRARIES: usize = 400;
+
+/// 用启动器自己的下载器预下载安装器需要的库
+///
+/// 安装器跟随重定向的次数有限，镜像链路一长就会报 `Invalid number of redirects` 直接失败。
+/// 我们的下载器支持多源与重试，先把 `install_profile.json` 里声明了下载地址的库备好，
+/// 安装器命中「文件已存在，校验通过」就会跳过下载。
+///
+/// 只处理主 artifact：natives、旧版安装器（无 downloads 字段）一律跳过，不猜地址、不碰生成物。
+/// 返回成功预下载的数量；单个库失败不阻断安装。
+pub async fn prefetch_install_libraries(
+    installer_path: &Path,
+    game_dir: &Path,
+    config: &DownloadManagerConfig,
+) -> anyhow::Result<usize> {
+    let file = std::fs::File::open(installer_path)?;
+    let mut archive = zip::ZipArchive::new(file)?;
+
+    let mut content = String::new();
+    {
+        let mut entry = archive.by_name("install_profile.json")?;
+        std::io::Read::read_to_string(&mut entry, &mut content)?;
+    }
+
+    let profile: serde_json::Value = serde_json::from_str(&content)?;
+    let libraries = profile["libraries"].as_array().cloned().unwrap_or_default();
+
+    let mut tasks: Vec<DownloadTask> = Vec::new();
+    let mut seen: std::collections::HashSet<String> = std::collections::HashSet::new();
+
+    for (index, library) in libraries.iter().enumerate() {
+        if tasks.len() >= MAX_PREFETCH_LIBRARIES {
+            log_warn!(
+                "[Installer] 预下载库数量达到上限 {}，其余交给安装器",
+                MAX_PREFETCH_LIBRARIES
+            );
+            break;
+        }
+        let Some(name) = library["name"].as_str() else {
+            continue;
+        };
+        let artifact = &library["downloads"]["artifact"];
+        let Some(official_url) = artifact["url"].as_str() else {
+            continue;
+        };
+        let relative = artifact["path"]
+            .as_str()
+            .map(str::to_string)
+            .unwrap_or_else(|| crate::minecraft::utils::maven::maven_to_relative_path(name));
+        if !relative.ends_with(".jar") || !seen.insert(relative.clone()) {
+            continue;
+        }
+
+        let local_path = game_dir.join("libraries").join(&relative);
+        if local_path.exists() {
+            continue;
+        }
+
+        let urls = sources::build_replace_urls(
+            official_url,
+            None,
+            sources::MAVEN_REPLACEMENTS,
+            config.source_mode,
+        );
+        if urls.is_empty() {
+            continue;
+        }
+
+        tasks.push(DownloadTask {
+            id: format!("installer-lib-{}", index),
+            urls,
+            local_path: local_path.to_string_lossy().to_string(),
+            expected_size: artifact["size"].as_i64().unwrap_or(0),
+            expected_hash: artifact["sha1"].as_str().map(str::to_string),
+        });
+    }
+
+    if tasks.is_empty() {
+        return Ok(0);
+    }
+
+    log_info!("[Installer] 预下载安装库 {} 个", tasks.len());
+    let manager = DownloadManager::from_config(config);
+    let total = tasks.len();
+    let results = manager.download_batch(tasks, None).await;
+    let ok = results
+        .iter()
+        .filter(|result| result.status != DownloadStatus::Failed)
+        .count();
+    if ok < total {
+        log_warn!(
+            "[Installer] 预下载安装库：成功 {} / {}，其余交给安装器处理",
+            ok,
+            total
+        );
+    }
+    Ok(ok)
+}
+
 /// Find generated version JSON files in installer output.
 fn find_generated_version_jsons(
     versions_dir: &Path,

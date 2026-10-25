@@ -1,7 +1,6 @@
 //! 加载器安装器（Forge / NeoForge）执行模块
 //!
-//! 两条路径：官方 installer.jar 的 `--installClient`（首选，走官方 maven、进度真实），
-//! 以及 bangbang93 注入器（国内镜像加速，官方路径失败时兜底）。
+//! 使用 bangbang93 注入器（与第三方启动器同一份 jar），库下载失败时由启动器预先补齐。
 
 use crate::resources;
 use crate::utils::cache;
@@ -107,17 +106,6 @@ pub(super) fn build_installer_args(
     }
 
     args
-}
-
-/// 构建官方安装器参数：`java -jar <installer> --installClient`
-///
-/// 官方安装器按当前工作目录找 `.minecraft`，因此运行时必须把 cwd 设为游戏目录。
-pub(super) fn build_official_args(installer_path: &str) -> Vec<String> {
-    vec![
-        "-jar".to_string(),
-        installer_path.to_string(),
-        "--installClient".to_string(),
-    ]
 }
 
 /// 在独立线程里持续读取输出流，按行写入共享缓冲
@@ -308,39 +296,6 @@ fn run_installer_process(
         message.push_str(&format!("。完整日志：{}", path));
     }
     Err(anyhow::anyhow!(message))
-}
-
-/// 用官方 installer.jar 安装（首选路径）
-///
-/// 走 Forge 官方 maven，不经过镜像改写，重定向链最短；进度直接来自安装器输出。
-pub fn run_official_installer(
-    java_path: &str,
-    installer_path: &str,
-    mc_dir: &str,
-    on_progress: Option<ProgressHandler>,
-) -> anyhow::Result<()> {
-    if !Path::new(installer_path).exists() {
-        return Err(anyhow::anyhow!(
-            "官方安装器文件缺失: {}，请重试安装（若反复失败请检查下载源）",
-            installer_path
-        ));
-    }
-
-    let args = build_official_args(installer_path);
-    log_info!(
-        "[Official] Starting installer: {} {} (cwd={})",
-        java_path,
-        args.join(" "),
-        mc_dir
-    );
-
-    run_installer_process(
-        java_path,
-        &args,
-        Some(Path::new(mc_dir)),
-        "official",
-        on_progress,
-    )
 }
 
 /// 用注入器安装（镜像加速路径）
