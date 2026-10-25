@@ -179,7 +179,13 @@ impl BatchCtx<'_> {
                     break;
                 }
 
-                let content = self.request(action, round, max_rounds, &queue).await?;
+                let content = match self.request(action, round, max_rounds, &queue).await {
+                    Ok(content) => content,
+                    Err(error) => {
+                        log_warn!("[ModTranslation] AI 批量翻译调用失败: {error}");
+                        continue;
+                    }
+                };
                 let parsed = prompt::parse_translations_response(&content)?;
                 let by_key: BTreeMap<&str, &str> = parsed
                     .iter()
@@ -251,8 +257,10 @@ impl BatchCtx<'_> {
                 user_prompt,
                 Some(self.model),
                 Some(super::progress::AI_TIMEOUT_SECS),
-            ) => result,
-            _ = super::progress::wait_cancel(self.cancel) => Err("任务已取消".to_string()),
+            ) => result.map_err(|error| error.to_string()),
+            _ = super::progress::wait_cancel(self.cancel) => {
+                return Err("任务已取消".to_string())
+            }
             _ = super::progress::smooth_progress(
                 "language",
                 self.base_progress,
@@ -261,7 +269,7 @@ impl BatchCtx<'_> {
                 self.on_progress,
                 move |_p: f64| label.clone(),
                 retry,
-            ) => Err("任务已取消".to_string()),
+            ) => return Err("任务已取消".to_string()),
         }
     }
 }
