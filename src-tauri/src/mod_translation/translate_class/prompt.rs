@@ -1,4 +1,7 @@
 //! class 判定 prompt 构建与 AI 响应宽容解析
+//!
+//! 宽容原则：未知 / 重复 / 无效的 decision 逐条丢弃并记录 WARN，不整批失败；
+//! 未被覆盖的候选交给调用方单独再请求一次或跳过。
 
 use std::collections::{HashMap, HashSet};
 
@@ -9,6 +12,14 @@ use crate::mod_translation::prompt;
 use crate::mod_translation::quality;
 use crate::mod_translation::types::{has_chinese, ClassCandidate, JarInspection};
 
+/// 单条 class 处置决策（AI 响应解析产物）
+pub(crate) struct DecisionEntry {
+    pub id: String,
+    pub action: String,
+    pub translation: Option<String>,
+    pub reason: Option<String>,
+}
+
 pub(crate) fn build_class_prompt(
     inspection: &JarInspection,
     batch: &[&ClassCandidate],
@@ -16,9 +27,17 @@ pub(crate) fn build_class_prompt(
 ) -> String {
     let candidates: Vec<Value> = batch
         .iter()
-        .map(|c| serde_json::json!({"id": c.id, "path": c.path, "text": c.text, "paths": c.paths}))
+        .map(|candidate| {
+            serde_json::json!({
+                "id": candidate.id,
+                "path": candidate.path,
+                "text": candidate.text,
+                "paths": candidate.paths,
+            })
+        })
         .collect();
-    let mut prompt_value = serde_json::json!({
+
+    let mut payload = serde_json::json!({
         "task": "判断 Minecraft 模组 class 常量文本是否展示给玩家；translate 必须提供含简体中文的 translation 且占位符原样保留，exclude 必须提供 reason",
         "output": "只输出 JSON 对象：{\"decisions\":[{\"id\":\"候选id\",\"action\":\"translate\"|\"exclude\",\"translation\":\"译文\",\"reason\":\"理由\"}]}。id 是 24 位十六进制字符串，必须逐字符原样复制 candidates 中的 id，禁止增删改任何字符；每个候选恰好一个 decision，不得遗漏、不得新增。注意：本任务输出 decisions 数组，不是 translations 数组。",
         "loader": inspection.loader.as_str(),
@@ -26,16 +45,16 @@ pub(crate) fn build_class_prompt(
         "candidates": candidates,
     });
     if let Some(error) = last_error {
-        prompt_value["retryNote"] = format!("上次判定校验失败：{error}，请重发合法 JSON").into();
+        payload["retryNote"] = format!("上次判定校验失败：{error}，请重发合法 JSON").into();
     }
-    prompt_value.to_string()
+    payload.to_string()
 }
 
 fn str_at<'a>(item: &'a Value, key: &str) -> &'a str {
     item.get(key).and_then(Value::as_str).unwrap_or("")
 }
 
-/// 编辑距离 ≤1 判断（id 为 ASCII hex，按字节比较）
+/// 编辑距离 ≤ 1（id 为 ASCII 十六进制，按字节比较）
 pub(crate) fn edit_distance_at_most_1(a: &str, b: &str) -> bool {
     let (short, long) = if a.len() <= b.len() { (a, b) } else { (b, a) };
     if long.len() - short.len() > 1 {
@@ -45,62 +64,105 @@ pub(crate) fn edit_distance_at_most_1(a: &str, b: &str) -> bool {
         return short
             .bytes()
             .zip(long.bytes())
-            .filter(|(x, y)| x != y)
+            .filter(|(left, right)| left != right)
             .count()
             <= 1;
     }
-    let (mut i, mut j, mut skipped) = (0usize, 0usize, false);
-    while i < short.len() && j < long.len() {
-        if short.as_bytes()[i] == long.as_bytes()[j] {
-            i += 1;
-            j += 1;
-        } else if !skipped {
-            skipped = true;
-            j += 1;
-        } else {
+    let mut short_index = 0;
+    let mut long_index = 0;
+    let mut skipped = false;
+    while short_index < short.len() && long_index < long.len() {
+        if short.as_bytes()[short_index] == long.as_bytes()[long_index] {
+            short_index += 1;
+            long_index += 1;
+        } else if skipped {
             return false;
+        } else {
+            skipped = true;
+            long_index += 1;
         }
     }
     true
 }
 
-/// 模型可能改写/截断 id：先精确匹配，再按编辑距离 ≤1 唯一匹配兜底
-fn resolve_candidate_id<'a>(expected: &'a HashSet<&str>, raw: &str) -> Option<&'a str> {
-    if expected.contains(raw) {
-        return expected.iter().copied().find(|id| *id == raw);
+/// 模型可能改写 / 截断 id：精确匹配优先，其次编辑距离 ≤ 1 的唯一匹配
+fn resolve_candidate_id<'a>(known: &'a HashSet<&str>, raw: &str) -> Option<&'a str> {
+    if let Some(exact) = known.iter().copied().find(|id| *id == raw) {
+        return Some(exact);
     }
-    let mut matches = expected
+    let mut candidates = known
         .iter()
+        .copied()
         .filter(|id| edit_distance_at_most_1(id, raw));
-    let first = matches.next()?;
-    if matches.next().is_some() {
-        return None; // 不唯一，无法确定
-    }
-    Some(*first)
+    let first = candidates.next()?;
+    candidates.next().is_none().then_some(first)
 }
 
-/// 宽容解析：未知/重复/无效 decision 逐条丢弃并记录 WARN，不整批失败
-/// 返回 (有效 decisions, 未覆盖候选)。未覆盖候选由调用方单独请求或跳过。
+/// 单条 decision 是否可采纳（返回采纳结果或丢弃原因）
+fn evaluate(item: &Value, candidate: &ClassCandidate) -> Result<DecisionEntry, &'static str> {
+    let action = str_at(item, "action");
+    let reason = str_at(item, "reason");
+    match action {
+        "exclude" => {
+            if reason.trim().is_empty() {
+                return Err("缺少理由");
+            }
+            Ok(DecisionEntry {
+                id: candidate.id.clone(),
+                action: "exclude".to_string(),
+                translation: None,
+                reason: Some(reason.to_string()),
+            })
+        }
+        "translate" => {
+            let raw = str_at(item, "translation");
+            let translation = quality::normalize_model_translation(&candidate.text, raw);
+            if !has_chinese(&translation) {
+                return Err("译文不含中文");
+            }
+            if quality::validate_protected_tokens(&candidate.text, &translation).is_some() {
+                return Err("占位符不一致");
+            }
+            Ok(DecisionEntry {
+                id: candidate.id.clone(),
+                action: "translate".to_string(),
+                translation: Some(translation),
+                reason: Some(reason.to_string()),
+            })
+        }
+        _ => Err("未知动作"),
+    }
+}
+
+/// 宽容解析：返回 (有效 decisions, 未覆盖候选)
 pub(crate) fn parse_and_validate_decisions<'a>(
     content: &str,
     candidates: &'a [&'a ClassCandidate],
 ) -> Result<(Vec<DecisionEntry>, Vec<&'a ClassCandidate>), String> {
     let stripped = prompt::strip_json_fences(content);
-    let json_str = prompt::extract_json_object(stripped).ok_or("AI 响应中未找到 JSON 对象")?;
+    let json_text = prompt::extract_json_object(stripped).ok_or("AI 响应中未找到 JSON 对象")?;
     let value: Value =
-        serde_json::from_str(json_str).map_err(|e| format!("解析 class 判定 JSON 失败: {e}"))?;
+        serde_json::from_str(json_text).map_err(|e| format!("解析 class 判定 JSON 失败: {e}"))?;
     let items = value
         .get("decisions")
         .and_then(Value::as_array)
         .ok_or("AI 响应缺少 decisions 数组")?;
-    let expected: HashSet<&str> = candidates.iter().map(|c| c.id.as_str()).collect();
-    let by_id: HashMap<_, _> = candidates.iter().map(|c| (c.id.as_str(), *c)).collect();
+
+    let known: HashSet<&str> = candidates
+        .iter()
+        .map(|candidate| candidate.id.as_str())
+        .collect();
+    let by_id: HashMap<&str, &ClassCandidate> = candidates
+        .iter()
+        .map(|candidate| (candidate.id.as_str(), *candidate))
+        .collect();
+
     let mut seen: HashSet<&str> = HashSet::new();
-    let mut covered: HashSet<&str> = HashSet::new();
-    let mut result = Vec::new();
+    let mut decisions: Vec<DecisionEntry> = Vec::new();
+
     for item in items {
         let raw_id = str_at(item, "id");
-        let Some(id) = resolve_candidate_id(&expected, raw_id) else {
+        let Some(id) = resolve_candidate_id(&known, raw_id) else {
             log_warn!("[ModTranslation] 丢弃未知 class 候选：{raw_id}");
             continue;
         };
@@ -108,65 +170,25 @@ pub(crate) fn parse_and_validate_decisions<'a>(
             log_warn!("[ModTranslation] 丢弃重复 class 候选：{id}");
             continue;
         }
-        let action = str_at(item, "action");
-        let reason = str_at(item, "reason");
-        let candidate = by_id
-            .get(id)
-            .copied()
-            .ok_or_else(|| format!("候选缺失：{id}"))?;
-        match action {
-            "exclude" => {
-                if reason.trim().is_empty() {
-                    log_warn!("[ModTranslation] 丢弃缺少理由的 class 候选：{id}");
-                    continue;
-                }
-                result.push(DecisionEntry {
-                    id: id.to_string(),
-                    action: "exclude".to_string(),
-                    translation: None,
-                    reason: Some(reason.to_string()),
-                });
-                covered.insert(id);
-            }
-            "translate" => {
-                let raw = str_at(item, "translation");
-                let translation = quality::normalize_model_translation(&candidate.text, raw);
-                if !has_chinese(&translation) {
-                    log_warn!("[ModTranslation] 丢弃译文不含中文的 class 候选：{id}");
-                    continue;
-                }
-                if let Some(error) =
-                    quality::validate_protected_tokens(&candidate.text, &translation)
-                {
-                    log_warn!("[ModTranslation] 丢弃占位符不符的 class 候选 {id}：{error}");
-                    continue;
-                }
-                result.push(DecisionEntry {
-                    id: id.to_string(),
-                    action: "translate".to_string(),
-                    translation: Some(translation),
-                    reason: Some(reason.to_string()),
-                });
-                covered.insert(id);
-            }
-            other => {
-                log_warn!("[ModTranslation] 丢弃未知动作的 class 候选 {id}：{other}");
-                continue;
-            }
+        let Some(candidate) = by_id.get(id).copied() else {
+            log_warn!("[ModTranslation] 候选缺失：{id}");
+            continue;
+        };
+        match evaluate(item, candidate) {
+            Ok(decision) => decisions.push(decision),
+            Err(reason) => log_warn!("[ModTranslation] 丢弃 class 候选 {id}：{reason}"),
         }
     }
+
+    let covered: HashSet<&str> = decisions
+        .iter()
+        .map(|decision| decision.id.as_str())
+        .collect();
     let uncovered: Vec<&ClassCandidate> = candidates
         .iter()
         .copied()
-        .filter(|c| !covered.contains(c.id.as_str()))
+        .filter(|candidate| !covered.contains(candidate.id.as_str()))
         .collect();
-    Ok((result, uncovered))
-}
 
-/// 单条 class 处置决策（AI 响应解析产物）
-pub(crate) struct DecisionEntry {
-    pub id: String,
-    pub action: String,
-    pub translation: Option<String>,
-    pub reason: Option<String>,
+    Ok((decisions, uncovered))
 }

@@ -6,6 +6,15 @@
 
 ### 重构
 
+#### 模组翻译：语言与 class 翻译路由按规格重新实现
+
+- **语言路由**（[`translate_lang.rs`](src-tauri/src/mod_translation/translate_lang.rs)）：待译条目过滤抽成 `pending_entries`，批次上下文收敛为 `BatchCtx`（`translate` / `request` 两个方法），fast/deep 通道只保留一个队列。
+- **class 路由**（[`translate_class/route.rs`](src-tauri/src/mod_translation/translate_class/route.rs)）：`judge_batch` 负责重试与兜底，`request` 负责 select 与进度，`apply_decisions` 统一处置计数。
+- **判定解析**（[`translate_class/prompt.rs`](src-tauri/src/mod_translation/translate_class/prompt.rs)）：单条 decision 校验抽成 `evaluate`，覆盖集合由采纳结果推导。
+- **处置应用**（[`translate_class/apply.rs`](src-tauri/src/mod_translation/translate_class/apply.rs)）：动作名收敛为常量，路径列表用 `is_empty` 判定。
+
+### 重构
+
 #### 模组翻译：JAR 分析按规格重新实现
 
 - **语言源**（[`analyze/sources.rs`](src-tauri/src/mod_translation/analyze/sources.rs)）：标准扩展名收敛为常量表，`en_us` 段判定与目标路径改写抽成 `has_english_segment` / `target_path_of`。

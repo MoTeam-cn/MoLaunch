@@ -7,6 +7,9 @@ use super::super::ledger::{ClassDecision, ClassDecisionLedger};
 use super::super::types::ClassCandidate;
 use super::prompt::DecisionEntry;
 
+const EXCLUDE_ACTION: &str = "exclude";
+const TRANSLATE_ACTION: &str = "translate";
+
 pub(crate) fn apply_decision(
     workspace: &Path,
     candidates: &[&ClassCandidate],
@@ -16,50 +19,54 @@ pub(crate) fn apply_decision(
     let candidate = candidates
         .iter()
         .copied()
-        .find(|c| c.id == decision.id)
+        .find(|candidate| candidate.id == decision.id)
         .ok_or_else(|| format!("未知候选：{}", decision.id))?;
+
     match decision.action.as_str() {
-        "exclude" => {
+        EXCLUDE_ACTION => {
             record_decision(
                 ledger,
                 &candidate.id,
-                "exclude",
+                EXCLUDE_ACTION,
                 None,
                 decision.reason.as_deref(),
             );
             Ok(())
         }
-        "translate" => {
+        TRANSLATE_ACTION => {
             let translation = decision
                 .translation
                 .clone()
                 .ok_or_else(|| format!("class 候选 {} 缺少译文", candidate.id))?;
-            apply_class_translation(workspace, candidate, &translation, ledger)
+            apply_translation(workspace, candidate, &translation, ledger)
         }
         other => Err(format!("未知动作：{other}")),
     }
 }
 
-fn apply_class_translation(
+fn apply_translation(
     workspace: &Path,
     candidate: &ClassCandidate,
     translation: &str,
-    class_ledger: &mut ClassDecisionLedger,
+    ledger: &mut ClassDecisionLedger,
 ) -> Result<(), String> {
     if candidate.text == translation {
         record_decision(
-            class_ledger,
+            ledger,
             &candidate.id,
-            "exclude",
+            EXCLUDE_ACTION,
             None,
             Some("译文与原文一致"),
         );
         return Ok(());
     }
-    let paths = match candidate.paths.as_slice() {
-        [] => vec![candidate.path.clone()],
-        _ => candidate.paths.clone(),
+
+    let paths: Vec<String> = if candidate.paths.is_empty() {
+        vec![candidate.path.clone()]
+    } else {
+        candidate.paths.clone()
     };
+
     for relative in &paths {
         let target_path = workspace.join(relative);
         let bytes = std::fs::read(&target_path)
@@ -69,18 +76,19 @@ fn apply_class_translation(
             return Err(format!("class 候选在声明路径中不存在：{relative}"));
         }
         crate::utils::fs::write_atomic(&target_path, &rewritten)?;
-        if !class_ledger.replaced_files.contains(relative) {
-            class_ledger.replaced_files.push(relative.clone());
+        if !ledger.replaced_files.contains(relative) {
+            ledger.replaced_files.push(relative.clone());
         }
     }
+
     record_decision(
-        class_ledger,
+        ledger,
         &candidate.id,
-        "translate",
+        TRANSLATE_ACTION,
         Some(translation),
         None,
     );
-    class_ledger.replacement_count += paths.len();
+    ledger.replacement_count += paths.len();
     Ok(())
 }
 
