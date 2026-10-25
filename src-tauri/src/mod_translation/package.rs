@@ -22,10 +22,9 @@ pub(super) fn package(
     class_ledger: &ClassDecisionLedger,
 ) -> Option<TaskSnapshot> {
     update_status(app, "package", 95.0, "正在打包", None);
-    let manifest = match jar::ArchiveManifest::read(workspace) {
-        Some(m) => m,
-        None => return Some(failed_snapshot("package", "缺少归档清单，无法重打包")),
-    };
+    if jar::WorkspaceMeta::read(workspace).is_none() {
+        return Some(failed_snapshot("package", "缺少工作区元数据，无法重打包"));
+    }
     let output_path = output_path_for(jar_path);
     if output_path.exists() {
         return Some(failed_snapshot(
@@ -33,7 +32,7 @@ pub(super) fn package(
             &format!("输出文件已存在: {}", output_path.display()),
         ));
     }
-    match jar::package_archive(workspace, &output_path, &manifest) {
+    match jar::package_archive(workspace, &output_path) {
         Ok(()) => {
             let language_attempted = work_graph
                 .items
