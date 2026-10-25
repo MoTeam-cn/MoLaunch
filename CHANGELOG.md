@@ -2,6 +2,16 @@
 
 本项目所有重要变更均会记录在此文件中。格式参考 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/)。
 
+## [0.3.12-rc.5] - 2026-10-25
+
+### 修复
+
+#### 背景图观感：去掉强制二次模糊
+
+- [`theme-dark.scss`](src/assets/styles/theme-dark.scss)：主区域不再叠加固定 16px 的 `backdrop-filter`，背景模糊只由「背景模糊」滑块作用在图片层；图片层加 `saturate` 轻微提饱和，抵消半透明白面板的灰感。
+- [`ui-prefs.ts`](src/utils/ui-prefs.ts)：写入 `--ui-bg-saturate`，移除 `--ui-panel-blur`；内容区不透明度默认 70 → 65。
+- [`BackgroundSection.vue`](src/views/settings/personal/BackgroundSection.vue)：填充方式提示补充「平铺按原尺寸重复，大图只显示中间一块」，照片建议用铺满裁剪。
+
 ## [0.3.12-rc.4] - 2026-10-25
 
 ### 修复
