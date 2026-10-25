@@ -49,7 +49,7 @@ pub(super) fn push(opts: &mut Vec<ExportOption>, instance_dir: &Path, rules_suff
     opts.push(ExportOption {
         id: "pack_data".into(),
         title: "整合包重要数据".into(),
-        description: Some("脚本文件、内置资源包、数据包等".into()),
+        description: Some("脚本、内置资源包与数据包".into()),
         rules: Some(format!(
             "hotai/|bansoukou/|addons/|multiblocked/|modpack-update-checker/|global_packs/|global_resource_packs/|global_data_packs/|optional_data_packs/|moonlight-global-datapacks/|maps/|icon.png|mods-resourcepacks/|matmos/|resource_assorts/|resource_assorts.json|patchouli_books/|datapacks/|kubejs*/|!kubejs*/probe/|!kubejs*/exported/|!kubejs*/jsconfig.json|!kubejs*/README.txt|openloader/|worldshape/|resources/|scripts/|structures/|fontfiles/|oresources/|packmenu/|craftpresence/|pointblanks/|template*/|!template*/playerdata/|!template*/stats/{}",
             rules_suffix
@@ -111,7 +111,7 @@ pub(super) fn push(opts: &mut Vec<ExportOption>, instance_dir: &Path, rules_suff
     opts.push(ExportOption {
         id: "maps".into(),
         title: "已绘制的地图".into(),
-        description: Some("地图类 Mod 为现有的存档、服务器记录的地图、路标点等".into()),
+        description: Some("地图类 Mod 保存的存档、服务器地图与路标".into()),
         rules: Some(format!(
             "journeymap/data/|xaero/|XaeroWaypoints/|XaeroWorldMap/{}",
             rules_suffix
@@ -150,7 +150,7 @@ pub(super) fn push(opts: &mut Vec<ExportOption>, instance_dir: &Path, rules_suff
     opts.push(ExportOption {
         id: "emi".into(),
         title: "EMI 个人信息".into(),
-        description: Some("物品收藏夹、默认配方、合成历史记录等".into()),
+        description: Some("物品收藏、默认配方与合成历史".into()),
         rules: Some(format!("emi.json{}", rules_suffix)),
         show_rules: None,
         default_checked: false,
@@ -164,7 +164,7 @@ pub(super) fn push(opts: &mut Vec<ExportOption>, instance_dir: &Path, rules_suff
     opts.push(ExportOption {
         id: "patchouli".into(),
         title: "帕秋莉手册个人信息".into(),
-        description: Some("教程书的已读记录、书签、阅读历史记录等".into()),
+        description: Some("教程书阅读进度与书签".into()),
         rules: Some(format!("patchouli_data.json{}", rules_suffix)),
         show_rules: None,
         default_checked: false,

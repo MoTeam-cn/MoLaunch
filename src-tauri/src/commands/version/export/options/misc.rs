@@ -11,7 +11,7 @@ pub(super) fn push(opts: &mut Vec<ExportOption>, instance_dir: &Path, rules_suff
     opts.push(ExportOption {
         id: "licence".into(),
         title: "协议".into(),
-        description: Some("Licence 文件".into()),
+        description: Some("许可协议文件".into()),
         rules: Some(format!("LICEN*{}", rules_suffix)),
         show_rules: None,
         default_checked: true,

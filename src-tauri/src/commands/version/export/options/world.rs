@@ -23,7 +23,7 @@ pub(super) fn push(opts: &mut Vec<ExportOption>, instance_dir: &Path, rules_suff
     opts.push(ExportOption {
         id: "schematics".into(),
         title: "导出的结构".into(),
-        description: Some("schematics 文件夹".into()),
+        description: Some("结构文件（schematics）".into()),
         rules: Some(format!("schematics/{}", rules_suffix)),
         show_rules: None,
         default_checked: false,
@@ -35,7 +35,7 @@ pub(super) fn push(opts: &mut Vec<ExportOption>, instance_dir: &Path, rules_suff
     opts.push(ExportOption {
         id: "replay".into(),
         title: "录像回放".into(),
-        description: Some("Replay Mod 的录像文件".into()),
+        description: Some("回放录像（Replay Mod）".into()),
         rules: Some(format!("replay_recordings/|replay_videos/{}", rules_suffix)),
         show_rules: None,
         default_checked: false,

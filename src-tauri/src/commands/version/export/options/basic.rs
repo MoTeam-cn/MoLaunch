@@ -23,7 +23,7 @@ pub(super) fn push(opts: &mut Vec<ExportOption>, instance_dir: &Path, rules_suff
     opts.push(ExportOption {
         id: "options".into(),
         title: "游戏本体设置".into(),
-        description: Some("键位、音量、视频设置等".into()),
+        description: Some("按键设置、音量与画面选项".into()),
         rules: Some(format!("options.txt|configureddefaults/{}", rules_suffix)),
         show_rules: None,
         default_checked: true,
@@ -35,7 +35,7 @@ pub(super) fn push(opts: &mut Vec<ExportOption>, instance_dir: &Path, rules_suff
     opts.push(ExportOption {
         id: "personal_info".into(),
         title: "游戏本体个人信息".into(),
-        description: Some("命令历史、已保存的快捷栏".into()),
+        description: Some("输入过的指令与快捷栏记录".into()),
         rules: Some(format!("hotbar.nbt|command_history.txt{}", rules_suffix)),
         show_rules: None,
         default_checked: false,
