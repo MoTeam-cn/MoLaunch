@@ -15,7 +15,6 @@
 - [`forge_installer.rs`](src-tauri/src/minecraft/loaders/forge_installer.rs)：移除 `run_official_installer` 与 `build_official_args`，只保留注入器；输出采集（GBK 回退解码、stdout/stderr 合并、15 分钟超时强杀、日志落盘）保持不变。
 - [`loader_helpers.rs`](src-tauri/src/commands/version/install/loader_helpers.rs)：安装器输出的真实进度写入阶段进度并广播，伪进度 ticker 改为「只补不覆盖」，不再出现一直 0% 然后直接跳 100%。
 
-
 ## [0.3.12-rc.6] - 2026-10-25
 
 ### 修复
