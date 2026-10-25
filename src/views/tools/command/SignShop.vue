@@ -15,7 +15,7 @@ import { SIGN_FACINGS, SIGN_IDS } from './data'
 import { buildSignShopCommand } from './generator'
 const ColorSelect = defineAsyncComponent(() => import('./ColorSelect.vue'))
 
-const signId = ref(SIGN_IDS[0])
+const signId = ref(SIGN_IDS[0].id)
 const facing = ref(SIGN_FACINGS[0].id)
 const x = ref('~')
 const y = ref('~')
@@ -23,7 +23,7 @@ const z = ref('~')
 const lines = ref<string[]>(['', '', '', ''])
 const textColor = ref('white')
 
-const signOptions = computed(() => SIGN_IDS.map((s) => ({ label: s, value: s })))
+const signOptions = computed(() => SIGN_IDS.map((sign) => ({ label: sign.name, value: sign.id })))
 const facingOptions = computed(() => SIGN_FACINGS.map((f) => ({ label: f.name, value: f.id })))
 
 const command = computed(() =>

@@ -4,6 +4,13 @@
 
 ## [Unreleased]
 
+### 修复
+
+#### 告示牌商店的「告示牌类型」显示为中文
+
+- [`command/data.ts`](src/views/tools/command/data.ts)：`SIGN_IDS` 由方块 ID 列表改为「ID + 中文名」表（橡木告示牌、云杉木告示牌等 12 项）。
+- [`command/SignShop.vue`](src/views/tools/command/SignShop.vue)：下拉改用中文名做显示、方块 ID 做取值，生成的 `/setblock` 指令不变。
+
 ### 变更
 
 #### 模组翻译：旧记忆与旧续传状态不再兼容

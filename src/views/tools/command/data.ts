@@ -96,20 +96,20 @@ export const ENTITIES: EntityOption[] = [
   { id: 'wither', name: '凋灵' },
 ]
 
-/** 告示牌商店：常见的告示牌方块 ID */
+/** 告示牌商店：常见告示牌方块（id 为方块 ID，name 为界面显示名） */
 export const SIGN_IDS = [
-  'oak_sign',
-  'spruce_sign',
-  'birch_sign',
-  'jungle_sign',
-  'acacia_sign',
-  'dark_oak_sign',
-  'mangrove_sign',
-  'cherry_sign',
-  'bamboo_sign',
-  'crimson_sign',
-  'warped_sign',
-  'pale_oak_sign',
+  { id: 'oak_sign', name: '橡木告示牌' },
+  { id: 'spruce_sign', name: '云杉木告示牌' },
+  { id: 'birch_sign', name: '白桦木告示牌' },
+  { id: 'jungle_sign', name: '丛林木告示牌' },
+  { id: 'acacia_sign', name: '金合欢木告示牌' },
+  { id: 'dark_oak_sign', name: '深色橡木告示牌' },
+  { id: 'mangrove_sign', name: '红树木告示牌' },
+  { id: 'cherry_sign', name: '樱花木告示牌' },
+  { id: 'bamboo_sign', name: '竹告示牌' },
+  { id: 'crimson_sign', name: '绯红木告示牌' },
+  { id: 'warped_sign', name: '诡异木告示牌' },
+  { id: 'pale_oak_sign', name: '苍白橡木告示牌' },
 ]
 
 /** 告示牌朝向（facing 方块状态） */
