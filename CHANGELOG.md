@@ -6,6 +6,19 @@
 
 ### 新增
 
+#### 崩溃分析：定位到具体 Mod 并可一键修复
+
+- [`mod_index.rs`](src-tauri/src/minecraft/launch/watcher/analyzer/mod_index.rs)（新增）/ [`collect.rs`](src-tauri/src/minecraft/launch/watcher/analyzer/collect.rs) / [`detector_stack.rs`](src-tauri/src/minecraft/launch/watcher/analyzer/detector_stack.rs)：收集阶段扫描 mods 目录建立「名字 → jar」索引，堆栈分析猜出的 Mod 名对到具体文件名，结论直接给「禁用哪个文件」。
+- [`types.rs`](src-tauri/src/minecraft/launch/watcher/types.rs) / [`scorer.rs`](src-tauri/src/minecraft/launch/watcher/analyzer/scorer.rs)：`CrashInfo` 新增 `actions`（`FixAction`：禁用 Mod / 打开 mods 目录 / 跳转设置页），按崩溃类别与已定位的 Mod 生成。
+- [`CrashFixActions.vue`](src/components/common/crash/CrashFixActions.vue)（新增）/ [`CrashDialog.vue`](src/components/common/CrashDialog.vue)：崩溃弹窗底部新增一键修复按钮，禁用 Mod 直接调用 `toggle_mod`。
+
+#### 内存推荐与启动前自动备份
+
+- [`jvm-recommend.ts`](src/utils/jvm-recommend.ts)（新增）/ [`MemoryAllocation.vue`](src/views/settings/settings-launch/MemoryAllocation.vue)：按物理内存给出推荐堆大小（40%，夹在 2~8 GB）与通用参数，一键采用；GC 仍由后端按 Java 版本自动选择。
+- [`auto-backup.ts`](src/utils/auto-backup.ts)（新增）/ [`launch.ts`](src/stores/launch.ts) / [`SettingsLaunch.vue`](src/views/settings/SettingsLaunch.vue)：启动设置新增「启动前自动备份存档」，每个版本每天一次、只备份前 3 个存档并覆盖旧文件，失败不阻断启动。
+
+### 新增
+
 #### 启动耗时分析
 
 - [`timing.rs`](src-tauri/src/minecraft/launch/pipeline/timing.rs)（新增）/ [`runner.rs`](src-tauri/src/minecraft/launch/pipeline/runner.rs) / [`execute.rs`](src-tauri/src/minecraft/launch/pipeline/execute.rs)：每个启动阶段用 `StageClock` 计时，启动完成时通过 `launch-timing` 事件下发 `LaunchTimings`（各阶段毫秒数 + 合计 + 版本 ID）；Java 自动切换重试时重新计时。
