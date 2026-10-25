@@ -297,7 +297,11 @@ pub fn run() {
                         tray::cleanup_and_exit(app);
                     }
                     _ => {
-                        // 每次询问：通知前端弹出选择框
+                        // 每次询问：先把窗口恢复到前台，否则用户在任务栏点关闭时
+                        // 看不到选择框，会以为程序没反应
+                        let _ = window.unminimize();
+                        let _ = window.show();
+                        let _ = window.set_focus();
                         log_info!("[Window] 关闭请求：通知前端弹出退出选择框");
                         let _ = app.emit("window-close-requested", ());
                     }
