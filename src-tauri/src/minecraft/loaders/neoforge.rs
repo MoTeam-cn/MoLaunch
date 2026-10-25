@@ -234,9 +234,6 @@ pub async fn install(
         cb(30.0);
     }
 
-    log_info!("[NeoForge] Using injector");
-    let (injector_path, wrapper_path) = super::forge_installer::extract_embedded_resources()?;
-
     if let Some(ref cb) = progress_callback {
         cb(40.0);
     }
