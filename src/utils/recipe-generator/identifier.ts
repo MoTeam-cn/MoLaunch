@@ -1,38 +1,36 @@
 /**
- * 合成配方生成器 - 标识符解析
+ * 合成配方生成器 - 标识符解析（对应规格 §3.2：物品引用与 data 后缀）
+ *
+ * 支持三种写法：`stone`、`minecraft:stone`、`minecraft:stone:1`（1.12 的 data 值）。
  */
 
 export type ItemRef = {
   namespace: string
   id: string
+  /** 1.12 的数据值后缀 */
   data?: number
 }
 
-const NAMESPACE_REGEX = /^[a-z0-9._-]+$/
-const ID_REGEX = /^[a-z0-9._/-]+$/
+/** 命名空间与路径的合法字符（Minecraft 资源位置规则） */
+const NAMESPACE_PATTERN = /^[a-z0-9._-]+$/
+const PATH_PATTERN = /^[a-z0-9._/-]+$/
+const DATA_SUFFIX = /^(.*):(\d+)$/
 
 export function parseIdentifier(raw: string): ItemRef | null {
-  if (!raw) return null
   const value = raw.trim()
   if (!value) return null
-  let namespace = 'minecraft'
-  let id = value
-  let data: number | undefined
 
-  // data 后缀（1.12 旧版，如 minecraft:stone:1）
-  const dataMatch = value.match(/^(.*):(\d+)$/)
-  if (dataMatch) {
-    id = dataMatch[1]
-    data = Number(dataMatch[2])
-  }
+  // 先剥掉末尾的数字后缀，再切命名空间
+  const withData = DATA_SUFFIX.exec(value)
+  const body = withData ? withData[1] : value
+  const data = withData ? Number(withData[2]) : undefined
 
-  const nsIndex = id.indexOf(':')
-  if (nsIndex !== -1) {
-    namespace = id.slice(0, nsIndex)
-    id = id.slice(nsIndex + 1)
-  }
-  if (!NAMESPACE_REGEX.test(namespace) || !ID_REGEX.test(id)) return null
-  return { namespace, id, data }
+  const separator = body.indexOf(':')
+  const namespace = separator === -1 ? 'minecraft' : body.slice(0, separator)
+  const id = separator === -1 ? body : body.slice(separator + 1)
+
+  if (!NAMESPACE_PATTERN.test(namespace) || !PATH_PATTERN.test(id)) return null
+  return data === undefined ? { namespace, id } : { namespace, id, data }
 }
 
 export function parseItemId(raw: string): ItemRef | null {
@@ -40,8 +38,8 @@ export function parseItemId(raw: string): ItemRef | null {
 }
 
 export function itemRefToString(ref: ItemRef): string {
-  const base = `${ref.namespace}:${ref.id}`
-  return ref.data !== undefined ? `${base}:${ref.data}` : base
+  const head = `${ref.namespace}:${ref.id}`
+  return ref.data === undefined ? head : `${head}:${ref.data}`
 }
 
 export function stripData(raw: string): string {

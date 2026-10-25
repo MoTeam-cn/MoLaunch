@@ -1,11 +1,11 @@
 /**
- * 合成配方生成器 - 配方生成入口
+ * 合成配方生成器 - 生成入口（校验 → 输出）
  *
- * 校验通过后按版本策略输出配方 JSON；校验失败抛错（错误信息面向 UI 展示）。
+ * 校验不通过时抛出带中文提示的错误，界面直接 toast。
  */
 import { formatRecipeJson } from './formatter'
+import { describeRecipeIssues, validateRecipe } from './validation'
 import type { JavaVersionId, RecipeSlot, RecipeSlotContext, RecipeState, SlotValue } from './types'
-import { validateRecipe, describeRecipeIssues } from './validation'
 
 export const CRAFTING_GRID_SLOTS: readonly RecipeSlot[] = [
   'crafting.1',
@@ -19,17 +19,20 @@ export const CRAFTING_GRID_SLOTS: readonly RecipeSlot[] = [
   'crafting.9',
 ]
 
-/** 合成网格槽位值（2x2 时自动裁剪右下角，与 3x3 索引对应） */
+/** 2×2 模式下禁用的槽位下标（3、6、7、8、9 号槽位，0 起算） */
+const TWO_BY_TWO_DISABLED = new Set([2, 5, 6, 7, 8])
+
+/** 合成网格槽位值；2×2 时禁用位返回 undefined */
 export function getCraftingGridValues(state: RecipeState): (SlotValue | undefined)[] {
-  const disabled = state.crafting.twoByTwo ? new Set([2, 5, 6, 7, 8]) : new Set<number>()
+  const disabled = state.crafting.twoByTwo ? TWO_BY_TWO_DISABLED : null
   return CRAFTING_GRID_SLOTS.map((slot, index) =>
-    disabled.has(index) ? undefined : state.slots[slot],
+    disabled?.has(index) ? undefined : state.slots[slot],
   )
 }
 
 /**
  * 生成配方 JSON
- * @throws 校验不通过时抛出带中文提示的 Error
+ * @throws 校验不通过时抛出带中文提示的错误
  */
 export function generateRecipeJson(
   state: RecipeState,
@@ -37,8 +40,6 @@ export function generateRecipeJson(
   context: RecipeSlotContext,
 ): Record<string, unknown> {
   const issues = validateRecipe(state, version, context)
-  if (issues.length > 0) {
-    throw new Error(describeRecipeIssues(issues))
-  }
+  if (issues.length > 0) throw new Error(describeRecipeIssues(issues))
   return formatRecipeJson(state, version, context)
 }

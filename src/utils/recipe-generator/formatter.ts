@@ -1,15 +1,12 @@
 /**
- * 合成配方生成器 - 版本策略格式化器
+ * 合成配方生成器 - 配方 JSON 输出（对应 specs/cleanroom/recipe-generator.md §3 §4）
  *
- * 配方 JSON 随版本演进，按四档策略输出：
- * - legacy(1.12)：{item: "ns:id", data}，type 无命名空间，不支持标签
- * - object(1.13~1.19)：ingredient {item|tag}，result {item, count}，cooking result 为字符串
- * - id-result(1.20~1.21.1)：ingredient {item|tag}，result {id, count}
- * - string(1.21.2+)：ingredient 直接用 "ns:id" / "#ns:tag"
+ * 输出差异集中成三种「引用写法」：legacy(1.12) / object(1.13~1.21.1) / string(1.21.2+)，
+ * 其余字段（category、show_notification、pattern、cookingtime）由版本能力表决定。
  */
 import {
   DEFAULT_COOKING_TIME,
-  isVersionAtLeast,
+  getVersionCapability,
   supportsRecipeCategory,
   supportsShowNotification,
   supportsSmithingTrimPattern,
@@ -17,63 +14,15 @@ import {
 import type { JavaVersionId, RecipeSlot, RecipeSlotContext, RecipeState, RecipeType, SlotValue } from './types'
 import { itemRefToString, parseIdentifier } from './identifier'
 
+/** 引用写法：决定物品/标签怎么写进 JSON */
 export type FormatterStrategy = 'legacy' | 'object' | 'id-result' | 'string'
 
 export function getFormatterStrategy(version: JavaVersionId): FormatterStrategy {
-  if (version === '1.12') return 'legacy'
-  if (isVersionAtLeast(version, '1.21.2')) return 'string'
-  if (isVersionAtLeast(version, '1.20')) return 'id-result'
-  return 'object'
-}
-
-/** 配方 type 字段（1.12/1.13 无命名空间前缀） */
-export function recipeTypeFullName(
-  type: RecipeType,
-  shapeless: boolean,
-  version: JavaVersionId,
-): string {
-  const base =
-    type === 'crafting' ? (shapeless ? 'crafting_shapeless' : 'crafting_shaped') : type
-  if (version === '1.12' || version === '1.13') return base
-  return `minecraft:${base}`
-}
-
-/** 解析槽位值为物品 ID（内置物品 / 自定义物品） */
-export function resolveItemId(value: SlotValue, context: RecipeSlotContext): string | null {
-  switch (value.kind) {
-    case 'item':
-      return value.id
-    case 'custom_item': {
-      const custom = context.customItemsByUid[value.uid]
-      if (!custom) return null
-      const ref = parseIdentifier(custom.id)
-      return ref ? itemRefToString(ref) : null
-    }
-    default:
-      return null
-  }
-}
-
-/** 解析槽位值为标签 ID（内置标签 / 自定义标签） */
-export function resolveTagId(value: SlotValue, context: RecipeSlotContext): string | null {
-  switch (value.kind) {
-    case 'vanilla_tag':
-      return value.id
-    case 'custom_tag': {
-      const custom = context.customTagsByUid[value.uid]
-      if (!custom) return null
-      return custom.id
-    }
-    default:
-      return null
-  }
-}
-
-/** 取槽位值的数量（仅物品类有） */
-export function slotCount(value: SlotValue | undefined): number | undefined {
-  return value && (value.kind === 'item' || value.kind === 'custom_item')
-    ? value.count
-    : undefined
+  const capability = getVersionCapability(version)
+  if (capability.stringIngredients) return 'string'
+  if (capability.resultUsesId) return 'id-result'
+  if (capability.objectIngredients) return 'object'
+  return 'legacy'
 }
 
 const SLOT_CAPTIONS: Record<string, string> = {
@@ -84,12 +33,69 @@ const SLOT_CAPTIONS: Record<string, string> = {
   result: '产物',
 }
 
-/** 槽位展示标题（如 smithing.base -> 底材） */
+/** 槽位中文标题（`smithing.base` → 底材） */
 export function slotCaption(slot: RecipeSlot): string {
-  return SLOT_CAPTIONS[slot.split('.')[1]] ?? slot.split('.')[1]
+  const [, tail] = slot.split('.')
+  return SLOT_CAPTIONS[tail] ?? tail
 }
 
-/** 组装 ingredient 字段值（1.21.2+ 输入支持 count） */
+/** 配方 type 字段：1.14 起带 `minecraft:` 前缀 */
+export function recipeTypeFullName(type: RecipeType, shapeless: boolean, version: JavaVersionId): string {
+  const bare = type === 'crafting' ? (shapeless ? 'crafting_shapeless' : 'crafting_shaped') : type
+  return getVersionCapability(version).namespacedType ? `minecraft:${bare}` : bare
+}
+
+/** 槽位 → 物品 ID（内置物品或自定义物品） */
+export function resolveItemId(value: SlotValue, context: RecipeSlotContext): string | null {
+  if (value.kind === 'item') return value.id
+  if (value.kind !== 'custom_item') return null
+  const custom = context.customItemsByUid[value.uid]
+  if (!custom) return null
+  const ref = parseIdentifier(custom.id)
+  return ref ? itemRefToString(ref) : null
+}
+
+/** 槽位 → 标签 ID（内置标签或自定义标签） */
+export function resolveTagId(value: SlotValue, context: RecipeSlotContext): string | null {
+  if (value.kind === 'vanilla_tag') return value.id
+  if (value.kind !== 'custom_tag') return null
+  return context.customTagsByUid[value.uid]?.id ?? null
+}
+
+/** 槽位数量（仅物品类有数量概念） */
+export function slotCount(value: SlotValue | undefined): number | undefined {
+  if (!value) return undefined
+  return value.kind === 'item' || value.kind === 'custom_item' ? value.count : undefined
+}
+
+/** 槽位值的等价键：同键即可复用同一个 pattern 字符 */
+function identityOf(value: SlotValue): string {
+  switch (value.kind) {
+    case 'item':
+      return `item:${value.id}`
+    case 'custom_item':
+      return `custom_item:${value.uid}`
+    case 'vanilla_tag':
+      return `vanilla_tag:${value.id}`
+    case 'custom_tag':
+      return `custom_tag:${value.uid}`
+  }
+}
+
+export function slotValuesEqual(a: SlotValue, b: SlotValue): boolean {
+  return identityOf(a) === identityOf(b)
+}
+
+/** 1.12 的物品对象：`{ item, data? }` */
+function legacyItemObject(itemId: string): Record<string, unknown> {
+  const ref = parseIdentifier(itemId)
+  if (!ref) throw new Error('物品标识符无效')
+  const out: Record<string, unknown> = { item: itemRefToString({ namespace: ref.namespace, id: ref.id }) }
+  if (ref.data !== undefined) out.data = ref.data
+  return out
+}
+
+/** ingredient 字段（1.21.2+ 允许带 count） */
 export function formatIngredient(
   value: SlotValue,
   context: RecipeSlotContext,
@@ -98,34 +104,27 @@ export function formatIngredient(
 ): unknown {
   const itemId = resolveItemId(value, context)
   if (itemId) {
-    if (strategy === 'string') {
-      if (count !== undefined && count > 1) return { item: itemId, count }
-      return itemId
-    }
-    if (strategy === 'legacy') {
-      const ref = parseIdentifier(itemId)
-      if (!ref) throw new Error('无效的物品标识符')
-      const out: Record<string, unknown> = {
-        item: itemRefToString({ namespace: ref.namespace, id: ref.id }),
-      }
-      if (ref.data !== undefined) out.data = ref.data
-      return out
-    }
+    if (strategy === 'legacy') return legacyItemObject(itemId)
+    if (strategy === 'string') return count !== undefined && count > 1 ? { item: itemId, count } : itemId
     return { item: itemId }
   }
+
   const tagId = resolveTagId(value, context)
   if (tagId) {
-    if (strategy === 'legacy') throw new Error('1.12 不支持标签')
-    if (strategy === 'string') {
-      if (count !== undefined && count > 1) return { tag: tagId, count }
-      return `#${tagId}`
-    }
+    if (strategy === 'legacy') throw new Error('该版本不支持物品标签')
+    if (strategy === 'string') return count !== undefined && count > 1 ? { tag: tagId, count } : `#${tagId}`
     return { tag: tagId }
   }
-  throw new Error('无效的槽位值')
+
+  throw new Error('槽位内容无效')
 }
 
-/** 常规结果（crafting / smithing 等） */
+/** 产物字段名：1.20 起用 `id`，之前用 `item` */
+function resultField(strategy: FormatterStrategy): 'item' | 'id' {
+  return strategy === 'id-result' || strategy === 'string' ? 'id' : 'item'
+}
+
+/** 常规产物（合成 / 锻造转换） */
 export function formatResult(
   value: SlotValue,
   context: RecipeSlotContext,
@@ -133,23 +132,18 @@ export function formatResult(
   count?: number,
 ): Record<string, unknown> {
   const itemId = resolveItemId(value, context)
-  if (!itemId) throw new Error('无效的结果物品')
+  if (!itemId) throw new Error('产物槽位必须是物品')
   const out: Record<string, unknown> = {}
   if (strategy === 'legacy') {
-    const ref = parseIdentifier(itemId)
-    if (!ref) throw new Error('无效的物品标识符')
-    out.item = itemRefToString({ namespace: ref.namespace, id: ref.id })
-    if (ref.data !== undefined) out.data = ref.data
-  } else if (strategy === 'object') {
-    out.item = itemId
+    Object.assign(out, legacyItemObject(itemId))
   } else {
-    out.id = itemId
+    out[resultField(strategy)] = itemId
   }
   if (count !== undefined && count > 1) out.count = count
   return out
 }
 
-/** 烹饪结果：1.20 前为字符串 ID，之后为 {id, count} */
+/** 熔炼类产物：1.20 前是字符串，之后是 `{ id, count }` */
 export function formatCookingResult(
   value: SlotValue,
   context: RecipeSlotContext,
@@ -157,14 +151,14 @@ export function formatCookingResult(
   count?: number,
 ): unknown {
   const itemId = resolveItemId(value, context)
-  if (!itemId) throw new Error('无效的结果物品')
+  if (!itemId) throw new Error('产物槽位必须是物品')
   if (strategy === 'legacy' || strategy === 'object') return itemId
   const out: Record<string, unknown> = { id: itemId }
   if (count !== undefined && count > 1) out.count = count
   return out
 }
 
-/** 切石结果：1.20 前为 {result: "ns:id", count}，之后为 {result: {id, count}} */
+/** 切石产物：`{ result: "id" | { id }, count }` */
 export function formatStonecutterResult(
   value: SlotValue,
   context: RecipeSlotContext,
@@ -172,18 +166,15 @@ export function formatStonecutterResult(
   count?: number,
 ): Record<string, unknown> {
   const itemId = resolveItemId(value, context)
-  if (!itemId) throw new Error('无效的结果物品')
-  const out: Record<string, unknown> = {}
-  if (strategy === 'legacy' || strategy === 'object') {
-    out.result = itemId
-  } else {
-    out.result = { id: itemId }
+  if (!itemId) throw new Error('产物槽位必须是物品')
+  const out: Record<string, unknown> = {
+    result: strategy === 'legacy' || strategy === 'object' ? itemId : { id: itemId },
   }
   if (count !== undefined && count > 1) out.count = count
   return out
 }
 
-/** 读取合成网格槽位（3x3 或 2x2，按行优先） */
+/** 合成格槽位值（2×2 时只取前四个，行优先） */
 export function getCraftingCells(state: RecipeState): (SlotValue | null)[] {
   const size = state.crafting.twoByTwo ? 2 : 3
   const cells: (SlotValue | null)[] = []
@@ -193,7 +184,11 @@ export function getCraftingCells(state: RecipeState): (SlotValue | null)[] {
   return cells
 }
 
-/** 计算 pattern（keepWhitespace 时保留完整网格；否则裁剪空行空列），并建立 key -> 槽位值 */
+/**
+ * 有形状合成：求最小包围盒生成 pattern，并分配 key 字符
+ * - `keepWhitespace` 为真时保留完整网格
+ * - 全空网格返回 `[' ']`
+ */
 export function buildCraftingPattern(
   state: RecipeState,
   _context: RecipeSlotContext,
@@ -205,10 +200,13 @@ export function buildCraftingPattern(
   )
 
   const keys: { char: string; value: SlotValue }[] = []
+  const byIdentity = new Map<string, string>()
   const keyOf = (value: SlotValue): string => {
-    const existing = keys.find((entry) => slotValuesEqual(entry.value, value))
-    if (existing) return existing.char
+    const identity = identityOf(value)
+    const known = byIdentity.get(identity)
+    if (known) return known
     const char = String.fromCharCode(65 + keys.length)
+    byIdentity.set(identity, char)
     keys.push({ char, value })
     return char
   }
@@ -220,47 +218,27 @@ export function buildCraftingPattern(
     }
   }
 
-  const nonEmptyRows = grid.filter((row) => row.some((cell) => cell !== null))
-  if (nonEmptyRows.length === 0) return { pattern: [' '], keys }
+  const filledRows = grid.filter((row) => row.some((cell) => cell !== null))
+  if (filledRows.length === 0) return { pattern: [' '], keys }
 
-  let minCol = size
-  let maxCol = -1
-  for (const row of nonEmptyRows) {
-    for (let col = 0; col < row.length; col += 1) {
-      if (row[col] !== null) {
-        minCol = Math.min(minCol, col)
-        maxCol = Math.max(maxCol, col)
-      }
-    }
-  }
+  const filledColumns = filledRows.flatMap((row) =>
+    row.flatMap((cell, column) => (cell === null ? [] : [column])),
+  )
+  const firstColumn = Math.min(...filledColumns)
+  const lastColumn = Math.max(...filledColumns)
 
-  const pattern: string[] = []
-  for (const row of nonEmptyRows) {
-    pattern.push(
+  return {
+    pattern: filledRows.map((row) =>
       row
-        .slice(minCol, maxCol + 1)
+        .slice(firstColumn, lastColumn + 1)
         .map((cell) => (cell === null ? ' ' : keyOf(cell)))
         .join(''),
-    )
-  }
-  return { pattern, keys }
-}
-
-export function slotValuesEqual(a: SlotValue, b: SlotValue): boolean {
-  if (a.kind !== b.kind) return false
-  switch (a.kind) {
-    case 'item':
-      return b.kind === 'item' && a.id === b.id
-    case 'custom_item':
-      return b.kind === 'custom_item' && a.uid === b.uid
-    case 'vanilla_tag':
-      return b.kind === 'vanilla_tag' && a.id === b.id
-    case 'custom_tag':
-      return b.kind === 'custom_tag' && a.uid === b.uid
+    ),
+    keys,
   }
 }
 
-/** 配方使用的槽位列表（不含结果槽） */
+/** 输入槽位（不含产物） */
 export function getInputSlots(state: RecipeState): RecipeSlot[] {
   switch (state.recipeType) {
     case 'crafting':
@@ -275,30 +253,22 @@ export function getInputSlots(state: RecipeState): RecipeSlot[] {
         'crafting.8',
         'crafting.9',
       ]
-    case 'smelting':
-    case 'blasting':
-    case 'smoking':
-    case 'campfire_cooking':
-      return ['cooking.ingredient']
     case 'stonecutter':
       return ['stonecutter.ingredient']
     case 'smithing':
     case 'smithing_trim':
     case 'smithing_transform':
       return ['smithing.template', 'smithing.base', 'smithing.addition']
+    default:
+      return ['cooking.ingredient']
   }
 }
 
-/** 配方使用的结果槽位 */
+/** 产物槽位 */
 export function getResultSlots(state: RecipeState): RecipeSlot[] {
   switch (state.recipeType) {
     case 'crafting':
       return ['crafting.result']
-    case 'smelting':
-    case 'blasting':
-    case 'smoking':
-    case 'campfire_cooking':
-      return ['cooking.result']
     case 'stonecutter':
       return ['stonecutter.result']
     case 'smithing':
@@ -306,9 +276,118 @@ export function getResultSlots(state: RecipeState): RecipeSlot[] {
       return ['smithing.result']
     case 'smithing_trim':
       return []
+    default:
+      return ['cooking.result']
   }
 }
 
+const COOKING_TYPES: readonly RecipeType[] = ['smelting', 'blasting', 'smoking', 'campfire_cooking']
+
+/** 通用头部字段：group / category / show_notification */
+function emitHeader(json: Record<string, unknown>, state: RecipeState, version: JavaVersionId): void {
+  const smithingType =
+    state.recipeType === 'smithing' ||
+    state.recipeType === 'smithing_trim' ||
+    state.recipeType === 'smithing_transform'
+
+  // 26.1 起切石机不接受 group 字段
+  const groupAllowed =
+    !smithingType && !(state.recipeType === 'stonecutter' && getVersionCapability(version).notificationCooking)
+  if (groupAllowed && state.group) json.group = state.group
+
+  if (state.category && state.category !== 'misc' && supportsRecipeCategory(version, state.recipeType)) {
+    json.category = state.category
+  }
+
+  if (!state.showNotification && supportsShowNotification(version, state.recipeType, state.crafting.shapeless)) {
+    json.show_notification = false
+  }
+}
+
+/** 合成：有形状写 pattern + key，无形状写扁平 ingredients */
+function emitCrafting(
+  json: Record<string, unknown>,
+  state: RecipeState,
+  context: RecipeSlotContext,
+  strategy: FormatterStrategy,
+): void {
+  if (state.crafting.shapeless) {
+    json.ingredients = getCraftingCells(state)
+      .filter((cell): cell is SlotValue => cell !== null)
+      .map((value) => formatIngredient(value, context, strategy, slotCount(value)))
+  } else {
+    const { pattern, keys } = buildCraftingPattern(state, context)
+    json.pattern = pattern
+    json.key = Object.fromEntries(
+      keys.map(({ char, value }) => [char, formatIngredient(value, context, strategy, slotCount(value))]),
+    )
+  }
+
+  const result = state.slots['crafting.result']
+  if (result) json.result = formatResult(result, context, strategy, slotCount(result))
+}
+
+/** 熔炼类：ingredient + result + experience + cookingtime */
+function emitCooking(
+  json: Record<string, unknown>,
+  state: RecipeState,
+  context: RecipeSlotContext,
+  strategy: FormatterStrategy,
+): void {
+  const ingredient = state.slots['cooking.ingredient']
+  if (ingredient) {
+    json.ingredient = formatIngredient(ingredient, context, strategy, slotCount(ingredient))
+  }
+
+  const result = state.slots['cooking.result']
+  if (result) json.result = formatCookingResult(result, context, strategy, slotCount(result))
+
+  json.experience = state.cooking.experience
+  const fallback = DEFAULT_COOKING_TIME[state.recipeType as keyof typeof DEFAULT_COOKING_TIME]
+  json.cookingtime = state.cooking.time ?? fallback
+}
+
+/** 切石机 */
+function emitStonecutter(
+  json: Record<string, unknown>,
+  state: RecipeState,
+  context: RecipeSlotContext,
+  strategy: FormatterStrategy,
+): void {
+  const ingredient = state.slots['stonecutter.ingredient']
+  if (ingredient) {
+    json.ingredient = formatIngredient(ingredient, context, strategy, slotCount(ingredient))
+  }
+  const result = state.slots['stonecutter.result']
+  if (result) json.result = formatStonecutterResult(result, context, strategy, slotCount(result))
+}
+
+/** 锻造：template / base / addition（+ trim 的 pattern / transform 的 result） */
+function emitSmithing(
+  json: Record<string, unknown>,
+  state: RecipeState,
+  context: RecipeSlotContext,
+  strategy: FormatterStrategy,
+  version: JavaVersionId,
+): void {
+  const template = state.slots['smithing.template']
+  const base = state.slots['smithing.base']
+  const addition = state.slots['smithing.addition']
+  if (template) json.template = formatIngredient(template, context, strategy, slotCount(template))
+  if (base) json.base = formatIngredient(base, context, strategy, slotCount(base))
+  if (addition) json.addition = formatIngredient(addition, context, strategy, slotCount(addition))
+
+  if (state.recipeType === 'smithing_trim' && state.smithing.trimPattern && supportsSmithingTrimPattern(version)) {
+    json.pattern = state.smithing.trimPattern
+  }
+
+  const result = state.slots['smithing.result']
+  if (result && state.recipeType !== 'smithing_trim') {
+    json.result = formatResult(result, context, strategy, slotCount(result))
+  }
+}
+
+/** 组装完整配方 JSON */
 export function formatRecipeJson(
   state: RecipeState,
   version: JavaVersionId,
@@ -318,85 +397,12 @@ export function formatRecipeJson(
   const json: Record<string, unknown> = {
     type: recipeTypeFullName(state.recipeType, state.crafting.shapeless, version),
   }
+  emitHeader(json, state, version)
 
-  const supportsGroup =
-    state.recipeType !== 'smithing' &&
-    state.recipeType !== 'smithing_trim' &&
-    state.recipeType !== 'smithing_transform'
-  if (supportsGroup && state.group) {
-    if (!(state.recipeType === 'stonecutter' && isVersionAtLeast(version, '26.1'))) {
-      json.group = state.group
-    }
-  }
-  if (state.category && state.category !== 'misc') {
-    if (supportsRecipeCategory(version, state.recipeType)) json.category = state.category
-  }
-  if (!state.showNotification && supportsShowNotification(version, state.recipeType, state.crafting.shapeless)) {
-    json.show_notification = false
-  }
-
-  if (state.recipeType === 'crafting') {
-    if (state.crafting.shapeless) {
-      json.ingredients = getCraftingCells(state)
-        .filter((cell): cell is SlotValue => cell !== null)
-        .map((value) => formatIngredient(value, context, strategy, slotCount(value)))
-    } else {
-      const { pattern, keys } = buildCraftingPattern(state, context)
-      json.pattern = pattern
-      json.key = Object.fromEntries(
-        keys.map(({ char, value }) => [char, formatIngredient(value, context, strategy, slotCount(value))]),
-      )
-    }
-    const result = state.slots['crafting.result']
-    if (result) json.result = formatResult(result, context, strategy, slotCount(result))
-  } else if (
-    state.recipeType === 'smelting' ||
-    state.recipeType === 'blasting' ||
-    state.recipeType === 'smoking' ||
-    state.recipeType === 'campfire_cooking'
-  ) {
-    const ingredient = state.slots['cooking.ingredient']
-    if (ingredient) {
-      json.ingredient = formatIngredient(ingredient, context, strategy, slotCount(ingredient))
-    }
-    const result = state.slots['cooking.result']
-    if (result) {
-      json.result = formatCookingResult(result, context, strategy, slotCount(result))
-    }
-    json.experience = state.cooking.experience
-    json.cookingtime = state.cooking.time ?? DEFAULT_COOKING_TIME[state.recipeType]
-  } else if (state.recipeType === 'stonecutter') {
-    const ingredient = state.slots['stonecutter.ingredient']
-    if (ingredient) {
-      json.ingredient = formatIngredient(ingredient, context, strategy, slotCount(ingredient))
-    }
-    const result = state.slots['stonecutter.result']
-    if (result) {
-      json.result = formatStonecutterResult(result, context, strategy, slotCount(result))
-    }
-  } else {
-    const template = state.slots['smithing.template']
-    const base = state.slots['smithing.base']
-    const addition = state.slots['smithing.addition']
-    if (template) {
-      json.template = formatIngredient(template, context, strategy, slotCount(template))
-    }
-    if (base) json.base = formatIngredient(base, context, strategy, slotCount(base))
-    if (addition) {
-      json.addition = formatIngredient(addition, context, strategy, slotCount(addition))
-    }
-    if (
-      state.recipeType === 'smithing_trim' &&
-      state.smithing.trimPattern &&
-      supportsSmithingTrimPattern(version)
-    ) {
-      json.pattern = state.smithing.trimPattern
-    }
-    const result = state.slots['smithing.result']
-    if (result && state.recipeType !== 'smithing_trim') {
-      json.result = formatResult(result, context, strategy, slotCount(result))
-    }
-  }
+  if (state.recipeType === 'crafting') emitCrafting(json, state, context, strategy)
+  else if (COOKING_TYPES.includes(state.recipeType)) emitCooking(json, state, context, strategy)
+  else if (state.recipeType === 'stonecutter') emitStonecutter(json, state, context, strategy)
+  else emitSmithing(json, state, context, strategy, version)
 
   return json
 }

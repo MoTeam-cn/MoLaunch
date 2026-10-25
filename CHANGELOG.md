@@ -4,6 +4,17 @@
 
 ## [Unreleased]
 
+### 重构
+
+#### 合成配方生成器按净室规格重新实现
+
+- **版本能力表**（[`versions.ts`](src/utils/recipe-generator/versions.ts)）：19 个版本各一行能力开关（`namespacedType` / `objectIngredients` / `stringIngredients` / `resultUsesId` / `ingredientCount` / `category` / `trimPattern` / 各类 `notification`），其余模块只读开关。
+- **配方输出**（[`formatter.ts`](src/utils/recipe-generator/formatter.ts)）：按配方类型拆成 `emitCrafting` / `emitCooking` / `emitStonecutter` / `emitSmithing`，pattern 的 key 分配改用等价键 + Map。
+- **校验**（[`validation.ts`](src/utils/recipe-generator/validation.ts)）：改为规则列表（类型可用 / 输入必填 / 产物必填 / 槽位合法 / 纹饰图案 / 合成非空），问题码去重。
+- **数据包**（[`datapack.ts`](src/utils/recipe-generator/datapack.ts)、[`exporter.ts`](src/utils/recipe-generator/exporter.ts)、[`recipe-engine.ts`](src/utils/recipe-generator/recipe-engine.ts)、[`tag-resolve.ts`](src/utils/recipe-generator/tag-resolve.ts)）：目录名与 pack_format 全部取自能力表，导出按是否支持数据包分流。
+- **资源加载**（[`resources.ts`](src/utils/recipe-generator/resources.ts)）：纹理图集改为惰性加载，模块导入不再发起请求。
+- **测试**：[`__tests__/recipe-generator.test.ts`](src/utils/recipe-generator/__tests__/recipe-generator.test.ts) 按规格 §6 验收用例重写（45 项），新增 [`recipe-layouts.test.ts`](src/views/tools/creation/recipe-generator/__tests__/recipe-layouts.test.ts) 校验槽位盒几何、越界与重叠。
+
 ### 变更
 
 #### 渐变文字按净室规格重新实现

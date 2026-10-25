@@ -1,10 +1,13 @@
 /**
- * 合成配方生成器 - 校验（问题码 + 中文提示）
+ * 合成配方生成器 - 校验（对应 specs/cleanroom/recipe-generator.md §5）
+ *
+ * 规则化：每条规则独立返回问题码，最后统一去重。
+ * 问题码 → 中文提示，界面直接展示 message。
  */
-import type { JavaVersionId, RecipeSlotContext, RecipeState } from './types'
 import { isRecipeTypeAvailable, supportsItemTags, supportsSmithingTrimPattern } from './versions'
 import { parseIdentifier } from './identifier'
 import { getInputSlots, getResultSlots } from './formatter'
+import type { JavaVersionId, RecipeSlot, RecipeSlotContext, RecipeState, SlotValue } from './types'
 
 export const RECIPE_ISSUE_CODES = [
   'unsupported-type',
@@ -47,107 +50,118 @@ function issue(code: RecipeIssueCode): RecipeIssue {
   return { code, message: ISSUE_MESSAGES[code] }
 }
 
-export function validateRecipe(
-  state: RecipeState,
-  version: JavaVersionId,
-  context: RecipeSlotContext,
-): RecipeIssue[] {
-  const issues: RecipeIssue[] = []
+const SMITHING_TYPES: readonly string[] = ['smithing', 'smithing_trim', 'smithing_transform']
 
-  if (!isRecipeTypeAvailable(version, state.recipeType)) {
-    issues.push(issue('unsupported-type'))
-    return issues
+/** 锻造类的槽位 → 缺失提示码 */
+const SMITHING_SLOT_ISSUES: Partial<Record<RecipeSlot, RecipeIssueCode>> = {
+  'smithing.template': 'missing-template',
+  'smithing.base': 'missing-base',
+  'smithing.addition': 'missing-addition',
+}
+
+type Rule = (state: RecipeState, version: JavaVersionId, context: RecipeSlotContext) => RecipeIssue[]
+
+/** 单个槽位值的合法性 */
+function checkSlotValue(value: SlotValue, version: JavaVersionId, context: RecipeSlotContext): RecipeIssue[] {
+  switch (value.kind) {
+    case 'item':
+      return parseIdentifier(value.id) ? [] : [issue('invalid-identifier')]
+    case 'vanilla_tag':
+      if (!supportsItemTags(version)) return [issue('tags-not-supported')]
+      return context.vanillaTags[value.id] ? [] : [issue('invalid-identifier')]
+    case 'custom_item': {
+      const custom = context.customItemsByUid[value.uid]
+      if (!custom) return [issue('missing-custom-item')]
+      return parseIdentifier(custom.id) ? [] : [issue('invalid-identifier')]
+    }
+    case 'custom_tag': {
+      const custom = context.customTagsByUid[value.uid]
+      if (!custom) return [issue('missing-custom-tag')]
+      return parseIdentifier(custom.id) ? [] : [issue('invalid-identifier')]
+    }
   }
+}
 
-  const inputSlots = getInputSlots(state)
-  const resultSlots = getResultSlots(state)
+const typeSupported: Rule = (state, version) =>
+  isRecipeTypeAvailable(version, state.recipeType) ? [] : [issue('unsupported-type')]
 
-  for (const slot of inputSlots) {
-    const value = state.slots[slot]
-    if (!value) {
-      if (state.recipeType === 'smithing' || state.recipeType === 'smithing_trim' || state.recipeType === 'smithing_transform') {
-        if (slot === 'smithing.template') issues.push(issue('missing-template'))
-        else if (slot === 'smithing.base') issues.push(issue('missing-base'))
-        else if (slot === 'smithing.addition') issues.push(issue('missing-addition'))
-      } else if (state.recipeType === 'crafting') {
-        continue
-      } else {
-        issues.push(issue('missing-ingredient'))
-      }
+/** 输入槽位：合成允许留空，锻造缺项逐个提示，其余类型要求必填 */
+const inputsFilled: Rule = (state) => {
+  const issues: RecipeIssue[] = []
+  for (const slot of getInputSlots(state)) {
+    if (state.slots[slot]) continue
+    if (SMITHING_TYPES.includes(state.recipeType)) {
+      const code = SMITHING_SLOT_ISSUES[slot]
+      if (code) issues.push(issue(code))
       continue
     }
-    issues.push(...validateSlotValue(value, version, context))
+    if (state.recipeType !== 'crafting') issues.push(issue('missing-ingredient'))
   }
+  return issues
+}
 
-  for (const slot of resultSlots) {
+/** 产物槽位：必填且不允许标签 */
+const resultsFilled: Rule = (state) => {
+  const issues: RecipeIssue[] = []
+  for (const slot of getResultSlots(state)) {
     const value = state.slots[slot]
     if (!value) {
       issues.push(issue('missing-result'))
       continue
     }
-    if (value.kind === 'vanilla_tag' || value.kind === 'custom_tag') {
-      issues.push(issue('tag-in-result'))
-    }
-    issues.push(...validateSlotValue(value, version, context))
+    if (value.kind === 'vanilla_tag' || value.kind === 'custom_tag') issues.push(issue('tag-in-result'))
   }
-
-  if (state.recipeType === 'smithing_trim' && supportsSmithingTrimPattern(version) && !state.smithing.trimPattern) {
-    issues.push(issue('missing-trim-pattern'))
-  }
-
-  if (state.recipeType === 'crafting') {
-    const filled = inputSlots.filter((slot) => state.slots[slot]).length
-    if (filled < 1) issues.push(issue('missing-ingredient'))
-  }
-
-  return dedupeIssues(issues)
+  return issues
 }
 
-function validateSlotValue(
-  value: RecipeState['slots'][keyof RecipeState['slots']],
-  version: JavaVersionId,
-  context: RecipeSlotContext,
-): RecipeIssue[] {
-  if (!value) return []
-  switch (value.kind) {
-    case 'item': {
-      const ref = parseIdentifier(value.id)
-      if (!ref) return [issue('invalid-identifier')]
-      return []
-    }
-    case 'vanilla_tag': {
-      if (!supportsItemTags(version)) return [issue('tags-not-supported')]
-      if (!context.vanillaTags[value.id]) return [issue('invalid-identifier')]
-      return []
-    }
-    case 'custom_item': {
-      const custom = context.customItemsByUid[value.uid]
-      if (!custom) return [issue('missing-custom-item')]
-      if (!parseIdentifier(custom.id)) return [issue('invalid-identifier')]
-      return []
-    }
-    case 'custom_tag': {
-      const custom = context.customTagsByUid[value.uid]
-      if (!custom) return [issue('missing-custom-tag')]
-      if (!supportsItemTags(version)) return [issue('tags-not-supported')]
-      return []
-    }
-  }
+/** 槽位值本身合法 */
+const slotValuesValid: Rule = (state, version, context) => {
+  const slots = [...getInputSlots(state), ...getResultSlots(state)]
+  return slots.flatMap((slot) => {
+    const value = state.slots[slot]
+    return value ? checkSlotValue(value, version, context) : []
+  })
 }
 
-export function isRecipeValid(
+/** 纹饰锻造必须有图案（1.21.5+） */
+const trimPatternPresent: Rule = (state, version) =>
+  state.recipeType === 'smithing_trim' && supportsSmithingTrimPattern(version) && !state.smithing.trimPattern
+    ? [issue('missing-trim-pattern')]
+    : []
+
+/** 合成至少放一件材料 */
+const craftingNotEmpty: Rule = (state) =>
+  state.recipeType === 'crafting' && getInputSlots(state).every((slot) => !state.slots[slot])
+    ? [issue('missing-ingredient')]
+    : []
+
+const RULES: readonly Rule[] = [
+  typeSupported,
+  inputsFilled,
+  resultsFilled,
+  slotValuesValid,
+  trimPatternPresent,
+  craftingNotEmpty,
+]
+
+export function validateRecipe(
   state: RecipeState,
   version: JavaVersionId,
   context: RecipeSlotContext,
-): boolean {
-  return validateRecipe(state, version, context).length === 0
+): RecipeIssue[] {
+  const seen = new Set<RecipeIssueCode>()
+  const issues: RecipeIssue[] = []
+  for (const rule of RULES) {
+    for (const found of rule(state, version, context)) {
+      if (seen.has(found.code)) continue
+      seen.add(found.code)
+      issues.push(found)
+    }
+  }
+  return issues
 }
 
-function dedupeIssues(issues: RecipeIssue[]): RecipeIssue[] {
-  return [...new Map(issues.map((item) => [item.code, item])).values()]
-}
-
-/** 单个问题的可读展示 */
+/** 把问题列表拼成一句中文提示（界面 toast 用） */
 export function describeRecipeIssues(issues: RecipeIssue[]): string {
-  return issues.map((item) => item.message).join('；')
+  return issues.map((found) => found.message).join('；')
 }

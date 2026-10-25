@@ -47,7 +47,7 @@ async function fetchJson<T>(url: string): Promise<T> {
   return getJson<T>(url)
 }
 
-const atlasLayoutPromise = fetchJson<AtlasLayout>(atlasLayoutUrl)
+let atlasLayoutPromise: Promise<AtlasLayout> | null = null
 
 const itemsCache = new Map<JavaVersionId, AssetItem[]>()
 const tagsCache = new Map<JavaVersionId, Record<string, string[]>>()
@@ -74,6 +74,7 @@ export async function loadVersionTags(version: JavaVersionId): Promise<Record<st
 }
 
 export async function getAtlasLayout(): Promise<AtlasLayout> {
+  atlasLayoutPromise ??= fetchJson<AtlasLayout>(atlasLayoutUrl)
   return atlasLayoutPromise
 }
 
