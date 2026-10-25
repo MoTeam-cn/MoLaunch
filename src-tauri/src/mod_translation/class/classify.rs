@@ -252,9 +252,11 @@ fn is_pure_command(value: &str) -> bool {
     let Some(head) = tokens.next() else {
         return false;
     };
-    let head_ok = head
-        .chars()
-        .all(|c| c.is_ascii_alphanumeric() || matches!(c, '_' | '.' | ':' | '-'));
+    let command = head.trim_start_matches('/');
+    let head_ok = !command.is_empty()
+        && command
+            .chars()
+            .all(|c| c.is_ascii_alphanumeric() || matches!(c, '_' | '.' | ':' | '-'));
     head_ok && tokens.all(is_command_argument)
 }
 

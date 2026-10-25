@@ -47,8 +47,9 @@ fn test_keyvalue_parsing_skips_comments_and_handles_escaped_separator() {
     let (entries, lines) = parse_keyvalue(content);
     assert_eq!(lines.len(), 5);
     let keys: Vec<&str> = entries.iter().map(|(key, _)| key.as_str()).collect();
-    assert_eq!(keys, vec!["key", "other"]);
+    assert_eq!(keys, vec!["key", "other", "path\\=key"]);
     assert_eq!(entries[1].1, "spaced");
+    assert_eq!(entries[2].1, "1");
 }
 
 #[test]
