@@ -234,11 +234,6 @@ pub async fn install(
         cb(30.0);
     }
 
-    // 预取 install_profile 声明的库，绕开安装器的重定向次数限制
-    if let Err(e) = shared::prefetch_install_libraries(&installer_path, game_dir, config).await {
-        log_warn!("[NeoForge] 预取安装库失败（继续尝试安装）: {}", e);
-    }
-
     log_info!("[NeoForge] Using injector");
     let (injector_path, wrapper_path) = super::forge_installer::extract_embedded_resources()?;
 
@@ -252,7 +247,7 @@ pub async fn install(
         cb(50.0);
     }
 
-    super::forge_installer::run_forge_installer(
+    let mut install_result = super::forge_installer::run_forge_installer(
         &java_path,
         &installer_path.to_string_lossy(),
         &injector_path,
@@ -260,7 +255,29 @@ pub async fn install(
         &game_dir.to_string_lossy(),
         true,
         None,
-    )?;
+    );
+
+    // 失败时预取库再试一次（镜像重定向超限的常见解法）；成功路径不受影响
+    if let Some(first_error) = install_result.as_ref().err().map(ToString::to_string) {
+        log_warn!("[NeoForge] 安装器失败，尝试预取库后重试: {}", first_error);
+        match shared::prefetch_install_libraries(&installer_path, game_dir, config).await {
+            Ok(count) if count > 0 => {
+                log_info!("[NeoForge] 已预取 {} 个库，重试安装器", count);
+                install_result = super::forge_installer::run_forge_installer(
+                    &java_path,
+                    &installer_path.to_string_lossy(),
+                    &injector_path,
+                    &wrapper_path,
+                    &game_dir.to_string_lossy(),
+                    true,
+                    None,
+                );
+            }
+            Ok(_) => log_warn!("[NeoForge] 没有可预取的库，保留原始错误"),
+            Err(e) => log_warn!("[NeoForge] 预取安装库失败，保留原始错误: {}", e),
+        }
+    }
+    install_result?;
 
     if let Some(ref cb) = progress_callback {
         cb(80.0);

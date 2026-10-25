@@ -120,12 +120,6 @@ async fn install_modern(
         cb(30.0);
     }
 
-    // 预取 install_profile 声明的库：安装器自身只跟随有限次重定向，
-    // 镜像链路一长就会报 Invalid number of redirects，先备好库可绕开
-    if let Err(e) = shared::prefetch_install_libraries(installer_path, game_dir, config).await {
-        log_warn!("[Forge] 预取安装库失败（继续尝试安装）: {}", e);
-    }
-
     log_info!("[Forge] Using injector for Forge {}", forge_version);
 
     let (injector_path, wrapper_path) =
@@ -149,19 +143,53 @@ async fn install_modern(
     let wrapper_path_owned = wrapper_path.to_string();
     let game_dir_str = game_dir.to_string_lossy().to_string();
 
-    tokio::task::spawn_blocking(move || {
-        super::super::forge_installer::run_forge_installer(
-            &java_path_owned,
-            &installer_path_str,
-            &injector_path_owned,
-            &wrapper_path_owned,
-            &game_dir_str,
-            false,
-            None,
-        )
+    let mut install_result = tokio::task::spawn_blocking({
+        let (java, installer, injector, wrapper, dir) = (
+            java_path_owned.clone(),
+            installer_path_str.clone(),
+            injector_path_owned.clone(),
+            wrapper_path_owned.clone(),
+            game_dir_str.clone(),
+        );
+        move || {
+            super::super::forge_installer::run_forge_installer(
+                &java, &installer, &injector, &wrapper, &dir, false, None,
+            )
+        }
     })
     .await
-    .map_err(|e| anyhow::anyhow!("Forge installer task panicked: {}", e))??;
+    .map_err(|e| anyhow::anyhow!("Forge installer task panicked: {}", e))?;
+
+    // 安装器失败时再预取库重试一次：安装器自身只跟随有限次重定向，
+    // 镜像链路一长就会报 Invalid number of redirects，库备好即可跳过下载。
+    // 只在失败后执行，安装成功的路径不受影响。
+    if let Some(first_error) = install_result.as_ref().err().map(ToString::to_string) {
+        log_warn!("[Forge] 安装器失败，尝试预取库后重试: {}", first_error);
+        match shared::prefetch_install_libraries(installer_path, game_dir, config).await {
+            Ok(count) if count > 0 => {
+                log_info!("[Forge] 已预取 {} 个库，重试安装器", count);
+                install_result = tokio::task::spawn_blocking({
+                    let (java, installer, injector, wrapper, dir) = (
+                        java_path_owned,
+                        installer_path_str,
+                        injector_path_owned,
+                        wrapper_path_owned,
+                        game_dir_str,
+                    );
+                    move || {
+                        super::super::forge_installer::run_forge_installer(
+                            &java, &installer, &injector, &wrapper, &dir, false, None,
+                        )
+                    }
+                })
+                .await
+                .map_err(|e| anyhow::anyhow!("Forge installer task panicked: {}", e))?;
+            }
+            Ok(_) => log_warn!("[Forge] 没有可预取的库，保留原始错误"),
+            Err(e) => log_warn!("[Forge] 预取安装库失败，保留原始错误: {}", e),
+        }
+    }
+    install_result?;
 
     if let Some(ref cb) = progress_callback {
         cb(80.0);

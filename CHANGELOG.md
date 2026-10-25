@@ -8,11 +8,9 @@
 
 #### 安装 Forge / NeoForge 时报「Invalid number of redirects」
 
-- [`shared.rs`](src-tauri/src/minecraft/loaders/shared.rs)：新增 `prefetch_install_libraries`，运行安装器前先用启动器自己的下载器（跟随重定向、支持多源与重试）把 `install_profile.json` 声明的库预取到 `libraries/`，安装器命中「文件已存在，校验通过」后不再走镜像的重定向链；单个库失败不阻断安装。
-- [`install.rs`](src-tauri/src/minecraft/loaders/forge/install.rs) / [`neoforge.rs`](src-tauri/src/minecraft/loaders/neoforge.rs)：安装前调用上述预取。
+- [`shared.rs`](src-tauri/src/minecraft/loaders/shared.rs)：新增 `prefetch_install_libraries`，解析 `install_profile.json` 中声明了下载地址的库，用启动器自己的下载器（跟随重定向、支持多源与重试）预取到 `libraries/`；只处理主 artifact、不猜地址、不碰安装器生成物，上限 400 个，单个失败不阻断。
+- [`install.rs`](src-tauri/src/minecraft/loaders/forge/install.rs) / [`neoforge.rs`](src-tauri/src/minecraft/loaders/neoforge.rs)：安装器失败后自动预取库并重试一次，成功路径完全不经过这段逻辑，失败时保留原始错误。
 - [`forge_installer.rs`](src-tauri/src/minecraft/loaders/forge_installer.rs)：失败信息中识别到重定向超限时补一句可操作提示（切换下载源后重试）。
-
-## [0.3.12-rc.6] - 2026-10-25
 
 ### 修复
 

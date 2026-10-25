@@ -142,11 +142,15 @@ pub async fn download_mojang_mappings(
     Ok(())
 }
 
+/// 预取库数量上限（防止极端 profile 拉长安装时间）
+const MAX_PREFETCH_LIBRARIES: usize = 400;
+
 /// 预取安装器 install_profile.json 里声明的库到 libraries 目录
 ///
-/// 注入器会把下载地址强制指向镜像，而安装器自身只跟随有限次重定向，镜像链路一长
-/// 就会报 `Invalid number of redirects` 直接失败。先用启动器自己的下载器（跟随重定向、
-/// 支持多源与重试）把库备好，安装器命中「文件已存在，校验通过」即可跳过下载。
+/// 用作安装器失败后的补救：注入器把下载地址强制指向镜像，而安装器自身只跟随有限次
+/// 重定向，镜像链路一长就会报 `Invalid number of redirects`。用启动器自己的下载器
+/// （跟随重定向、支持多源与重试）把库备好，安装器重试时命中「文件已存在，校验通过」
+/// 即可跳过下载。只处理声明了 artifact.url 的库，不猜地址、不碰安装器生成物。
 ///
 /// 返回成功预取的库数量；任何单个库失败都不阻断（交给安装器自己再试）。
 pub async fn prefetch_install_libraries(
@@ -170,11 +174,22 @@ pub async fn prefetch_install_libraries(
     let mut seen: std::collections::HashSet<String> = std::collections::HashSet::new();
 
     for (index, library) in libraries.iter().enumerate() {
+        if tasks.len() >= MAX_PREFETCH_LIBRARIES {
+            log_warn!(
+                "[Installer] 预取库数量达到上限 {}，其余交给安装器",
+                MAX_PREFETCH_LIBRARIES
+            );
+            break;
+        }
         let Some(name) = library["name"].as_str() else {
             continue;
         };
-        // 只处理主 artifact，natives 等由安装器自己处理
+        // 只处理声明了下载地址的主 artifact：natives、需要安装器自行生成的条目
+        // 以及旧版安装器（无 downloads 字段）一律跳过，避免猜错 URL 或覆盖生成物
         let artifact = &library["downloads"]["artifact"];
+        let Some(official_url) = artifact["url"].as_str() else {
+            continue;
+        };
         let relative = artifact["path"]
             .as_str()
             .map(str::to_string)
@@ -188,10 +203,7 @@ pub async fn prefetch_install_libraries(
             continue;
         }
 
-        let official_url = artifact["url"]
-            .as_str()
-            .map(str::to_string)
-            .unwrap_or_else(|| format!("{}/{}", sources::MAVEN_FORGE, relative));
+        let official_url = official_url.to_string();
         let urls = sources::build_replace_urls(
             &official_url,
             None,
