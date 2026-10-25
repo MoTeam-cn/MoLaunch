@@ -258,9 +258,7 @@ impl BatchCtx<'_> {
                 Some(self.model),
                 Some(super::progress::AI_TIMEOUT_SECS),
             ) => result.map_err(|error| error.to_string()),
-            _ = super::progress::wait_cancel(self.cancel) => {
-                return Err("任务已取消".to_string())
-            }
+            _ = super::progress::wait_cancel(self.cancel) => Err("任务已取消".to_string()),
             _ = super::progress::smooth_progress(
                 "language",
                 self.base_progress,
@@ -269,7 +267,7 @@ impl BatchCtx<'_> {
                 self.on_progress,
                 move |_p: f64| label.clone(),
                 retry,
-            ) => return Err("任务已取消".to_string()),
+            ) => Err("任务已取消".to_string()),
         }
     }
 }

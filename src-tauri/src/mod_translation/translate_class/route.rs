@@ -201,7 +201,7 @@ async fn request(
             Some(model),
             Some(progress::AI_TIMEOUT_SECS),
         ) => result.map_err(|error| error.to_string()),
-        _ = progress::wait_cancel(cancel) => return Err("任务已取消".to_string()),
+        _ = progress::wait_cancel(cancel) => Err("任务已取消".to_string()),
         _ = progress::smooth_progress(
             STAGE,
             base_progress,
@@ -210,7 +210,7 @@ async fn request(
             on_progress,
             move |_p: f64| label.clone(),
             retry,
-        ) => return Err("任务已取消".to_string()),
+        ) => Err("任务已取消".to_string()),
     }
 }
 
