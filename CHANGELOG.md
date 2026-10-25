@@ -4,6 +4,22 @@
 
 ## [Unreleased]
 
+### 修复
+
+#### 背景图玻璃效果不再波及弹窗
+
+- [`theme-dark.scss`](src/assets/styles/theme-dark.scss)：玻璃规则限定在 `#app` 内的页面卡片；弹窗 / 抽屉 / 下拉都 teleport 到 `body`，不再被半透明覆盖，退出确认框等浮层恢复不透明；移除按 `shadow-lg` 批量匹配的浮层规则。
+
+#### 暗色主题下社区列表与部分面板仍是浅底
+
+- [`Community.vue`](src/views/Community.vue)：搜索结果列表容器由内联 `#f5f7fa` 改为 `var(--surface-subtle)`，暗色主题下随主题变深。
+- 配方生成器（[`ItemPalette.vue`](src/views/tools/creation/recipe-generator/ItemPalette.vue)、[`RecipeDisplayPanel.vue`](src/views/tools/creation/recipe-generator/RecipeDisplayPanel.vue)、[`RecipeSettingsForm.vue`](src/views/tools/creation/recipe-generator/RecipeSettingsForm.vue)、[`RecipeSlotDrawer.vue`](src/views/tools/creation/recipe-generator/RecipeSlotDrawer.vue)、[`RecipeItemIcon.vue`](src/views/tools/creation/recipe-generator/RecipeItemIcon.vue)、[`RecipeTagPopup.vue`](src/views/tools/creation/recipe-generator/RecipeTagPopup.vue)、[`TagPalette.vue`](src/views/tools/creation/recipe-generator/TagPalette.vue)）样式块中的 `#1d2129` / `#4e5969` / `#86909c` / `#e5e6eb` 等硬编码颜色改为 `--text-*` / `--border-*` 语义变量。
+- 同类问题一并处理：[`ReleaseTimeline.vue`](src/components/about/ReleaseTimeline.vue)、[`ReleaseTimelineItem.vue`](src/components/about/ReleaseTimelineItem.vue)、[`ToolCallEntry.vue`](src/components/experimental/ToolCallEntry.vue)、[`LicenseTab.vue`](src/views/settings/more/LicenseTab.vue)、[`StructPopup.vue`](src/views/tools/data/StructPopup.vue)。
+
+#### 关闭窗口时退出确认框不置前
+
+- [`lib.rs`](src-tauri/src/lib.rs)：`close_behavior = ask` 分支在通知前端弹框前先 `unminimize` / `show` / `set_focus`，任务栏点关闭后窗口会回到前台，不再出现「点了关闭没反应」。
+
 ### 变更
 
 #### 来源说明补充与致谢条目压缩

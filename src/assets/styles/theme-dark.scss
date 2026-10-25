@@ -446,21 +446,12 @@ html[data-theme='dark'],
   background-color: transparent;
 }
 
-[data-has-background='true'] .bg-white {
+/* 只作用于 #app 内的页面卡片。弹窗 / 抽屉 / 下拉都 teleport 到 body，
+   不在 #app 里，因此保持不透明——否则弹窗文字会透出下层内容看不清 */
+[data-has-background='true'] #app .bg-white {
   background-color: rgb(255 255 255 / var(--ui-panel-alpha, 0.7));
 }
 
-[data-has-background='true'][data-theme='dark'] .bg-white {
-  background-color: rgb(23 26 31 / var(--ui-panel-alpha, 0.7));
-}
-
-/* 浮层跟随同一透明度，避免下拉/弹窗比卡片更实 */
-[data-has-background='true'] [class*='shadow-lg'],
-[data-has-background='true'] .bg-surface-pop {
-  background-color: rgb(255 255 255 / var(--ui-panel-alpha, 0.7));
-}
-
-[data-has-background='true'][data-theme='dark'] [class*='shadow-lg'],
-[data-has-background='true'][data-theme='dark'] .bg-surface-pop {
+[data-has-background='true'][data-theme='dark'] #app .bg-white {
   background-color: rgb(23 26 31 / var(--ui-panel-alpha, 0.7));
 }
