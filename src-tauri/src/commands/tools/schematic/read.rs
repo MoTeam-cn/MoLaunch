@@ -252,17 +252,17 @@ fn read_litematic(root: &Value, name: &str) -> Result<SchematicData, String> {
         return Err("投影调色板为空".to_string());
     }
 
-    // 收集各区域的方块实体（坐标已按包围盒偏移换算）
+    // 收集各区域的方块实体（坐标已按包围盒偏移换算；read.rs 的 as_int 为 i64）
     let mut block_entities: Vec<super::entities::BlockEntity> = Vec::new();
     let mut raw_entities: Vec<super::entities::RawEntity> = Vec::new();
     for value in regions.values() {
         let position = compound(get(value, "Position")).ok_or("区域缺少 Position")?;
-        let pos = [
-            as_int(position.get("x")).unwrap_or(0) - min[0] as i32,
-            as_int(position.get("y")).unwrap_or(0) - min[1] as i32,
-            as_int(position.get("z")).unwrap_or(0) - min[2] as i32,
+        let offset: [i32; 3] = [
+            (as_int(position.get("x")).unwrap_or(0) - min[0]) as i32,
+            (as_int(position.get("y")).unwrap_or(0) - min[1]) as i32,
+            (as_int(position.get("z")).unwrap_or(0) - min[2]) as i32,
         ];
-        block_entities.extend(super::entities::read_litematic(value, pos));
+        block_entities.extend(super::entities::read_litematic(value, offset));
         raw_entities.extend(super::entities::read_litematic_entities(value));
     }
 

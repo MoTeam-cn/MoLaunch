@@ -244,9 +244,9 @@ fn collect_positions(
             for offset in -half..=half {
                 // 沿切片轴平移，其余两轴构成圆形截面
                 let (bx, by, bz) = match request.axis {
-                    "x" => (cx as i64 + offset, cy, cz),
-                    "z" => (cx, cy, cz as i64 + offset),
-                    _ => (cx, cy as i64 + offset, cz),
+                    "x" => (cx as i64 + offset, cy as i64, cz as i64),
+                    "z" => (cx as i64, cy as i64, cz as i64 + offset),
+                    _ => (cx as i64, cy as i64 + offset, cz as i64),
                 };
                 for dv in -radius..=radius {
                     for du in -radius..=radius {
