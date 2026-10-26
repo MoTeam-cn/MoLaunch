@@ -6,6 +6,17 @@
 
 ### 新增
 
+#### 投影预览：会话式加载、编辑与旧版格式支持
+
+- [`session.rs`](src-tauri/src/commands/tools/schematic/session.rs)：新增会话层，投影数据常驻内存并按视口分片返回；最多同时保留 3 个会话，单次切片上限 100 万格。取消「一次性传输整份数据」带来的体积限制，上限由 400 万方块提升到 5000 万。
+- [`session.rs`](src-tauri/src/commands/tools/schematic/session.rs)：新增矩形填充 / 条件替换（仅替换指定来源方块）、撤销重做（记录变更索引与前后值）、旋转 90°（双向）、镜像 X/Z、上下翻转。
+- [`legacy_blocks.rs`](src-tauri/src/commands/tools/schematic/legacy_blocks.rs)：新增 448 条旧版「数字 id + 元数据 → 现代方块 id」映射表（二分查找），未收录组合退化为 `minecraft:legacy_<id>_<meta>`，不静默映射错方块。
+- [`read.rs`](src-tauri/src/commands/tools/schematic/read.rs)：支持 1.13 之前的 MCEdit 投影（`Blocks` + `Data` + 可选 `AddBlocks` 半字节高位）。
+- [`dispatcher.rs`](src-tauri/src/commands/tools/dispatcher.rs)：投影 action 由 2 个扩展为 7 个（open / slice / edit / history / transform / export / close）。
+- [`SchematicToolbar.vue`](src/views/tools/storage/schematic/SchematicToolbar.vue) + [`SchematicPalette.vue`](src/views/tools/storage/schematic/SchematicPalette.vue)：新增工具栏（轴/层/工具/撤销重做/变换/缩放/导出）与可搜索的方块选择器。
+- [`SchematicCanvas.vue`](src/views/tools/storage/schematic/SchematicCanvas.vue)：支持鼠标框选编辑范围，选中区域实时高亮。
+- 测试：Rust 新增 6 例（旧版映射覆盖度、会话编辑撤销重做、切片布局、旋转尺寸、非法层号与非法变换），前端 141 例全通过。
+
 #### 投影预览（工具页 → 存档资源）
 
 只读浏览并导出 Minecraft 投影文件，三种格式均按公开规范自行实现解析与写出：

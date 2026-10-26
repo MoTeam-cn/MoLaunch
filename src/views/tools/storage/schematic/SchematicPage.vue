@@ -1,51 +1,53 @@
 <script setup lang="ts">
 /**
- * 投影预览
+ * 投影预览 / 编辑
  *
- * 打开 Sponge .schematic / Litematica .litematic / 原版结构 .nbt，
- * 按 X/Y/Z 轴逐层浏览方块分布、查看方块统计，并可导出为三种格式之一。
- * 只读预览：不含方块编辑与旋转镜像。
+ * 打开 Sponge / Litematica / 原版结构 / 旧版 MCEdit 投影，按轴逐层浏览。
+ * 数据常驻后端会话，前端只取当前视口切片，因此不受整体体积限制。
+ * 支持填充、替换、撤销重做、旋转镜像与三格式导出。
  */
 
-import { computed, ref, watch } from 'vue'
-import { ArrowDownTrayIcon, FolderOpenIcon } from '@heroicons/vue/24/outline'
-import Button from '@/components/common/Button.vue'
-import SegmentedButtons from '@/components/common/SegmentedButtons.vue'
+import { computed, onBeforeUnmount, ref, watch } from 'vue'
 import { pickFile, pickSavePath } from '@/utils/fileDialog'
 import { toastError, toastSuccess } from '@/utils/toast'
-import { schematicExport, schematicOpen, type SchematicOpenResult } from '@/utils/api/tools/schematic'
 import {
-  decodeBlocks,
-  extractSlice,
-  findAirIndex,
-  sliceBounds,
-  type SliceAxis,
-} from '@/utils/schematic/decode'
+  schematicClose,
+  schematicEdit,
+  schematicExport,
+  schematicHistory,
+  schematicOpen,
+  schematicSlice,
+  schematicTransform,
+  type SchematicOpenResult,
+  type SliceAxisParam,
+} from '@/utils/api/tools/schematic'
+import { decodeBlocks, findAirIndex, type SchematicSlice } from '@/utils/schematic/decode'
 import SchematicCanvas from './SchematicCanvas.vue'
+import SchematicPalette from './SchematicPalette.vue'
 import SchematicStats from './SchematicStats.vue'
+import SchematicToolbar from './SchematicToolbar.vue'
 
-const payload = ref<SchematicOpenResult | null>(null)
-const blocks = ref<Uint16Array | null>(null)
-const sourcePath = ref('')
-const airIndex = ref(0)
-const axis = ref<SliceAxis>('y')
+/** 视口单边最大格子数 */
+const VIEW_SIZE = 128
+
+const session = ref<SchematicOpenResult | null>(null)
+const slice = ref<SchematicSlice | null>(null)
+const sliceOrigin = ref({ x: 0, y: 0 })
+const axis = ref<SliceAxisParam>('y')
 const layer = ref(0)
+const viewport = ref({ x: 0, y: 0 })
+const cellSize = ref(4)
+const tool = ref<'browse' | 'fill' | 'replace'>('browse')
+const selectedBlock = ref(0)
+const replaceFrom = ref(0)
+const airIndex = ref(0)
+const canUndo = ref(false)
+const canRedo = ref(false)
+const nonAir = ref(0)
 const hover = ref<{ x: number; y: number; id: string } | null>(null)
 const loading = ref(false)
-const exporting = ref(false)
+const busy = ref(false)
 const exportFormat = ref('sponge_v2')
-
-const axisOptions = [
-  { label: 'Y 轴（水平层）', value: 'y' },
-  { label: 'X 轴', value: 'x' },
-  { label: 'Z 轴', value: 'z' },
-]
-
-const formatOptions = [
-  { label: 'Sponge', value: 'sponge_v2' },
-  { label: 'Litematic', value: 'litematic' },
-  { label: '结构文件', value: 'structure' },
-]
 
 const FORMAT_EXT: Record<string, string> = {
   sponge_v2: 'schem',
@@ -53,39 +55,78 @@ const FORMAT_EXT: Record<string, string> = {
   structure: 'nbt',
 }
 
-const bounds = computed(() =>
-  payload.value
-    ? sliceBounds(payload.value.size, axis.value)
-    : { layers: 1, width: 1, height: 1 },
-)
+const plane = computed(() => {
+  if (!session.value) return { width: 1, height: 1, layers: 1 }
+  const [sx, sy, sz] = session.value.size
+  if (axis.value === 'x') return { width: sz, height: sy, layers: sx }
+  if (axis.value === 'z') return { width: sx, height: sy, layers: sz }
+  return { width: sx, height: sz, layers: sy }
+})
 
-const slice = computed(() => {
-  if (!payload.value || !blocks.value) return null
-  return extractSlice(blocks.value, payload.value.size, axis.value, layer.value)
+const paletteCounts = computed<Record<string, number>>(() => {
+  const map: Record<string, number> = {}
+  session.value?.counts.forEach((item) => {
+    map[item.id] = item.count
+  })
+  return map
 })
 
 const hoverLabel = computed(() => {
   if (!hover.value) return ''
-  const id = hover.value.id.replace('minecraft:', '')
-  return `(${hover.value.x}, ${hover.value.y}) ${id}`
+  return `(${hover.value.x}, ${hover.value.y}) ${hover.value.id.replace('minecraft:', '')}`
 })
+
+async function refreshSlice(): Promise<void> {
+  if (!session.value) return
+  const w = Math.min(VIEW_SIZE, plane.value.width)
+  const h = Math.min(VIEW_SIZE, plane.value.height)
+  viewport.value = {
+    x: Math.min(Math.max(viewport.value.x, 0), Math.max(plane.value.width - w, 0)),
+    y: Math.min(Math.max(viewport.value.y, 0), Math.max(plane.value.height - h, 0)),
+  }
+  const result = await schematicSlice(
+    session.value.sessionId,
+    axis.value,
+    layer.value,
+    viewport.value.x,
+    viewport.value.y,
+    w,
+    h,
+  )
+  slice.value = { width: result.width, height: result.height, cells: decodeBlocks(result.cellsBase64) }
+  sliceOrigin.value = { x: result.x, y: result.y }
+}
+
+function centerViewport(): void {
+  const w = Math.min(VIEW_SIZE, plane.value.width)
+  const h = Math.min(VIEW_SIZE, plane.value.height)
+  viewport.value = {
+    x: Math.max(Math.floor((plane.value.width - w) / 2), 0),
+    y: Math.max(Math.floor((plane.value.height - h) / 2), 0),
+  }
+}
 
 async function openFile(): Promise<void> {
   loading.value = true
   try {
     const path = await pickFile({
       title: '选择投影文件',
-      filters: [
-        { name: '投影文件', extensions: ['schem', 'schematic', 'litematic', 'nbt'] },
-      ],
+      filters: [{ name: '投影文件', extensions: ['schem', 'schematic', 'litematic', 'nbt'] }],
     })
     if (!path) return
+    if (session.value) await schematicClose(session.value.sessionId)
     const result = await schematicOpen(path)
-    payload.value = result
-    blocks.value = decodeBlocks(result.blocksBase64)
-    sourcePath.value = path
+    session.value = result
     airIndex.value = findAirIndex(result.palette)
-    layer.value = Math.floor(sliceBounds(result.size, axis.value).layers / 2)
+    const firstSolid = result.palette.findIndex((id) => id !== 'minecraft:air')
+    selectedBlock.value = firstSolid >= 0 ? firstSolid : 0
+    replaceFrom.value = airIndex.value >= 0 ? airIndex.value : 0
+    nonAir.value = result.nonAir
+    canUndo.value = false
+    canRedo.value = false
+    layer.value = Math.floor(plane.value.layers / 2)
+    centerViewport()
+    await refreshSlice()
     toastSuccess(`已打开 ${result.name}（${result.format}）`)
   } catch (err) {
     toastError(`打开失败：${err}`)
@@ -94,93 +135,164 @@ async function openFile(): Promise<void> {
   }
 }
 
+async function applySelection(range: { x: number; y: number; w: number; h: number }): Promise<void> {
+  if (!session.value || tool.value === 'browse') return
+  busy.value = true
+  try {
+    const result = await schematicEdit({
+      sessionId: session.value.sessionId,
+      axis: axis.value,
+      layer: layer.value,
+      x: sliceOrigin.value.x + range.x,
+      y: sliceOrigin.value.y + range.y,
+      w: range.w,
+      h: range.h,
+      block: selectedBlock.value,
+      mode: tool.value === 'replace' ? 'replace' : 'fill',
+      from: tool.value === 'replace' ? replaceFrom.value : null,
+    })
+    nonAir.value = result.nonAir
+    canUndo.value = result.canUndo
+    canRedo.value = result.canRedo
+    await refreshSlice()
+  } catch (err) {
+    toastError(`编辑失败：${err}`)
+  } finally {
+    busy.value = false
+  }
+}
+
+async function step(action: 'undo' | 'redo'): Promise<void> {
+  if (!session.value) return
+  try {
+    const result = await schematicHistory(session.value.sessionId, action)
+    nonAir.value = result.nonAir
+    canUndo.value = result.canUndo
+    canRedo.value = result.canRedo
+    await refreshSlice()
+  } catch (err) {
+    toastError(`操作失败：${err}`)
+  }
+}
+
+async function doTransform(
+  kind: 'rotate_cw' | 'rotate_ccw' | 'mirror_x' | 'mirror_z' | 'flip_y',
+): Promise<void> {
+  if (!session.value) return
+  busy.value = true
+  try {
+    const result = await schematicTransform(session.value.sessionId, kind)
+    session.value = { ...session.value, size: result.size }
+    nonAir.value = result.nonAir
+    canUndo.value = false
+    canRedo.value = false
+    layer.value = Math.floor(plane.value.layers / 2)
+    centerViewport()
+    await refreshSlice()
+  } catch (err) {
+    toastError(`变换失败：${err}`)
+  } finally {
+    busy.value = false
+  }
+}
+
 async function doExport(): Promise<void> {
-  if (!payload.value || !sourcePath.value) return
-  exporting.value = true
+  if (!session.value) return
+  busy.value = true
   try {
     const ext = FORMAT_EXT[exportFormat.value] ?? 'schem'
     const target = await pickSavePath({
       title: '导出投影',
-      defaultPath: `${payload.value.name}.${ext}`,
+      defaultPath: `${session.value.name}.${ext}`,
       filters: [{ name: ext.toUpperCase(), extensions: [ext] }],
     })
     if (!target) return
-    const result = await schematicExport(sourcePath.value, target, exportFormat.value)
+    const result = await schematicExport(session.value.sessionId, target, exportFormat.value)
     toastSuccess(`已导出（${(result.bytes / 1024).toFixed(1)} KB）`)
   } catch (err) {
     toastError(`导出失败：${err}`)
   } finally {
-    exporting.value = false
+    busy.value = false
   }
 }
 
+function zoom(delta: number): void {
+  cellSize.value = Math.min(16, Math.max(1, cellSize.value + delta))
+}
+
 watch(axis, () => {
-  layer.value = Math.floor(bounds.value.layers / 2)
+  layer.value = Math.floor(plane.value.layers / 2)
+  centerViewport()
+  void refreshSlice()
+})
+watch(layer, () => void refreshSlice())
+
+onBeforeUnmount(() => {
+  if (session.value) void schematicClose(session.value.sessionId)
 })
 </script>
 
 <template>
   <section class="flex flex-col gap-4 rounded-lg border border-gray-300 bg-white p-4">
-    <div class="flex flex-wrap items-center gap-2">
-      <Button :loading="loading" @click="openFile">
-        <FolderOpenIcon class="h-4 w-4" />
-        打开投影
-      </Button>
+    <SchematicToolbar
+      :loading="loading"
+      :busy="busy"
+      :session="session"
+      :axis="axis"
+      :layer="layer"
+      :plane-layers="plane.layers"
+      :tool="tool"
+      :can-undo="canUndo"
+      :can-redo="canRedo"
+      :export-format="exportFormat"
+      :non-air="nonAir"
+      @open="openFile"
+      @update:axis="axis = $event"
+      @update:layer="layer = $event"
+      @update:tool="tool = $event"
+      @update:export-format="exportFormat = $event"
+      @undo="step('undo')"
+      @redo="step('redo')"
+      @transform="doTransform"
+      @zoom="zoom"
+      @export="doExport"
+    />
 
-      <template v-if="payload">
-        <span class="text-xs text-gray-500">
-          {{ payload.name }} · {{ payload.format }} ·
-          {{ payload.size[0] }}×{{ payload.size[1] }}×{{ payload.size[2] }}
-        </span>
-        <span class="mx-1 h-5 w-px bg-gray-200" />
-        <SegmentedButtons v-model="exportFormat" :options="formatOptions" />
-        <Button type="outline" :loading="exporting" @click="doExport">
-          <ArrowDownTrayIcon class="h-4 w-4" />
-          导出
-        </Button>
-      </template>
-    </div>
-
-    <p v-if="!payload" class="text-xs text-gray-500">
-      支持 Sponge（.schem / .schematic，v1 与 v2）、Litematica（.litematic）与原版结构文件（.nbt）。
-      单个投影上限 400 万方块。
+    <p v-if="!session" class="text-xs text-gray-500">
+      支持 Sponge（.schem / .schematic，v1 与 v2）、Litematica（.litematic）、原版结构（.nbt）
+      与旧版 MCEdit 投影。打开后按视口分片加载，大投影也能流畅浏览。
     </p>
 
-    <template v-else>
-      <div class="flex flex-wrap items-center gap-3">
-        <SegmentedButtons v-model="axis" :options="axisOptions" />
-        <div class="flex min-w-[240px] flex-1 items-center gap-2">
-          <span class="text-xs text-gray-600">第 {{ layer + 1 }} / {{ bounds.layers }} 层</span>
-          <input
-            v-model.number="layer"
-            type="range"
-            min="0"
-            :max="Math.max(bounds.layers - 1, 0)"
-            class="flex-1 accent-brand-2"
-          />
-        </div>
+    <div v-else class="flex flex-wrap items-start gap-4">
+      <div class="flex flex-col gap-2">
+        <SchematicCanvas
+          v-if="slice"
+          :slice="slice"
+          :palette="session.palette"
+          :air-index="airIndex"
+          :cell-size="cellSize"
+          :selectable="tool !== 'browse'"
+          @hover="hover = $event"
+          @select="applySelection"
+        />
+        <span class="h-4 text-xs text-gray-500">{{ hoverLabel }}</span>
       </div>
 
-      <div class="flex flex-wrap items-start gap-4">
-        <div class="flex flex-col gap-2">
-          <SchematicCanvas
-            v-if="slice"
-            :slice="slice"
-            :palette="payload.palette"
-            :air-index="airIndex"
-            @hover="hover = $event"
-          />
-          <span class="h-4 text-xs text-gray-500">{{ hoverLabel }}</span>
-        </div>
-
-        <div class="min-w-[260px] flex-1">
-          <SchematicStats
-            :counts="payload.counts"
-            :non-air="payload.nonAir"
-            :total="payload.total"
-          />
-        </div>
+      <div class="flex min-w-[260px] flex-1 flex-col gap-3">
+        <SchematicPalette
+          v-if="tool !== 'browse'"
+          v-model="selectedBlock"
+          :palette="session.palette"
+          :counts="paletteCounts"
+        />
+        <SchematicPalette
+          v-if="tool === 'replace'"
+          v-model="replaceFrom"
+          :palette="session.palette"
+          :counts="paletteCounts"
+        />
+        <SchematicStats :counts="session.counts" :non-air="nonAir" :total="session.total" />
       </div>
-    </template>
+    </div>
   </section>
 </template>

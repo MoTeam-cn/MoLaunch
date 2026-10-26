@@ -46,7 +46,7 @@ static DISPATCHER: Lazy<Dispatcher> = Lazy::new(|| {
         }),
     );
 
-    // 投影工具（2 个）：打开预览 / 导出格式
+    // 投影工具（7 个）：打开会话 / 取切片 / 编辑 / 撤销重做 / 变换 / 导出 / 关闭
     d.register(
         "schematic_open",
         handler!(_state, _app, params, {
@@ -57,12 +57,57 @@ static DISPATCHER: Lazy<Dispatcher> = Lazy::new(|| {
         }),
     );
     d.register(
+        "schematic_slice",
+        handler!(_state, _app, params, {
+            let p: SchematicSliceParams =
+                serde_json::from_value(params).map_err(|e| format!("参数解析失败: {}", e))?;
+            let r = schematic::slice(p).await?;
+            serde_json::to_value(r).map_err(|e| e.to_string())
+        }),
+    );
+    d.register(
+        "schematic_edit",
+        handler!(_state, _app, params, {
+            let p: SchematicEditParams =
+                serde_json::from_value(params).map_err(|e| format!("参数解析失败: {}", e))?;
+            let r = schematic::edit(p).await?;
+            serde_json::to_value(r).map_err(|e| e.to_string())
+        }),
+    );
+    d.register(
+        "schematic_history",
+        handler!(_state, _app, params, {
+            let p: SchematicHistoryParams =
+                serde_json::from_value(params).map_err(|e| format!("参数解析失败: {}", e))?;
+            let r = schematic::history(p).await?;
+            serde_json::to_value(r).map_err(|e| e.to_string())
+        }),
+    );
+    d.register(
+        "schematic_transform",
+        handler!(_state, _app, params, {
+            let p: SchematicTransformParams =
+                serde_json::from_value(params).map_err(|e| format!("参数解析失败: {}", e))?;
+            let r = schematic::transform(p).await?;
+            serde_json::to_value(r).map_err(|e| e.to_string())
+        }),
+    );
+    d.register(
         "schematic_export",
         handler!(_state, _app, params, {
             let p: SchematicExportParams =
                 serde_json::from_value(params).map_err(|e| format!("参数解析失败: {}", e))?;
             let r = schematic::export(p).await?;
             serde_json::to_value(r).map_err(|e| e.to_string())
+        }),
+    );
+    d.register(
+        "schematic_close",
+        handler!(_state, _app, params, {
+            let p: SchematicCloseParams =
+                serde_json::from_value(params).map_err(|e| format!("参数解析失败: {}", e))?;
+            schematic::close(p).await?;
+            Ok(serde_json::Value::Null)
         }),
     );
 

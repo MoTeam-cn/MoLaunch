@@ -36,6 +36,8 @@ pub fn read_schematic(path: &Path) -> Result<SchematicData, String> {
         read_structure(&root, &name)?
     } else if get(&root, "BlockData").is_some() && get(&root, "Palette").is_some() {
         read_sponge(&root, &name)?
+    } else if get(&root, "Blocks").is_some() && get(&root, "Data").is_some() {
+        read_mcedit_legacy(&root, &name)?
     } else {
         return Err(
             "无法识别的投影格式（支持 Sponge .schematic、Litematica .litematic、原版结构 .nbt）"
@@ -304,6 +306,77 @@ fn read_structure(root: &Value, name: &str) -> Result<SchematicData, String> {
         format: "structure",
         name: name.to_string(),
         size: [sx as u32, sy as u32, sz as u32],
+        palette,
+        blocks,
+    })
+}
+
+// ---------- 旧版 MCEdit（数字 id + 元数据） ----------
+
+/// 解析 1.13 之前的 MCEdit 投影：`Blocks` 存方块 id，`Data` 存元数据，
+/// `AddBlocks`（可选）以半字节形式存高位 id。
+fn read_mcedit_legacy(root: &Value, name: &str) -> Result<SchematicData, String> {
+    let width = as_int(get(root, "Width")).unwrap_or(0);
+    let height = as_int(get(root, "Height")).unwrap_or(0);
+    let length = as_int(get(root, "Length")).unwrap_or(0);
+    if width <= 0 || height <= 0 || length <= 0 {
+        return Err("投影尺寸非法".to_string());
+    }
+
+    let blocks_raw = byte_array(get(root, "Blocks")).ok_or("缺少 Blocks")?;
+    let data_raw = byte_array(get(root, "Data")).unwrap_or_default();
+    let add_raw = byte_array(get(root, "AddBlocks")).unwrap_or_default();
+
+    let volume = (width as usize) * (height as usize) * (length as usize);
+    if blocks_raw.len() < volume {
+        return Err(format!(
+            "Blocks 长度不足（期望 {}，实际 {}）",
+            volume,
+            blocks_raw.len()
+        ));
+    }
+
+    let mut palette: Vec<String> = Vec::new();
+    let mut palette_index: HashMap<String, u16> = HashMap::new();
+    let mut blocks: Vec<u16> = Vec::with_capacity(volume);
+
+    for position in 0..volume {
+        let base = u16::from(blocks_raw[position]);
+        // AddBlocks 每字节存两个方块的高位半字节
+        let high = if add_raw.is_empty() {
+            0u16
+        } else {
+            let byte = add_raw[position / 2];
+            if position % 2 == 0 {
+                u16::from(byte & 0x0f)
+            } else {
+                u16::from((byte >> 4) & 0x0f)
+            }
+        };
+        let id = base | (high << 8);
+        let meta = data_raw.get(position).copied().unwrap_or(0) & 0x0f;
+        let name_id = super::legacy_blocks::legacy_block_name(id, meta)
+            .map(str::to_string)
+            .unwrap_or_else(|| format!("minecraft:legacy_{}_{}", id, meta));
+        let index = match palette_index.get(&name_id) {
+            Some(&found) => found,
+            None => {
+                if palette.len() > u16::MAX as usize {
+                    return Err("调色板条目过多".to_string());
+                }
+                palette.push(name_id.clone());
+                let assigned = (palette.len() - 1) as u16;
+                palette_index.insert(name_id, assigned);
+                assigned
+            }
+        };
+        blocks.push(index);
+    }
+
+    Ok(SchematicData {
+        format: "mcedit_legacy",
+        name: name.to_string(),
+        size: [width as u32, height as u32, length as u32],
         palette,
         blocks,
     })

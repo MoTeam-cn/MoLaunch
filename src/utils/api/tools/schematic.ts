@@ -1,53 +1,120 @@
 /**
- * 工具模块 - 投影（schematic）预览与导出
+ * 工具模块 - 投影（schematic）会话式预览、编辑与导出
  *
- * 对应后端 tools_manager 的 schematic_open / schematic_export action。
+ * 对应后端 tools_manager 的 schematic_open / slice / edit / history / transform /
+ * export / close action。打开后数据留在后端内存，前端按视口取切片。
  */
 
 import { TOOLS_ACTIONS, toolsManager } from './core'
 
-/** 方块统计条目 */
 export interface SchematicBlockCount {
   id: string
   count: number
 }
 
-/** 打开投影的结果 */
 export interface SchematicOpenResult {
-  /** sponge_v1 / sponge_v2 / litematic / structure */
+  sessionId: string
   format: string
   name: string
-  /** [x, y, z] */
   size: [number, number, number]
-  /** 索引 -> 方块 id */
   palette: string[]
-  /** u16 小端数组的 base64，长度 = x*y*z */
-  blocksBase64: string
   total: number
   nonAir: number
   counts: SchematicBlockCount[]
 }
 
-/** 导出结果 */
+export interface SchematicSliceResult {
+  x: number
+  y: number
+  width: number
+  height: number
+  cellsBase64: string
+}
+
+export interface SchematicEditResult {
+  changed: number
+  nonAir: number
+  canUndo: boolean
+  canRedo: boolean
+}
+
+export interface SchematicTransformResult {
+  size: [number, number, number]
+  nonAir: number
+}
+
 export interface SchematicExportResult {
   path: string
   bytes: number
 }
 
-/** 打开投影文件 */
+export type SliceAxisParam = 'x' | 'y' | 'z'
+
 export async function schematicOpen(path: string): Promise<SchematicOpenResult> {
   return toolsManager<SchematicOpenResult>(TOOLS_ACTIONS.SCHEMATIC_OPEN, { path })
 }
 
-/** 导出投影文件（format: sponge_v2 / litematic / structure） */
+export async function schematicSlice(
+  sessionId: string,
+  axis: SliceAxisParam,
+  layer: number,
+  x: number,
+  y: number,
+  w: number,
+  h: number,
+): Promise<SchematicSliceResult> {
+  return toolsManager<SchematicSliceResult>(TOOLS_ACTIONS.SCHEMATIC_SLICE, {
+    sessionId,
+    axis,
+    layer,
+    x,
+    y,
+    w,
+    h,
+  })
+}
+
+export async function schematicEdit(params: {
+  sessionId: string
+  axis: SliceAxisParam
+  layer: number
+  x: number
+  y: number
+  w: number
+  h: number
+  block: number
+  mode: 'fill' | 'replace'
+  from?: number | null
+}): Promise<SchematicEditResult> {
+  return toolsManager<SchematicEditResult>(TOOLS_ACTIONS.SCHEMATIC_EDIT, params)
+}
+
+export async function schematicHistory(
+  sessionId: string,
+  action: 'undo' | 'redo',
+): Promise<SchematicEditResult> {
+  return toolsManager<SchematicEditResult>(TOOLS_ACTIONS.SCHEMATIC_HISTORY, { sessionId, action })
+}
+
+export async function schematicTransform(
+  sessionId: string,
+  kind: 'rotate_cw' | 'rotate_ccw' | 'mirror_x' | 'mirror_z' | 'flip_y',
+): Promise<SchematicTransformResult> {
+  return toolsManager<SchematicTransformResult>(TOOLS_ACTIONS.SCHEMATIC_TRANSFORM, { sessionId, kind })
+}
+
 export async function schematicExport(
-  sourcePath: string,
+  sessionId: string,
   targetPath: string,
   format: string,
 ): Promise<SchematicExportResult> {
   return toolsManager<SchematicExportResult>(TOOLS_ACTIONS.SCHEMATIC_EXPORT, {
-    sourcePath,
+    sessionId,
     targetPath,
     format,
   })
+}
+
+export async function schematicClose(sessionId: string): Promise<void> {
+  await toolsManager(TOOLS_ACTIONS.SCHEMATIC_CLOSE, { sessionId })
 }

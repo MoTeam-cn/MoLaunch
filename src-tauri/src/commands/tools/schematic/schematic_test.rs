@@ -6,7 +6,9 @@ use super::codec::{
     count_non_air, decode_packed_longs, decode_varints, encode_blocks_base64, encode_packed_longs,
     encode_varints, is_air, normalize_block_id, top_counts,
 };
+use super::legacy_blocks::{legacy_block_count, legacy_block_name};
 use super::read::{read_schematic, SchematicData};
+use super::session;
 use super::write::export;
 
 fn sample_data() -> SchematicData {
@@ -198,4 +200,78 @@ fn test_export_rejects_unknown_format() {
     let data = sample_data();
     let path = temp_path("unknown.bin");
     assert!(export(&data, "nope", &path).is_err());
+}
+
+#[test]
+fn test_legacy_block_table_covers_common_blocks() {
+    assert!(legacy_block_count() > 400);
+    assert_eq!(legacy_block_name(1, 0), Some("minecraft:stone"));
+    assert_eq!(legacy_block_name(1, 1), Some("minecraft:granite"));
+    assert_eq!(legacy_block_name(5, 2), Some("minecraft:birch_planks"));
+    assert_eq!(legacy_block_name(35, 14), Some("minecraft:red_wool"));
+    assert_eq!(
+        legacy_block_name(95, 3),
+        Some("minecraft:light_blue_stained_glass")
+    );
+    assert_eq!(legacy_block_name(251, 15), Some("minecraft:black_concrete"));
+    // 未收录的组合必须返回 None，由调用方退化为 legacy_<id>_<meta>
+    assert_eq!(legacy_block_name(9999, 0), None);
+}
+
+#[test]
+fn test_session_edit_undo_redo() {
+    session::clear_all();
+    let id = session::create(sample_data());
+
+    let (changed, non_air, can_undo, _) =
+        session::edit(&id, "y", 0, 0, 0, 2, 2, 2, "fill", None).expect("编辑失败");
+    assert_eq!(changed, 4);
+    assert!(non_air > 0);
+    assert!(can_undo);
+
+    let (_, _, can_undo_after, can_redo_after) = session::history(&id, "undo").expect("撤销失败");
+    assert!(!can_undo_after);
+    assert!(can_redo_after);
+
+    let (_, _, _, _) = session::history(&id, "redo").expect("重做失败");
+    session::close(&id);
+}
+
+#[test]
+fn test_session_slice_matches_layout() {
+    session::clear_all();
+    let id = session::create(sample_data());
+    let (width, height, cells) = session::slice(&id, "y", 0, 0, 0, 3, 4).expect("切片失败");
+    assert_eq!(width, 3);
+    assert_eq!(height, 4);
+    // 3×4 个格子，base64 长度应为 24 字节的 4/3 倍
+    assert_eq!(cells.len(), 32);
+    session::close(&id);
+}
+
+#[test]
+fn test_session_transform_rotates_size() {
+    session::clear_all();
+    let id = session::create(sample_data());
+    let (size, _) = session::transform(&id, "rotate_cw").expect("旋转失败");
+    assert_eq!(size, [4, 2, 3]);
+    let (restored, _) = session::transform(&id, "rotate_ccw").expect("反向旋转失败");
+    assert_eq!(restored, [3, 2, 4]);
+    session::close(&id);
+}
+
+#[test]
+fn test_session_transform_rejects_unknown_kind() {
+    session::clear_all();
+    let id = session::create(sample_data());
+    assert!(session::transform(&id, "spin").is_err());
+    session::close(&id);
+}
+
+#[test]
+fn test_session_slice_rejects_out_of_range_layer() {
+    session::clear_all();
+    let id = session::create(sample_data());
+    assert!(session::slice(&id, "y", 99, 0, 0, 1, 1).is_err());
+    session::close(&id);
 }

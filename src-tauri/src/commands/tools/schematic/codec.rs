@@ -4,8 +4,8 @@ use std::collections::HashMap;
 
 use base64::Engine as _;
 
-/// 体积上限（方块数）；超过则拒绝打开，避免一次性渲染卡死
-pub const MAX_VOLUME: u64 = 4_000_000;
+/// 体积上限（方块数）：会话常驻内存，每方块 2 字节，5000 万方块约 100MB
+pub const MAX_VOLUME: u64 = 50_000_000;
 
 /// 解码无符号 LEB128 变长整数序列（Sponge BlockData 编码）
 pub fn decode_varints(bytes: &[u8]) -> Result<Vec<u32>, String> {
