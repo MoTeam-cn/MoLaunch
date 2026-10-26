@@ -212,7 +212,6 @@ fn test_legacy_block_table_covers_common_blocks() {
 
 #[test]
 fn test_session_edit_undo_redo() {
-    session::clear_all();
     let id = session::create(sample_data());
 
     // 2×2 区域里有 1 格本来就是目标方块，因此实际改动 3 格
@@ -245,7 +244,6 @@ fn test_session_edit_undo_redo() {
 
 #[test]
 fn test_session_slice_matches_layout() {
-    session::clear_all();
     let id = session::create(sample_data());
     let (width, height, cells) = session::slice(&id, "y", 0, 0, 0, 3, 4).expect("切片失败");
     assert_eq!(width, 3);
@@ -257,7 +255,6 @@ fn test_session_slice_matches_layout() {
 
 #[test]
 fn test_session_transform_rotates_size() {
-    session::clear_all();
     let id = session::create(sample_data());
     let (size, _) = session::transform(&id, "rotate_cw").expect("旋转失败");
     assert_eq!(size, [4, 2, 3]);
@@ -268,7 +265,6 @@ fn test_session_transform_rotates_size() {
 
 #[test]
 fn test_session_transform_rejects_unknown_kind() {
-    session::clear_all();
     let id = session::create(sample_data());
     assert!(session::transform(&id, "spin").is_err());
     session::close(&id);
@@ -276,7 +272,6 @@ fn test_session_transform_rejects_unknown_kind() {
 
 #[test]
 fn test_session_slice_rejects_out_of_range_layer() {
-    session::clear_all();
     let id = session::create(sample_data());
     assert!(session::slice(&id, "y", 99, 0, 0, 1, 1).is_err());
     session::close(&id);

@@ -97,17 +97,6 @@ pub fn close(session_id: &str) {
     registry.order.retain(|id| id != session_id);
 }
 
-/// 清空所有会话（仅测试使用）
-#[cfg(test)]
-pub fn clear_all() {
-    let mut registry = match REGISTRY.lock() {
-        Ok(guard) => guard,
-        Err(poisoned) => poisoned.into_inner(),
-    };
-    registry.sessions.clear();
-    registry.order.clear();
-}
-
 /// 三维索引（x 最快、其次 z、最后 y）
 pub fn index_of(size: [u32; 3], x: u32, y: u32, z: u32) -> usize {
     (y as usize) * (size[2] as usize) * (size[0] as usize)
