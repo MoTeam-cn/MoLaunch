@@ -429,8 +429,9 @@ fn test_block_entities_survive_litematic_roundtrip() {
 #[test]
 fn test_block_entities_survive_structure_roundtrip() {
     let mut data = sample_data();
+    // 结构格式把实体挂在方块条目上，所以坐标必须落在非空气方块上（[0,0,1] 是木板）
     data.block_entities.push(super::entities::BlockEntity {
-        pos: [2, 1, 1],
+        pos: [0, 0, 1],
         id: "minecraft:furnace".to_string(),
         data: std::collections::HashMap::new(),
     });
@@ -463,7 +464,7 @@ fn test_block_entities_survive_structure_roundtrip() {
 
     let reread = read_schematic(&path).expect("回读失败");
     assert_eq!(reread.block_entities.len(), 1);
-    assert_eq!(reread.block_entities[0].pos, [2, 1, 1]);
+    assert_eq!(reread.block_entities[0].pos, [0, 0, 1]);
     assert_eq!(reread.block_entities[0].id, "minecraft:furnace");
 }
 

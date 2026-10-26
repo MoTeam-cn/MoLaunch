@@ -281,6 +281,9 @@ pub fn to_litematic(entities: &[BlockEntity]) -> Vec<Value> {
 }
 
 /// 原版结构文件：把方块实体挂回对应方块的 `nbt` 字段
+///
+/// 结构格式没有独立的实体方块列表，实体只能挂在 `blocks[]` 条目上；
+/// 落在空气方块上的实体无法表达，会被跳过（这类数据本身也不合法）。
 pub fn attach_to_structure_blocks(blocks: &mut [Value], entities: &[BlockEntity]) {
     let mut by_pos: HashMap<[i32; 3], &BlockEntity> = HashMap::new();
     for entity in entities {
