@@ -32,9 +32,20 @@
 
 ## 简介
 
-MoLaunch 是一款 Minecraft Java 版启动器，提供下载、安装、启动、联机等完整的游戏管理能力，基于 **Tauri 2 + Vue 3 + Rust** 构建，并内置一整套实用的游戏工具。
+MoLaunch 是一款 Minecraft 启动器（支持 Java 版），提供下载、安装、启动、联机等完整的游戏管理能力，基于 **Tauri 2 + Vue 3 + Rust** 构建，并内置一整套实用的游戏工具。
 
 本仓库为 MoLaunch 的开源代码。你可以直接使用构建产物，也可以基于本仓库自行编译、二次开发。
+
+## 下载与社区
+
+不想自己编译的话，直接去官网下载安装包；遇到问题欢迎进群反馈。
+
+| 入口 | 地址 |
+| --- | --- |
+| 官网（下载 / 更新日志 / 接口文档） | <https://molaunch.moiu.cn> |
+| QQ 交流群 | 群号 `1129693482` · [一键加群](https://qm.qq.com/q/QkMzW7rzGM) |
+| 团队官网 | <https://www.moteam.top> |
+| 问题反馈 | <https://github.com/MoTeam-cn/MoLaunch/issues> |
 
 ## 界面预览
 
@@ -155,8 +166,12 @@ Minecraft 是 Mojang Synergies AB 的商标。MoLaunch 不隶属于 Mojang、Mic
 
 ## 相关链接
 
+- 官网：<https://molaunch.moiu.cn>
 - 仓库：https://github.com/MoTeam-cn/MoLaunch
 - 问题反馈：https://github.com/MoTeam-cn/MoLaunch/issues
+- QQ 交流群：群号 1129693482 · <https://qm.qq.com/q/QkMzW7rzGM>
+- 团队官网：<https://www.moteam.top>
 - 更新日志：[CHANGELOG.md](./CHANGELOG.md)
+- 致谢与历史说明：[ACKNOWLEDGEMENTS.md](./ACKNOWLEDGEMENTS.md)
 - 许可证：[LICENSE](./LICENSE)
 - 第三方版权清单：[licenses.txt](./src-tauri/resources/about/licenses.txt)
