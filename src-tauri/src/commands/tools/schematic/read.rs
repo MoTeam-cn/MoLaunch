@@ -361,7 +361,6 @@ fn read_mcedit_legacy(root: &Value, name: &str) -> Result<SchematicData, String>
     }
 
     let mut palette: Vec<String> = Vec::new();
-    let mut palette_index: HashMap<String, u16> = HashMap::new();
     // (id, meta) 只有几十种组合，缓存后避免逐方块重复格式化字符串
     let mut legacy_index: HashMap<(u16, u8), u16> = HashMap::new();
     let mut blocks: Vec<u16> = Vec::with_capacity(volume);
