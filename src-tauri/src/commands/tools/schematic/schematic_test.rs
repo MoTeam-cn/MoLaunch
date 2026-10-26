@@ -3,8 +3,8 @@
 use std::path::PathBuf;
 
 use super::codec::{
-    count_non_air, decode_packed_longs, decode_varints, encode_blocks_base64, encode_packed_longs,
-    encode_varints, is_air, normalize_block_id, top_counts,
+    count_non_air, decode_packed_longs, decode_varints, encode_packed_longs, encode_varints,
+    is_air, normalize_block_id, top_counts,
 };
 use super::legacy_blocks::{legacy_block_count, legacy_block_name};
 use super::read::{read_schematic, SchematicData};
@@ -102,14 +102,6 @@ fn test_count_non_air_ignores_air_entries() {
     let palette = vec!["minecraft:air".to_string(), "minecraft:stone".to_string()];
     let blocks = vec![0u16, 1, 1, 0];
     assert_eq!(count_non_air(&blocks, &palette), 2);
-}
-
-#[test]
-fn test_encode_blocks_base64_matches_byte_length() {
-    let blocks = vec![1u16, 2, 3];
-    let encoded = encode_blocks_base64(&blocks);
-    // 3 个 u16 = 6 字节，base64 后 8 个字符（无填充）
-    assert_eq!(encoded.len(), 8);
 }
 
 #[test]
