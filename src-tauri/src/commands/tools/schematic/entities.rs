@@ -145,6 +145,60 @@ pub fn read_sponge(root: &Value, offset: [i32; 3]) -> Vec<BlockEntity> {
     out
 }
 
+/// 旧版 MCEdit：`TileEntities`（id 为 `Sign`/`Chest` 这类驼峰名，坐标是 0 基整数）
+pub fn read_legacy(root: &Value) -> Vec<BlockEntity> {
+    let Some(map) = compound(root) else {
+        return Vec::new();
+    };
+    let list = as_list(map.get("TileEntities"))
+        .cloned()
+        .unwrap_or_default();
+
+    let mut out = Vec::new();
+    for entry in list {
+        let Some(fields) = compound(&entry) else {
+            continue;
+        };
+        let (Some(x), Some(y), Some(z)) = (
+            as_int(fields.get("x")),
+            as_int(fields.get("y")),
+            as_int(fields.get("z")),
+        ) else {
+            continue;
+        };
+        let id = as_string(fields.get("id"))
+            .or_else(|| as_string(fields.get("Id")))
+            .map(|raw| normalize_legacy_id(&raw))
+            .unwrap_or_else(|| "minecraft:chest".to_string());
+        out.push(BlockEntity {
+            pos: [x, y, z],
+            id,
+            data: rest_fields(fields, &["Pos", "pos", "Id", "id", "x", "y", "z"]),
+        });
+    }
+    out
+}
+
+/// 1.12 的方块实体 id 是 `Sign` / `MobSpawner` 这类驼峰名，统一转成 `minecraft:mob_spawner`
+fn normalize_legacy_id(raw: &str) -> String {
+    if raw.contains(':') {
+        return raw.to_string();
+    }
+    let mut out = String::with_capacity(raw.len() + 10);
+    out.push_str("minecraft:");
+    for (index, ch) in raw.chars().enumerate() {
+        if ch.is_ascii_uppercase() {
+            if index > 0 {
+                out.push('_');
+            }
+            out.push(ch.to_ascii_lowercase());
+        } else {
+            out.push(ch);
+        }
+    }
+    out
+}
+
 /// Litematica：区域内的 `TileEntities`
 pub fn read_litematic(region: &Value, offset: [i32; 3]) -> Vec<BlockEntity> {
     let Some(map) = compound(region) else {

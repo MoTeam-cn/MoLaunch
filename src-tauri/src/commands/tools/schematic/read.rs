@@ -362,6 +362,8 @@ fn read_mcedit_legacy(root: &Value, name: &str) -> Result<SchematicData, String>
 
     let mut palette: Vec<String> = Vec::new();
     let mut palette_index: HashMap<String, u16> = HashMap::new();
+    // (id, meta) 只有几十种组合，缓存后避免逐方块重复格式化字符串
+    let mut legacy_index: HashMap<(u16, u8), u16> = HashMap::new();
     let mut blocks: Vec<u16> = Vec::with_capacity(volume);
 
     for position in 0..volume {
@@ -379,18 +381,17 @@ fn read_mcedit_legacy(root: &Value, name: &str) -> Result<SchematicData, String>
         };
         let id = base | (high << 8);
         let meta = data_raw.get(position).copied().unwrap_or(0) & 0x0f;
-        let name_id = super::legacy_blocks::legacy_block_name(id, meta)
-            .map(str::to_string)
-            .unwrap_or_else(|| format!("minecraft:legacy_{}_{}", id, meta));
-        let index = match palette_index.get(&name_id) {
+        let index = match legacy_index.get(&(id, meta)) {
             Some(&found) => found,
             None => {
                 if palette.len() > u16::MAX as usize {
                     return Err("调色板条目过多".to_string());
                 }
-                palette.push(name_id.clone());
+                let name_id = super::legacy_blocks::legacy_block_name(id, meta)
+                    .unwrap_or_else(|| format!("minecraft:legacy_{}_{}", id, meta));
+                palette.push(name_id);
                 let assigned = (palette.len() - 1) as u16;
-                palette_index.insert(name_id, assigned);
+                legacy_index.insert((id, meta), assigned);
                 assigned
             }
         };
@@ -403,8 +404,8 @@ fn read_mcedit_legacy(root: &Value, name: &str) -> Result<SchematicData, String>
         size: [width as u32, height as u32, length as u32],
         palette,
         blocks,
-        // 旧版格式不保存方块实体
-        block_entities: Vec::new(),
+        // 旧版格式的 TileEntities 只有告示牌等少数类型，坐标已是 0 基
+        block_entities: super::entities::read_legacy(root),
         raw_entities: Vec::new(),
     })
 }

@@ -199,17 +199,53 @@ fn test_export_rejects_unknown_format() {
 #[test]
 fn test_legacy_block_table_covers_common_blocks() {
     assert!(legacy_block_count() > 400);
-    assert_eq!(legacy_block_name(1, 0), Some("minecraft:stone"));
-    assert_eq!(legacy_block_name(1, 1), Some("minecraft:granite"));
-    assert_eq!(legacy_block_name(5, 2), Some("minecraft:birch_planks"));
-    assert_eq!(legacy_block_name(35, 14), Some("minecraft:red_wool"));
+    assert_eq!(legacy_block_name(1, 0).as_deref(), Some("minecraft:stone"));
     assert_eq!(
-        legacy_block_name(95, 3),
+        legacy_block_name(1, 1).as_deref(),
+        Some("minecraft:granite")
+    );
+    // 位规则：原木低 2 位树种、高 2 位轴向（3 表示全树皮）
+    assert_eq!(
+        legacy_block_name(17, 0).as_deref(),
+        Some("minecraft:oak_log")
+    );
+    assert_eq!(
+        legacy_block_name(17, 13).as_deref(),
+        Some("minecraft:spruce_wood")
+    );
+    assert_eq!(
+        legacy_block_name(162, 13).as_deref(),
+        Some("minecraft:dark_oak_wood")
+    );
+    // 带釉陶瓦颜色由 id 决定，元数据是朝向
+    assert_eq!(
+        legacy_block_name(241, 0).as_deref(),
+        Some("minecraft:pink_glazed_terracotta")
+    );
+    assert_eq!(
+        legacy_block_name(244, 3).as_deref(),
+        Some("minecraft:light_blue_glazed_terracotta")
+    );
+    assert_eq!(
+        legacy_block_name(5, 2).as_deref(),
+        Some("minecraft:birch_planks")
+    );
+    assert_eq!(
+        legacy_block_name(35, 14).as_deref(),
+        Some("minecraft:red_wool")
+    );
+    assert_eq!(
+        legacy_block_name(95, 3).as_deref(),
         Some("minecraft:light_blue_stained_glass")
     );
-    assert_eq!(legacy_block_name(251, 15), Some("minecraft:black_concrete"));
+    assert_eq!(
+        legacy_block_name(251, 15).as_deref(),
+        Some("minecraft:black_concrete")
+    );
     // 未收录的组合必须返回 None，由调用方退化为 legacy_<id>_<meta>
     assert_eq!(legacy_block_name(9999, 0), None);
+    assert!(legacy_block_name(1, 0).is_some());
+    assert_eq!(legacy_block_count() % 16, 0);
 }
 
 #[test]
