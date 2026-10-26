@@ -95,3 +95,6 @@ node_modules
 # Frp（fork 仓库本地克隆，独立 git 仓库，不入 MoLaunch 主仓库）
 /Frp
 /proxy
+
+# 私有协议库（与主控交互协议，独立私有仓库，不得进入公开仓库）
+/MoLaunch-Protocol/
