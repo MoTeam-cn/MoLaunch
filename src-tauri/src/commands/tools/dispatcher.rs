@@ -7,7 +7,7 @@ use tauri::AppHandle;
 use super::types::*;
 use super::{
     archive, cleanup, crash_analyzer, download, filename, launcher_import, memory, mod_tools, nbt,
-    network, picker_window, recipe_generator, resourcepack, screenshot, version_json,
+    network, picker_window, recipe_generator, resourcepack, schematic, screenshot, version_json,
 };
 use crate::handler;
 use crate::state::AppState;
@@ -43,6 +43,26 @@ static DISPATCHER: Lazy<Dispatcher> = Lazy::new(|| {
             let p: DeleteDownloadParams =
                 serde_json::from_value(params).map_err(|e| format!("参数解析失败: {}", e))?;
             download::delete_download(&state, p).await
+        }),
+    );
+
+    // 投影工具（2 个）：打开预览 / 导出格式
+    d.register(
+        "schematic_open",
+        handler!(_state, _app, params, {
+            let p: SchematicOpenParams =
+                serde_json::from_value(params).map_err(|e| format!("参数解析失败: {}", e))?;
+            let r = schematic::open(p).await?;
+            serde_json::to_value(r).map_err(|e| e.to_string())
+        }),
+    );
+    d.register(
+        "schematic_export",
+        handler!(_state, _app, params, {
+            let p: SchematicExportParams =
+                serde_json::from_value(params).map_err(|e| format!("参数解析失败: {}", e))?;
+            let r = schematic::export(p).await?;
+            serde_json::to_value(r).map_err(|e| e.to_string())
         }),
     );
 

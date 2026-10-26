@@ -87,6 +87,9 @@ export const TOOLS_ACTIONS = {
   NBT_PARSE: 'nbt_parse',
   NBT_SAVE: 'nbt_save',
   NBT_LIST_SAVE_FILES: 'nbt_list_save_files',
+  // 投影预览与导出
+  SCHEMATIC_OPEN: 'schematic_open',
+  SCHEMATIC_EXPORT: 'schematic_export',
   // 合成配方生成器：数据包 zip 打包
   RECIPE_GENERATOR_EXPORT: 'recipe_generator_export',
   // 启动器数据导入：探测外部启动器实例

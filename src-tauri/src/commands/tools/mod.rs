@@ -23,6 +23,7 @@ pub mod network;
 pub mod picker_window;
 pub mod recipe_generator;
 pub mod resourcepack;
+pub mod schematic;
 pub mod screenshot;
 pub mod types;
 pub mod version_json;

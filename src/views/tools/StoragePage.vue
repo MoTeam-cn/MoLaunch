@@ -9,18 +9,20 @@
  * - 资源包转换
  * - 资源包编辑器（不进入游戏可视化查看/编辑资源包）
  * - 种子地图
+ * - 投影预览（Sponge / Litematica / 结构文件）
  *
  * 深链支持：URL `?subtab=screenshot` 可直接切到对应子页签（由 SubTabBar 内置持久化恢复）。
  */
 import { ref, defineAsyncComponent } from 'vue'
 const SubTabBar = defineAsyncComponent(() => import('@/components/common/SubTabBar.vue'))
-import { CameraIcon, CubeIcon, FolderIcon, MapIcon, PhotoIcon, TableCellsIcon } from '@heroicons/vue/24/outline'
+import { CameraIcon, CubeIcon, FolderIcon, MapIcon, PhotoIcon, SquaresPlusIcon, TableCellsIcon } from '@heroicons/vue/24/outline'
 const ArchiveManager = defineAsyncComponent(() => import('./archive/ArchiveManager.vue'))
 const NbtViewer = defineAsyncComponent(() => import('./data/NbtViewer.vue'))
 const ScreenshotManager = defineAsyncComponent(() => import('./data/ScreenshotManager.vue'))
 const ResourcePackConverter = defineAsyncComponent(() => import('./data/ResourcePackConverter.vue'))
 const ResourcePackEditor = defineAsyncComponent(() => import('./data/ResourcePackEditor.vue'))
 const SeedMap = defineAsyncComponent(() => import('./data/SeedMap.vue'))
+const SchematicPage = defineAsyncComponent(() => import('./storage/schematic/SchematicPage.vue'))
 
 const subTabs = [
   { id: 'archive', label: '存档管理', icon: FolderIcon },
@@ -29,6 +31,7 @@ const subTabs = [
   { id: 'resourcepack', label: '资源包转换', icon: PhotoIcon },
   { id: 'resourcepack-editor', label: '资源包编辑器', icon: CubeIcon },
   { id: 'seedmap', label: '种子地图', icon: MapIcon },
+  { id: 'schematic', label: '投影预览', icon: SquaresPlusIcon },
 ]
 const activeSubTab = ref('archive')
 </script>
@@ -44,6 +47,7 @@ const activeSubTab = ref('archive')
         <ScreenshotManager v-else-if="activeSubTab === 'screenshot'" />
         <ResourcePackConverter v-else-if="activeSubTab === 'resourcepack'" />
         <ResourcePackEditor v-else-if="activeSubTab === 'resourcepack-editor'" />
+        <SchematicPage v-else-if="activeSubTab === 'schematic'" />
         <SeedMap v-else />
       </div>
     </div>

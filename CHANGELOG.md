@@ -6,6 +6,19 @@
 
 ### 新增
 
+#### 投影预览（工具页 → 存档资源）
+
+只读浏览并导出 Minecraft 投影文件，三种格式均按公开规范自行实现解析与写出：
+
+- [`read.rs`](src-tauri/src/commands/tools/schematic/read.rs)：Sponge v1/v2、Litematica、原版结构文件解析，统一为「x 最快、其次 z、最后 y」的方块索引；多区域自动合并包围盒，单投影上限 400 万方块。
+- [`codec.rs`](src-tauri/src/commands/tools/schematic/codec.rs)：LEB128 变长整数、Litematica 位压缩长整型（编解码对称）、方块 id 归一化、空气判定与数量统计。
+- [`write.rs`](src-tauri/src/commands/tools/schematic/write.rs)：导出 Sponge v2（gzip）、Litematica（gzip）、原版结构文件。
+- [`schematic/mod.rs`](src-tauri/src/commands/tools/schematic/mod.rs)：新增 `schematic_open` / `schematic_export` 两个 action，解析与导出走 `spawn_blocking`。
+- [`decode.ts`](src/utils/schematic/decode.ts)：base64 → u16 解码、按 X/Y/Z 轴切片、方块配色（常用方块查表，未知方块按 id 哈希取稳定色）。
+- [`SchematicPage.vue`](src/views/tools/storage/schematic/SchematicPage.vue) + [`SchematicCanvas.vue`](src/views/tools/storage/schematic/SchematicCanvas.vue) + [`SchematicStats.vue`](src/views/tools/storage/schematic/SchematicStats.vue)：逐层浏览、悬停显示方块名、Top 方块统计与占比、三格式导出。
+- [`StoragePage.vue`](src/views/tools/StoragePage.vue)：新增「投影预览」子页签。
+- 测试：Rust 12 例（编解码往返、三种格式导出后回读校验）+ 前端 14 例（解码、切片、配色、统计）。
+
 #### 皮肤编辑器（工具页 → 创作指令）
 
 像素级编辑 Minecraft 皮肤，纯前端自研实现，不依赖第三方编辑器：
