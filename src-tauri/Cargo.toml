@@ -60,7 +60,18 @@ sha2 = "0.10"
 md5 = "0.7"
 hex = "0.4"
 futures-util = "0.3"
-zip = "4"
+# 关闭默认特性中的 zstd：该依赖链存在无修复版本的 unsound 公告，
+# 且 Minecraft 相关 zip（游戏 jar / 数据包 / 整合包）不使用 zstd 压缩。
+zip = { version = "4", default-features = false, features = [
+    "aes-crypto",
+    "bzip2",
+    "deflate",
+    "deflate64",
+    "lzma-static",
+    "ppmd",
+    "time",
+    "xz",
+] }
 regex = "1"
 anyhow = "1"
 chrono = "0.4"
