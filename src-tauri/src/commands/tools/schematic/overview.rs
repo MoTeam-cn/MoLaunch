@@ -121,4 +121,5 @@ pub fn encode_u16(values: &[u16]) -> String {
 }
 
 #[cfg(test)]
+#[path = "overview_test.rs"]
 mod overview_test;
