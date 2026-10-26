@@ -53,11 +53,14 @@
 - **顺带**（[`entities.rs`](src-tauri/src/commands/tools/schematic/entities.rs)）：旧版格式的 `TileEntities` 此前被整体丢弃，现在会读出并归一化 id（`Sign` → `minecraft:sign`），告示牌文字不再丢失。
 - **验证**：该投影 79 种 `(id, meta)` 组合全部映射为真实方块名，占位符清零；测试补位规则断言（`17:13` → 云杉全树皮、`162:13` → 深色橡木全树皮、带釉陶瓦按 id 定色）。
 
-#### 配方物品抽屉的图标不显示
+#### 配方物品图标整块消失
 
-- **问题**（[`resources.ts`](src/utils/recipe-generator/resources.ts)）：图集坐标表在运行时通过一次 HTTP 请求取回，请求失败（自定义协议下 404、被 CSP 拦截、返回的不是 JSON）会让整张坐标表为空，抽屉里所有物品就只剩名字没有图标，而且没有任何错误提示——因为加载异常被 `finally` 吞掉，页面照常渲染。
-- **改法**：坐标表改为 `?raw` 静态内联进包体（48KB，比多一跳网络更划算，且彻底不受协议／CSP 影响）；解析失败时返回空表而不是抛错，由调用方退化。贴图 PNG 仍走 `?url` 交给 Vite 输出。
-- **兜底**（[`RecipeItemIcon.vue`](src/views/tools/creation/recipe-generator/RecipeItemIcon.vue)）：图集或条目缺失时不再空白，改为显示物品名首字母；同时改用安全访问，避免图集未就绪时整个条目渲染报错。
+- **现象**（[`RecipeItemIcon.vue`](src/views/tools/creation/recipe-generator/RecipeItemIcon.vue)）：抽屉、配方槽位、标签成员弹窗里的物品图标全部看不见，但物品名还在——图标区域塌成了一条线。
+- **根因**：图标边长写在样式里，用了 `width: v-bind(size + 'px')`。Vue 会把 `v-bind()` 里的表达式文本写进 CSS 变量名，于是生成的是 `--<hash>-size + 'px'` 这种含空格和加号的变量名；CSS 里 `var(--<hash>-size + 'px')` 不是合法的变量引用，浏览器直接丢弃 `width`/`height` 两条声明。元素又是 `inline-flex` 且内容为空，宽度高度就都收成 0，背景图照常设置但完全看不见。
+- **改法**：尺寸改由内联样式给出（`iconStyle` 同时包含宽高与切图背景），样式里不再用 `v-bind()`。全项目复查，`v-bind()` 只有这一处。
+- **顺带**（[`resources.ts`](src/utils/recipe-generator/resources.ts)）：图集坐标表原本在运行时要一次 HTTP 请求，失败会让整张表为空且没有任何提示，改为 `?raw` 静态内联；解析失败返回空表而不是抛错。
+- **兜底**：取不到贴图时显示物品名首字母，不再是空白。
+- **测试**：新增 3 例 SSR 渲染断言（有贴图时带 `background-image` 且宽高落在元素自身、缺贴图时保留尺寸并显示首字母、图集未就绪时不抛错）。
 
 ## [0.3.13-rc.1] - 2026-10-26
 
