@@ -25,6 +25,7 @@ import {
   decodeU16,
   densestLayer,
   findAirIndex,
+  surfaceLayer,
   nearestOccupiedLayer,
   type SchematicOverview,
   type SchematicSlice,
@@ -172,8 +173,8 @@ export function useSchematicEditor() {
       canRedo.value = false
       tool.value = 'browse'
       await loadOverview()
-      // 打开后直接落在建筑最密集的层，避免停在空层上什么都看不到
-      const dense = overview.value ? densestLayer(overview.value.layerCounts) : -1
+      // 打开后落在地面层：带地形的投影最密层在地底，取密度过半的最上层才看得到建筑
+      const dense = overview.value ? surfaceLayer(overview.value.layerCounts) : -1
       layer.value = dense >= 0 ? Math.min(dense, plane.value.layers - 1) : Math.floor(plane.value.layers / 2)
       centerViewport()
       await refreshSlice()

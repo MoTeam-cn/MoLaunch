@@ -7,6 +7,7 @@ import {
   extractSlice,
   findAirIndex,
   sliceBounds,
+  surfaceLayer,
 } from '../decode'
 
 /** 把 u16 数组编码为后端使用的 base64（小端） */
@@ -114,3 +115,23 @@ describe('palette helpers', () => {
     expect(countSliceBlocks(cells, ['minecraft:air', 'minecraft:stone'], 0)).toBe(2)
   })
 })
+
+describe('surfaceLayer', () => {
+  it('should pick the topmost dense layer when terrain fills the bottom', () => {
+    // 模拟带地形的建筑投影：y=0..63 整层石头，y=64 整层草地，y=65 以上只有零星建筑方块
+    const counts = new Array(256).fill(0);
+    for (let y = 0; y <= 64; y++) counts[y] = 20000;
+    counts[65] = 800;
+    counts[66] = 400;
+    expect(surfaceLayer(counts)).toBe(64);
+  });
+
+  it('should pick the densest layer when nothing reaches half of peak', () => {
+    const counts = [0, 10, 40, 12, 0];
+    expect(surfaceLayer(counts)).toBe(2);
+  });
+
+  it('should return -1 when every layer is empty', () => {
+    expect(surfaceLayer([0, 0, 0])).toBe(-1);
+  });
+});

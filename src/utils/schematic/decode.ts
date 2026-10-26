@@ -210,6 +210,26 @@ export function densestLayer(layerCounts: readonly number[]): number {
   return best
 }
 
+/**
+ * 打开投影时该定位到的层。
+ *
+ * 带地形的投影（地表建筑）最密集的层在地底——整层石头，直接跳过去只能看到一片岩层。
+ * 这里取「密度不低于峰值一半的最上层」，对地形投影正好落在最上面那层完整地面，
+ * 对悬空建筑则落在实体最多的那一层。
+ */
+export function surfaceLayer(layerCounts: readonly number[]): number {
+  let peak = 0
+  for (const count of layerCounts) {
+    if (count > peak) peak = count
+  }
+  if (peak === 0) return -1
+  const threshold = peak * 0.5
+  for (let index = layerCounts.length - 1; index >= 0; index--) {
+    if (layerCounts[index] >= threshold) return index
+  }
+  return -1
+}
+
 /** 距离指定层最近的非空层（找不到返回 -1） */
 export function nearestOccupiedLayer(layerCounts: readonly number[], from: number): number {
   if (layerCounts[from]) return from
