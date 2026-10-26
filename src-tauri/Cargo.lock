@@ -2934,8 +2934,8 @@ dependencies = [
 
 [[package]]
 name = "molaunch-protocol"
-version = "0.1.0"
-source = "git+https://github.com/MoTeam-cn/MoLaunch-Protocol?tag=v0.1.0#e891c793120ff09ba0f58227b5a7f5c2085ebc4c"
+version = "0.2.0"
+source = "git+https://github.com/MoTeam-cn/MoLaunch-Protocol?tag=v0.2.0#bf409ca247ac6e26d0e05189a8350b1b5d0e1b5f"
 dependencies = [
  "aes-gcm",
  "base64 0.22.1",
