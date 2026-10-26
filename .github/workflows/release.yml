@@ -169,6 +169,11 @@ jobs:
           # update_check.sign_keys 同值：不一致则 ping 全部 403；未注入则 ping 被静默跳过。
           # GitHub Secrets 配置名：MOLAUNCH_UPDATE_SIGN_KEY
           MOLAUNCH_UPDATE_SIGN_KEY: ${{ secrets.MOLAUNCH_UPDATE_SIGN_KEY }}
+          # 匿名错误上报接入参数（编译期注入，见 src-tauri/src/telemetry/config.rs）。
+          # 三个 secret 任一缺失则功能自动关闭；总开关 TELEMETRY_ENABLED 亦需为 true。
+          MOLAUNCH_SLS_ENDPOINT: ${{ secrets.MOLAUNCH_SLS_ENDPOINT }}
+          MOLAUNCH_SLS_PROJECT: ${{ secrets.MOLAUNCH_SLS_PROJECT }}
+          MOLAUNCH_SLS_LOGSTORE: ${{ secrets.MOLAUNCH_SLS_LOGSTORE }}
         with:
           tauriScript: npx tauri
           # Windows 优先使用 NSIS 安装包（而非 MSI），与 updater 协议一致
