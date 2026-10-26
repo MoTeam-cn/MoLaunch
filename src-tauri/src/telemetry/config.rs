@@ -16,7 +16,7 @@ pub const SLS_LOGSTORE: &str = "";
 pub const SLS_TOPIC: &str = "launcher-error";
 
 /// 单设备每日最多上报条数
-pub const MAX_EVENTS_PER_DAY: u32 = 8;
+pub const MAX_EVENTS_PER_DAY: u32 = 5;
 
 /// 同签名去重窗口（秒）：6 小时内同一错误只报一次
 pub const DEDUP_WINDOW_SECS: i64 = 6 * 3600;
@@ -25,13 +25,13 @@ pub const DEDUP_WINDOW_SECS: i64 = 6 * 3600;
 pub const MAX_QUEUE_LINES: usize = 60;
 
 /// message 字段最大字符数
-pub const MAX_MESSAGE_CHARS: usize = 400;
+pub const MAX_MESSAGE_CHARS: usize = 300;
 
 /// 日志尾部最大字符数
-pub const MAX_LOG_TAIL_CHARS: usize = 1200;
+pub const MAX_LOG_TAIL_CHARS: usize = 800;
 
 /// panic 堆栈最大字符数
-pub const MAX_STACK_CHARS: usize = 900;
+pub const MAX_STACK_CHARS: usize = 700;
 
 /// 日志尾部最多保留行数（供后续事件复用）
 pub const LOG_RING_LINES: usize = 25;

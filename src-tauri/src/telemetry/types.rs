@@ -60,9 +60,9 @@ impl TelemetryEvent {
         }
     }
 
-    /// 附加日志尾部（自动截断）
+    /// 附加日志尾部（保留最后 N 个字符 —— 最近发生的才有诊断价值）
     pub fn with_log_tail(mut self, tail: &str) -> Self {
-        self.log_tail = truncate_chars(tail, MAX_LOG_TAIL_CHARS);
+        self.log_tail = truncate_tail_chars(tail, MAX_LOG_TAIL_CHARS);
         self
     }
 
@@ -90,6 +90,18 @@ impl TelemetryEvent {
             "stack": self.stack,
         })
     }
+}
+
+/// 按字符保留**末尾**（日志尾部用，最近几行才有诊断价值）
+pub fn truncate_tail_chars(text: &str, max_chars: usize) -> String {
+    let total = text.chars().count();
+    if total <= max_chars {
+        return text.to_string();
+    }
+    let skip = total - max_chars;
+    let mut out = String::from("…");
+    out.extend(text.chars().skip(skip));
+    out
 }
 
 /// 按字符截断（避免切断 UTF-8）

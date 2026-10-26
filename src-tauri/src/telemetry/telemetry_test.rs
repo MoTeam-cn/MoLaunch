@@ -1,7 +1,7 @@
 //! 遥测模块测试：签名归一化 / 文本脱敏 / 字段截断 / 请求体字段
 
 use super::signature::{normalize_message, sanitize_text, signature};
-use super::types::{truncate_chars, EventKind, TelemetryEvent};
+use super::types::{truncate_chars, truncate_tail_chars, EventKind, TelemetryEvent};
 
 #[test]
 fn test_normalize_message_replaces_numbers() {
@@ -51,6 +51,20 @@ fn test_truncate_chars_keeps_utf8_intact() {
 #[test]
 fn test_truncate_chars_keeps_short_text() {
     assert_eq!(truncate_chars("短", 10), "短");
+}
+
+#[test]
+fn test_truncate_tail_chars_keeps_last_chars() {
+    let out = truncate_tail_chars("第一行\n第二行\n第三行", 5);
+    assert!(out.ends_with("第三行"));
+    assert!(out.starts_with('…'));
+}
+
+#[test]
+fn test_log_tail_keeps_recent_lines() {
+    let tail = "old line 1\nold line 2\nNEW ERROR HERE";
+    let event = TelemetryEvent::new(EventKind::Error, "src/a.rs:1", "err").with_log_tail(tail);
+    assert!(event.log_tail.contains("NEW ERROR HERE"));
 }
 
 #[test]
