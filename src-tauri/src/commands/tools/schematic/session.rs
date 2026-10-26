@@ -257,6 +257,7 @@ pub fn history(session_id: &str, action: &str) -> Result<(u32, u64, bool, bool),
         } else {
             record.before.clone()
         };
+        let changed = record.indices.len() as u32;
         for (offset, &index) in record.indices.iter().enumerate() {
             if let Some(slot) = session.data.blocks.get_mut(index) {
                 *slot = values[offset];
@@ -269,7 +270,7 @@ pub fn history(session_id: &str, action: &str) -> Result<(u32, u64, bool, bool),
         }
         let non_air = count_non_air(&session.data.blocks, &session.data.palette);
         Ok((
-            record.indices.len() as u32,
+            changed,
             non_air,
             !session.undo.is_empty(),
             !session.redo.is_empty(),
@@ -320,7 +321,7 @@ pub fn transform(session_id: &str, kind: &str) -> Result<([u32; 3], u64), String
 /// 供导出使用：在会话上执行只读操作
 pub fn inspect<R>(
     session_id: &str,
-    action: impl FnOnce(&Session) -> Result<R, String>,
+    action: impl FnOnce(&mut Session) -> Result<R, String>,
 ) -> Result<R, String> {
     with_session(session_id, action)
 }
