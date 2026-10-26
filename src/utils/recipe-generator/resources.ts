@@ -11,6 +11,10 @@
  */
 import type { CustomItem, CustomTag, JavaVersionId, RecipeSlotContext } from './types'
 import { getJson } from '@/utils/request'
+// 图集直接打进包体：48KB 的坐标表走 ?raw 内联，避免运行时再发一次请求
+// （自定义协议下偶发 404 或被 CSP 拦截，会让整屏图标变成空白且没有任何提示）
+import atlasLayoutRaw from './assets/texture-atlas.json?raw'
+import atlasPngUrl from './assets/texture-atlas.png?url'
 
 export type AssetItem = {
   id: string
@@ -39,9 +43,6 @@ const tagsGlob = import.meta.glob<string>('./assets/tags/*.json', {
   query: '?url',
   import: 'default',
 })
-
-const atlasLayoutUrl = new URL('./assets/texture-atlas.json', import.meta.url).href
-const atlasPngUrl = new URL('./assets/texture-atlas.png', import.meta.url).href
 
 async function fetchJson<T>(url: string): Promise<T> {
   return getJson<T>(url)
@@ -74,8 +75,19 @@ export async function loadVersionTags(version: JavaVersionId): Promise<Record<st
 }
 
 export async function getAtlasLayout(): Promise<AtlasLayout> {
-  atlasLayoutPromise ??= fetchJson<AtlasLayout>(atlasLayoutUrl)
+  atlasLayoutPromise ??= Promise.resolve(parseAtlasLayout(atlasLayoutRaw))
   return atlasLayoutPromise
+}
+
+/** 解析内联的图集坐标表；结构异常时返回空表，调用方退化为纯色/占位符 */
+function parseAtlasLayout(raw: string): AtlasLayout {
+  try {
+    const parsed = JSON.parse(raw) as AtlasLayout
+    if (!parsed?.size || !parsed?.layout) return { size: [0, 0], layout: {} }
+    return parsed
+  } catch {
+    return { size: [0, 0], layout: {} }
+  }
 }
 
 export function getAtlasPngUrl(): string {

@@ -17,7 +17,12 @@ const props = withDefaults(
   { size: 32, label: '' },
 )
 
-const region = computed(() => (props.texture ? props.atlas.layout[props.texture] : undefined))
+const region = computed(() =>
+  props.texture ? props.atlas?.layout?.[props.texture] : undefined,
+)
+
+/** 没有贴图时用名称首字母兜底，至少能看出是哪个物品 */
+const initial = computed(() => (props.label || '?').trim().charAt(0).toUpperCase() || '?')
 
 const backgroundStyle = computed(() => {
   const regionValue = region.value
@@ -40,7 +45,7 @@ const backgroundStyle = computed(() => {
       :style="backgroundStyle"
       :aria-label="label"
     >
-      <span v-if="!region" class="recipe-item-icon-placeholder">?</span>
+      <span v-if="!region" class="recipe-item-icon-placeholder">{{ initial }}</span>
     </span>
   </Tooltip>
 </template>
