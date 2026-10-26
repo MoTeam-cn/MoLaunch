@@ -436,6 +436,31 @@ fn test_block_entities_survive_structure_roundtrip() {
     });
     let path = temp_path("entities.nbt");
     export(&data, "structure", &path).expect("导出失败");
+
+    // 先确认写出的字节里确实带了实体信息，便于区分写入侧与读取侧问题
+    let raw = std::fs::read(&path).expect("读取导出文件失败");
+    let raw_text = String::from_utf8_lossy(&raw);
+    assert!(
+        raw_text.contains("minecraft:furnace"),
+        "导出字节中缺少实体 id，写入侧有问题"
+    );
+    let parsed: fastnbt::Value = fastnbt::from_bytes(&raw).expect("导出文件无法解析");
+    let blocks = match &parsed {
+        fastnbt::Value::Compound(map) => match map.get("blocks") {
+            Some(fastnbt::Value::List(items)) => items.clone(),
+            _ => Vec::new(),
+        },
+        _ => Vec::new(),
+    };
+    let with_nbt = blocks
+        .iter()
+        .filter(|entry| match entry {
+            fastnbt::Value::Compound(fields) => fields.contains_key("nbt"),
+            _ => false,
+        })
+        .count();
+    assert_eq!(with_nbt, 1, "blocks[].nbt 数量不符");
+
     let reread = read_schematic(&path).expect("回读失败");
     assert_eq!(reread.block_entities.len(), 1);
     assert_eq!(reread.block_entities[0].pos, [2, 1, 1]);
