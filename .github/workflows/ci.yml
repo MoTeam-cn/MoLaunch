@@ -152,6 +152,11 @@ jobs:
           # 与原 rustsec-action 行为一致：仅 CI 报告，不自动创建 issue
           createIssues: false
 
+      # 审计失败时打印具体条目，便于定位新增公告（默认只写 step summary，日志里看不到明细）
+      - name: Security audit details
+        if: failure()
+        run: cargo audit -f src-tauri/Cargo.lock 2>&1 | tail -80 || true
+
   # Rust 测试
   rust-test:
     name: Rust Test
