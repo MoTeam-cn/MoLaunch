@@ -17,6 +17,7 @@ pub mod sdk;
 pub mod splash;
 pub mod state;
 pub mod storage;
+pub mod telemetry;
 pub mod tray;
 pub mod utils;
 #[cfg(target_os = "windows")]
@@ -54,6 +55,24 @@ pub fn run() {
 
     // 初始化日志系统（从配置文件加载日志级别和输出选项）
     logger::init_from_config();
+
+    // 匿名错误上报：panic 兜底钩子。保留控制台输出，同时把崩溃（含堆栈与最近日志）
+    // 写入本地待发送队列，下次启动补发 —— 进程可能来不及联网就退出。
+    std::panic::set_hook(Box::new(|info| {
+        let payload = info
+            .payload()
+            .downcast_ref::<&str>()
+            .map(|s| (*s).to_string())
+            .or_else(|| info.payload().downcast_ref::<String>().cloned())
+            .unwrap_or_else(|| "panic".to_string());
+        let location = info
+            .location()
+            .map(|l| format!("{}:{}", l.file(), l.line()))
+            .unwrap_or_else(|| "unknown".to_string());
+        let stack = std::backtrace::Backtrace::force_capture().to_string();
+        telemetry::record_panic(&payload, &location, &stack);
+        eprintln!("[PANIC] {} at {}", payload, location);
+    }));
 
     // 初始化 HTTP 客户端（根据代理 + TLS 配置）
     // ignore_tls 走注册表（DeveloperUnlocked + DeveloperMode + IgnoreTls 三层判定），
@@ -197,6 +216,10 @@ pub fn run() {
 
             // 地区判定预热：中国大陆机器在后台先判定网络出口，避免首次打开下载页时等待
             utils::region::prefetch();
+
+            // 匿名错误上报：预热本地状态并启动后台补发任务
+            // （未配置 SLS Project/Logstore 时只入队不发送，不影响任何现有流程）
+            telemetry::spawn_background();
 
             // 创建系统托盘（右键菜单：打开主页面 / 检查更新 / 退出）
             if let Err(e) = tray::setup_tray(app.handle()) {

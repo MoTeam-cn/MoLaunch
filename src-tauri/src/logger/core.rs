@@ -115,6 +115,13 @@ impl Logger {
             let _ = file.flush();
         }
 
+        // 匿名错误上报：环形缓冲留存上下文；ERROR 级别额外入队一条待上报事件
+        // （record_error 内部只用静默文件 IO，不调用 log_* 宏，避免重入 LOGGER 死锁）
+        crate::telemetry::push_log_line(&log_line);
+        if level == LogLevel::Error {
+            crate::telemetry::record_error(&format!("{}:{}", rel_path, line), &sanitized);
+        }
+
         // 输出到控制台（带颜色）
         if self.console_output {
             // 时间：灰色

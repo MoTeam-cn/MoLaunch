@@ -4,6 +4,20 @@
 
 ## [Unreleased]
 
+### 新增
+
+#### 匿名错误上报（阿里云 SLS WebTracking）
+
+启动器在出错与崩溃时自动上报一条脱敏事件，无需用户手动反馈：
+
+- [`telemetry/mod.rs`](src-tauri/src/telemetry/mod.rs) 新增遥测模块：事件构造、签名聚合、去重限流、本地待发送队列、后台补发。
+- [`telemetry/sink.rs`](src-tauri/src/telemetry/sink.rs)：走 SLS WebTracking 写入（`https://{project}.{endpoint}/logstores/{logstore}/track`），无需签名、只能写不能读，密钥不入客户端。
+- [`telemetry/config.rs`](src-tauri/src/telemetry/config.rs)：端点 `cn-chengdu.log.aliyuncs.com` 与各项上限（单条 message 400 字、日志尾部 1200 字、堆栈 900 字、每日 8 条、同签名 6 小时去重），适配每月 500MB 免费额度。
+- [`telemetry/signature.rs`](src-tauri/src/telemetry/signature.rs)：抹掉数字 / 十六进制 / UUID / 用户名后取哈希，同类错误在不同机器上得到同一签名，后台可聚合计数。
+- [`logger/core.rs`](src-tauri/src/logger/core.rs)：ERROR 级别日志入队上报，并维护 25 行环形缓冲作为上下文；`record_error` 只用静默文件 IO，不重入日志锁。
+- [`lib.rs`](src-tauri/src/lib.rs)：panic 钩子把崩溃写入本地队列（下次启动补发），setup 阶段启动后台上报任务。
+- [`manager/telemetry.rs`](src-tauri/src/commands/system/manager/telemetry.rs)：新增 `telemetry_status` / `telemetry_set_enabled` / `telemetry_flush` 三个 action。
+
 ### 修复
 
 #### 部分用户提示「SDK 未加载，无法加密认证数据」

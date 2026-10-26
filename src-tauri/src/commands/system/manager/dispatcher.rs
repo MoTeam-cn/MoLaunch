@@ -185,6 +185,9 @@ static DISPATCHER: Lazy<Dispatcher> = Lazy::new(|| {
             serde_json::to_value(r).map_err(|e| e.to_string())
         }),
     );
+    // 匿名错误上报（3 个）：状态查询 / 开关 / 手动发送
+    super::telemetry::register(&mut d);
+
     d.register(
         "unregister_deeplink",
         handler!(_state, _app, _params, {

@@ -5,6 +5,7 @@ mod developer;
 mod dispatcher;
 mod game_dir;
 mod memory;
+mod telemetry;
 mod updater;
 
 pub use dispatcher::dispatch;
