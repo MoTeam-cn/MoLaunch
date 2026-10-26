@@ -39,6 +39,8 @@ defineProps<{
   brushSize: number
   radius: number
   cylinderHeight: number
+  /** 是否已取到层密度（有才能跳到最密层） */
+  hasOverview: boolean
 }>()
 
 const emit = defineEmits<{
@@ -53,6 +55,7 @@ const emit = defineEmits<{
   undo: []
   redo: []
   transform: [kind: 'rotate_cw' | 'rotate_ccw' | 'mirror_x' | 'mirror_z' | 'flip_y']
+  jumpDense: []
   zoom: [delta: number]
   pan: [dx: number, dy: number]
   export: []
@@ -212,6 +215,9 @@ function onNumber(event: Event, key: 'brushSize' | 'radius' | 'cylinderHeight'):
       </Button>
       <Button size="small" type="outline" @click="emit('pan', 1, 0)">
         <ChevronRightIcon class="h-4 w-4" />
+      </Button>
+      <Button v-if="hasOverview" size="small" type="outline" @click="emit('jumpDense')">
+        跳到最密层
       </Button>
       <Button size="small" type="outline" @click="emit('zoom', -1)">
         <MagnifyingGlassMinusIcon class="h-4 w-4" />

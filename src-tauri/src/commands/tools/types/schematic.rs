@@ -36,6 +36,31 @@ pub struct SchematicBlockCount {
     pub count: u64,
 }
 
+/// 取概览（层密度与俯视高度图）
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SchematicOverviewParams {
+    pub session_id: String,
+}
+
+/// 概览结果
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SchematicOverviewResult {
+    pub size: [u32; 3],
+    /// 每层非空方块数，下标即层号（y 轴）
+    pub layer_counts: Vec<u64>,
+    pub width: u32,
+    pub height: u32,
+    pub step: u32,
+    /// 俯视每列最高方块的调色板索引（小端 u16 数组）
+    pub top_index_base64: String,
+    /// 俯视每列最高方块的高度（小端 u16 数组）
+    pub top_height_base64: String,
+    /// 表示"该列全空"的方块索引
+    pub empty_index: u16,
+}
+
 /// 取切片：按轴 + 层 + 视口窗口取一小块
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]

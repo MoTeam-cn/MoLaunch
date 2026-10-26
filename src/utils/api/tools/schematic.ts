@@ -23,6 +23,17 @@ export interface SchematicOpenResult {
   counts: SchematicBlockCount[]
 }
 
+export interface SchematicOverviewResult {
+  size: [number, number, number]
+  layerCounts: number[]
+  width: number
+  height: number
+  step: number
+  topIndexBase64: string
+  topHeightBase64: string
+  emptyIndex: number
+}
+
 export interface SchematicSliceResult {
   x: number
   y: number
@@ -52,6 +63,12 @@ export type SliceAxisParam = 'x' | 'y' | 'z'
 
 export async function schematicOpen(path: string): Promise<SchematicOpenResult> {
   return toolsManager<SchematicOpenResult>(TOOLS_ACTIONS.SCHEMATIC_OPEN, { path })
+}
+
+export async function schematicOverview(
+  sessionId: string,
+): Promise<SchematicOverviewResult> {
+  return toolsManager<SchematicOverviewResult>(TOOLS_ACTIONS.SCHEMATIC_OVERVIEW, { sessionId })
 }
 
 export async function schematicSlice(

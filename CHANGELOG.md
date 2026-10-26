@@ -8,6 +8,15 @@
 
 ### 新增
 
+#### 投影预览：层密度条与等轴测立体图
+
+- [`overview.rs`](src-tauri/src/commands/tools/schematic/overview.rs)：新增概览计算——每层非空方块数与俯视高度图（每列最高方块与高度），单边超过 256 时按整数步长降采样。
+- [`dispatcher.rs`](src-tauri/src/commands/tools/dispatcher.rs)：投影 action 增至 8 个，新增 `schematic_overview`。
+- [`SchematicOverview.vue`](src/views/tools/storage/schematic/SchematicOverview.vue) + [`isometric.ts`](src/utils/schematic/isometric.ts)：用俯视高度图画 2:1 等轴测柱体阵列，直观展示整体轮廓与高度分布，可放大查看。
+- [`SchematicLayerBar.vue`](src/views/tools/storage/schematic/SchematicLayerBar.vue)：层密度条按非空方块数显示各层占比，点击任意位置跳到该层。
+- [`useSchematicEditor.ts`](src/composables/useSchematicEditor.ts)：打开投影后自动落在建筑最密集的层，并提供「跳到最密层」「跳到最近非空层」。
+- [`SchematicPage.vue`](src/views/tools/storage/schematic/SchematicPage.vue)：当前层为空时给出提示与一键跳转，解决打开后落在空层、画布全白的问题。
+- 测试：Rust 新增 5 例（层密度、俯视高度取值、超大平面降采样、未知会话、编码字节数），前端 141 例保持通过。
 #### 与主控交互的协议迁入私有仓库
 
 - 新增私有仓库 [`MoLaunch-Protocol`](https://github.com/MoTeam-cn/MoLaunch-Protocol)（crate `molaunch-protocol` v0.1.0），承载与主控交互的全部协议实现：MoSign-v1 设备认证、MoSign-v2 机器鉴权、加密原语与 ECIES 信封、工作量证明、DataChannel 帧格式、联机信令类型。

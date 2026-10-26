@@ -9,6 +9,7 @@
 mod codec;
 mod entities;
 mod legacy_blocks;
+mod overview;
 mod read;
 mod session;
 mod write;
@@ -21,8 +22,8 @@ use std::path::PathBuf;
 use crate::commands::tools::types::{
     SchematicBlockCount, SchematicCloseParams, SchematicEditParams, SchematicEditResult,
     SchematicExportParams, SchematicExportResult, SchematicHistoryParams, SchematicHistoryResult,
-    SchematicOpenParams, SchematicOpenResult, SchematicSliceParams, SchematicSliceResult,
-    SchematicTransformParams, SchematicTransformResult,
+    SchematicOpenParams, SchematicOpenResult, SchematicOverviewParams, SchematicOverviewResult,
+    SchematicSliceParams, SchematicSliceResult, SchematicTransformParams, SchematicTransformResult,
 };
 
 /// 单次返回的方块统计条目上限
@@ -57,6 +58,21 @@ pub async fn open(params: SchematicOpenParams) -> Result<SchematicOpenResult, St
     Ok(SchematicOpenResult {
         session_id,
         ..result
+    })
+}
+
+/// 概览：层密度与俯视高度图（供立体预览与非空层定位）
+pub async fn overview(params: SchematicOverviewParams) -> Result<SchematicOverviewResult, String> {
+    let data = overview::build(&params.session_id)?;
+    Ok(SchematicOverviewResult {
+        size: data.size,
+        layer_counts: data.layer_counts,
+        width: data.width,
+        height: data.height,
+        step: data.step,
+        top_index_base64: overview::encode_u16(&data.top_index),
+        top_height_base64: overview::encode_u16(&data.top_height),
+        empty_index: overview::EMPTY_INDEX,
     })
 }
 

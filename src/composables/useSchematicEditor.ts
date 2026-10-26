@@ -14,12 +14,21 @@ import {
   schematicExport,
   schematicHistory,
   schematicOpen,
+  schematicOverview,
   schematicSlice,
   schematicTransform,
   type SchematicOpenResult,
   type SliceAxisParam,
 } from '@/utils/api/tools/schematic'
-import { decodeBlocks, findAirIndex, type SchematicSlice } from '@/utils/schematic/decode'
+import {
+  decodeBlocks,
+  decodeU16,
+  densestLayer,
+  findAirIndex,
+  nearestOccupiedLayer,
+  type SchematicOverview,
+  type SchematicSlice,
+} from '@/utils/schematic/decode'
 import { EDIT_TOOLS, TOOL_INTERACTION, type SchematicTool } from '@/views/tools/storage/schematic/types'
 
 /** 视口单边最大格子数 */
@@ -53,6 +62,7 @@ export function useSchematicEditor() {
   const loading = ref(false)
   const busy = ref(false)
   const exportFormat = ref('sponge_v2')
+  const overview = ref<SchematicOverview | null>(null)
 
   const plane = computed(() => {
     if (!session.value) return { width: 1, height: 1, layers: 1 }
@@ -104,6 +114,26 @@ export function useSchematicEditor() {
     sliceOrigin.value = { x: result.x, y: result.y }
   }
 
+  /** 拉取层密度与俯视高度图（供立体预览与非空层定位） */
+  async function loadOverview(): Promise<void> {
+    if (!session.value) return
+    try {
+      const result = await schematicOverview(session.value.sessionId)
+      overview.value = {
+        width: result.width,
+        height: result.height,
+        step: result.step,
+        topIndex: decodeU16(result.topIndexBase64),
+        topHeight: decodeU16(result.topHeightBase64),
+        layerCounts: result.layerCounts,
+        emptyIndex: result.emptyIndex,
+      }
+    } catch {
+      // 概览是增强项，失败不影响逐层浏览
+      overview.value = null
+    }
+  }
+
   /** 拖拽平移时合并刷新，避免每格触发一次 IPC */
   function scheduleRefresh(delay = 90): void {
     if (refreshTimer) clearTimeout(refreshTimer)
@@ -141,7 +171,10 @@ export function useSchematicEditor() {
       canUndo.value = false
       canRedo.value = false
       tool.value = 'browse'
-      layer.value = Math.floor(plane.value.layers / 2)
+      await loadOverview()
+      // 打开后直接落在建筑最密集的层，避免停在空层上什么都看不到
+      const dense = overview.value ? densestLayer(overview.value.layerCounts) : -1
+      layer.value = dense >= 0 ? Math.min(dense, plane.value.layers - 1) : Math.floor(plane.value.layers / 2)
       centerViewport()
       await refreshSlice()
       toastSuccess(`已打开 ${result.name}（${result.format}）`)
@@ -250,6 +283,7 @@ export function useSchematicEditor() {
       nonAir.value = result.nonAir
       canUndo.value = false
       canRedo.value = false
+      await loadOverview()
       layer.value = Math.floor(plane.value.layers / 2)
       centerViewport()
       await refreshSlice()
@@ -278,6 +312,28 @@ export function useSchematicEditor() {
     } finally {
       busy.value = false
     }
+  }
+
+  /** 当前层是否一个方块都没有 */
+  const layerEmpty = computed(() => {
+    if (!overview.value) return false
+    return (overview.value.layerCounts[layer.value] ?? 0) === 0
+  })
+
+  /** 跳到最近的非空层 */
+  async function jumpToNearestOccupied(): Promise<void> {
+    if (!overview.value) return
+    const target = nearestOccupiedLayer(overview.value.layerCounts, layer.value)
+    if (target >= 0 && target !== layer.value) {
+      layer.value = target
+    }
+  }
+
+  /** 跳到建筑最密集的层 */
+  async function jumpToDensest(): Promise<void> {
+    if (!overview.value) return
+    const target = densestLayer(overview.value.layerCounts)
+    if (target >= 0) layer.value = target
   }
 
   function zoom(delta: number): void {
@@ -316,11 +372,13 @@ export function useSchematicEditor() {
     loading,
     busy,
     exportFormat,
+    overview,
     plane,
     paletteCounts,
     interaction,
     needsBlock,
     hoverLabel,
+    layerEmpty,
     openFile,
     onSelect,
     onPaint,
@@ -329,6 +387,8 @@ export function useSchematicEditor() {
     step,
     doTransform,
     doExport,
+    jumpToNearestOccupied,
+    jumpToDensest,
     zoom,
   }
 }

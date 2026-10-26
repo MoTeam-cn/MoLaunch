@@ -154,3 +154,70 @@ export function countSliceBlocks(
 export function findAirIndex(palette: readonly string[]): number {
   return palette.findIndex((id) => id === 'minecraft:air')
 }
+
+/** 调整颜色明暗：factor < 1 变暗，> 1 变亮（支持 #rrggbb 与 hsl()） */
+export function shade(color: string, factor: number): string {
+  if (color.startsWith('#')) {
+    const hex = color.slice(1)
+    const full = hex.length === 3 ? hex.split('').map((c) => c + c).join('') : hex
+    const value = Number.parseInt(full, 16)
+    if (Number.isNaN(value)) return color
+    const channels = [(value >> 16) & 0xff, (value >> 8) & 0xff, value & 0xff]
+    const scaled = channels.map((c) => Math.max(0, Math.min(255, Math.round(c * factor))))
+    return `#${scaled.map((c) => c.toString(16).padStart(2, '0')).join('')}`
+  }
+  const match = color.match(/hsl\(([\d.]+),\s*([\d.]+)%,\s*([\d.]+)%\)/)
+  if (!match) return color
+  const lightness = Math.max(0, Math.min(100, Number(match[3]) * factor))
+  return `hsl(${match[1]}, ${match[2]}%, ${lightness.toFixed(1)}%)`
+}
+
+/** 俯视概览数据 */
+export interface SchematicOverview {
+  width: number
+  height: number
+  step: number
+  /** 每列最高方块的调色板索引 */
+  topIndex: Uint16Array
+  /** 每列最高方块的高度（0 表示全空） */
+  topHeight: Uint16Array
+  /** 每层非空方块数 */
+  layerCounts: number[]
+  /** 表示"该列全空"的方块索引 */
+  emptyIndex: number
+}
+
+/** 解码概览里的 u16 小端数组 */
+export function decodeU16(base64: string): Uint16Array {
+  const binary = atob(base64)
+  const out = new Uint16Array(binary.length >> 1)
+  for (let i = 0; i < out.length; i++) {
+    out[i] = binary.charCodeAt(i * 2) | (binary.charCodeAt(i * 2 + 1) << 8)
+  }
+  return out
+}
+
+/** 最密集的非空层（找不到返回 -1） */
+export function densestLayer(layerCounts: readonly number[]): number {
+  let best = -1
+  let bestCount = 0
+  layerCounts.forEach((count, index) => {
+    if (count > bestCount) {
+      bestCount = count
+      best = index
+    }
+  })
+  return best
+}
+
+/** 距离指定层最近的非空层（找不到返回 -1） */
+export function nearestOccupiedLayer(layerCounts: readonly number[], from: number): number {
+  if (layerCounts[from]) return from
+  for (let offset = 1; offset < layerCounts.length; offset++) {
+    const up = from + offset
+    if (up < layerCounts.length && layerCounts[up]) return up
+    const down = from - offset
+    if (down >= 0 && layerCounts[down]) return down
+  }
+  return -1
+}
