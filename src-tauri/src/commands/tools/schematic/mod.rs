@@ -83,15 +83,17 @@ pub async fn slice(params: SchematicSliceParams) -> Result<SchematicSliceResult,
 pub async fn edit(params: SchematicEditParams) -> Result<SchematicEditResult, String> {
     let (changed, non_air, can_undo, can_redo) = session::edit(
         &params.session_id,
-        &params.axis,
-        params.layer,
-        params.x,
-        params.y,
-        params.w,
-        params.h,
-        params.block,
-        &params.mode,
-        params.from,
+        session::EditRequest {
+            axis: &params.axis,
+            layer: params.layer,
+            x: params.x,
+            y: params.y,
+            w: params.w,
+            h: params.h,
+            block: params.block,
+            mode: &params.mode,
+            from: params.from,
+        },
     )?;
     Ok(SchematicEditResult {
         changed,

@@ -2,8 +2,6 @@
 
 use std::collections::HashMap;
 
-use base64::Engine as _;
-
 /// 体积上限（方块数）：会话常驻内存，每方块 2 字节，5000 万方块约 100MB
 pub const MAX_VOLUME: u64 = 50_000_000;
 
@@ -162,13 +160,4 @@ pub fn count_non_air(blocks: &[u16], palette: &[String]) -> u64 {
                 .unwrap_or(false)
         })
         .count() as u64
-}
-
-/// u16 数组 → base64（小端）
-pub fn encode_blocks_base64(blocks: &[u16]) -> String {
-    let mut bytes = Vec::with_capacity(blocks.len() * 2);
-    for value in blocks {
-        bytes.extend_from_slice(&value.to_le_bytes());
-    }
-    base64::engine::general_purpose::STANDARD.encode(bytes)
 }

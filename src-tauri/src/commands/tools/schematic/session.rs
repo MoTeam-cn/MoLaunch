@@ -10,7 +10,7 @@ use std::sync::Mutex;
 use base64::Engine as _;
 use once_cell::sync::Lazy;
 
-use super::codec::{count_non_air, is_air};
+use super::codec::count_non_air;
 use super::read::SchematicData;
 
 /// 同时保留的会话数量上限（超出后淘汰最早的会话）
@@ -31,7 +31,6 @@ pub struct Session {
     pub data: SchematicData,
     undo: Vec<EditRecord>,
     redo: Vec<EditRecord>,
-    pub opened_at: u64,
 }
 
 struct Registry {
@@ -62,7 +61,6 @@ pub fn create(data: SchematicData) -> String {
             data,
             undo: Vec::new(),
             redo: Vec::new(),
-            opened_at: serial,
         },
     );
     registry.order.push(id.clone());
@@ -99,7 +97,8 @@ pub fn close(session_id: &str) {
     registry.order.retain(|id| id != session_id);
 }
 
-/// 清空所有会话（测试用）
+/// 清空所有会话（仅测试使用）
+#[cfg(test)]
 pub fn clear_all() {
     let mut registry = match REGISTRY.lock() {
         Ok(guard) => guard,
@@ -127,7 +126,7 @@ pub fn plane_size(size: [u32; 3], axis: &str) -> Result<(u32, u32, u32), String>
 }
 
 /// 把平面坐标 + 层换算成三维坐标
-fn to_xyz(size: [u32; 3], axis: &str, layer: u32, u: u32, v: u32) -> (u32, u32, u32) {
+fn to_xyz(axis: &str, layer: u32, u: u32, v: u32) -> (u32, u32, u32) {
     match axis {
         "x" => (layer, v, u),
         "z" => (u, v, layer),
@@ -160,7 +159,7 @@ pub fn slice(
         let mut cells: Vec<u16> = Vec::with_capacity((width * height) as usize);
         for row in 0..height {
             for col in 0..width {
-                let (bx, by, bz) = to_xyz(size, axis, layer, x + col, y + row);
+                let (bx, by, bz) = to_xyz(axis, layer, x + col, y + row);
                 let index = index_of(size, bx, by, bz);
                 cells.push(session.data.blocks.get(index).copied().unwrap_or(0));
             }
@@ -169,19 +168,32 @@ pub fn slice(
     })
 }
 
+/// 一次编辑请求
+pub struct EditRequest<'a> {
+    pub axis: &'a str,
+    pub layer: u32,
+    pub x: u32,
+    pub y: u32,
+    pub w: u32,
+    pub h: u32,
+    pub block: u16,
+    pub mode: &'a str,
+    pub from: Option<u16>,
+}
+
 /// 在指定层的矩形区域填充方块
-pub fn edit(
-    session_id: &str,
-    axis: &str,
-    layer: u32,
-    x: u32,
-    y: u32,
-    w: u32,
-    h: u32,
-    block: u16,
-    mode: &str,
-    from: Option<u16>,
-) -> Result<(u32, u64, bool, bool), String> {
+pub fn edit(session_id: &str, request: EditRequest<'_>) -> Result<(u32, u64, bool, bool), String> {
+    let EditRequest {
+        axis,
+        layer,
+        x,
+        y,
+        w,
+        h,
+        block,
+        mode,
+        from,
+    } = request;
     with_session(session_id, |session| {
         let size = session.data.size;
         let (plane_w, plane_h, layers) = plane_size(size, axis)?;
@@ -199,7 +211,7 @@ pub fn edit(
         let mut after: Vec<u16> = Vec::new();
         for row in 0..height {
             for col in 0..width {
-                let (bx, by, bz) = to_xyz(size, axis, layer, x + col, y + row);
+                let (bx, by, bz) = to_xyz(axis, layer, x + col, y + row);
                 let index = index_of(size, bx, by, bz);
                 let current = session.data.blocks.get(index).copied().unwrap_or(0);
                 if mode == "replace" {
@@ -278,6 +290,9 @@ pub fn history(session_id: &str, action: &str) -> Result<(u32, u64, bool, bool),
     })
 }
 
+/// 坐标映射函数类型（输入原坐标与尺寸，输出新坐标）
+type AxisMap = fn(u32, u32, u32, [u32; 3]) -> (u32, u32, u32);
+
 /// 变换：旋转 / 镜像 / 上下翻转
 pub fn transform(session_id: &str, kind: &str) -> Result<([u32; 3], u64), String> {
     with_session(session_id, |session| {
@@ -287,7 +302,7 @@ pub fn transform(session_id: &str, kind: &str) -> Result<([u32; 3], u64), String
             "mirror_x" | "mirror_z" | "flip_y" => [sx, sy, sz],
             other => return Err(format!("未知变换: {}", other)),
         };
-        let map: fn(u32, u32, u32, [u32; 3]) -> (u32, u32, u32) = match kind {
+        let map: AxisMap = match kind {
             "rotate_cw" => |x, y, z, [sx, _sy, _sz]| (z, y, sx - 1 - x),
             "rotate_ccw" => |x, y, z, [_sx, _sy, sz]| (sz - 1 - z, y, x),
             "mirror_x" => |x, y, z, [sx, _sy, _sz]| (sx - 1 - x, y, z),
@@ -324,11 +339,6 @@ pub fn inspect<R>(
     action: impl FnOnce(&mut Session) -> Result<R, String>,
 ) -> Result<R, String> {
     with_session(session_id, action)
-}
-
-/// 调色板中空气对应的索引（没有则返回 None）
-pub fn air_index(palette: &[String]) -> Option<u16> {
-    palette.iter().position(|id| is_air(id)).map(|v| v as u16)
 }
 
 fn encode_u16(values: &[u16]) -> String {

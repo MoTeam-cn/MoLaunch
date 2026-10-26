@@ -223,9 +223,23 @@ fn test_session_edit_undo_redo() {
     session::clear_all();
     let id = session::create(sample_data());
 
-    let (changed, non_air, can_undo, _) =
-        session::edit(&id, "y", 0, 0, 0, 2, 2, 2, "fill", None).expect("编辑失败");
-    assert_eq!(changed, 4);
+    // 2×2 区域里有 1 格本来就是目标方块，因此实际改动 3 格
+    let (changed, non_air, can_undo, _) = session::edit(
+        &id,
+        session::EditRequest {
+            axis: "y",
+            layer: 0,
+            x: 0,
+            y: 0,
+            w: 2,
+            h: 2,
+            block: 2,
+            mode: "fill",
+            from: None,
+        },
+    )
+    .expect("编辑失败");
+    assert_eq!(changed, 3);
     assert!(non_air > 0);
     assert!(can_undo);
 

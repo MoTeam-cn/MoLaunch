@@ -465,7 +465,8 @@ pub fn legacy_block_name(id: u16, meta: u8) -> Option<&'static str> {
         .map(|index| LEGACY_BLOCKS[index].2)
 }
 
-/// 表中收录的条目数（供测试断言覆盖度）
+/// 表中收录的条目数（仅测试使用）
+#[cfg(test)]
 pub fn legacy_block_count() -> usize {
     LEGACY_BLOCKS.len()
 }
