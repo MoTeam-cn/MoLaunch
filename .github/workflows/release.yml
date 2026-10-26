@@ -130,9 +130,16 @@ jobs:
       - name: Install frontend dependencies
         run: npm ci --prefer-offline --no-audit --no-fund
 
-      # 私有协议库（molaunch-protocol）需要凭据才能拉取；用 PAT 改写 https 前缀
+      # 私有协议库（molaunch-protocol）需要凭据：写 git 凭据文件并校验可访问
       - name: Authorize private protocol repo
-        run: git config --global url."https://x-access-token:${{ secrets.PROTOCOL_REPO_TOKEN }}@github.com/".insteadOf "https://github.com/"
+        env:
+          PROTOCOL_TOKEN: ${{ secrets.PROTOCOL_REPO_TOKEN }}
+        run: |
+          git config --global credential.helper store
+          printf 'https://x-access-token:%s@github.com\n' "$PROTOCOL_TOKEN" > "$HOME/.git-credentials"
+          chmod 600 "$HOME/.git-credentials"
+          git config --global url."https://x-access-token:$PROTOCOL_TOKEN@github.com/".insteadOf "https://github.com/"
+          git ls-remote --heads https://github.com/MoTeam-cn/MoLaunch-Protocol | head -3
 
 
       - uses: Swatinem/rust-cache@v2
