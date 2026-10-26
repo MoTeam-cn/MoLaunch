@@ -30,6 +30,7 @@ import {
   type SchematicOverview,
   type SchematicSlice,
 } from '@/utils/schematic/decode'
+import { loadBlockAtlas, type BlockAtlas } from '@/utils/schematic/textures'
 import { EDIT_TOOLS, TOOL_INTERACTION, type SchematicTool } from '@/views/tools/storage/schematic/types'
 
 /** 视口单边最大格子数 */
@@ -64,6 +65,11 @@ export function useSchematicEditor() {
   const busy = ref(false)
   const exportFormat = ref('sponge_v2')
   const overview = ref<SchematicOverview | null>(null)
+/** 方块贴图图集：加载失败时为 null，画布退回纯色 */
+const atlas = ref<BlockAtlas | null>(null)
+loadBlockAtlas().then((loaded) => {
+  atlas.value = loaded
+})
 
   const plane = computed(() => {
     if (!session.value) return { width: 1, height: 1, layers: 1 }
@@ -390,6 +396,7 @@ export function useSchematicEditor() {
     doExport,
     jumpToNearestOccupied,
     jumpToDensest,
+    atlas,
     zoom,
   }
 }

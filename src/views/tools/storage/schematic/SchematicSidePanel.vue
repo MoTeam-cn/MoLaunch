@@ -7,6 +7,7 @@
  */
 
 import type { SchematicBlockCount } from '@/utils/api/tools/schematic'
+import type { BlockAtlas } from '@/utils/schematic/textures'
 import SchematicPalette from './SchematicPalette.vue'
 import SchematicStats from './SchematicStats.vue'
 
@@ -18,6 +19,8 @@ defineProps<{
   total: number
   showPicker: boolean
   showFrom: boolean
+  /** 方块贴图图集，为空时选择器只显示纯色 */
+  atlas?: BlockAtlas | null
 }>()
 
 const selectedBlock = defineModel<number>('selectedBlock', { required: true })
@@ -28,12 +31,22 @@ const replaceFrom = defineModel<number>('replaceFrom', { required: true })
   <div class="flex min-w-[260px] flex-1 flex-col gap-3">
     <template v-if="showPicker">
       <span class="text-xs text-gray-600">目标方块</span>
-      <SchematicPalette v-model="selectedBlock" :palette="palette" :counts="counts" />
+      <SchematicPalette
+        v-model="selectedBlock"
+        :palette="palette"
+        :counts="counts"
+        :atlas="atlas ?? null"
+      />
     </template>
     <template v-if="showFrom">
       <span class="text-xs text-gray-600">来源方块（只替换这一种）</span>
-      <SchematicPalette v-model="replaceFrom" :palette="palette" :counts="counts" />
+      <SchematicPalette
+        v-model="replaceFrom"
+        :palette="palette"
+        :counts="counts"
+        :atlas="atlas ?? null"
+      />
     </template>
-    <SchematicStats :counts="topCounts" :non-air="nonAir" :total="total" />
+    <SchematicStats :counts="topCounts" :non-air="nonAir" :total="total" :atlas="atlas ?? null" />
   </div>
 </template>

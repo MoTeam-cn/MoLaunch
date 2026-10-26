@@ -9,6 +9,7 @@
  */
 
 import { blockColor, shade, type SchematicOverview } from './decode'
+import { drawTexture, resolveTexture, type BlockAtlas } from './textures'
 
 /** 单张图最多绘制的柱体数（超出按整数倍抽稀） */
 const MAX_CELLS = 20000
@@ -58,11 +59,58 @@ export interface IsometricOptions {
   worldHeight: number
   canvasWidth: number
   canvasHeight: number
+  /** 方块贴图图集；为空或柱体过多时退回纯色 */
+  atlas?: BlockAtlas | null
+}
+
+/** 超过这个柱体数就不贴图（贴图每面一次 drawImage，纯色快一个量级） */
+const MAX_TEXTURED_COLUMNS = 12000
+
+/** 图集内单个贴图的边长（原版方块贴图统一 16×16） */
+const tileSrc = 16
+
+/**
+ * 画一个侧面：先按平行四边形映射贴图，再叠一层暗色体现光照。
+ *
+ * 侧面四点满足 P(u, v) = 起点 + u * (dxU, dyU) + v * (0, lift)，
+ * 因此变换矩阵取 [dxU, dyU, 0, lift]，源图 16×16 恰好铺满该四边形。
+ */
+function drawFace(
+  ctx: CanvasRenderingContext2D,
+  atlas: BlockAtlas | null,
+  texture: [number, number, number, number] | null,
+  corners: Array<[number, number]>,
+  fallbackColor: string,
+  darken: number,
+  dxU: number,
+  dyU: number,
+  lift: number,
+): void {
+  const [start] = corners
+  if (atlas && texture && lift > 0) {
+    ctx.save()
+    ctx.transform(dxU / tileSrc, dyU / tileSrc, 0, lift / tileSrc, start[0], start[1])
+    drawTexture(ctx, atlas, texture, 0, 0, tileSrc, tileSrc)
+    ctx.restore()
+  } else {
+    ctx.fillStyle = fallbackColor
+    ctx.beginPath()
+    ctx.moveTo(corners[0][0], corners[0][1])
+    for (let i = 1; i < corners.length; i++) ctx.lineTo(corners[i][0], corners[i][1])
+    ctx.closePath()
+    ctx.fill()
+  }
+  ctx.fillStyle = `rgba(15, 23, 42, ${darken})`
+  ctx.beginPath()
+  ctx.moveTo(corners[0][0], corners[0][1])
+  for (let i = 1; i < corners.length; i++) ctx.lineTo(corners[i][0], corners[i][1])
+  ctx.closePath()
+  ctx.fill()
 }
 
 /** 渲染等轴测图到画布；返回实际绘制的柱体数 */
 export function drawIsometric(canvas: HTMLCanvasElement, options: IsometricOptions): number {
-  const { grid, palette, emptyIndex, worldHeight, canvasWidth, canvasHeight } = options
+  const { grid, palette, emptyIndex, worldHeight, canvasWidth, canvasHeight, atlas } = options
   const ctx = canvas.getContext('2d')
   if (!ctx) return 0
 
@@ -81,6 +129,15 @@ export function drawIsometric(canvas: HTMLCanvasElement, options: IsometricOptio
 
   const centerX = canvas.width / 2
   const baseY = pad + maxLift
+
+  let columns = 0
+  if (atlas) {
+    for (let i = 0; i < grid.topHeight.length; i++) {
+      if (grid.topHeight[i] && grid.topIndex[i] !== emptyIndex) columns++
+    }
+  }
+  const atlasReady = atlas && columns > 0 && columns <= MAX_TEXTURED_COLUMNS ? atlas : null
+  if (atlasReady) ctx.imageSmoothingEnabled = false
 
   let drawn = 0
   // 画家算法：按 (col + row) 递增，保证近处覆盖远处
@@ -106,36 +163,41 @@ export function drawIsometric(canvas: HTMLCanvasElement, options: IsometricOptio
       const color = blockColor(id)
       const half = tileW / 2
       const quarter = tileH / 2
+      const texture = atlasReady ? resolveTexture(atlasReady, id) : null
 
       // 左侧面
-      ctx.fillStyle = shade(color, 0.72)
-      ctx.beginPath()
-      ctx.moveTo(sx - half, sy)
-      ctx.lineTo(sx, sy + quarter)
-      ctx.lineTo(sx, sy + quarter + lift)
-      ctx.lineTo(sx - half, sy + lift)
-      ctx.closePath()
-      ctx.fill()
+      drawFace(ctx, atlasReady, texture, [
+        [sx - half, sy],
+        [sx, sy + quarter],
+        [sx, sy + quarter + lift],
+        [sx - half, sy + lift],
+      ], shade(color, 0.72), 0.26, half, quarter, lift)
 
       // 右侧面
-      ctx.fillStyle = shade(color, 0.55)
-      ctx.beginPath()
-      ctx.moveTo(sx, sy + quarter)
-      ctx.lineTo(sx + half, sy)
-      ctx.lineTo(sx + half, sy + lift)
-      ctx.lineTo(sx, sy + quarter + lift)
-      ctx.closePath()
-      ctx.fill()
+      drawFace(ctx, atlasReady, texture, [
+        [sx, sy + quarter],
+        [sx + half, sy],
+        [sx + half, sy + lift],
+        [sx, sy + quarter + lift],
+      ], shade(color, 0.55), 0.42, half, -quarter, lift)
 
       // 顶面
-      ctx.fillStyle = color
-      ctx.beginPath()
-      ctx.moveTo(sx, sy - quarter)
-      ctx.lineTo(sx + half, sy)
-      ctx.lineTo(sx, sy + quarter)
-      ctx.lineTo(sx - half, sy)
-      ctx.closePath()
-      ctx.fill()
+      if (atlasReady && texture) {
+        ctx.save()
+        // 单位正方形经该矩阵变换即为 2:1 菱形
+        ctx.transform(half / tileSrc, quarter / tileSrc, -half / tileSrc, quarter / tileSrc, sx, sy - quarter)
+        drawTexture(ctx, atlasReady, texture, 0, 0, tileSrc, tileSrc)
+        ctx.restore()
+      } else {
+        ctx.fillStyle = color
+        ctx.beginPath()
+        ctx.moveTo(sx, sy - quarter)
+        ctx.lineTo(sx + half, sy)
+        ctx.lineTo(sx, sy + quarter)
+        ctx.lineTo(sx - half, sy)
+        ctx.closePath()
+        ctx.fill()
+      }
 
       drawn++
     }

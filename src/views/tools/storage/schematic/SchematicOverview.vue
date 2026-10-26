@@ -9,6 +9,7 @@
 import { computed, onMounted, ref, watch } from 'vue'
 import { compressOverview, drawIsometric } from '@/utils/schematic/isometric'
 import type { SchematicOverview } from '@/utils/schematic/decode'
+import type { BlockAtlas } from '@/utils/schematic/textures'
 
 const props = defineProps<{
   overview: SchematicOverview | null
@@ -16,6 +17,8 @@ const props = defineProps<{
   emptyIndex: number
   /** 世界高度（方块数） */
   worldHeight: number
+  /** 方块贴图图集，为空时退化纯色 */
+  atlas?: BlockAtlas | null
 }>()
 
 const canvasRef = ref<HTMLCanvasElement | null>(null)
@@ -37,11 +40,12 @@ function render(): void {
     worldHeight: props.worldHeight,
     canvasWidth: canvasWidth.value,
     canvasHeight: canvasHeight.value,
+    atlas: props.atlas ?? null,
   })
 }
 
 watch(
-  () => [props.overview, props.palette, expanded.value],
+  () => [props.overview, props.palette, expanded.value, props.atlas],
   render,
   { immediate: true },
 )

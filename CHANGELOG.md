@@ -4,9 +4,38 @@
 
 ## [Unreleased]
 
-## [0.3.13-rc.1] - 2026-10-26
-
 ### 新增
+
+#### 投影预览：层密度条与等轴测立体图
+
+- [`overview.rs`](src-tauri/src/commands/tools/schematic/overview.rs)：新增概览计算——每层非空方块数与俯视高度图（每列最高方块与高度），单边超过 256 时按整数步长降采样。
+- [`dispatcher.rs`](src-tauri/src/commands/tools/dispatcher.rs)：投影 action 增至 8 个，新增 `schematic_overview`。
+- [`SchematicOverview.vue`](src/views/tools/storage/schematic/SchematicOverview.vue) + [`isometric.ts`](src/utils/schematic/isometric.ts)：用俯视高度图画 2:1 等轴测柱体阵列，直观展示整体轮廓与高度分布，可放大查看。
+- [`SchematicLayerBar.vue`](src/views/tools/storage/schematic/SchematicLayerBar.vue)：层密度条按非空方块数显示各层占比，点击任意位置跳到该层。
+- [`useSchematicEditor.ts`](src/composables/useSchematicEditor.ts)：打开投影后自动落在建筑最密集的层，并提供「跳到最密层」「跳到最近非空层」。
+- [`SchematicPage.vue`](src/views/tools/storage/schematic/SchematicPage.vue)：当前层为空时给出提示与一键跳转，解决打开后落在空层、画布全白的问题。
+- 测试：Rust 新增 5 例（层密度、俯视高度取值、超大平面降采样、未知会话、编码字节数），前端 141 例保持通过。
+
+#### 与主控交互的协议迁入私有仓库
+
+- 新增私有仓库 [`MoLaunch-Protocol`](https://github.com/MoTeam-cn/MoLaunch-Protocol)（crate `molaunch-protocol` v0.1.0），承载与主控交互的全部协议实现：MoSign-v1 设备认证、MoSign-v2 机器鉴权、加密原语与 ECIES 信封、工作量证明、DataChannel 帧格式、联机信令类型。
+- [`Cargo.toml`](src-tauri/Cargo.toml)：新增私有 git 依赖（按 tag 固定版本），协议实现不再出现在公开仓库。
+- [`online/crypto.rs`](src-tauri/src/minecraft/online/crypto.rs)、[`ecies.rs`](src-tauri/src/minecraft/online/ecies.rs)、[`pow.rs`](src-tauri/src/minecraft/online/pow.rs)、[`protocol.rs`](src-tauri/src/minecraft/online/protocol.rs)、[`auth/`](src-tauri/src/minecraft/online/auth/mod.rs)、[`signaling/types/`](src-tauri/src/minecraft/online/signaling/types/mod.rs)：改为转发协议库，调用路径保持不变；对应实现与测试文件从本仓库删除。
+- [`storage.rs`](src-tauri/src/minecraft/online/storage.rs)：`DeviceCredentials` 结构改由协议库维护，本仓库只保留加密持久化。
+- [`time_sync.rs`](src-tauri/src/minecraft/online/time_sync.rs)：对时结果同时写入协议库时钟基准，保证签名时间戳与之一致。
+- [`lib.rs`](src-tauri/src/lib.rs)：把协议库日志接入启动器日志系统。
+- CI（[`ci.yml`](.github/workflows/ci.yml)、[`release.yml`](.github/workflows/release.yml)）：新增私有协议库的拉取授权（`PROTOCOL_REPO_TOKEN`），公开仓库克隆后需自备访问权限才能从源码构建。
+
+#### 投影工具改用原版方块贴图
+
+- **问题**（[`SchematicCanvas.vue`](src/views/tools/storage/schematic/SchematicCanvas.vue)、[`isometric.ts`](src/utils/schematic/isometric.ts)）：逐层视图与立体预览此前每种方块只画一个纯色块，同名系列（云杉木板与白桦木板、各种染色陶瓦）只能靠颜色深浅区分，密集区域几乎看不出是什么方块。
+- **改法**：新增 [`textures.ts`](src/utils/schematic/textures.ts)，复用配方生成器的原版纹理图集（16×16 贴图紧密排列）。方块名先查物品表的贴图映射，再按 `blocks/<名称>` 直查，最后按材料回退（半砖／楼梯 → 木板或同名材料，墙上告示牌 → 告示牌物品贴图，墙上的火把 → 立式火把）。
+- **绘制**：逐层视图直接按图集坐标切图；等轴测顶面用仿射变换把方形贴图压成 2:1 菱形，左右侧面各按对应平行四边形映射并叠一层暗色体现光照。柱体超过 12000 个时自动退回纯色，避免贴图逐面绘制拖慢刷新。
+- **取不到贴图**：返回 `null`，调用方退回原来的纯色，不会出现空白格子（水、岩浆这类没有物品贴图的方块就属于这种情况）。
+- **顺带**：方块选择器与方块统计的色块一并改用贴图；统计列表的 `title` 属性换成 `Tooltip` 组件。
+- **测试**：新增 7 例（按名直查、物品表优先、半砖／楼梯材料回退、墙上告示牌、墙上火把、剥离 blockstate 属性、未知名与空图集）。
+
+### 修复
 
 #### 打开带地形的投影时定位到地面层而不是地底
 
@@ -24,24 +53,16 @@
 - **顺带**（[`entities.rs`](src-tauri/src/commands/tools/schematic/entities.rs)）：旧版格式的 `TileEntities` 此前被整体丢弃，现在会读出并归一化 id（`Sign` → `minecraft:sign`），告示牌文字不再丢失。
 - **验证**：该投影 79 种 `(id, meta)` 组合全部映射为真实方块名，占位符清零；测试补位规则断言（`17:13` → 云杉全树皮、`162:13` → 深色橡木全树皮、带釉陶瓦按 id 定色）。
 
-#### 投影预览：层密度条与等轴测立体图
+#### 配方物品抽屉的图标不显示
 
-- [`overview.rs`](src-tauri/src/commands/tools/schematic/overview.rs)：新增概览计算——每层非空方块数与俯视高度图（每列最高方块与高度），单边超过 256 时按整数步长降采样。
-- [`dispatcher.rs`](src-tauri/src/commands/tools/dispatcher.rs)：投影 action 增至 8 个，新增 `schematic_overview`。
-- [`SchematicOverview.vue`](src/views/tools/storage/schematic/SchematicOverview.vue) + [`isometric.ts`](src/utils/schematic/isometric.ts)：用俯视高度图画 2:1 等轴测柱体阵列，直观展示整体轮廓与高度分布，可放大查看。
-- [`SchematicLayerBar.vue`](src/views/tools/storage/schematic/SchematicLayerBar.vue)：层密度条按非空方块数显示各层占比，点击任意位置跳到该层。
-- [`useSchematicEditor.ts`](src/composables/useSchematicEditor.ts)：打开投影后自动落在建筑最密集的层，并提供「跳到最密层」「跳到最近非空层」。
-- [`SchematicPage.vue`](src/views/tools/storage/schematic/SchematicPage.vue)：当前层为空时给出提示与一键跳转，解决打开后落在空层、画布全白的问题。
-- 测试：Rust 新增 5 例（层密度、俯视高度取值、超大平面降采样、未知会话、编码字节数），前端 141 例保持通过。
-#### 与主控交互的协议迁入私有仓库
+- **问题**（[`resources.ts`](src/utils/recipe-generator/resources.ts)）：图集坐标表在运行时通过一次 HTTP 请求取回，请求失败（自定义协议下 404、被 CSP 拦截、返回的不是 JSON）会让整张坐标表为空，抽屉里所有物品就只剩名字没有图标，而且没有任何错误提示——因为加载异常被 `finally` 吞掉，页面照常渲染。
+- **改法**：坐标表改为 `?raw` 静态内联进包体（48KB，比多一跳网络更划算，且彻底不受协议／CSP 影响）；解析失败时返回空表而不是抛错，由调用方退化。贴图 PNG 仍走 `?url` 交给 Vite 输出。
+- **兜底**（[`RecipeItemIcon.vue`](src/views/tools/creation/recipe-generator/RecipeItemIcon.vue)）：图集或条目缺失时不再空白，改为显示物品名首字母；同时改用安全访问，避免图集未就绪时整个条目渲染报错。
 
-- 新增私有仓库 [`MoLaunch-Protocol`](https://github.com/MoTeam-cn/MoLaunch-Protocol)（crate `molaunch-protocol` v0.1.0），承载与主控交互的全部协议实现：MoSign-v1 设备认证、MoSign-v2 机器鉴权、加密原语与 ECIES 信封、工作量证明、DataChannel 帧格式、联机信令类型。
-- [`Cargo.toml`](src-tauri/Cargo.toml)：新增私有 git 依赖（按 tag 固定版本），协议实现不再出现在公开仓库。
-- [`online/crypto.rs`](src-tauri/src/minecraft/online/crypto.rs)、[`ecies.rs`](src-tauri/src/minecraft/online/ecies.rs)、[`pow.rs`](src-tauri/src/minecraft/online/pow.rs)、[`protocol.rs`](src-tauri/src/minecraft/online/protocol.rs)、[`auth/`](src-tauri/src/minecraft/online/auth/mod.rs)、[`signaling/types/`](src-tauri/src/minecraft/online/signaling/types/mod.rs)：改为转发协议库，调用路径保持不变；对应实现与测试文件从本仓库删除。
-- [`storage.rs`](src-tauri/src/minecraft/online/storage.rs)：`DeviceCredentials` 结构改由协议库维护，本仓库只保留加密持久化。
-- [`time_sync.rs`](src-tauri/src/minecraft/online/time_sync.rs)：对时结果同时写入协议库时钟基准，保证签名时间戳与之一致。
-- [`lib.rs`](src-tauri/src/lib.rs)：把协议库日志接入启动器日志系统。
-- CI（[`ci.yml`](.github/workflows/ci.yml)、[`release.yml`](.github/workflows/release.yml)）：新增私有协议库的拉取授权（`PROTOCOL_REPO_TOKEN`），公开仓库克隆后需自备访问权限才能从源码构建。
+## [0.3.13-rc.1] - 2026-10-26
+
+### 新增
+
 #### 投影编辑：方块实体保留、多形状选区、拖拽平移
 
 - [`entities.rs`](src-tauri/src/commands/tools/schematic/entities.rs)：新增方块实体与非方块实体的归一化读写，三种格式互转（Sponge `BlockEntities`、Litematica 区域 `TileEntities` / `Entities`、结构文件 `blocks[].nbt` / `entities`）。箱子内容、告示牌文字、刷怪笼配置等不再在打开/导出中丢失。
@@ -123,7 +144,6 @@
 - [`shared.rs`](src-tauri/src/minecraft/loaders/shared.rs)：新增 `prefetch_install_libraries`，解析 `install_profile.json` 中声明了下载地址的库，用启动器自己的下载器（多源 + 重试）补到 `libraries/`；只处理主 artifact、不猜地址、上限 400 个，失败不阻断。
 - [`forge_installer.rs`](src-tauri/src/minecraft/loaders/forge_installer.rs)：移除 `run_official_installer` 与 `build_official_args`，只保留注入器；输出采集（GBK 回退解码、stdout/stderr 合并、15 分钟超时强杀、日志落盘）保持不变。
 - [`loader_helpers.rs`](src-tauri/src/commands/version/install/loader_helpers.rs)：安装器输出的真实进度写入阶段进度并广播，伪进度 ticker 改为「只补不覆盖」，不再出现一直 0% 然后直接跳 100%。
-
 
 ## [0.3.12-rc.6] - 2026-10-25
 
@@ -2715,9 +2735,6 @@ oom_heartbeat\ 心跳上报时房主侧查询在线人数随请求体携带 \pla
 - 合规：所有文件 ≤300 行、文件头注释 ≤5 行、mod.rs 仅聚合不堆积、无重复造轮子
 - 验证：`cargo check`（0 error）、`vue-tsc --noEmit`（0 error）、`eslint`（0 error）
 
-
-
-
 ### 修复
 
 #### Tag 组件预设色 purge 丢失 + 全局缺 import 补齐
@@ -2738,7 +2755,6 @@ oom_heartbeat\ 心跳上报时房主侧查询在线人数随请求体携带 \pla
   - 涉及 `PCL/` 目录、`PCL\Logo.png`、`PCL 路径` 的历史迁移描述改为中性表述（保留 MoLaunch 命名）
 - 验证：替换后 `CHANGELOG.md` 中 `PCL2|PCL-main|Plain Craft Launcher|PCL` 相关引用为 0，正文语义通顺、中文无乱码，备份文件保留可回退
 
-
 ### 新增
 
 #### 全项目自绘 badge/tag/chip 样式统一替换为 Tag 组件
@@ -2753,7 +2769,6 @@ oom_heartbeat\ 心跳上报时房主侧查询在线人数随请求体携带 \pla
   - 既有 `.badge-*`/`.tag-*` 通用类与含图标/Tooltip/交互/语义状态徽章（`OnlineTopBar`、`AccountCard`、`RoomGuestPanel`、`OnlineDevicePanel`、`DeepLinkTab`、`PluginListSection`、`ModToolbar`、`PermissionTableSection`、`CrashAnalyzer`、`LaunchPanel` 等）按规则保留
 - 验证：`vue-tsc --noEmit`（0 error）、`npx eslint src`（0 error 0 warning，仅既有 9 warning）
 
-
 ### 新增
 
 #### Tag 组件：复刻 Arco Design Vue Tag（替代自绘前缀 tag）
@@ -2764,7 +2779,6 @@ oom_heartbeat\ 心跳上报时房主侧查询在线人数随请求体携带 \pla
   - `src/assets/styles/main.css`：`@layer components` 新增 `.tag` 基础样式 + `.tag-size-*` 尺寸 + 13 色预设（浅底深字）+ `.tag-icon`/`.tag-close-btn`/`.tag-close-icon`
   - `src/components/about/ReleaseTimeline.vue`：提交前缀改用 `<Tag size="small" :color="...">`（feat→green / fix→red / docs→blue / refactor→purple / perf→orange / chore→gray / style→cyan / test→magenta / build→arcoblue / ci→gold / 其他→gray），删除原 `.commit-tag` 与 `.tag-*` scoped 样式，保留 commit-item 布局对齐（:deep(.tag) flex:none）
 - 验证：`vue-tsc --noEmit`、`eslint`（0 error 0 warning）通过
-
 
 ### 新增
 
@@ -2780,7 +2794,6 @@ oom_heartbeat\ 心跳上报时房主侧查询在线人数随请求体携带 \pla
   - **弹窗尺寸与滚动区域**（`src/components/about/UpdateDialog.vue`）：宽度 `max-w-md` → `max-w-xl`（28rem→36rem）；"发现新版本"分支改为独立 flex 容器——**最新版本行固定**，仅下方日志区域按 `min-h-0 flex-1 overflow-y-auto` 独立滚动（其余状态仍用 modal-scroll 整体滚动）
 - 验证：`vue-tsc --noEmit`、`eslint`（0 error 0 warning）通过；解析逻辑用例单测通过（5 通道识别 + 9 前缀/scope/`!c` 识别 + 1 多版本合并切分）
 
-
 ### 新增
 
 #### 更新日志时间线组件：`ReleaseTimeline.vue` 分版本分段渲染
@@ -2791,7 +2804,6 @@ oom_heartbeat\ 心跳上报时房主侧查询在线人数随请求体携带 \pla
   - `src/components/about/UpdateDialog.vue`：更新日志区域改用 `<ReleaseTimeline :notes="updateState.notes" />`，移除原 `notesHtml` computed、`renderMarkdown`/`handleMarkdownLinkClick` import 与 `.markdown-body` scoped 样式（已随组件迁移）
   - 链接点击仍走 `handleMarkdownLinkClick` 系统浏览器策略，XSS 防护（DOMPurify）不降级
 - 验证：`vue-tsc --noEmit`、`eslint`（0 error 0 warning）通过；解析逻辑 5 个用例单测通过（CI 多版本格式 / v 前缀 + rc 后缀 / 三级标题变体 / 无标题退化 / 空串）
-
 
 ### 修复
 
@@ -2806,7 +2818,6 @@ oom_heartbeat\ 心跳上报时房主侧查询在线人数随请求体携带 \pla
 - 验证：updater `cargo check --offline` 通过（minisign-verify v0.2.5 锁定）；ci-upload.cjs `node --check` 通过；DB `signature TEXT` 无长度限制
 - 注意：数据库中已有的历史 release 记录 signature 仍是旧拼接格式（无法解析），需重新发布或用管理后台更新 signature 后才可校验通过
 
-
 ### 新增
 
 #### 收编 apiServer 接口路径：新增 `src-tauri/src/api_paths.rs` 统一集中定义
@@ -2818,7 +2829,6 @@ oom_heartbeat\ 心跳上报时房主侧查询在线人数随请求体携带 \pla
   - 改造 9 个文件引用常量：`client/auth.rs`、`client/jwks.rs`、`client/time.rs`、`online/frp.rs`、`signaling/room_api.rs`、`signaling/session.rs`、`signaling/whitelist.rs`、`signaling/lobby.rs`、`commands/system/updater/check.rs`（删除原 `UPDATER_PATH` 局部常量）
   - 日志路径（`http_log::log_http_request` / log_info 的路径字段）同步改用常量，保证请求与日志单一来源
 - 验证：`cargo check`、`cargo clippy`（无告警）、`cargo test`（181 passed）通过
-
 
 ### 新增
 
@@ -2837,7 +2847,6 @@ oom_heartbeat\ 心跳上报时房主侧查询在线人数随请求体携带 \pla
   - client（Windows 目标）：`cargo check`、`cargo clippy` 通过；macOS/Linux 的 `install_unix.rs` 因本机无交叉编译器由 CI 验证
   - 前端：`vue-tsc --noEmit`、`eslint` 通过
 
-
 ### 修复
 
 #### Windows 退出时静默更新失效：last.sig 签名未缓存导致 updater 参数解析失败
@@ -2850,7 +2859,6 @@ oom_heartbeat\ 心跳上报时房主侧查询在线人数随请求体携带 \pla
 - 验证：`cargo check` / `cargo clippy --all-features` 通过（零警告）
 
 ## [0.3.2] - 2026-08-05
-
 
 ### 新增
 
@@ -2867,7 +2875,6 @@ oom_heartbeat\ 心跳上报时房主侧查询在线人数随请求体携带 \pla
   - 前端：新增 `src/composables/external-settings.ts`（localStorage 持久化）；`download.ts` 的 `downloadFile` 支持 `DownloadFileSettings` 传参；`ExternalDownload.vue` 新增「工具原理」说明区与「高级设置」折叠面板（自定义 UA / 并发线程数 / 单文件分片数 / 限速 MB/s / 恢复默认）
 - 验证：`cargo test --all-features` 181 个测试全部通过；`vue-tsc`、`eslint`、`vite build` 通过
 
-
 ### 新增
 
 #### FRP 后端内联测试拆分为独立测试文件
@@ -2877,7 +2884,6 @@ oom_heartbeat\ 心跳上报时房主侧查询在线人数随请求体携带 \pla
   - 上述 5 个文件改为 `#[cfg(test)] #[path = "xxx_tests.rs"] mod tests;` 引用方式
   - 新增独立测试文件：`detect_tests.rs`、`frpc_config_tests.rs`、`provider_system_tests.rs`、`auth/pkce_tests.rs`、`api_spec/http_tests.rs`
 - 验证：`cargo test --all-features` 177 个测试全部通过
-
 
 ### 新增
 
@@ -2890,7 +2896,6 @@ oom_heartbeat\ 心跳上报时房主侧查询在线人数随请求体携带 \pla
   - `src-tauri/src/lib.rs`：`setup` 中创建托盘；注册 `tray::request_exit` 命令
   - `src/components/layout/TopNavLayout.vue`：`useTauriEvent` 监听 `tray-check-update` 触发检查更新
 - 验证：`cargo check/clippy` 通过
-
 
 ### 新增
 
@@ -2905,7 +2910,6 @@ oom_heartbeat\ 心跳上报时房主侧查询在线人数随请求体携带 \pla
   - `src-tauri/resources/defaults/config.ini`：`[General]` 补充 `close_behavior`（默认 `ask`）与注释，保证通过 `sync_config` 的 `merge_missing_from` 自动合并进老用户已存在的配置文件
 - 验证：`vue-tsc --noEmit`、`eslint`、`vite build` 通过，Vue 文件均 ≤300 行
 
-
 ### 新增
 
 #### 托盘退出弹确认框 + 更新日志 Markdown 渲染 + 退出框样式优化
@@ -2919,7 +2923,6 @@ oom_heartbeat\ 心跳上报时房主侧查询在线人数随请求体携带 \pla
   - `src/components/layout/ExitConfirmDialog.vue`：标题与正文加 `whitespace-nowrap` 防换行、正文改 `text-gray-500`，底部复选框与按钮文案收窄并加 `flex-none`，避免挤压换行
 - 验证：`cargo check/clippy`、`vue-tsc --noEmit`、`eslint`、`vite build` 通过，Vue 文件均 ≤300 行
 
-
 ### 新增
 
 #### 更新日志 Markdown 链接禁止页面内跳转，改走系统浏览器
@@ -2930,7 +2933,6 @@ oom_heartbeat\ 心跳上报时房主侧查询在线人数随请求体携带 \pla
   - `src/components/about/UpdateDialog.vue`：更新日志容器绑定 `handleMarkdownLinkClick`
 - 验证：`vue-tsc --noEmit`、`eslint`、`vite build` 通过，Vue 文件均 ≤300 行
 
-
 ### 新增
 
 #### 更新日志链接点击走系统浏览器并加 toast 提示
@@ -2939,7 +2941,6 @@ oom_heartbeat\ 心跳上报时房主侧查询在线人数随请求体携带 \pla
 - 改动：
   - `src/utils/markdown.ts`：`handleMarkdownLinkClick` 调用 `open` 成功后 `toastInfo('已在系统浏览器中打开')`，失败时 `toastError('打开外部链接失败')`
 - 验证：`vue-tsc --noEmit`、`eslint` 通过
-
 
 ### 新增
 
@@ -2950,7 +2951,6 @@ oom_heartbeat\ 心跳上报时房主侧查询在线人数随请求体携带 \pla
   - `src/utils/online/detect.ts`：`detectNatTypeWithStun`/`detectNatType` 增加 `[NAT]` 前缀控制台日志——使用的 STUN 服务器列表、每个 ICE candidate（含地址:端口）、gathering 状态流转、超时兜底、推断结果与耗时
 - 验证：`vue-tsc --noEmit`、`eslint` 通过
 
-
 ### 新增
 
 #### frp 厂商 OAuth2 回调后自动将启动器窗口置于最前
@@ -2960,7 +2960,6 @@ oom_heartbeat\ 心跳上报时房主侧查询在线人数随请求体携带 \pla
   - `src-tauri/src/commands/frp/auth/oauth2/flow.rs`：`start_oauth2` 新增 `app: &tauri::AppHandle` 参数，收到回调后（token 交换前）`unminimize + show + set_focus` 将主窗口置顶聚焦
   - `src-tauri/src/commands/frp/manager/auth_actions.rs`：`start_oauth2` action 由 `_app` 改 `app` 传入 AppHandle
 - 验证：`cargo check/clippy` 通过
-
 
 ### 修复
 
@@ -2973,7 +2972,6 @@ oom_heartbeat\ 心跳上报时房主侧查询在线人数随请求体携带 \pla
   - `src-tauri/src/commands/frp/log_redact_tests.rs`：补充 ANSI 清洗用例
 - 验证：`cargo test --all-features` 181 个测试全部通过
 
-
 ### 修复
 
 #### 隧道启停加载状态按隧道 ID 区分
@@ -2985,7 +2983,6 @@ oom_heartbeat\ 心跳上报时房主侧查询在线人数随请求体携带 \pla
   - `src/components/frp/TunnelList.vue`：按钮加载态改为仅当 `actionLoading && actionTunnelId === tunnel.id` 时展示
 - 验证：`vue-tsc --noEmit`、`eslint`、`vite build` 通过
 
-
 ### 修复
 
 #### SeedMap 组件 v-model 属性名还原为 kebab-case
@@ -2993,7 +2990,6 @@ oom_heartbeat\ 心跳上报时房主侧查询在线人数随请求体携带 \pla
 - 背景：`SeedMap.vue` 中 `SeedMapControls` / `SeedMapSidebar` 的 `v-model:userX` 等 camelCase 写法与 Vue 组件 props 定义不符，还原为 kebab-case（`v-model:user-x` 等）
 - 改动：`src/views/tools/data/SeedMap.vue` 的 `v-model` 属性统一还原为 kebab-case
 - 验证：`vue-tsc --noEmit` 通过
-
 
 ### 修复
 
@@ -3005,7 +3001,6 @@ oom_heartbeat\ 心跳上报时房主侧查询在线人数随请求体携带 \pla
   - `src/components/layout/TopNavLayout.vue`：移除已无触发方的 `tray-request-exit` 监听
 - 验证：`cargo check/clippy`、`vue-tsc --noEmit`、`eslint` 通过
 
-
 ### 修复
 
 #### 关闭 picker 子窗口误触发主进程退出确认
@@ -3015,7 +3010,6 @@ oom_heartbeat\ 心跳上报时房主侧查询在线人数随请求体携带 \pla
 - 改动：
   - `src-tauri/src/lib.rs`：`on_window_event` 开头增加 `if window.label() != "main" { return; }`，关闭拦截与 DevTools 状态重置仅作用于主窗口，picker 等子窗口关闭直接放行
 - 验证：`cargo check/clippy` 通过
-
 
 ### 修复
 
@@ -3028,7 +3022,6 @@ oom_heartbeat\ 心跳上报时房主侧查询在线人数随请求体携带 \pla
   - `src/components/layout/TopNavLayout.vue`：`handleClose`/`onExitConfirm` 的 `hide()` 加 `.catch` 失败兜底 toast
 - 验证：`vue-tsc --noEmit`、`eslint` 通过
 
-
 ### 修复
 
 #### Windows 构建不再引入官方 updater plugin（条件编译）
@@ -3039,7 +3032,6 @@ oom_heartbeat\ 心跳上报时房主侧查询在线人数随请求体携带 \pla
   - `src-tauri/src/lib.rs`：`.plugin(tauri_plugin_updater::Builder::new().build())` 包 `#[cfg(not(target_os = "windows"))]`
   - `src-tauri/capabilities/updater.json`（新增）：`updater:default` 权限独立成文件并 `platforms: ["linux","macOS"]`；`capabilities/migrated.json` 移除 `updater:default`（Windows 上该权限不存在会致 tauri-build 失败）
 - 验证：`cargo check/clippy`（Windows 目标）通过
-
 
 ### 修复
 
@@ -3053,7 +3045,6 @@ oom_heartbeat\ 心跳上报时房主侧查询在线人数随请求体携带 \pla
   - 前端 `request_exit` 命令调用点位于 `doExit` 末尾，保证先保存配置/联机退房/待安装更新，再由后端兜底清理
 - 验证：`cargo check/clippy` 通过
 
-
 ### 修复
 
 #### 联机房间切页被销毁：保活提升为全局 store 定时器，脱离页面生命周期
@@ -3066,7 +3057,6 @@ oom_heartbeat\ 心跳上报时房主侧查询在线人数随请求体携带 \pla
   - `src/composables/useOnlineNav.ts`：`isReady` watch 中若已进入房间则房间详情优先（覆盖重挂载时 role 保留但 activeCategory 默认 create 的错位）
 - 验证：`vue-tsc --noEmit`、`eslint`、`vite build` 全部通过
 
-
 ### 修复
 
 #### 联机房间失联被销毁：keepalive 失败可感知 + 房间关闭主动退出 + 断连自动补发
@@ -3077,7 +3067,6 @@ oom_heartbeat\ 心跳上报时房主侧查询在线人数随请求体携带 \pla
   - `src/composables/useRoomHost/useRoomHostPolling.ts`：`doKeepalive` 捕获 `RoomClosedError` 后停止轮询并触发 `onRoomClosed` 回调；新增 `RoomHostPollingOptions` 注入
   - `src/composables/useRoomHost.ts`：注入 `onRoomClosed`（停止轮询、`lan.stop`、`hostMesh.close` + `setRoomKey(null)`、`store.resetRoomState`、toast 提示）；`cloudConnected` 由断开恢复为连接时，除 `startTimers()` 外立即补发一次 doKeepalive/pollParticipants/pollAnswers，避免在 120s 窗口内漏报被判失联
 - 验证：`vue-tsc --noEmit` 通过、`eslint` 通过
-
 
 ### 修复
 
@@ -3090,7 +3079,6 @@ oom_heartbeat\ 心跳上报时房主侧查询在线人数随请求体携带 \pla
   - `src/components/online/WhitelistEditor.vue`：未启用时仅显示「启用白名单」开关与说明；启用后才显示添加输入框；白名单列表仅在「启用且已有条目」时出现，空状态仅在启用时展示
   - `src/components/common/BackToTop.vue`：移除外层 `Tooltip`（返回顶部按钮上滑功能），保留按钮涟漪/光晕/滑入动画
 - 验证：`vue-tsc --noEmit` 通过、`eslint` 通过、Vue 文件均 ≤300 行
-
 
 ### 修复
 
@@ -3107,7 +3095,6 @@ oom_heartbeat\ 心跳上报时房主侧查询在线人数随请求体携带 \pla
 - 根因：`resolve_field` 的 split 分支从未拆分 `host:port`，前端 `parseInt("节点域名:17000")` 为 `NaN` 被 `|| 7000` 兜底掩盖；Input 组件 `String(val)` 化导致端口以字符串传给后端 `u16` 参数
 - 验证：`cargo check` 通过、`cargo test` 152 passed、`vue-tsc --noEmit` 通过
 
-
 ### 修复
 
 #### 复用全局 formatBytes：消除 UpdateDialog 局部实现遮蔽
@@ -3117,7 +3104,6 @@ oom_heartbeat\ 心跳上报时房主侧查询在线人数随请求体携带 \pla
   - `src/components/about/UpdateDialog.vue`：删除局部 `formatBytes`，新增 `import { formatBytes } from '@/utils/format'`，下载大小文案统一走全局实现
 - 设计决策：复用既有全局工具而非保留局部副本，符合「可复用函数必须提取到单独 TypeScript 文件」项目约定
 - 验证：`npx vite build` 通过（exit 0）
-
 
 ### 修复
 
@@ -3131,7 +3117,6 @@ oom_heartbeat\ 心跳上报时房主侧查询在线人数随请求体携带 \pla
   - `commands/version/list/detect.rs`（A5）：setup.ini `Type=` 手写解析改为复用 `VersionSetup::load`，`Release`/`Unknown` 继续降级检测
   - `minecraft/version/state.rs`：`VersionType::from_str` 补充 `old_alpha`/`old_beta` 别名映射（原 detect.rs 依赖此映射，复用后保持行为等价）；`state_tests.rs` 新增别名测试
 - 验证：`cargo check`、`cargo test --lib` 通过（151+1 passed / 0 failed）、`cargo clippy` 零警告
-
 
 ### 修复
 
@@ -3147,7 +3132,6 @@ oom_heartbeat\ 心跳上报时房主侧查询在线人数随请求体携带 \pla
 - 设计决策：优先复用既有工具；`useVirtualLan` 的 TUN 数据流属后台持续推送，选 `onGlobalEvent` 而非 `useTauriEvent`；`DeviceCodeModal` 保留返回值驱动复制失败状态的语义
 - 验证：`npx vue-tsc --noEmit`（exit 0）、`npx vite build`（exit 0）
 
-
 ### 修复
 
 #### 前端头部注释精简（审计 P1，docs/fix-debug/06-frontend-header-comments.md）
@@ -3158,7 +3142,6 @@ oom_heartbeat\ 心跳上报时房主侧查询在线人数随请求体携带 \pla
   - 7 个文件的重要设计信息迁移到函数/类型级 `/** */` 注释（信息无丢失）：crypto.ts（帧性能）、parser.ts（JSON/XML 样例）、generatorWorker.ts（WASM API 清单）、terrainShading.ts（渲染算法）、protocol.ts（帧布局与子类型）、structures.ts（queryMode 语义）、developer.ts（解锁触发链）
   - 关键约束保留：useVirtualLan（onGlobalEvent 永不 unlisten）、useGlobalTauriEvent（unlisten 竞态消除）、useWebRTC/useWebRTCMesh（无 trickle ICE、AES-GCM）
 - 验证：`npx vue-tsc --noEmit`（exit 0）、`npx vite build`（exit 0）
-
 
 ### 架构
 
@@ -3176,7 +3159,6 @@ oom_heartbeat\ 心跳上报时房主侧查询在线人数随请求体携带 \pla
 - 设计决策：全部保持对外 API/消息契约/序列化结构不变；前端优先 composable 提取（状态与模板强耦合场景）、子组件承接模板片段（双向绑定用 defineModel）；后端保持 `pub use` re-export 路径兼容
 - 验证：`npx vue-tsc --noEmit`（exit 0）、`npx vite build`（exit 0）、`cargo check`（exit 0）、`cargo test --lib`（152 passed / 0 failed）、`cargo clippy --lib`（零警告）
 
-
 ### 架构
 
 #### SDK DES 加解密统一（审计 A1，docs/fix-debug/03-backend-architecture.md）
@@ -3187,7 +3169,6 @@ oom_heartbeat\ 心跳上报时房主侧查询在线人数随请求体携带 \pla
   - 4 个调用方改用公共 helper，删除各自复制实现（约 72 行）
 - 设计决策：保留两种语义变体而非强行统一为一种，避免改变各调用方现有容错行为（最小修改）；helper 放 utils 层（纯 SDK 操作，无业务依赖）
 - 验证：`cargo check`（exit 0）、`cargo test --lib`（152 passed / 0 failed）、`cargo clippy --lib`（零警告）
-
 
 ### 架构
 
@@ -3204,7 +3185,6 @@ oom_heartbeat\ 心跳上报时房主侧查询在线人数随请求体携带 \pla
 - 设计决策：采用「物理移动 + 相对导入 + mod.rs 转发」而非拆分重构，注册表逻辑零改动，行为完全等价；utils 层自此不再引用任何 commands 业务符号
 - 验证：`cargo check`（exit 0）、`cargo test --lib`（152 passed / 0 failed）、`cargo clippy --lib`（零警告）
 
-
 ### 架构
 
 #### 阶段三批9：行数治理 51 个文件拆分至 ≤300（前端 13 / 后端 32，docs/04-file-line-limits.md）
@@ -3218,7 +3198,6 @@ oom_heartbeat\ 心跳上报时房主侧查询在线人数随请求体携带 \pla
 - 设计决策：纯类型/纯 RESP 文件（signaling/types、types/frp.ts）按域拆且给出收益说明；平台分支（windows/linux）独立文件消除死代码告警；主文件转目录手工聚合不低于风险
 - 验证：`npx vue-tsc --noEmit`（exit 0）、`npx vite build`（exit 0）、`cargo check`（exit 0 无新告警）、`cargo test --lib`（152 passed / 0 failed）、`cargo clippy --lib`（零警告）
 
-
 ### 架构
 
 #### 前端头部注释 P2 档精简（审计批 8，docs/06-frontend-header-comments.md）
@@ -3226,7 +3205,6 @@ oom_heartbeat\ 心跳上报时房主侧查询在线人数随请求体携带 \pla
 - 背景：项目规范要求前端 ts 文件头部注释 ≤8 行；前一阶段已清 P1 档（>=24 行），本批收敛 9~23 行档的 P2 剩余文件
 - 改动：composables 系 24 个、stores/types/plugins/router/tutorials/config 系 22 个、utils/api/online/seedmap/useSeedMap 系 30 个共约 76 个文件头部注释精简至 ≤8 行（净删约 460 行）；`useTauriEvent` 等竞态防护约束、`useWatermarkData` 屏印缓存等关键设计信息保留在头部或迁移至函数/类型级 `/** */` 注释，`element-icons.ts` MIT 许可证头部豁免
 - 验证：`npx vue-tsc --noEmit`（exit 0）
-
 
 ### 架构
 
@@ -3240,7 +3218,6 @@ oom_heartbeat\ 心跳上报时房主侧查询在线人数随请求体携带 \pla
   - `certs.rs::validate_filename` 白名单语义与 `sanitize_file_name` 黑名单差异函数级注释文档化；plugin:fs 前端仅 1 处调用不抽象（调用方数量 <2）
   - 收尾两个 300-399 档遗漏文件：`certs.rs`（304 行，转为 `certs/` 目录并从 mod.rs 拆出 `pem.rs` PEM 解析）、`commands/frp/types/api_spec.rs`（303 行，转为 `api_spec/` 目录拆 `models`/`field_mapping`）；演进后前后端全量扫描零超限
 - 验证：`cargo check`（exit 0 无新告警）、`cargo test --lib`（152 passed）
-
 
 ### 架构
 
@@ -3256,7 +3233,6 @@ oom_heartbeat\ 心跳上报时房主侧查询在线人数随请求体携带 \pla
 - 关键约束（实证）：`#[tauri::command]` 函数无法移入子模块再 pub use 重导出（generate_handler 的 `__cmd__*` 宏仅模块内文本可见），命令转发函数保留在 mod.rs 并注释原因；E0364 可见性越界（重导出项可见性不得超过待导出项）；`mod linux/macos/windows;` 声明需 `#[cfg]` 门控（修复 window_title 缺门控导致的 Windows 编译失败）；`#[macro_export]` 宏移子模块需 `$crate::` 绝对路径
 - 验证：`cargo check`（exit 0 无告警）、`cargo test --lib`（152 passed / 0 failed）、`cargo clippy --lib`（零警告）
 
-
 ### 重构
 
 #### 后端测试代码拆分：8 个文件内联 mod tests 迁移至 xxx_tests.rs
@@ -3264,7 +3240,6 @@ oom_heartbeat\ 心跳上报时房主侧查询在线人数随请求体携带 \pla
 - 背景：项目规范要求测试代码必须放到同目录 xxx_test.rs；审计（docs/fix-debug/01）发现 deeplink/security.rs、utils/client_type.rs、commands/frp/{types,sandbox,auth/flows,api_spec/{jsonpath,envelope,config_gen}}.rs 共 8 个文件以内联 `#[cfg(test)] mod tests { ... }` 携带 25 个测试函数（约 350 行），与其余 27 个文件的外部测试文件模式不一致
 - 改动（16 文件）：8 个主文件删除内联测试块，改为 `#[cfg(test)] #[path = "xxx_tests.rs"] mod tests;`；同目录新增 8 个 `xxx_tests.rs` 测试文件（纯移动，业务逻辑零改动）
 - 验证：`cargo check --manifest-path src-tauri/Cargo.toml` 通过（exit 0）；`cargo test --manifest-path src-tauri/Cargo.toml --lib` 全部通过（151 passed / 0 failed，25 个用例无丢失）
-
 
 ### 重构
 
@@ -6644,7 +6619,6 @@ oom_heartbeat\ 心跳上报时房主侧查询在线人数随请求体携带 \pla
   - `MsAccountInfo` / `AuthlibAccountInfo` / `LocalAuthResult` / `DeviceStatus` 等 View 结构体已存在，本次无需新增
   - `to_storage_json()` 模式参考 `DeviceCredentials` 已有的 `is_registered()` / `is_token_expired()` 方法风格
 - 验证：`cargo check` 编译通过
-
 
 #### 弹窗 Promise 化修复内存优化强力模式 + 插件卸载确认无响应
 - 背景：`showConfirm` 为回调式签名返回 `void`，在 async 函数中被误用为 Promise（`await showConfirm(...)` 立即 resolve），导致内存优化「强力模式」复选框点击后无反应、插件卸载确认弹窗点击后无后续动作
@@ -11708,11 +11682,6 @@ oom_heartbeat\ 心跳上报时房主侧查询在线人数随请求体携带 \pla
 #### CF slug 查询修复（missing field `data` 警告消除）
 - 现象：用户日志显示 `[WARN] CF 响应解析失败: https://mod.mcimirror.top/curseforge/v1/mods/oworld2create (error decoding response body: missing field 'data' at line 1 column 110)`。根因是 CF API `/v1/mods/<id>` 只接受数字 modId，对非数字 slug 镜像返回不含 `data` 字段的不同响应结构
 - 修复（backend: src-tauri/src/minecraft/community/curseforge.rs `get_project`）：判断 `project_id` 是否全数字，数字走原 `/mods/<id>` 路径，非数字走 `/mods/search?gameId=432&slug=<slug>` 搜索接口取首个结果。两种响应结构分别用不同 struct 反序列化，避免 "missing field" 错误
-
-
-
-
-
 
 ### 新增
 

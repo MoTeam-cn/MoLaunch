@@ -86,6 +86,7 @@ const editor = useSchematicEditor()
               :cell-size="editor.cellSize.value"
               :interaction="editor.interaction.value"
               :brush-size="editor.brushSize.value"
+              :atlas="editor.atlas.value"
               @hover="editor.hover.value = $event"
               @select="editor.onSelect"
               @paint="editor.onPaint"
@@ -106,6 +107,7 @@ const editor = useSchematicEditor()
           :total="editor.session.value.total"
           :show-picker="editor.needsBlock.value"
           :show-from="editor.tool.value === 'replace'"
+          :atlas="editor.atlas.value"
         />
       </div>
 
@@ -115,6 +117,7 @@ const editor = useSchematicEditor()
         :palette="editor.session.value.palette"
         :empty-index="editor.overview.value.emptyIndex"
         :world-height="editor.session.value.size[1]"
+        :atlas="editor.atlas.value"
       />
     </template>
   </section>

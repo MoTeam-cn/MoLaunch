@@ -8,6 +8,7 @@
 
 import { computed, ref, watch } from 'vue'
 import { blockColor, type SchematicSlice } from '@/utils/schematic/decode'
+import { drawTexture, resolveTexture, type BlockAtlas } from '@/utils/schematic/textures'
 import type { CanvasInteraction } from './types'
 
 const props = defineProps<{
@@ -20,6 +21,8 @@ const props = defineProps<{
   interaction: CanvasInteraction
   /** 画笔笔尖尺寸（格） */
   brushSize?: number
+  /** 方块贴图图集，为空时退化纯色 */
+  atlas?: BlockAtlas | null
 }>()
 
 const emit = defineEmits<{
@@ -64,15 +67,22 @@ function redraw(): void {
   if (!ctx) return
 
   const size = props.cellSize
+  const atlas = props.atlas ?? null
   ctx.clearRect(0, 0, canvas.width, canvas.height)
+  ctx.imageSmoothingEnabled = false
   for (let row = 0; row < props.slice.height; row++) {
     for (let col = 0; col < props.slice.width; col++) {
       const index = props.slice.cells[row * props.slice.width + col]
       if (index === props.airIndex) continue
       const id = props.palette[index]
       if (!id) continue
-      ctx.fillStyle = blockColor(id)
-      ctx.fillRect(col * size, row * size, size, size)
+      const texture = resolveTexture(atlas, id)
+      if (atlas && texture) {
+        drawTexture(ctx, atlas, texture, col * size, row * size, size, size)
+      } else {
+        ctx.fillStyle = blockColor(id)
+        ctx.fillRect(col * size, row * size, size, size)
+      }
     }
   }
 
@@ -205,7 +215,7 @@ function onUp(): void {
   redraw()
 }
 
-watch(() => [props.slice, props.cellSize, props.brushSize], redraw, { immediate: true })
+watch(() => [props.slice, props.cellSize, props.brushSize, props.atlas], redraw, { immediate: true })
 </script>
 
 <template>
