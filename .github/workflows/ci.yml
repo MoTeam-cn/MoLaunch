@@ -208,10 +208,5 @@ jobs:
       # generate_context! 宏要求 frontendDist(../dist) 存在（tauri-build 校验）
       - name: Ensure frontend dist directory
         run: mkdir -p dist
-      # 诊断：确认测试文件确实在工作区（曾出现模块文件缺失的报错）
-      - name: Verify schematic test files
-        run: |
-          git log -1 --oneline
-          ls -la src-tauri/src/commands/tools/schematic/
       - run: cargo test --all-features
         working-directory: src-tauri
