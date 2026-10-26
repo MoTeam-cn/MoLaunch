@@ -224,7 +224,7 @@ fn test_legacy_block_table_covers_common_blocks() {
     );
     assert_eq!(
         legacy_block_name(244, 3).as_deref(),
-        Some("minecraft:light_blue_glazed_terracotta")
+        Some("minecraft:cyan_glazed_terracotta")
     );
     assert_eq!(
         legacy_block_name(5, 2).as_deref(),

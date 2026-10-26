@@ -286,7 +286,7 @@ pub fn legacy_block_name(id: u16, meta: u8) -> Option<String> {
         },
         155 => match m {
             1 => "chiseled_quartz_block".to_string(),
-            2 | 3 | 4 => "quartz_pillar".to_string(),
+            2..=4 => "quartz_pillar".to_string(),
             _ => "quartz_block".to_string(),
         },
 
