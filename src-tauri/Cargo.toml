@@ -17,6 +17,8 @@ tauri-build = { version = "2", features = [] }
 # 不再使用 cc crate 编译为静态库或经 build.rs 编译——前端通过 WASM 直接调用，无需 Rust FFI 中转
 
 [dependencies]
+# 与主控交互协议（私有仓库）：签名、加密原语、帧格式、信令类型
+molaunch-protocol = { git = "https://github.com/MoTeam-cn/MoLaunch-Protocol", tag = "v0.1.0" }
 # 启用 devtools feature：让 release 构建也支持 open_devtools() 调用
 # （Tauri 默认仅在 debug 构建开启 devtools；测试版需要在开发者模式开启时
 # 通过设置页按钮调出 devtools 用于排查问题，故 release 也需开启）

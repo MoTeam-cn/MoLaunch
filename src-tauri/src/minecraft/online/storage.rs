@@ -6,92 +6,13 @@
 use crate::log_warn;
 use crate::migrations::online_legacy::legacy_device_path;
 use crate::sdk::SdkInstance;
-use serde::Deserialize;
 use std::path::Path;
 use std::path::PathBuf;
 use std::sync::Arc;
 use tokio::sync::Mutex as TokioMutex;
 
-/// 持久化的设备凭证
-///
-/// 安全约束（方案 C）：仅派生 `Deserialize`（从加密文件反序列化），**不派生 `Serialize`**。
-/// 含 Ed25519 私钥种子、X25519 私钥、device_pk、device_token 等高敏感字段，
-/// 持久化写入时调用 `to_storage_json()`；IPC 返回前端用 `DeviceStatus`（已 `#[serde(skip)]` device_pk）。
-#[derive(Debug, Clone, Deserialize, Default)]
-pub struct DeviceCredentials {
-    /// Ed25519 私钥种子（32 字节，Base64Url）
-    pub ed25519_seed_b64u: String,
-    /// X25519 静态私钥（32 字节，Base64Url）
-    pub x25519_secret_b64u: String,
-    /// 设备主键（UUID）
-    pub device_pk: String,
-    /// 设备 access JWT（Bearer token，调用 /v1 业务接口用，1h 有效期）
-    pub device_token: String,
-    /// access JWT 过期时间（Unix 秒）
-    pub token_expires_at: u64,
-    /// refresh_token（用于续期 access token，30d 有效期；空串表示旧版凭证未持有）
-    #[serde(default)]
-    pub refresh_token: String,
-    /// refresh_token 过期时间（Unix 秒；0 表示未设置/旧版凭证）
-    #[serde(default)]
-    pub refresh_expires_at: u64,
-    /// 云端为设备生成的 X25519 公钥（Base64Url，ECIES 加密用）
-    pub device_public_key_b64u: String,
-    /// 设备友好标识（mcsdk-xxxx-xxxx-xxxx-xxxx）
-    pub device_id: String,
-    /// 最后登录时间（Unix 秒）
-    pub last_login_at: u64,
-    /// 签发此凭证的 API 服务端地址（用于检测 api_server_url 切换后旧凭证失效）
-    #[serde(default)]
-    pub api_server_url: String,
-}
-
-impl DeviceCredentials {
-    /// 是否已注册（有 device_pk 和密钥）
-    pub fn is_registered(&self) -> bool {
-        !self.device_pk.is_empty()
-            && !self.ed25519_seed_b64u.is_empty()
-            && !self.x25519_secret_b64u.is_empty()
-            && !self.device_public_key_b64u.is_empty()
-    }
-
-    /// JWT 是否已过期（容差 60 秒，避免边界请求失败）
-    pub fn is_token_expired(&self) -> bool {
-        if self.token_expires_at == 0 {
-            return true;
-        }
-        let now = chrono::Utc::now().timestamp() as u64;
-        now + 60 >= self.token_expires_at
-    }
-
-    /// refresh_token 是否已过期（容差 60 秒）
-    ///
-    /// `refresh_expires_at == 0` 视为已过期（旧版凭证未设置或未持有 refresh_token）。
-    pub fn is_refresh_token_expired(&self) -> bool {
-        if self.refresh_expires_at == 0 {
-            return true;
-        }
-        let now = chrono::Utc::now().timestamp() as u64;
-        now + 60 >= self.refresh_expires_at
-    }
-
-    /// 构建包含全部字段（含私钥/JWT）的 JSON，仅供持久化写入加密文件使用
-    pub fn to_storage_json(&self) -> serde_json::Value {
-        serde_json::json!({
-            "ed25519_seed_b64u": self.ed25519_seed_b64u,
-            "x25519_secret_b64u": self.x25519_secret_b64u,
-            "device_pk": self.device_pk,
-            "device_token": self.device_token,
-            "token_expires_at": self.token_expires_at,
-            "refresh_token": self.refresh_token,
-            "refresh_expires_at": self.refresh_expires_at,
-            "device_public_key_b64u": self.device_public_key_b64u,
-            "device_id": self.device_id,
-            "last_login_at": self.last_login_at,
-            "api_server_url": self.api_server_url,
-        })
-    }
-}
+// 设备凭证结构由私有协议库维护（字段与协议一一对应），此处仅转发。
+pub use molaunch_protocol::credentials::DeviceCredentials;
 
 /// 联机设备凭证存储
 ///

@@ -129,6 +129,10 @@ jobs:
       - uses: Swatinem/rust-cache@v2
         with:
           workspaces: src-tauri
+      # 私有协议库（molaunch-protocol）需要凭据才能拉取；用 PAT 改写 https 前缀
+      - name: Authorize private protocol repo
+        run: git config --global url."https://x-access-token:${{ secrets.PROTOCOL_REPO_TOKEN }}@github.com/".insteadOf "https://github.com/"
+
       # generate_context! 宏要求 frontendDist(../dist) 存在（tauri-build 校验）
       - name: Ensure frontend dist directory
         run: mkdir -p dist
@@ -176,6 +180,10 @@ jobs:
           packages: libwebkit2gtk-4.1-dev build-essential clang curl wget file libxdo-dev libssl-dev libayatana-appindicator3-dev librsvg2-dev libsoup-3.0-dev
           version: 1.0
           execute_install_scripts: true
+
+      # 私有协议库（molaunch-protocol）需要凭据才能拉取；用 PAT 改写 https 前缀
+      - name: Authorize private protocol repo
+        run: git config --global url."https://x-access-token:${{ secrets.PROTOCOL_REPO_TOKEN }}@github.com/".insteadOf "https://github.com/"
 
       - uses: dtolnay/rust-toolchain@stable
       - uses: Swatinem/rust-cache@v2

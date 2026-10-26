@@ -8,6 +8,15 @@
 
 ### 新增
 
+#### 与主控交互的协议迁入私有仓库
+
+- 新增私有仓库 [`MoLaunch-Protocol`](https://github.com/MoTeam-cn/MoLaunch-Protocol)（crate `molaunch-protocol` v0.1.0），承载与主控交互的全部协议实现：MoSign-v1 设备认证、MoSign-v2 机器鉴权、加密原语与 ECIES 信封、工作量证明、DataChannel 帧格式、联机信令类型。
+- [`Cargo.toml`](src-tauri/Cargo.toml)：新增私有 git 依赖（按 tag 固定版本），协议实现不再出现在公开仓库。
+- [`online/crypto.rs`](src-tauri/src/minecraft/online/crypto.rs)、[`ecies.rs`](src-tauri/src/minecraft/online/ecies.rs)、[`pow.rs`](src-tauri/src/minecraft/online/pow.rs)、[`protocol.rs`](src-tauri/src/minecraft/online/protocol.rs)、[`auth/`](src-tauri/src/minecraft/online/auth/mod.rs)、[`signaling/types/`](src-tauri/src/minecraft/online/signaling/types/mod.rs)：改为转发协议库，调用路径保持不变；对应实现与测试文件从本仓库删除。
+- [`storage.rs`](src-tauri/src/minecraft/online/storage.rs)：`DeviceCredentials` 结构改由协议库维护，本仓库只保留加密持久化。
+- [`time_sync.rs`](src-tauri/src/minecraft/online/time_sync.rs)：对时结果同时写入协议库时钟基准，保证签名时间戳与之一致。
+- [`lib.rs`](src-tauri/src/lib.rs)：把协议库日志接入启动器日志系统。
+- CI（[`ci.yml`](.github/workflows/ci.yml)、[`release.yml`](.github/workflows/release.yml)）：新增私有协议库的拉取授权（`PROTOCOL_REPO_TOKEN`），公开仓库克隆后需自备访问权限才能从源码构建。
 #### 投影编辑：方块实体保留、多形状选区、拖拽平移
 
 - [`entities.rs`](src-tauri/src/commands/tools/schematic/entities.rs)：新增方块实体与非方块实体的归一化读写，三种格式互转（Sponge `BlockEntities`、Litematica 区域 `TileEntities` / `Entities`、结构文件 `blocks[].nbt` / `entities`）。箱子内容、告示牌文字、刷怪笼配置等不再在打开/导出中丢失。

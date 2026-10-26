@@ -67,6 +67,8 @@ pub async fn sync_once(client: &OnlineClient) -> Result<i64, ClientError> {
     let offset = compute_offset(data.server_time, local_now());
     OFFSET_SECS.store(offset, Ordering::Relaxed);
     LAST_SYNC_AT.store(data.server_time, Ordering::Relaxed);
+    // 协议库的签名时间戳走同一基准，避免两套偏移不一致
+    molaunch_protocol::clock::set_offset(offset);
     if offset.abs() >= OFFSET_WARN_SECS {
         crate::log_warn!(
             "[Online] 本机时钟与服务端偏差 {} 秒，认证时间戳已按服务端对齐（timezone={}）",

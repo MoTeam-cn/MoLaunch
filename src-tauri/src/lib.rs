@@ -200,6 +200,9 @@ pub fn run() {
             // setup 钩子在窗口/webview 创建后、前端加载前调用
             log_info!("[Startup] Tauri setup() hook entered — webview & window created");
 
+            // 私有协议库的日志接入启动器日志系统
+            install_protocol_log_sink();
+
             // deeplink 已暂时禁用：跳过 molaunch:// 协议监听与内置 handler 注册，
             // 后续启用时恢复 `deeplink::init(app.handle())` 调用（含返回的 EventId）
 
@@ -352,4 +355,14 @@ pub fn run() {
     builder
         .run(tauri::generate_context!())
         .expect("error while running MoLaunch");
+}
+
+/// 把私有协议库（`molaunch-protocol`）的日志转发到启动器日志系统
+fn install_protocol_log_sink() {
+    molaunch_protocol::log::set_sink(|level, message| match level {
+        molaunch_protocol::log::Level::Debug => log_debug!("{}", message),
+        molaunch_protocol::log::Level::Info => log_info!("{}", message),
+        molaunch_protocol::log::Level::Warn => log_warn!("{}", message),
+        molaunch_protocol::log::Level::Error => log_error!("{}", message),
+    });
 }

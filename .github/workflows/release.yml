@@ -129,6 +129,11 @@ jobs:
       - name: Install frontend dependencies
         run: npm ci --prefer-offline --no-audit --no-fund
 
+      # 私有协议库（molaunch-protocol）需要凭据才能拉取；用 PAT 改写 https 前缀
+      - name: Authorize private protocol repo
+        run: git config --global url."https://x-access-token:${{ secrets.PROTOCOL_REPO_TOKEN }}@github.com/".insteadOf "https://github.com/"
+
+
       - uses: Swatinem/rust-cache@v2
         with:
           workspaces: |
