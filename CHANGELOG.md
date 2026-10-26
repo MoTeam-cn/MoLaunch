@@ -6,6 +6,20 @@
 
 ### 新增
 
+#### 皮肤编辑器（工具页 → 创作指令）
+
+像素级编辑 Minecraft 皮肤，纯前端自研实现，不依赖第三方编辑器：
+
+- [`layout.ts`](src/utils/skin-editor/layout.ts)：64×64 与 64×32 皮肤的 UV 分区表（头/身/双臂/双腿的本体与外层区），支持布局自动识别、坐标命中与旧版左右肢共用判定。
+- [`pixel-buffer.ts`](src/utils/skin-editor/pixel-buffer.ts)：RGBA 像素缓冲，提供画笔（可调笔刷）、直线、油漆桶、取色；撤销栈用差分记录（深度 50），不存整图快照。
+- [`image.ts`](src/utils/skin-editor/image.ts)：PNG 与像素缓冲互转、像素风画布渲染（关闭平滑、按倍率放大）。
+- [`useSkinEditor.ts`](src/composables/useSkinEditor.ts)：编辑器状态机（工具/颜色/笔刷/部件/撤销重做/布局切换），3D 预览地址节流刷新避免高频重建。
+- [`SkinEditorPage.vue`](src/views/tools/creation/skin-editor/SkinEditorPage.vue) + [`SkinCanvas.vue`](src/views/tools/creation/skin-editor/SkinCanvas.vue) + [`SkinToolbar.vue`](src/views/tools/creation/skin-editor/SkinToolbar.vue)：画布交互（拖动连续绘制、部件高亮、网格、缩放）、工具栏与 PNG 导入导出。
+- [`CreateCmdPage.vue`](src/views/tools/CreateCmdPage.vue)：新增「皮肤编辑」子页签。
+- 单测 [`pixel-buffer.test.ts`](src/utils/skin-editor/__tests__/pixel-buffer.test.ts)：17 例覆盖像素读写、撤销重做、油漆桶边界、笔刷加粗、栈上限与布局识别。
+
+### 新增
+
 #### 匿名错误上报（阿里云 SLS WebTracking）
 
 启动器在出错与崩溃时自动上报一条脱敏事件，无需用户手动反馈：
