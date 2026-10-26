@@ -39,10 +39,11 @@ fn test_top_height_map_picks_highest_block() {
     assert_eq!(data.step, 1);
     assert_eq!((data.width, data.height), (3, 4));
 
-    // (x=0, z=1)：y=0 与 y=1 都非空气，最高层为 y=1，相对高度 2
-    let cell = 1 * data.width + 0;
+    // (x=0, z=1)：y=0 与 y=1 都非空气，最高层为 y=1，相对高度 2；
+    // 该处最高块是 blocks[15] = 1，对应调色板索引 1（stone）
+    let cell = data.width;
     assert_eq!(data.top_height[cell as usize], 2);
-    assert_eq!(data.top_index[cell as usize], 2);
+    assert_eq!(data.top_index[cell as usize], 1);
 
     // (x=0, z=0) 两列都是空气
     assert_eq!(data.top_height[0], 0);
