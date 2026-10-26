@@ -62,12 +62,12 @@ pub fn build(session_id: &str) -> Result<Overview, String> {
         // 俯视降采样步长
         let longest = sx.max(sz);
         let step = if longest > MAX_SIDE {
-            (longest + MAX_SIDE - 1) / MAX_SIDE
+            longest.div_ceil(MAX_SIDE)
         } else {
             1
         };
-        let width = (sx + step - 1) / step;
-        let height = (sz + step - 1) / step;
+        let width = sx.div_ceil(step);
+        let height = sz.div_ceil(step);
 
         let mut top_index: Vec<u16> = vec![EMPTY_INDEX; (width * height) as usize];
         let mut top_height: Vec<u16> = vec![0; (width * height) as usize];
