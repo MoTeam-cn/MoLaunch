@@ -2,8 +2,8 @@
 /**
  * 投影工具栏
  *
- * 打开文件 / 轴与层切换 / 编辑工具 / 撤销重做 / 旋转镜像 / 缩放 / 导出。
- * 纯展示组件，状态由页面持有。
+ * 打开 / 轴与层 / 编辑工具（浏览·平移·画笔·矩形·球体·圆柱·替换）/ 笔尖与半径
+ * / 撤销重做 / 旋转镜像 / 缩放 / 导出。纯展示组件，状态由页面持有。
  */
 
 import {
@@ -22,6 +22,7 @@ import {
 import Button from '@/components/common/Button.vue'
 import SegmentedButtons from '@/components/common/SegmentedButtons.vue'
 import type { SchematicOpenResult, SliceAxisParam } from '@/utils/api/tools/schematic'
+import type { SchematicTool } from './types'
 
 defineProps<{
   loading: boolean
@@ -30,19 +31,25 @@ defineProps<{
   axis: SliceAxisParam
   layer: number
   planeLayers: number
-  tool: 'browse' | 'fill' | 'replace'
+  tool: SchematicTool
   canUndo: boolean
   canRedo: boolean
   exportFormat: string
   nonAir: number
+  brushSize: number
+  radius: number
+  cylinderHeight: number
 }>()
 
 const emit = defineEmits<{
   open: []
   'update:axis': [value: SliceAxisParam]
   'update:layer': [value: number]
-  'update:tool': [value: 'browse' | 'fill' | 'replace']
+  'update:tool': [value: SchematicTool]
   'update:exportFormat': [value: string]
+  'update:brushSize': [value: number]
+  'update:radius': [value: number]
+  'update:cylinderHeight': [value: number]
   undo: []
   redo: []
   transform: [kind: 'rotate_cw' | 'rotate_ccw' | 'mirror_x' | 'mirror_z' | 'flip_y']
@@ -58,7 +65,11 @@ const axisOptions = [
 ]
 const toolOptions = [
   { label: '浏览', value: 'browse' },
-  { label: '填充', value: 'fill' },
+  { label: '平移', value: 'pan' },
+  { label: '画笔', value: 'brush' },
+  { label: '矩形', value: 'rect' },
+  { label: '球体', value: 'sphere' },
+  { label: '圆柱', value: 'cylinder' },
   { label: '替换', value: 'replace' },
 ]
 const formatOptions = [
@@ -66,6 +77,13 @@ const formatOptions = [
   { label: 'Litematic', value: 'litematic' },
   { label: '结构文件', value: 'structure' },
 ]
+
+function onNumber(event: Event, key: 'brushSize' | 'radius' | 'cylinderHeight'): void {
+  const value = Number((event.target as HTMLInputElement).value)
+  if (key === 'brushSize') emit('update:brushSize', value)
+  else if (key === 'radius') emit('update:radius', value)
+  else emit('update:cylinderHeight', value)
+}
 </script>
 
 <template>
@@ -100,7 +118,7 @@ const formatOptions = [
         :options="axisOptions"
         @update:model-value="emit('update:axis', $event as SliceAxisParam)"
       />
-      <div class="flex min-w-[200px] flex-1 items-center gap-2">
+      <div class="flex min-w-[180px] flex-1 items-center gap-2">
         <span class="text-xs text-gray-600">第 {{ layer + 1 }} / {{ planeLayers }} 层</span>
         <input
           :value="layer"
@@ -111,17 +129,56 @@ const formatOptions = [
           @input="emit('update:layer', Number(($event.target as HTMLInputElement).value))"
         />
       </div>
-      <SegmentedButtons
-        :model-value="tool"
-        :options="toolOptions"
-        @update:model-value="emit('update:tool', $event as 'browse' | 'fill' | 'replace')"
-      />
       <Button size="small" type="outline" :disabled="!canUndo" @click="emit('undo')">
         <ArrowUturnLeftIcon class="h-4 w-4" />
       </Button>
       <Button size="small" type="outline" :disabled="!canRedo" @click="emit('redo')">
         <ArrowUturnRightIcon class="h-4 w-4" />
       </Button>
+    </div>
+
+    <div v-if="session" class="flex flex-wrap items-center gap-2">
+      <SegmentedButtons
+        :model-value="tool"
+        :options="toolOptions"
+        @update:model-value="emit('update:tool', $event as SchematicTool)"
+      />
+      <label v-if="tool === 'brush'" class="flex items-center gap-2 text-xs text-gray-600">
+        笔尖
+        <input
+          :value="brushSize"
+          type="range"
+          min="1"
+          max="15"
+          class="w-24 accent-brand-2"
+          @input="onNumber($event, 'brushSize')"
+        />
+        <span class="w-6 text-right">{{ brushSize }}</span>
+      </label>
+      <label v-if="tool === 'sphere' || tool === 'cylinder'" class="flex items-center gap-2 text-xs text-gray-600">
+        半径
+        <input
+          :value="radius"
+          type="range"
+          min="1"
+          max="32"
+          class="w-24 accent-brand-2"
+          @input="onNumber($event, 'radius')"
+        />
+        <span class="w-6 text-right">{{ radius }}</span>
+      </label>
+      <label v-if="tool === 'cylinder'" class="flex items-center gap-2 text-xs text-gray-600">
+        高度
+        <input
+          :value="cylinderHeight"
+          type="range"
+          min="1"
+          max="64"
+          class="w-24 accent-brand-2"
+          @input="onNumber($event, 'cylinderHeight')"
+        />
+        <span class="w-6 text-right">{{ cylinderHeight }}</span>
+      </label>
     </div>
 
     <div v-if="session" class="flex flex-wrap items-center gap-2">
@@ -143,7 +200,7 @@ const formatOptions = [
         上下翻转
       </Button>
       <span class="mx-1 h-5 w-px bg-gray-200" />
-      <span class="text-xs text-gray-600">平移</span>
+      <span class="text-xs text-gray-600">视口</span>
       <Button size="small" type="outline" @click="emit('pan', 0, -1)">
         <ChevronUpIcon class="h-4 w-4" />
       </Button>
@@ -156,7 +213,6 @@ const formatOptions = [
       <Button size="small" type="outline" @click="emit('pan', 1, 0)">
         <ChevronRightIcon class="h-4 w-4" />
       </Button>
-      <span class="mx-1 h-5 w-px bg-gray-200" />
       <Button size="small" type="outline" @click="emit('zoom', -1)">
         <MagnifyingGlassMinusIcon class="h-4 w-4" />
       </Button>

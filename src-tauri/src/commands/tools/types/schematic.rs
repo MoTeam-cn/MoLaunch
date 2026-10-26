@@ -80,6 +80,22 @@ pub struct SchematicEditParams {
     pub mode: String,
     /// replace 模式下的来源方块索引
     pub from: Option<u16>,
+    /// 形状：rect（矩形）/ sphere（球体）/ cylinder（圆柱）/ points（画笔落点）
+    #[serde(default = "default_shape")]
+    pub shape: String,
+    /// 球体与圆柱半径（格）
+    #[serde(default)]
+    pub radius: u32,
+    /// 圆柱沿切片轴的高度（格）
+    #[serde(default)]
+    pub height: u32,
+    /// 画笔落点（平面坐标对）
+    #[serde(default)]
+    pub points: Vec<[u32; 2]>,
+}
+
+fn default_shape() -> String {
+    "rect".to_string()
 }
 
 /// 编辑结果

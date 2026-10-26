@@ -72,6 +72,10 @@ fn build_sponge(data: &SchematicData) -> Result<Vec<u8>, String> {
         )),
     );
     root.insert("Metadata".to_string(), Value::Compound(metadata));
+    root.insert(
+        "BlockEntities".to_string(),
+        Value::List(super::entities::to_sponge(&data.block_entities)),
+    );
     serialize(&Value::Compound(root))
 }
 
@@ -112,8 +116,14 @@ fn build_litematic(data: &SchematicData) -> Result<Vec<u8>, String> {
         "BlockStates".to_string(),
         Value::LongArray(fastnbt::LongArray::new(states)),
     );
-    region.insert("TileEntities".to_string(), Value::List(Vec::new()));
-    region.insert("Entities".to_string(), Value::List(Vec::new()));
+    region.insert(
+        "TileEntities".to_string(),
+        Value::List(super::entities::to_litematic(&data.block_entities)),
+    );
+    region.insert(
+        "Entities".to_string(),
+        Value::List(super::entities::to_raw(&data.raw_entities)),
+    );
     region.insert("PendingBlockTicks".to_string(), Value::List(Vec::new()));
     region.insert("PendingFluidTicks".to_string(), Value::List(Vec::new()));
 
@@ -198,11 +208,16 @@ fn build_structure(data: &SchematicData) -> Result<Vec<u8>, String> {
         blocks_list.push(Value::Compound(entry));
     }
 
+    super::entities::attach_to_structure_blocks(&mut blocks_list, &data.block_entities);
+
     let mut root: HashMap<String, Value> = HashMap::new();
     root.insert("size".to_string(), Value::List(size_list));
     root.insert("palette".to_string(), Value::List(palette_list));
     root.insert("blocks".to_string(), Value::List(blocks_list));
-    root.insert("entities".to_string(), Value::List(Vec::new()));
+    root.insert(
+        "entities".to_string(),
+        Value::List(super::entities::to_raw(&data.raw_entities)),
+    );
     root.insert("DataVersion".to_string(), Value::Int(3953));
     serialize(&Value::Compound(root))
 }

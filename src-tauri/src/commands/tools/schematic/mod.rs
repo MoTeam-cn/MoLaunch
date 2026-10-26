@@ -7,6 +7,7 @@
 //! 打开后数据常驻内存（会话），前端按视口分片取用，因此不再受整份数据体积限制。
 
 mod codec;
+mod entities;
 mod legacy_blocks;
 mod read;
 mod session;
@@ -93,6 +94,10 @@ pub async fn edit(params: SchematicEditParams) -> Result<SchematicEditResult, St
             block: params.block,
             mode: &params.mode,
             from: params.from,
+            shape: &params.shape,
+            radius: params.radius,
+            height: params.height,
+            points: &params.points,
         },
     )?;
     Ok(SchematicEditResult {

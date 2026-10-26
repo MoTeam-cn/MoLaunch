@@ -25,6 +25,8 @@ fn sample_data() -> SchematicData {
         blocks: vec![
             0, 1, 1, 2, 0, 1, 0, 0, 2, 2, 1, 0, 0, 2, 2, 1, 1, 0, 2, 0, 0, 1, 2, 2,
         ],
+        block_entities: Vec::new(),
+        raw_entities: Vec::new(),
     }
 }
 
@@ -218,6 +220,10 @@ fn test_session_edit_undo_redo() {
     let (changed, non_air, can_undo, _) = session::edit(
         &id,
         session::EditRequest {
+            shape: "rect",
+            radius: 0,
+            height: 0,
+            points: &[],
             axis: "y",
             layer: 0,
             x: 0,
@@ -274,5 +280,219 @@ fn test_session_transform_rejects_unknown_kind() {
 fn test_session_slice_rejects_out_of_range_layer() {
     let id = session::create(sample_data());
     assert!(session::slice(&id, "y", 99, 0, 0, 1, 1).is_err());
+    session::close(&id);
+}
+
+#[test]
+fn test_edit_sphere_fills_round_volume() {
+    let id = session::create(sample_data());
+    let (changed, _, _, _) = session::edit(
+        &id,
+        session::EditRequest {
+            axis: "y",
+            layer: 0,
+            x: 1,
+            y: 2,
+            w: 1,
+            h: 1,
+            shape: "sphere",
+            radius: 1,
+            height: 0,
+            points: &[],
+            block: 2,
+            mode: "fill",
+            from: None,
+        },
+    )
+    .expect("球体填充失败");
+    // 半径 1 的球体共 7 格（含中心），其中与原方块相同的会被跳过
+    assert!(changed > 0 && changed <= 7, "实际改动 {}", changed);
+    session::close(&id);
+}
+
+#[test]
+fn test_edit_cylinder_respects_height() {
+    let id = session::create(sample_data());
+    let (changed, _, _, _) = session::edit(
+        &id,
+        session::EditRequest {
+            axis: "y",
+            layer: 1,
+            x: 1,
+            y: 2,
+            w: 1,
+            h: 1,
+            shape: "cylinder",
+            radius: 1,
+            height: 3,
+            points: &[],
+            block: 2,
+            mode: "fill",
+            from: None,
+        },
+    )
+    .expect("圆柱填充失败");
+    assert!(changed > 0);
+    session::close(&id);
+}
+
+#[test]
+fn test_edit_points_paints_only_listed_cells() {
+    let id = session::create(sample_data());
+    let points: Vec<[u32; 2]> = vec![[0, 0], [2, 3]];
+    let (changed, _, _, _) = session::edit(
+        &id,
+        session::EditRequest {
+            axis: "y",
+            layer: 0,
+            x: 0,
+            y: 0,
+            w: 0,
+            h: 0,
+            shape: "points",
+            radius: 0,
+            height: 0,
+            points: &points,
+            block: 2,
+            mode: "fill",
+            from: None,
+        },
+    )
+    .expect("画笔填充失败");
+    assert!(changed <= 2, "实际改动 {}", changed);
+    session::close(&id);
+}
+
+#[test]
+fn test_edit_rejects_unknown_shape() {
+    let id = session::create(sample_data());
+    let result = session::edit(
+        &id,
+        session::EditRequest {
+            axis: "y",
+            layer: 0,
+            x: 0,
+            y: 0,
+            w: 1,
+            h: 1,
+            shape: "torus",
+            radius: 1,
+            height: 1,
+            points: &[],
+            block: 2,
+            mode: "fill",
+            from: None,
+        },
+    );
+    assert!(result.is_err());
+    session::close(&id);
+}
+
+#[test]
+fn test_block_entities_survive_sponge_roundtrip() {
+    let mut data = sample_data();
+    let mut fields = std::collections::HashMap::new();
+    fields.insert(
+        "id".to_string(),
+        fastnbt::Value::String("minecraft:chest".to_string()),
+    );
+    data.block_entities.push(super::entities::BlockEntity {
+        pos: [1, 0, 2],
+        id: "minecraft:chest".to_string(),
+        data: fields,
+    });
+
+    let path = temp_path("entities.schem");
+    export(&data, "sponge_v2", &path).expect("导出失败");
+    let reread = read_schematic(&path).expect("回读失败");
+    assert_eq!(reread.block_entities.len(), 1);
+    assert_eq!(reread.block_entities[0].pos, [1, 0, 2]);
+    assert_eq!(reread.block_entities[0].id, "minecraft:chest");
+}
+
+#[test]
+fn test_block_entities_survive_litematic_roundtrip() {
+    let mut data = sample_data();
+    data.block_entities.push(super::entities::BlockEntity {
+        pos: [0, 1, 3],
+        id: "minecraft:sign".to_string(),
+        data: std::collections::HashMap::new(),
+    });
+    let path = temp_path("entities.litematic");
+    export(&data, "litematic", &path).expect("导出失败");
+    let reread = read_schematic(&path).expect("回读失败");
+    assert_eq!(reread.block_entities.len(), 1);
+    assert_eq!(reread.block_entities[0].pos, [0, 1, 3]);
+    assert_eq!(reread.block_entities[0].id, "minecraft:sign");
+}
+
+#[test]
+fn test_block_entities_survive_structure_roundtrip() {
+    let mut data = sample_data();
+    data.block_entities.push(super::entities::BlockEntity {
+        pos: [2, 1, 1],
+        id: "minecraft:furnace".to_string(),
+        data: std::collections::HashMap::new(),
+    });
+    let path = temp_path("entities.nbt");
+    export(&data, "structure", &path).expect("导出失败");
+    let reread = read_schematic(&path).expect("回读失败");
+    assert_eq!(reread.block_entities.len(), 1);
+    assert_eq!(reread.block_entities[0].pos, [2, 1, 1]);
+    assert_eq!(reread.block_entities[0].id, "minecraft:furnace");
+}
+
+#[test]
+fn test_transform_moves_block_entities() {
+    let mut data = sample_data();
+    data.block_entities.push(super::entities::BlockEntity {
+        pos: [0, 0, 0],
+        id: "minecraft:chest".to_string(),
+        data: std::collections::HashMap::new(),
+    });
+    let id = session::create(data);
+    session::transform(&id, "rotate_cw").expect("旋转失败");
+    session::inspect(&id, |s| {
+        // 顺时针旋转后 (0,0,0) 落到新坐标 (0, 0, sx-1) = (0, 0, 2)
+        assert_eq!(s.data.block_entities[0].pos, [0, 0, 2]);
+        Ok(())
+    })
+    .expect("读取会话失败");
+    session::close(&id);
+}
+
+#[test]
+fn test_edit_prunes_replaced_block_entities() {
+    let mut data = sample_data();
+    data.block_entities.push(super::entities::BlockEntity {
+        pos: [0, 0, 0],
+        id: "minecraft:chest".to_string(),
+        data: std::collections::HashMap::new(),
+    });
+    let id = session::create(data);
+    session::edit(
+        &id,
+        session::EditRequest {
+            axis: "y",
+            layer: 0,
+            x: 0,
+            y: 0,
+            w: 1,
+            h: 1,
+            shape: "rect",
+            radius: 0,
+            height: 0,
+            points: &[],
+            block: 2,
+            mode: "fill",
+            from: None,
+        },
+    )
+    .expect("编辑失败");
+    session::inspect(&id, |s| {
+        assert!(s.data.block_entities.is_empty(), "被替换方块的实体应被移除");
+        Ok(())
+    })
+    .expect("读取会话失败");
     session::close(&id);
 }

@@ -2,12 +2,13 @@
 /**
  * 投影切片画布
  *
- * 渲染后端返回的视口切片；支持鼠标框选（返回平面坐标范围）供填充/替换使用。
- * 空气格保持棋盘背景，不绘制颜色。
+ * 渲染后端返回的视口切片，并按交互模式派发事件：
+ * browse（只悬停）、pan（拖拽平移）、brush（拖拽涂抹）、rect（框选）、point（形状落点）。
  */
 
 import { computed, ref, watch } from 'vue'
 import { blockColor, type SchematicSlice } from '@/utils/schematic/decode'
+import type { CanvasInteraction } from './types'
 
 const props = defineProps<{
   slice: SchematicSlice
@@ -15,30 +16,43 @@ const props = defineProps<{
   airIndex: number
   /** 每格像素 */
   cellSize: number
-  /** 是否允许框选（编辑模式） */
-  selectable: boolean
+  /** 交互模式 */
+  interaction: CanvasInteraction
+  /** 画笔笔尖尺寸（格） */
+  brushSize?: number
 }>()
 
 const emit = defineEmits<{
   hover: [info: { x: number; y: number; id: string } | null]
   select: [range: { x: number; y: number; w: number; h: number }]
+  paint: [points: Array<[number, number]>]
+  pan: [dx: number, dy: number]
+  point: [center: { x: number; y: number }]
 }>()
 
 const canvasRef = ref<HTMLCanvasElement | null>(null)
 const dragging = ref(false)
 const anchor = ref<{ x: number; y: number } | null>(null)
 const cursor = ref<{ x: number; y: number } | null>(null)
+const lastPan = ref<{ x: number; y: number } | null>(null)
+const painted = ref<Set<string>>(new Set())
 
 const pixelWidth = computed(() => props.slice.width * props.cellSize)
 const pixelHeight = computed(() => props.slice.height * props.cellSize)
 
+const brushSize = computed(() => Math.max(props.brushSize ?? 1, 1))
+
 const selectionBox = computed(() => {
+  if (props.interaction !== 'rect') return null
   if (!anchor.value || !cursor.value) return null
   const x0 = Math.min(anchor.value.x, cursor.value.x)
   const y0 = Math.min(anchor.value.y, cursor.value.y)
-  const w = Math.abs(cursor.value.x - anchor.value.x) + 1
-  const h = Math.abs(cursor.value.y - anchor.value.y) + 1
-  return { x: x0, y: y0, w, h }
+  return {
+    x: x0,
+    y: y0,
+    w: Math.abs(cursor.value.x - anchor.value.x) + 1,
+    h: Math.abs(cursor.value.y - anchor.value.y) + 1,
+  }
 })
 
 function redraw(): void {
@@ -79,6 +93,14 @@ function redraw(): void {
     }
   }
 
+  if (painted.value.size > 0) {
+    ctx.fillStyle = 'rgba(19, 112, 243, 0.35)'
+    painted.value.forEach((key) => {
+      const [col, row] = key.split(':').map(Number)
+      ctx.fillRect(col * size, row * size, size, size)
+    })
+  }
+
   const box = selectionBox.value
   if (box) {
     ctx.fillStyle = 'rgba(19, 112, 243, 0.22)'
@@ -100,16 +122,39 @@ function toCell(event: MouseEvent): { x: number; y: number } | null {
   return { x, y }
 }
 
+/** 把笔尖覆盖的格子记入涂抹集合 */
+function stampBrush(cell: { x: number; y: number }): void {
+  const half = Math.floor((brushSize.value - 1) / 2)
+  for (let dy = 0; dy < brushSize.value; dy++) {
+    for (let dx = 0; dx < brushSize.value; dx++) {
+      const x = cell.x - half + dx
+      const y = cell.y - half + dy
+      if (x < 0 || y < 0 || x >= props.slice.width || y >= props.slice.height) continue
+      painted.value.add(`${x}:${y}`)
+    }
+  }
+}
+
 function onDown(event: MouseEvent): void {
   const cell = toCell(event)
   if (!cell) return
-  if (!props.selectable) {
+  if (props.interaction === 'browse') {
     emit('select', { x: cell.x, y: cell.y, w: 1, h: 1 })
+    return
+  }
+  if (props.interaction === 'point') {
+    emit('point', cell)
     return
   }
   dragging.value = true
   anchor.value = cell
   cursor.value = cell
+  if (props.interaction === 'pan') {
+    lastPan.value = cell
+  } else if (props.interaction === 'brush') {
+    painted.value = new Set()
+    stampBrush(cell)
+  }
   redraw()
 }
 
@@ -122,21 +167,45 @@ function onMove(event: MouseEvent): void {
   const index = props.slice.cells[cell.y * props.slice.width + cell.x]
   emit('hover', { x: cell.x, y: cell.y, id: props.palette[index] ?? 'minecraft:air' })
   if (!dragging.value) return
+
+  if (props.interaction === 'pan') {
+    const last = lastPan.value
+    if (!last) return
+    const dx = cell.x - last.x
+    const dy = cell.y - last.y
+    if (dx !== 0 || dy !== 0) {
+      lastPan.value = cell
+      emit('pan', dx, dy)
+    }
+    return
+  }
+
   cursor.value = cell
+  if (props.interaction === 'brush') stampBrush(cell)
   redraw()
 }
 
 function onUp(): void {
   if (!dragging.value) return
   dragging.value = false
+  if (props.interaction === 'brush' && painted.value.size > 0) {
+    const points: Array<[number, number]> = []
+    painted.value.forEach((key) => {
+      const [x, y] = key.split(':').map(Number)
+      points.push([x, y])
+    })
+    emit('paint', points)
+    painted.value = new Set()
+  }
   const box = selectionBox.value
-  if (box) emit('select', box)
+  if (props.interaction === 'rect' && box) emit('select', box)
   anchor.value = null
   cursor.value = null
+  lastPan.value = null
   redraw()
 }
 
-watch(() => [props.slice, props.cellSize], redraw, { immediate: true })
+watch(() => [props.slice, props.cellSize, props.brushSize], redraw, { immediate: true })
 </script>
 
 <template>
@@ -146,7 +215,8 @@ watch(() => [props.slice, props.cellSize], redraw, { immediate: true })
     <canvas
       ref="canvasRef"
       :style="{ width: pixelWidth + 'px', height: pixelHeight + 'px' }"
-      class="block cursor-crosshair"
+      class="block select-none"
+      :class="interaction === 'pan' ? 'cursor-grab' : 'cursor-crosshair'"
       @mousedown="onDown"
       @mousemove="onMove"
       @mouseup="onUp"

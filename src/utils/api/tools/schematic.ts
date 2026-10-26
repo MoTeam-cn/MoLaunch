@@ -74,7 +74,9 @@ export async function schematicSlice(
   })
 }
 
-export async function schematicEdit(params: {
+export type EditShape = 'rect' | 'sphere' | 'cylinder' | 'points'
+
+export interface SchematicEditParams {
   sessionId: string
   axis: SliceAxisParam
   layer: number
@@ -85,7 +87,17 @@ export async function schematicEdit(params: {
   block: number
   mode: 'fill' | 'replace'
   from?: number | null
-}): Promise<SchematicEditResult> {
+  /** 选区形状：矩形 / 球体 / 圆柱 / 画笔落点 */
+  shape?: EditShape
+  /** 球体与圆柱半径 */
+  radius?: number
+  /** 圆柱沿切片轴高度 */
+  height?: number
+  /** 画笔落点（平面坐标） */
+  points?: Array<[number, number]>
+}
+
+export async function schematicEdit(params: SchematicEditParams): Promise<SchematicEditResult> {
   return toolsManager<SchematicEditResult>(TOOLS_ACTIONS.SCHEMATIC_EDIT, params)
 }
 

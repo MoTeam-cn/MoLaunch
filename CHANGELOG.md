@@ -6,6 +6,16 @@
 
 ### 新增
 
+#### 投影编辑：方块实体保留、多形状选区、拖拽平移
+
+- [`entities.rs`](src-tauri/src/commands/tools/schematic/entities.rs)：新增方块实体与非方块实体的归一化读写，三种格式互转（Sponge `BlockEntities`、Litematica 区域 `TileEntities` / `Entities`、结构文件 `blocks[].nbt` / `entities`）。箱子内容、告示牌文字、刷怪笼配置等不再在打开/导出中丢失。
+- [`session.rs`](src-tauri/src/commands/tools/schematic/session.rs)：编辑时自动清除被替换方块的实体（避免实体指向已失效方块）；旋转镜像时同步换算方块实体坐标，非方块实体因坐标语义不可靠而丢弃并记录警告。
+- [`session.rs`](src-tauri/src/commands/tools/schematic/session.rs)：选区形状扩展为矩形 / 球体 / 圆柱 / 画笔落点四种，替换模式可与任意形状组合。
+- [`SchematicCanvas.vue`](src/views/tools/storage/schematic/SchematicCanvas.vue)：支持拖拽平移、拖拽涂抹（笔尖 1–15 格）、形状落点与框选，交互模式由工具决定。
+- [`SchematicToolbar.vue`](src/views/tools/storage/schematic/SchematicToolbar.vue)：工具扩为 7 种（浏览 / 平移 / 画笔 / 矩形 / 球体 / 圆柱 / 替换），新增笔尖、半径、圆柱高度滑杆。
+- [`useSchematicEditor.ts`](src/composables/useSchematicEditor.ts)：把投影编辑的状态与操作抽成组合式函数，页面只保留布局；视口单边上限由 128 提到 192 格，拖拽平移合并刷新避免逐格 IPC。
+- [`SchematicSidePanel.vue`](src/views/tools/storage/schematic/SchematicSidePanel.vue)：新增侧栏组件，按当前工具决定显示目标方块与来源方块选择器。
+- 测试：Rust 新增 9 例（三格式实体往返、球体/圆柱/画笔选区、非法形状、变换后实体坐标、编辑清理实体），前端 141 例保持通过。
 #### 投影预览：会话式加载、编辑与旧版格式支持
 
 - [`session.rs`](src-tauri/src/commands/tools/schematic/session.rs)：新增会话层，投影数据常驻内存并按视口分片返回；最多同时保留 3 个会话，单次切片上限 100 万格。取消「一次性传输整份数据」带来的体积限制，上限由 400 万方块提升到 5000 万。

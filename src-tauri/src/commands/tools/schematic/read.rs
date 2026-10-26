@@ -20,6 +20,10 @@ pub struct SchematicData {
     pub size: [u32; 3],
     pub palette: Vec<String>,
     pub blocks: Vec<u16>,
+    /// 方块实体（箱子内容、告示牌文字等），随编辑与导出保留
+    pub block_entities: Vec<super::entities::BlockEntity>,
+    /// 非方块实体（生物等），仅在未做变换时原样保留
+    pub raw_entities: Vec<super::entities::RawEntity>,
 }
 
 /// 读取投影文件，自动识别格式
@@ -130,6 +134,8 @@ fn read_sponge(root: &Value, name: &str) -> Result<SchematicData, String> {
         size: [width as u32, height as u32, length as u32],
         palette,
         blocks,
+        block_entities: super::entities::read_sponge(root, [0, 0, 0]),
+        raw_entities: Vec::new(),
     })
 }
 
@@ -246,12 +252,28 @@ fn read_litematic(root: &Value, name: &str) -> Result<SchematicData, String> {
         return Err("投影调色板为空".to_string());
     }
 
+    // 收集各区域的方块实体（坐标已按包围盒偏移换算）
+    let mut block_entities: Vec<super::entities::BlockEntity> = Vec::new();
+    let mut raw_entities: Vec<super::entities::RawEntity> = Vec::new();
+    for value in regions.values() {
+        let position = compound(get(value, "Position")).ok_or("区域缺少 Position")?;
+        let pos = [
+            as_int(position.get("x")).unwrap_or(0) - min[0] as i32,
+            as_int(position.get("y")).unwrap_or(0) - min[1] as i32,
+            as_int(position.get("z")).unwrap_or(0) - min[2] as i32,
+        ];
+        block_entities.extend(super::entities::read_litematic(value, pos));
+        raw_entities.extend(super::entities::read_litematic_entities(value));
+    }
+
     Ok(SchematicData {
         format: "litematic",
         name: name.to_string(),
         size: [sx, sy, sz],
         palette,
         blocks,
+        block_entities,
+        raw_entities,
     })
 }
 
@@ -308,6 +330,8 @@ fn read_structure(root: &Value, name: &str) -> Result<SchematicData, String> {
         size: [sx as u32, sy as u32, sz as u32],
         palette,
         blocks,
+        block_entities: super::entities::read_structure(root),
+        raw_entities: super::entities::read_structure_entities(root),
     })
 }
 
@@ -379,6 +403,9 @@ fn read_mcedit_legacy(root: &Value, name: &str) -> Result<SchematicData, String>
         size: [width as u32, height as u32, length as u32],
         palette,
         blocks,
+        // 旧版格式不保存方块实体
+        block_entities: Vec::new(),
+        raw_entities: Vec::new(),
     })
 }
 

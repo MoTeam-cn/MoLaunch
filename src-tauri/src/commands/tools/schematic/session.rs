@@ -3,7 +3,7 @@
 //! 会话以 ID 引用，前端只按需取当前视口那一小块，因此不再受"一次性传输整份数据"
 //! 的体积限制；同时保留编辑历史（撤销/重做）与变换能力。
 
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::Mutex;
 
@@ -161,61 +161,152 @@ pub fn slice(
 pub struct EditRequest<'a> {
     pub axis: &'a str,
     pub layer: u32,
+    /// 矩形/画笔：平面起点；球体/圆柱：中心点
     pub x: u32,
     pub y: u32,
+    /// 矩形/画笔：宽高；球体/圆柱忽略
     pub w: u32,
     pub h: u32,
+    /// rect / sphere / cylinder / points
+    pub shape: &'a str,
+    /// 球体与圆柱的半径（格）
+    pub radius: u32,
+    /// 圆柱沿切片轴的高度（格）
+    pub height: u32,
+    /// 画笔落点（平面坐标，逐个填充）
+    pub points: &'a [[u32; 2]],
     pub block: u16,
     pub mode: &'a str,
     pub from: Option<u16>,
 }
 
-/// 在指定层的矩形区域填充方块
+/// 收集本次编辑命中的三维坐标
+fn collect_positions(
+    size: [u32; 3],
+    request: &EditRequest<'_>,
+) -> Result<Vec<(u32, u32, u32)>, String> {
+    let (plane_w, plane_h, layers) = plane_size(size, request.axis)?;
+    if request.layer >= layers {
+        return Err(format!("层号超出范围（0-{}）", layers.saturating_sub(1)));
+    }
+    let mut out: Vec<(u32, u32, u32)> = Vec::new();
+
+    match request.shape {
+        "rect" => {
+            let width = request.w.min(plane_w.saturating_sub(request.x)).max(1);
+            let height = request.h.min(plane_h.saturating_sub(request.y)).max(1);
+            for row in 0..height {
+                for col in 0..width {
+                    out.push(to_xyz(
+                        request.axis,
+                        request.layer,
+                        request.x + col,
+                        request.y + row,
+                    ));
+                }
+            }
+        }
+        "points" => {
+            for point in request.points {
+                let (u, v) = (point[0], point[1]);
+                if u >= plane_w || v >= plane_h {
+                    continue;
+                }
+                out.push(to_xyz(request.axis, request.layer, u, v));
+            }
+        }
+        "sphere" => {
+            let (cx, cy, cz) = to_xyz(request.axis, request.layer, request.x, request.y);
+            let radius = request.radius.max(1) as i64;
+            for dy in -radius..=radius {
+                for dz in -radius..=radius {
+                    for dx in -radius..=radius {
+                        if dx * dx + dy * dy + dz * dz > radius * radius {
+                            continue;
+                        }
+                        let (nx, ny, nz) = (cx as i64 + dx, cy as i64 + dy, cz as i64 + dz);
+                        if nx < 0 || ny < 0 || nz < 0 {
+                            continue;
+                        }
+                        if nx as u32 >= size[0] || ny as u32 >= size[1] || nz as u32 >= size[2] {
+                            continue;
+                        }
+                        out.push((nx as u32, ny as u32, nz as u32));
+                    }
+                }
+            }
+        }
+        "cylinder" => {
+            let (cx, cy, cz) = to_xyz(request.axis, request.layer, request.x, request.y);
+            let radius = request.radius.max(1) as i64;
+            let height = request.height.max(1) as i64;
+            let half = height / 2;
+            for offset in -half..=half {
+                // 沿切片轴平移，其余两轴构成圆形截面
+                let (bx, by, bz) = match request.axis {
+                    "x" => (cx as i64 + offset, cy, cz),
+                    "z" => (cx, cy, cz as i64 + offset),
+                    _ => (cx, cy as i64 + offset, cz),
+                };
+                for dv in -radius..=radius {
+                    for du in -radius..=radius {
+                        if du * du + dv * dv > radius * radius {
+                            continue;
+                        }
+                        let (nx, ny, nz) = match request.axis {
+                            "x" => (bx, by + dv, bz + du),
+                            "z" => (bx + du, by + dv, bz),
+                            _ => (bx + du, by, bz + dv),
+                        };
+                        if nx < 0 || ny < 0 || nz < 0 {
+                            continue;
+                        }
+                        if nx as u32 >= size[0] || ny as u32 >= size[1] || nz as u32 >= size[2] {
+                            continue;
+                        }
+                        out.push((nx as u32, ny as u32, nz as u32));
+                    }
+                }
+            }
+        }
+        other => return Err(format!("未知编辑形状: {}", other)),
+    }
+    Ok(out)
+}
+
+/// 执行编辑：填充或条件替换
 pub fn edit(session_id: &str, request: EditRequest<'_>) -> Result<(u32, u64, bool, bool), String> {
-    let EditRequest {
-        axis,
-        layer,
-        x,
-        y,
-        w,
-        h,
-        block,
-        mode,
-        from,
-    } = request;
+    let block = request.block;
+    let mode = request.mode.to_string();
+    let from = request.from;
     with_session(session_id, |session| {
         let size = session.data.size;
-        let (plane_w, plane_h, layers) = plane_size(size, axis)?;
-        if layer >= layers {
-            return Err(format!("层号超出范围（0-{}）", layers.saturating_sub(1)));
-        }
         if block as usize >= session.data.palette.len() {
             return Err("目标方块不在调色板中".to_string());
         }
-        let width = w.min(plane_w.saturating_sub(x)).max(1);
-        let height = h.min(plane_h.saturating_sub(y)).max(1);
+        let positions = collect_positions(size, &request)?;
 
         let mut indices: Vec<usize> = Vec::new();
         let mut before: Vec<u16> = Vec::new();
         let mut after: Vec<u16> = Vec::new();
-        for row in 0..height {
-            for col in 0..width {
-                let (bx, by, bz) = to_xyz(axis, layer, x + col, y + row);
-                let index = index_of(size, bx, by, bz);
-                let current = session.data.blocks.get(index).copied().unwrap_or(0);
-                if mode == "replace" {
-                    match from {
-                        Some(source) if current == source => {}
-                        _ => continue,
-                    }
+        let mut touched: HashSet<[i32; 3]> = HashSet::new();
+
+        for (bx, by, bz) in positions {
+            let index = index_of(size, bx, by, bz);
+            let current = session.data.blocks.get(index).copied().unwrap_or(0);
+            if mode == "replace" {
+                match from {
+                    Some(source) if current == source => {}
+                    _ => continue,
                 }
-                if current == block {
-                    continue;
-                }
-                indices.push(index);
-                before.push(current);
-                after.push(block);
             }
+            if current == block {
+                continue;
+            }
+            indices.push(index);
+            before.push(current);
+            after.push(block);
+            touched.insert([bx as i32, by as i32, bz as i32]);
         }
 
         let changed = indices.len() as u32;
@@ -225,6 +316,8 @@ pub fn edit(session_id: &str, request: EditRequest<'_>) -> Result<(u32, u64, boo
                     *slot = after[offset];
                 }
             }
+            // 方块被替换后原方块实体已失效，一并移除
+            super::entities::prune(&mut session.data.block_entities, &touched);
             session.undo.push(EditRecord {
                 indices,
                 before,
@@ -312,6 +405,14 @@ pub fn transform(session_id: &str, kind: &str) -> Result<([u32; 3], u64), String
                     }
                 }
             }
+        }
+        super::entities::transform_positions(&mut session.data.block_entities, kind, [sx, sy, sz]);
+        if !session.data.raw_entities.is_empty() {
+            crate::log_warn!(
+                "投影变换后非方块实体坐标无法可靠换算，已丢弃 {} 个",
+                session.data.raw_entities.len()
+            );
+            session.data.raw_entities.clear();
         }
         session.data.size = new_size;
         session.data.blocks = blocks;
