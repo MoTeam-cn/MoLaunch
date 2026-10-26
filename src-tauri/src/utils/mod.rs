@@ -26,3 +26,6 @@ pub mod sdk_crypto;
 pub mod sqlite;
 pub mod update_sign;
 pub mod version;
+
+#[cfg(test)]
+mod sdk_crypto_test;

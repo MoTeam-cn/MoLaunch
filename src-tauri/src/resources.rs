@@ -263,12 +263,28 @@ pub fn extract_resource(resource_path: &str, target_path: &Path) -> anyhow::Resu
 pub fn extract_sdk() -> anyhow::Result<std::path::PathBuf> {
     let sdk_filename = crate::sdk::get_sdk_filename();
     let resource_path = format!("sdk/{}", sdk_filename);
+    let primary_path = crate::utils::cache_temp::sdk_library_path(sdk_filename);
 
-    let target_path = crate::utils::cache_temp::sdk_library_path(sdk_filename);
+    if let Err(primary_error) = extract_resource(&resource_path, &primary_path) {
+        // 系统临时目录可能被杀软拦截或不可写，退回到 AppData 持久目录
+        let dir = crate::storage::appdata::ensure_appdata_subdir("sdk").map_err(|e| {
+            anyhow::anyhow!(
+                "临时目录释放失败（{}），AppData 目录也不可用：{}",
+                primary_error,
+                e
+            )
+        })?;
+        let fallback_path = dir.join(sdk_filename);
+        log_warn!(
+            "SDK 释放到临时目录失败（{}），改用 {}",
+            primary_error,
+            fallback_path.display()
+        );
+        extract_resource(&resource_path, &fallback_path)?;
+        return Ok(fallback_path);
+    }
 
-    extract_resource(&resource_path, &target_path)?;
-
-    Ok(target_path)
+    Ok(primary_path)
 }
 
 /// 释放 updater.exe 到 AppData 全局目录（Windows 专属）

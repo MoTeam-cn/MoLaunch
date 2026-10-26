@@ -33,9 +33,51 @@ pub struct SdkInstance {
 unsafe impl Send for SdkInstance {}
 unsafe impl Sync for SdkInstance {}
 
+/// 清理已释放的 SDK 动态库（临时目录 + AppData 两处）
+fn cleanup_extracted_library() {
+    let sdk_filename = crate::sdk::get_sdk_filename();
+    let mut candidates = vec![crate::utils::cache_temp::sdk_library_path(sdk_filename)];
+    if let Ok(dir) = crate::storage::appdata::appdata_subdir("sdk") {
+        candidates.push(dir.join(sdk_filename));
+    }
+    for path in candidates {
+        if !path.exists() {
+            continue;
+        }
+        match std::fs::remove_file(&path) {
+            Ok(()) => crate::log_warn!("[SDK] 已删除可能损坏的动态库: {}", path.display()),
+            Err(e) => crate::log_warn!(
+                "[SDK] 删除 {} 失败（可能被杀软占用）: {}",
+                path.display(),
+                e
+            ),
+        }
+    }
+}
+
 impl SdkInstance {
     /// 加载 SDK 库
+    ///
+    /// 首次失败时清理已释放的动态库再重试一次：杀软截断、残留旧文件或临时目录
+    /// 写入异常都可能导致加载失败，重新释放通常能自愈。
     pub fn load() -> Result<Self, SdkError> {
+        match Self::load_once() {
+            Ok(instance) => Ok(instance),
+            Err(first_error) => {
+                crate::log_warn!("[SDK] 首次加载失败：{}，清理缓存后重试", first_error);
+                cleanup_extracted_library();
+                Self::load_once().map_err(|second_error| {
+                    SdkError::LoadFailed(format!(
+                        "{}；清理缓存重试后仍失败：{}",
+                        first_error, second_error
+                    ))
+                })
+            }
+        }
+    }
+
+    /// 单次加载尝试
+    fn load_once() -> Result<Self, SdkError> {
         let lib_path = check_sdk_library()?;
         log_info!("Loading SDK lite from: {}", lib_path.display());
 

@@ -6,6 +6,15 @@
 
 ### 修复
 
+#### 部分用户提示「SDK 未加载，无法加密认证数据」
+
+- [`sdk_crypto.rs`](src-tauri/src/utils/sdk_crypto.rs)：SDK 未加载时先做一次懒加载重试（启动阶段被杀软拦截或临时目录异常的用户可自愈）；仍失败则把失败原因与动态库路径写进错误信息，并提示加入杀毒白名单。
+- [`instance.rs`](src-tauri/src/sdk/instance.rs)：动态库首次加载失败时清理已释放的库文件后重试一次，覆盖杀软截断、残留旧文件等场景。
+- [`resources.rs`](src-tauri/src/resources.rs)：SDK 释放到系统临时目录失败时退回 `%APPDATA%/.Molaunch/sdk/`，避免临时目录不可写导致 SDK 永久不可用。
+- [`app.rs`](src-tauri/src/state/app.rs)：启动加载失败时记录原因，供上述错误信息展示。
+
+### 修复
+
 #### 加载器安装：注入器主路径，失败时由启动器补全库
 
 主路径与第三方启动器保持一致（同一份注入器 jar），官方安装器路径已移除（官方 maven 在国内下载过慢）：

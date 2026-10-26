@@ -132,6 +132,8 @@ impl AppState {
             }
             Err(e) => {
                 log_warn!("Failed to load SDK lite: {}", e);
+                // 记下原因，后续加解密失败时一并展示给用户
+                crate::utils::sdk_crypto::set_load_error(e.to_string());
                 None
             }
         };
