@@ -10,7 +10,7 @@ use std::path::Path;
 use fastnbt::Value;
 
 use super::codec::{
-    count_non_air, decode_packed_longs, decode_varints, is_air, normalize_block_id, MAX_VOLUME,
+    count_non_air, decode_packed_longs, decode_varints, normalize_block_id, MAX_VOLUME,
 };
 
 /// 解析后的投影数据
@@ -372,12 +372,4 @@ fn list(value: Option<&Value>) -> Option<&Vec<Value>> {
         Some(Value::List(items)) => Some(items),
         _ => None,
     }
-}
-
-/// 供上层判断方块是否为空气
-pub fn palette_is_air(palette: &[String], index: u16) -> bool {
-    palette
-        .get(index as usize)
-        .map(|id| is_air(id))
-        .unwrap_or(true)
 }
