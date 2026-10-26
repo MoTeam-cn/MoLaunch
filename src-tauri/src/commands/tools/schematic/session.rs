@@ -252,10 +252,10 @@ pub fn history(session_id: &str, action: &str) -> Result<(u32, u64, bool, bool),
         let Some(record) = record else {
             return Err("没有可回退的操作".to_string());
         };
-        let values = if action == "redo" {
-            &record.after
+        let values: Vec<u16> = if action == "redo" {
+            record.after.clone()
         } else {
-            &record.before
+            record.before.clone()
         };
         for (offset, &index) in record.indices.iter().enumerate() {
             if let Some(slot) = session.data.blocks.get_mut(index) {
