@@ -14,7 +14,7 @@
 - [`read.rs`](src-tauri/src/commands/tools/schematic/read.rs)：支持 1.13 之前的 MCEdit 投影（`Blocks` + `Data` + 可选 `AddBlocks` 半字节高位）。
 - [`dispatcher.rs`](src-tauri/src/commands/tools/dispatcher.rs)：投影 action 由 2 个扩展为 7 个（open / slice / edit / history / transform / export / close）。
 - [`SchematicToolbar.vue`](src/views/tools/storage/schematic/SchematicToolbar.vue) + [`SchematicPalette.vue`](src/views/tools/storage/schematic/SchematicPalette.vue)：新增工具栏（轴/层/工具/撤销重做/变换/缩放/导出）与可搜索的方块选择器。
-- [`SchematicCanvas.vue`](src/views/tools/storage/schematic/SchematicCanvas.vue)：支持鼠标框选编辑范围，选中区域实时高亮。
+- [`SchematicCanvas.vue`](src/views/tools/storage/schematic/SchematicCanvas.vue)：支持鼠标框选编辑范围，选中区域实时高亮；工具栏提供方向键平移视口与缩放。
 - 测试：Rust 新增 6 例（旧版映射覆盖度、会话编辑撤销重做、切片布局、旋转尺寸、非法层号与非法变换），前端 141 例全通过。
 
 #### 投影预览（工具页 → 存档资源）

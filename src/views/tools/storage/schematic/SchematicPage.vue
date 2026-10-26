@@ -216,6 +216,14 @@ async function doExport(): Promise<void> {
   }
 }
 
+/** 平移视口（每次移动视口边长的一半） */
+async function pan(dx: number, dy: number): Promise<void> {
+  if (!session.value) return
+  const step = Math.max(Math.floor(VIEW_SIZE / 2), 1)
+  viewport.value = { x: viewport.value.x + dx * step, y: viewport.value.y + dy * step }
+  await refreshSlice()
+}
+
 function zoom(delta: number): void {
   cellSize.value = Math.min(16, Math.max(1, cellSize.value + delta))
 }
@@ -255,6 +263,7 @@ onBeforeUnmount(() => {
       @redo="step('redo')"
       @transform="doTransform"
       @zoom="zoom"
+      @pan="pan"
       @export="doExport"
     />
 

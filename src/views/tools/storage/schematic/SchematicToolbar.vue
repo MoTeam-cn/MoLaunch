@@ -11,6 +11,10 @@ import {
   ArrowPathRoundedSquareIcon,
   ArrowUturnLeftIcon,
   ArrowUturnRightIcon,
+  ChevronDownIcon,
+  ChevronLeftIcon,
+  ChevronRightIcon,
+  ChevronUpIcon,
   FolderOpenIcon,
   MagnifyingGlassMinusIcon,
   MagnifyingGlassPlusIcon,
@@ -43,6 +47,7 @@ const emit = defineEmits<{
   redo: []
   transform: [kind: 'rotate_cw' | 'rotate_ccw' | 'mirror_x' | 'mirror_z' | 'flip_y']
   zoom: [delta: number]
+  pan: [dx: number, dy: number]
   export: []
 }>()
 
@@ -136,6 +141,20 @@ const formatOptions = [
       </Button>
       <Button size="small" type="outline" :loading="busy" @click="emit('transform', 'flip_y')">
         上下翻转
+      </Button>
+      <span class="mx-1 h-5 w-px bg-gray-200" />
+      <span class="text-xs text-gray-600">平移</span>
+      <Button size="small" type="outline" @click="emit('pan', 0, -1)">
+        <ChevronUpIcon class="h-4 w-4" />
+      </Button>
+      <Button size="small" type="outline" @click="emit('pan', 0, 1)">
+        <ChevronDownIcon class="h-4 w-4" />
+      </Button>
+      <Button size="small" type="outline" @click="emit('pan', -1, 0)">
+        <ChevronLeftIcon class="h-4 w-4" />
+      </Button>
+      <Button size="small" type="outline" @click="emit('pan', 1, 0)">
+        <ChevronRightIcon class="h-4 w-4" />
       </Button>
       <span class="mx-1 h-5 w-px bg-gray-200" />
       <Button size="small" type="outline" @click="emit('zoom', -1)">
