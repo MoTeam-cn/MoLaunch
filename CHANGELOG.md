@@ -8,6 +8,14 @@
 
 ### 新增
 
+#### 投影保留方块状态属性
+
+- **问题**：调色板只存方块名，`jungle_slab[half=top]`、`oak_stairs[facing=east,half=top]`、`oak_log[axis=x]` 这些属性全部丢弃，导入后再导出形状就变了——上半砖变下半砖，楼梯朝向翻转，原木纹理方向错。
+- **读取**（[`read.rs`](src-tauri/src/commands/tools/schematic/read.rs)）：Sponge 的 `Palette` 键本身就是完整 blockstate，改为原样规范化保留；Litematica 与结构格式的 `{Name, Properties}` 拆解后重新拼成 `minecraft:x[k=v,...]`（属性按 key 排序，保证同一状态稳定可比）。
+- **旧版**（[`legacy_blocks.rs`](src-tauri/src/commands/tools/schematic/legacy_blocks.rs)）：按元数据位推导属性——原木 `axis`（高 2 位）、树叶 `persistent`（bit2）、半砖 `half`（bit3）、楼梯 `facing`+`half`+`shape`、活板门 `open`+`half`、门 `facing`+`half`、火把 `facing`。**只输出位语义确定的属性**：猜错方向比不写更糟，不写只是回到默认朝向，写错会让整栋楼的楼梯反着放。
+- **导出**（[`write.rs`](src-tauri/src/commands/tools/schematic/write.rs)）：拆回 `Name` 与 `Properties` 两个字段写入。
+- **配套**（[`codec.rs`](src-tauri/src/commands/tools/schematic/codec.rs)、[`decode.ts`](src/utils/schematic/decode.ts)）：新增 `split_block_state` / `join_block_state` / `block_base_name`；空气判断、贴图与配色改为按方块名匹配；统计按方块名聚合，避免上下半砖分成两行。
+
 #### 投影预览：层密度条与等轴测立体图
 
 - [`overview.rs`](src-tauri/src/commands/tools/schematic/overview.rs)：新增概览计算——每层非空方块数与俯视高度图（每列最高方块与高度），单边超过 256 时按整数步长降采样。

@@ -8,10 +8,20 @@ use std::path::Path;
 
 use fastnbt::{SerOpts, Value};
 
-use super::codec::{bits_per_entry, encode_packed_longs, encode_varints};
+use super::codec::{bits_per_entry, encode_packed_longs, encode_varints, split_block_state};
 use super::read::SchematicData;
 
 /// 导出目标格式
+/// 把 `minecraft:x[k=v,...]` 拆成 Name 与 Properties 两个字段
+fn block_state_fields(id: &str) -> (String, HashMap<String, Value>) {
+    let (base, props) = split_block_state(id);
+    let mut properties: HashMap<String, Value> = HashMap::with_capacity(props.len());
+    for (key, value) in props {
+        properties.insert(key, Value::String(value));
+    }
+    (base, properties)
+}
+
 pub fn export(data: &SchematicData, format: &str, target: &Path) -> Result<u64, String> {
     let bytes = match format {
         "sponge_v2" => gzip(&build_sponge(data)?)?,
@@ -92,9 +102,10 @@ fn build_litematic(data: &SchematicData) -> Result<Vec<u8>, String> {
 
     let mut palette_list: Vec<Value> = Vec::with_capacity(data.palette.len());
     for id in &data.palette {
+        let (name, properties) = block_state_fields(id);
         let mut entry: HashMap<String, Value> = HashMap::new();
-        entry.insert("Name".to_string(), Value::String(id.clone()));
-        entry.insert("Properties".to_string(), Value::Compound(HashMap::new()));
+        entry.insert("Name".to_string(), Value::String(name));
+        entry.insert("Properties".to_string(), Value::Compound(properties));
         palette_list.push(Value::Compound(entry));
     }
 
@@ -175,8 +186,12 @@ fn build_structure(data: &SchematicData) -> Result<Vec<u8>, String> {
 
     let mut palette_list: Vec<Value> = Vec::with_capacity(data.palette.len());
     for id in &data.palette {
+        let (name, properties) = block_state_fields(id);
         let mut entry: HashMap<String, Value> = HashMap::new();
-        entry.insert("Name".to_string(), Value::String(id.clone()));
+        entry.insert("Name".to_string(), Value::String(name));
+        if !properties.is_empty() {
+            entry.insert("Properties".to_string(), Value::Compound(properties));
+        }
         palette_list.push(Value::Compound(entry));
     }
 

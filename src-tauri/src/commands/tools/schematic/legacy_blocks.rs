@@ -46,7 +46,7 @@ const SLAB8: [&str; 8] = [
 ];
 
 /// 按位规则推导方块名
-pub fn legacy_block_name(id: u16, meta: u8) -> Option<String> {
+fn legacy_plain_name(id: u16, meta: u8) -> Option<String> {
     let m = meta & 0x0f;
     let name = match id {
         // 空气：必须单独列出，否则会退化成 legacy_0_0 占位符，
@@ -296,6 +296,98 @@ pub fn legacy_block_name(id: u16, meta: u8) -> Option<String> {
         _ => return None,
     };
     Some(format!("minecraft:{}", name))
+}
+
+/// 组装带属性的方块状态字符串
+fn state(base: &str, props: &[(&str, &str)]) -> String {
+    if props.is_empty() {
+        return format!("minecraft:{}", base);
+    }
+    let mut owned: Vec<(String, String)> = props
+        .iter()
+        .map(|(key, value)| (key.to_string(), value.to_string()))
+        .collect();
+    owned.sort_by(|a, b| a.0.cmp(&b.0));
+    super::codec::join_block_state(&format!("minecraft:{}", base), &owned)
+}
+
+/// 元数据里带朝向/开合/上下半截的方块，按位还原成 blockstate 属性。
+///
+/// 只输出位语义确定的属性：猜错方向比不写更糟——不写只是回到默认朝向，
+/// 写错会让整栋楼的楼梯全部反着放。
+fn legacy_properties(id: u16, meta: u8) -> Vec<(&'static str, &'static str)> {
+    let m = meta & 0x0f;
+    match id {
+        // 原木：低 2 位树种，高 2 位轴向（0=Y 1=X 2=Z 3=六面树皮，后者已映射成 *_wood）
+        17 | 162 => match (m >> 2) & 3 {
+            0 => vec![("axis", "y")],
+            1 => vec![("axis", "x")],
+            2 => vec![("axis", "z")],
+            _ => Vec::new(),
+        },
+        // 树叶：bit2 表示不衰减
+        18 | 161 => {
+            if (m >> 2) & 1 == 1 {
+                vec![("persistent", "true")]
+            } else {
+                Vec::new()
+            }
+        }
+        // 半砖/台阶：bit3 表示上半砖
+        44 | 126 => vec![("half", if m & 8 != 0 { "top" } else { "bottom" })],
+        // 楼梯：低 2 位朝向，bit3 上半
+        53 | 67 | 108 | 109 | 114 | 128 | 134 | 135 | 136 | 156 | 163 | 164 | 180 | 203 => vec![
+            (
+                "facing",
+                match m & 3 {
+                    0 => "east",
+                    1 => "west",
+                    2 => "south",
+                    _ => "north",
+                },
+            ),
+            ("half", if m & 8 != 0 { "top" } else { "bottom" }),
+            ("shape", "straight"),
+        ],
+        // 活板门：bit2 开合，bit3 上下（朝向位语义有歧义，留默认）
+        96 | 167 => vec![
+            ("half", if m & 8 != 0 { "top" } else { "bottom" }),
+            ("open", if m & 4 != 0 { "true" } else { "false" }),
+        ],
+        // 门：低 2 位朝向，bit3 上半扇
+        64 | 71 | 193 | 194 | 195 | 196 | 197 => vec![
+            (
+                "facing",
+                match m & 3 {
+                    0 => "east",
+                    1 => "south",
+                    2 => "west",
+                    _ => "north",
+                },
+            ),
+            ("half", if m & 8 != 0 { "upper" } else { "lower" }),
+        ],
+        // 火把：0 站立，1-4 依次为东/西/南/北
+        50 | 75 | 76 => match m {
+            1 => vec![("facing", "east")],
+            2 => vec![("facing", "west")],
+            3 => vec![("facing", "south")],
+            4 => vec![("facing", "north")],
+            _ => Vec::new(),
+        },
+        _ => Vec::new(),
+    }
+}
+
+/// 推导完整的方块状态（含属性）
+pub fn legacy_block_name(id: u16, meta: u8) -> Option<String> {
+    let plain = legacy_plain_name(id, meta)?;
+    let props = legacy_properties(id, meta);
+    if props.is_empty() {
+        return Some(plain);
+    }
+    let base = plain.strip_prefix("minecraft:").unwrap_or(&plain);
+    Some(state(base, &props))
 }
 
 /// 表中收录的规则覆盖范围（供测试断言）

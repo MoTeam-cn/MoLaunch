@@ -119,21 +119,28 @@ const BLOCK_COLORS: Record<string, string> = {
 
 const colorCache = new Map<string, string>()
 
+/** 去掉 blockstate 属性，只留方块名 */
+export function blockBaseName(id: string): string {
+  const open = id.indexOf('[')
+  return open < 0 ? id : id.slice(0, open)
+}
+
 /** 方块 id → 展示色（未知方块按 id 哈希生成稳定颜色） */
 export function blockColor(id: string): string {
-  const cached = colorCache.get(id)
+  const base = blockBaseName(id)
+  const cached = colorCache.get(base)
   if (cached) return cached
-  const known = BLOCK_COLORS[id]
+  const known = BLOCK_COLORS[base]
   if (known) {
-    colorCache.set(id, known)
+    colorCache.set(base, known)
     return known
   }
   let hash = 0
-  for (let i = 0; i < id.length; i++) {
-    hash = (hash * 31 + id.charCodeAt(i)) % 360
+  for (let i = 0; i < base.length; i++) {
+    hash = (hash * 31 + base.charCodeAt(i)) % 360
   }
   const color = `hsl(${hash}, 42%, 58%)`
-  colorCache.set(id, color)
+  colorCache.set(base, color)
   return color
 }
 
@@ -152,7 +159,7 @@ export function countSliceBlocks(
 
 /** 调色板中空气对应的索引（找不到返回 -1） */
 export function findAirIndex(palette: readonly string[]): number {
-  return palette.findIndex((id) => id === 'minecraft:air')
+  return palette.findIndex((id) => blockBaseName(id) === 'minecraft:air')
 }
 
 /** 调整颜色明暗：factor < 1 变暗，> 1 变亮（支持 #rrggbb 与 hsl()） */

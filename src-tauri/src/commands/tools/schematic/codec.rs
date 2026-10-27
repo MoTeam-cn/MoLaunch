@@ -125,10 +125,70 @@ pub fn normalize_block_id(raw: &str) -> String {
     }
 }
 
+/// 拆出方块名与属性；属性按 key 升序，保证同一状态字符串稳定可比
+pub fn split_block_state(raw: &str) -> (String, Vec<(String, String)>) {
+    let trimmed = raw.trim();
+    let Some(open) = trimmed.find('[') else {
+        return (normalize_block_id(trimmed), Vec::new());
+    };
+    let base = normalize_block_id(&trimmed[..open]);
+    let Some(close) = trimmed.rfind(']') else {
+        return (base, Vec::new());
+    };
+    if close <= open {
+        return (base, Vec::new());
+    }
+    let mut props: Vec<(String, String)> = Vec::new();
+    for pair in trimmed[open + 1..close].split(',') {
+        let pair = pair.trim();
+        if pair.is_empty() {
+            continue;
+        }
+        let Some(eq) = pair.find('=') else {
+            continue;
+        };
+        let key = pair[..eq].trim();
+        let value = pair[eq + 1..].trim();
+        if key.is_empty() || value.is_empty() {
+            continue;
+        }
+        props.push((key.to_string(), value.to_string()));
+    }
+    props.sort_by(|a, b| a.0.cmp(&b.0));
+    props.dedup_by(|a, b| a.0 == b.0);
+    (base, props)
+}
+
+/// 拼成 `minecraft:x[k=v,...]`；无属性时只返回方块名
+pub fn join_block_state(base: &str, props: &[(String, String)]) -> String {
+    if props.is_empty() {
+        return base.to_string();
+    }
+    let body: Vec<String> = props
+        .iter()
+        .map(|(key, value)| format!("{}={}", key, value))
+        .collect();
+    format!("{}[{}]", base, body.join(","))
+}
+
+/// 规范化完整 blockstate 字符串（补齐命名空间、属性排序）
+pub fn normalize_block_state(raw: &str) -> String {
+    let (base, props) = split_block_state(raw);
+    join_block_state(&base, &props)
+}
+
+/// 只取方块名（不含属性），用于贴图、配色与空气判断
+pub fn block_base_name(raw: &str) -> &str {
+    match raw.find('[') {
+        Some(pos) => raw[..pos].trim(),
+        None => raw.trim(),
+    }
+}
+
 /// 是否为空气类方块（不计入非空气统计）
 pub fn is_air(id: &str) -> bool {
     matches!(
-        id,
+        block_base_name(id),
         "minecraft:air" | "minecraft:cave_air" | "minecraft:void_air" | "minecraft:structure_void"
     )
 }
@@ -139,10 +199,20 @@ pub fn top_counts(blocks: &[u16], palette: &[String], limit: usize) -> Vec<(Stri
     for &index in blocks {
         *counter.entry(index).or_insert(0) += 1;
     }
-    let mut items: Vec<(String, u64)> = counter
+    // 按方块名聚合：上下半砖、不同朝向的同种方块在统计里合并成一行
+    let mut merged: HashMap<&str, u64> = HashMap::new();
+    for (index, count) in counter {
+        let Some(id) = palette.get(index as usize) else {
+            continue;
+        };
+        if is_air(id) {
+            continue;
+        }
+        *merged.entry(block_base_name(id)).or_insert(0) += count;
+    }
+    let mut items: Vec<(String, u64)> = merged
         .into_iter()
-        .filter_map(|(index, count)| palette.get(index as usize).map(|id| (id.clone(), count)))
-        .filter(|(id, _)| !is_air(id))
+        .map(|(name, count)| (name.to_string(), count))
         .collect();
     items.sort_by(|a, b| b.1.cmp(&a.1).then_with(|| a.0.cmp(&b.0)));
     items.truncate(limit);

@@ -10,7 +10,8 @@ use std::path::Path;
 use fastnbt::Value;
 
 use super::codec::{
-    count_non_air, decode_packed_longs, decode_varints, normalize_block_id, MAX_VOLUME,
+    count_non_air, decode_packed_longs, decode_varints, join_block_state, normalize_block_id,
+    normalize_block_state, MAX_VOLUME,
 };
 
 /// 解析后的投影数据
@@ -100,7 +101,8 @@ fn read_sponge(root: &Value, name: &str) -> Result<SchematicData, String> {
         if index > max_index {
             max_index = index;
         }
-        entries.push((index, normalize_block_id(id)));
+        // Sponge 的 Palette 键本身就是完整 blockstate（含 [props]），原样保留
+        entries.push((index, normalize_block_state(id)));
     }
     if max_index < 0 {
         return Err("调色板为空".to_string());
@@ -200,10 +202,7 @@ fn read_litematic(root: &Value, name: &str) -> Result<SchematicData, String> {
             list(get(value, "BlockStatePalette")).ok_or("区域缺少 BlockStatePalette")?;
         let mut index_map: Vec<u16> = Vec::with_capacity(local_palette.len());
         for entry in local_palette {
-            let id = get(entry, "Name")
-                .and_then(as_string)
-                .map(|raw| normalize_block_id(&raw))
-                .unwrap_or_else(|| "minecraft:air".to_string());
+            let id = block_state_from_entry(entry);
             let global = match palette.iter().position(|existing| existing == &id) {
                 Some(found) => found as u16,
                 None => {
@@ -294,11 +293,7 @@ fn read_structure(root: &Value, name: &str) -> Result<SchematicData, String> {
     let palette_list = list(get(root, "palette")).ok_or("缺少 palette")?;
     let mut palette: Vec<String> = Vec::with_capacity(palette_list.len());
     for entry in palette_list {
-        let id = get(entry, "Name")
-            .and_then(as_string)
-            .map(|raw| normalize_block_id(&raw))
-            .unwrap_or_else(|| "minecraft:air".to_string());
-        palette.push(id);
+        palette.push(block_state_from_entry(entry));
     }
 
     let mut blocks: Vec<u16> = vec![0; (sx as usize) * (sy as usize) * (sz as usize)];
@@ -407,6 +402,27 @@ fn read_mcedit_legacy(root: &Value, name: &str) -> Result<SchematicData, String>
         block_entities: super::entities::read_legacy(root),
         raw_entities: Vec::new(),
     })
+}
+
+/// 从 `{Name, Properties}` 形式的调色板条目还原完整 blockstate。
+///
+/// 1.13 之后方块名与属性分离存储，属性直接丢会丢掉朝向、上下半砖、水logged 等
+/// 影响外观的信息，导出时形状就变了。
+fn block_state_from_entry(entry: &Value) -> String {
+    let name = get(entry, "Name")
+        .and_then(as_string)
+        .unwrap_or_else(|| "minecraft:air".to_string());
+    let base = normalize_block_id(&name);
+    let mut props: Vec<(String, String)> = Vec::new();
+    if let Some(map) = compound(get(entry, "Properties")) {
+        for (key, value) in map {
+            if let Some(text) = as_string(value) {
+                props.push((key.clone(), text));
+            }
+        }
+    }
+    props.sort_by(|a, b| a.0.cmp(&b.0));
+    join_block_state(&base, &props)
 }
 
 // ---------- NBT 取值helper ----------
