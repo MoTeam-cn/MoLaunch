@@ -8,6 +8,15 @@
 
 ### 新增
 
+#### 投影 3D 预览改用真实方块模型
+
+- **问题**：原来是俯视高度图拉的等轴测柱体，只能看轮廓——台阶、楼梯、栅栏、植物全都画成完整方块，转不动也看不出形状。
+- **现在**：[`SchematicScene.vue`](src/views/tools/storage/schematic/SchematicScene.vue) 用渲染库按原版方块模型绘制，形状与游戏内一致；复用资源包预览已在用的原版资源加载路径（[`previewResources.ts`](src/utils/resourcepack/previewResources.ts)），不额外引入资源。
+- **遮挡剔除**（[`structure.ts`](src/utils/schematic/structure.ts)）：六个邻居都不透明的实心方块谁也看不见，建结构前直接丢掉；液体额外按"同种液体也算实心"处理，只保留表层。5,531,904 方块的地形剔除后只剩几万个，百万级对象的内存开销也就没了。
+- **交互**：拖拽旋转、滚轮缩放、自动旋转开关、重置视角；相机距离按投影尺寸自适应，落地即正对整体。
+- **移除**：`SchematicOverview.vue` 与 `isometric.ts`（2D 等轴测实现）不再使用，层密度条保留。
+- **测试**：`structure.test.ts` 4 例（全实心内部剔除、单层不剔除、空腔壁保留、液体不当作不透明）。
+
 #### 投影体素数据接口（3D 预览用）
 
 - [`volume.rs`](src-tauri/src/commands/tools/schematic/volume.rs)：把整个体积的方块索引压成一条 zlib 流返回。u16 数组对有地形的投影压缩后通常只剩原始体积的几个百分点，因此整份压一次传完，不必按块往返；超过 1600 万方块直接拒绝并提示改用逐层浏览，避免前端解包卡死。

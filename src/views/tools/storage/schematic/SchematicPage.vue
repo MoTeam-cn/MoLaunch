@@ -6,13 +6,13 @@
  * 数据常驻后端会话，前端只取当前视口切片，因此不受整体体积限制。
  * 支持画笔、矩形、球体、圆柱、条件替换，撤销重做，旋转镜像，三格式导出；
  * 方块实体（箱子内容、告示牌文字等）随编辑与导出保留。
- * 另有层密度条与等轴测立体预览，避免在空层上盲翻。
+ * 另有层密度条与 3D 立体预览，避免在空层上盲翻。
  */
 
 import { ExclamationTriangleIcon } from '@heroicons/vue/24/outline'
 import SchematicCanvas from './SchematicCanvas.vue'
 import SchematicLayerBar from './SchematicLayerBar.vue'
-import SchematicOverview from './SchematicOverview.vue'
+import SchematicScene from './SchematicScene.vue'
 import SchematicSidePanel from './SchematicSidePanel.vue'
 import SchematicToolbar from './SchematicToolbar.vue'
 import { useSchematicEditor } from '@/composables/useSchematicEditor'
@@ -111,13 +111,9 @@ const editor = useSchematicEditor()
         />
       </div>
 
-      <SchematicOverview
-        v-if="editor.overview.value"
-        :overview="editor.overview.value"
-        :palette="editor.session.value.palette"
-        :empty-index="editor.overview.value.emptyIndex"
-        :world-height="editor.session.value.size[1]"
-        :atlas="editor.atlas.value"
+      <SchematicScene
+        :session-id="editor.session.value.sessionId"
+        :size="editor.session.value.size"
       />
     </template>
   </section>
