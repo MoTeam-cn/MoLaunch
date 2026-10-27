@@ -7,6 +7,7 @@ mod project;
 mod search;
 mod types;
 
+pub(crate) use convert::construct_edge_url;
 pub use fingerprint::{fingerprint_search, fingerprint_search_with_downloads};
 pub use project::{batch_get_mod_slugs, get_project, get_versions};
 pub use search::search;

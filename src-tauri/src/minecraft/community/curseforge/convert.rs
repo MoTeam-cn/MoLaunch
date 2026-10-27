@@ -157,19 +157,33 @@ pub(crate) fn convert_version(file: &CfFile, rtype: ResourceType) -> ResourceVer
     }
 }
 
-/// 构造 CurseForge 下载 URL
+/// 解析 CurseForge 文件的下载 URL
+///
+/// - 官方 API 返回了地址：原样使用
+/// - 地址为空（作者禁止第三方分发）：推导开关开启时按 fileId 构造 CDN 地址，
+///   否则返回空串，由上层按「无下载地址」处理
+///
+/// 推导是开发者选项（`download.cf_derive_url`），开关镜像在
+/// [`crate::minecraft::community::cf_policy`]。
 pub(crate) fn parse_cf_download_url(url: &Option<String>, file_name: &str, file_id: i64) -> String {
-    if let Some(ref u) = url {
-        if !u.is_empty() {
-            return u.clone();
-        }
+    if let Some(u) = url.as_deref().filter(|u| !u.is_empty()) {
+        return u.to_string();
     }
-    // Fallback: 从 file_id 构造 edge.forgecdn.net URL
-    let id_str = file_id.to_string();
-    if id_str.len() >= 6 {
-        let (p1, p2) = id_str.split_at(id_str.len() - 4);
-        format!("https://edge.forgecdn.net/files/{}/{}", p1, p2)
-    } else {
-        format!("https://edge.forgecdn.net/files/0/{}", file_name)
+    if !crate::minecraft::community::cf_policy::enabled() {
+        return String::new();
     }
+    construct_edge_url(file_id, file_name)
+}
+
+/// 构造 CurseForge CDN 下载地址
+///
+/// 布局：`https://edge.forgecdn.net/files/{id / 1000}/{id % 1000}/{文件名}`。
+/// 文件名必须按 path segment 做百分号编码：CF 的文件名常含空格、`+`、`:`
+/// （如 `jei 1.21.5+neoforge.jar`），直接拼接会被 CDN 解析成空格或端口分隔符而 404；
+/// 编码后 `/` 与 `..` 一并失效，顺带满足路径穿越防护。
+pub(crate) fn construct_edge_url(file_id: i64, file_name: &str) -> String {
+    let group = file_id / 1000;
+    let rest = file_id % 1000;
+    let encoded = urlencoding::encode(file_name);
+    format!("https://edge.forgecdn.net/files/{group}/{rest}/{encoded}")
 }

@@ -140,25 +140,33 @@ pub(super) fn extract_mr_project_id(url: &str) -> Option<String> {
     None
 }
 
-/// 构造 CF edge 下载 URL（当 download_url 为空时的 fallback）
+/// 构造 CF edge 下载 URL（download_url 为空、且推导开关已开启时的 fallback）
 ///
-/// 拼接规则：`https://edge.forgecdn.net/files/{id前4位}/{id余位}/{FileName}`
-/// 余位用 i64 转换去掉前导 0，例如 2725062 → 2725/62
-///
-/// 始终使用官方域名构造，镜像替换由调用方通过 `cdn_urls()` 处理
-/// （source=0 时 cdn_urls 会替换为 mocdn 镜像）
+/// 实现收敛在社区资源层 [`crate::minecraft::community::curseforge::construct_edge_url`]：
+/// 路径布局为 `files/{id/1000}/{id%1000}/{百分号编码后的文件名}`。始终用官方域名
+/// 构造，镜像替换由调用方通过 `cdn_urls()` 处理（source=0 时替换为 mocdn 镜像）。
 pub(super) fn construct_cf_edge_url(file_id: i64, file_name: &str) -> String {
-    const CF_EDGE_BASE: &str = "https://edge.forgecdn.net";
-    let id_str = file_id.to_string();
-    // fileId 至少 5 位才能拆分前 4 位 / 余位
-    if id_str.len() >= 5 {
-        let (p1, p2) = id_str.split_at(4);
-        // 余位 parse 为 i64 去掉前导 0（如 062 → 62）
-        let p2_num: i64 = p2.parse().unwrap_or(0);
-        format!("{}/files/{}/{}/{}", CF_EDGE_BASE, p1, p2_num, file_name)
-    } else {
-        // fileId 过短无法拆分，回退 0/{file_name}
-        format!("{}/files/0/{}", CF_EDGE_BASE, file_name)
+    crate::minecraft::community::curseforge::construct_edge_url(file_id, file_name)
+}
+
+/// 解析 CurseForge 文件的可用下载地址
+///
+/// - 官方 API 返回了地址：原样使用
+/// - 地址为空（作者禁止第三方分发）：`derive` 为 true 时按 fileId 推导 CDN 地址，
+///   否则返回 `None`，由调用方给出手动下载提示
+///
+/// 推导是开发者选项（`download.cf_derive_url`）：它依赖 CurseForge 未公开的 CDN
+/// 路径布局，默认关闭。
+pub(super) fn resolve_cf_download_url(
+    download_url: Option<&str>,
+    file_id: i64,
+    file_name: &str,
+    derive: bool,
+) -> Option<String> {
+    match download_url.filter(|url| !url.is_empty()) {
+        Some(url) => Some(url.to_string()),
+        None if derive => Some(construct_cf_edge_url(file_id, file_name)),
+        None => None,
     }
 }
 
