@@ -49,6 +49,9 @@ const SLAB8: [&str; 8] = [
 pub fn legacy_block_name(id: u16, meta: u8) -> Option<String> {
     let m = meta & 0x0f;
     let name = match id {
+        // 空气：必须单独列出，否则会退化成 legacy_0_0 占位符，
+        // 整个体积都会被当成实心方块，画布与统计一起失真
+        0 => "air".to_string(),
         // 基础方块
         // 石头：元数据是石种细分
         1 => match m {

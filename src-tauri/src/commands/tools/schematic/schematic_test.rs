@@ -199,6 +199,9 @@ fn test_export_rejects_unknown_format() {
 #[test]
 fn test_legacy_block_table_covers_common_blocks() {
     assert!(legacy_block_count() > 400);
+    // 空气必须显式映射：漏了会让整份体积都被当成实心方块
+    assert_eq!(legacy_block_name(0, 0).as_deref(), Some("minecraft:air"));
+    assert_eq!(legacy_block_name(0, 7).as_deref(), Some("minecraft:air"));
     assert_eq!(legacy_block_name(1, 0).as_deref(), Some("minecraft:stone"));
     assert_eq!(
         legacy_block_name(1, 1).as_deref(),
