@@ -4,7 +4,7 @@
 
 ## [Unreleased]
 
-## [0.3.13-rc.2] - 2026-10-27
+## [0.3.13-rc.3] - 2026-10-27
 
 ### 新增
 
@@ -33,6 +33,18 @@
 - **旧版**（[`legacy_blocks.rs`](src-tauri/src/commands/tools/schematic/legacy_blocks.rs)）：按元数据位推导属性——原木 `axis`（高 2 位）、树叶 `persistent`（bit2）、半砖 `half`（bit3）、楼梯 `facing`+`half`+`shape`、活板门 `open`+`half`、门 `facing`+`half`、火把 `facing`。**只输出位语义确定的属性**：猜错方向比不写更糟，不写只是回到默认朝向，写错会让整栋楼的楼梯反着放。
 - **导出**（[`write.rs`](src-tauri/src/commands/tools/schematic/write.rs)）：拆回 `Name` 与 `Properties` 两个字段写入。
 - **配套**（[`codec.rs`](src-tauri/src/commands/tools/schematic/codec.rs)、[`decode.ts`](src/utils/schematic/decode.ts)）：新增 `split_block_state` / `join_block_state` / `block_base_name`；空气判断、贴图与配色改为按方块名匹配；统计按方块名聚合，避免上下半砖分成两行。
+
+### 修复
+
+#### 旧版投影的空气被当成实心方块
+
+- **现象**（[`legacy_blocks.rs`](src-tauri/src/commands/tools/schematic/legacy_blocks.rs)）：打开带地形的旧版投影，画布全蓝、方块统计里的「非空气方块」等于总体积、立体预览是一整块实心方块。
+- **根因**：上一版把 `(id, meta)` 精确表改成位规则推导时，重写了 `id >= 1` 的分支却漏掉了 `id == 0`。空气落到兜底分支，退化成 `minecraft:legacy_0_0` 占位符，被当成真实方块参与绘制与统计。一个 147×256×147 的投影里有 4,233,368 个（76.5%）方块因此变成实心。
+- **改法**：显式映射 `0 => minecraft:air`，并补回归断言 `legacy_block_name(0, 0)` 与 `legacy_block_name(0, 7)` 都返回空气。修复后该投影的非空气方块为 1,298,536，与逐层浏览、统计、立体预览三处数字一致。
+
+## [0.3.13-rc.2] - 2026-10-27
+
+### 新增
 
 #### 投影预览：层密度条与等轴测立体图
 
@@ -88,7 +100,6 @@
 - **改法**：尺寸改由内联样式给出（`iconStyle` 同时包含宽高与切图背景），样式里不再用 `v-bind()`。全项目复查，`v-bind()` 只有这一处。
 - **顺带**（[`resources.ts`](src/utils/recipe-generator/resources.ts)）：图集坐标表原本在运行时要一次 HTTP 请求，失败会让整张表为空且没有任何提示，改为 `?raw` 静态内联；解析失败返回空表而不是抛错。
 - **兜底**：取不到贴图时显示物品名首字母，不再是空白。
-- **测试**：新增 3 例 SSR 渲染断言（有贴图时带 `background-image` 且宽高落在元素自身、缺贴图时保留尺寸并显示首字母、图集未就绪时不抛错）。
 
 ## [0.3.13-rc.1] - 2026-10-26
 
