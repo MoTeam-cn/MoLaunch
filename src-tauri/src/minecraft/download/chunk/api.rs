@@ -36,7 +36,8 @@ fn plan_chunk_count(file_size: u64, requested: usize) -> usize {
     if requested <= 1 {
         return requested;
     }
-    let upper = requested.saturating_mul(2).min(MAX_PLANNED_CHUNKS).max(1);
+    // 上限：最多翻一倍，且不超过硬上限（clamp 的 min 恒小于 max，不会 panic）
+    let upper = requested.saturating_mul(2).clamp(1, MAX_PLANNED_CHUNKS);
     let lower = requested.min(upper);
     let by_size = usize::try_from(file_size / TARGET_SEGMENT_BYTES).unwrap_or(upper);
     by_size.clamp(lower, upper)
