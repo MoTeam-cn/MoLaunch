@@ -210,7 +210,28 @@ fn test_legacy_block_table_covers_common_blocks() {
     // 位规则：原木低 2 位树种、高 2 位轴向（3 表示全树皮）
     assert_eq!(
         legacy_block_name(17, 0).as_deref(),
-        Some("minecraft:oak_log")
+        Some("minecraft:oak_log[axis=y]")
+    );
+    assert_eq!(
+        legacy_block_name(17, 4).as_deref(),
+        Some("minecraft:oak_log[axis=x]")
+    );
+    assert_eq!(
+        legacy_block_name(17, 8).as_deref(),
+        Some("minecraft:oak_log[axis=z]")
+    );
+    // 半砖 bit3 = 上半砖，楼梯低 2 位朝向 + bit3 上下
+    assert_eq!(
+        legacy_block_name(44, 8).as_deref(),
+        Some("minecraft:stone_slab[half=top]")
+    );
+    assert_eq!(
+        legacy_block_name(44, 0).as_deref(),
+        Some("minecraft:stone_slab[half=bottom]")
+    );
+    assert_eq!(
+        legacy_block_name(53, 3).as_deref(),
+        Some("minecraft:oak_stairs[facing=north,half=bottom,shape=straight]")
     );
     assert_eq!(
         legacy_block_name(17, 13).as_deref(),
