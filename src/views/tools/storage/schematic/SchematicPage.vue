@@ -70,11 +70,11 @@ const editor = useSchematicEditor()
       </div>
 
       <!--
-        宽屏两列：左列自上而下是 3D 预览与逐层视图，右列侧栏跨两行。
-        窄屏退回单列，顺序为 3D → 侧栏 → 逐层。
+        宽屏两列：左侧 3D 占满高度，右侧自上而下是逐层视图与方块列表。
+        窄屏退回单列，顺序为 3D → 逐层 → 方块列表。
       -->
-      <div class="grid min-h-0 gap-3 xl:grid-cols-[minmax(0,1fr)_320px]">
-        <div class="min-w-0">
+      <div class="flex min-h-0 flex-col gap-3 xl:flex-row">
+        <div class="min-w-0 flex-1">
           <SchematicScene
             :session-id="editor.session.value.sessionId"
             :size="editor.session.value.size"
@@ -82,7 +82,42 @@ const editor = useSchematicEditor()
           />
         </div>
 
-        <div class="flex min-w-0 flex-col xl:row-span-2 xl:self-start">
+        <div class="flex w-full shrink-0 flex-col gap-3 xl:w-[460px]">
+          <div class="flex min-w-0 flex-col gap-2 rounded-lg border border-gray-200 p-2">
+            <div class="flex flex-wrap items-center gap-2">
+              <span class="text-xs font-medium text-gray-500">逐层视图</span>
+              <span class="text-xs text-gray-400">
+                第 {{ editor.layer.value + 1 }} 层 · y = {{ editor.layer.value }}
+              </span>
+            </div>
+            <div class="flex min-w-0 items-start gap-2 overflow-auto">
+              <SchematicLayerBar
+                v-if="editor.overview.value"
+                :layer-counts="editor.overview.value.layerCounts"
+                :current="editor.layer.value"
+                @pick="editor.layer.value = $event"
+              />
+              <div class="flex min-w-0 flex-col gap-1">
+                <SchematicCanvas
+                  v-if="editor.slice.value"
+                  :slice="editor.slice.value"
+                  :palette="editor.session.value.palette"
+                  :air-index="editor.airIndex.value"
+                  :cell-size="editor.cellSize.value"
+                  :interaction="editor.interaction.value"
+                  :brush-size="editor.brushSize.value"
+                  :atlas="editor.atlas.value"
+                  @hover="editor.hover.value = $event"
+                  @select="editor.onSelect"
+                  @paint="editor.onPaint"
+                  @point="editor.onPoint"
+                  @pan="editor.onPan"
+                />
+                <span class="h-4 text-xs text-gray-500">{{ editor.hoverLabel.value }}</span>
+              </div>
+            </div>
+          </div>
+
           <SchematicSidePanel
             v-model:selected-block="editor.selectedBlock.value"
             v-model:replace-from="editor.replaceFrom.value"
@@ -95,41 +130,6 @@ const editor = useSchematicEditor()
             :show-from="editor.tool.value === 'replace'"
             :atlas="editor.atlas.value"
           />
-        </div>
-
-        <div class="flex min-w-0 flex-col gap-2">
-          <div class="flex flex-wrap items-center gap-2">
-            <span class="text-xs font-medium text-gray-500">逐层视图</span>
-            <span class="text-xs text-gray-400">
-              第 {{ editor.layer.value + 1 }} 层 · y = {{ editor.layer.value }} · 悬停查看坐标与方块
-            </span>
-          </div>
-          <div class="flex min-w-0 items-start gap-3 overflow-x-auto">
-            <SchematicLayerBar
-              v-if="editor.overview.value"
-              :layer-counts="editor.overview.value.layerCounts"
-              :current="editor.layer.value"
-              @pick="editor.layer.value = $event"
-            />
-            <div class="flex min-w-0 flex-col gap-2">
-              <SchematicCanvas
-                v-if="editor.slice.value"
-                :slice="editor.slice.value"
-                :palette="editor.session.value.palette"
-                :air-index="editor.airIndex.value"
-                :cell-size="editor.cellSize.value"
-                :interaction="editor.interaction.value"
-                :brush-size="editor.brushSize.value"
-                :atlas="editor.atlas.value"
-                @hover="editor.hover.value = $event"
-                @select="editor.onSelect"
-                @paint="editor.onPaint"
-                @point="editor.onPoint"
-                @pan="editor.onPan"
-              />
-              <span class="h-4 text-xs text-gray-500">{{ editor.hoverLabel.value }}</span>
-            </div>
-          </div>
         </div>
       </div>
     </template>

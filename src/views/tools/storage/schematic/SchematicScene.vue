@@ -8,12 +8,13 @@
  */
 
 import { onBeforeUnmount, ref, watch } from 'vue'
-import * as THREE from 'three'
 import { ThreeStructureRenderer } from '@mattzh72/lodestone'
 import { ArrowsPointingOutIcon, CubeTransparentIcon, HandRaisedIcon } from '@heroicons/vue/24/outline'
 import Tooltip from '@/components/common/Tooltip.vue'
 import { schematicVolume } from '@/utils/api/tools/schematic'
 import { decodeZlibU16 } from '@/utils/schematic/decode'
+import { MIN_RADIUS, clamp, orbitPosition, panTarget, type Vec3 } from '@/utils/schematic/camera'
+import { alignMaterials, syncClipPlanes } from '@/utils/schematic/renderer-fixes'
 import { buildStructure } from '@/utils/schematic/structure'
 import { getVanillaBase } from '@/utils/resourcepack/previewResources'
 
@@ -25,15 +26,14 @@ const props = defineProps<{
   revision?: number
 }>()
 
-const FOV = 70
-const MIN_RADIUS = 2
-
 const stageEl = ref<HTMLDivElement | null>(null)
 const canvasEl = ref<HTMLCanvasElement | null>(null)
 const loading = ref(false)
 const error = ref('')
 const stats = ref('')
 const autoRotate = ref(false)
+/** 精简渲染：剔掉被完全包围的内部方块，大投影能省下大量几何 */
+const cullOccluded = ref(false)
 
 let renderer: ThreeStructureRenderer | null = null
 let resizeObserver: ResizeObserver | null = null
@@ -47,36 +47,15 @@ let panning = false
 let dragging = false
 let lastX = 0
 let lastY = 0
-let target: [number, number, number] = [0, 0, 0]
-
-function clamp(value: number, min: number, max: number): number {
-  return Math.min(max, Math.max(min, value))
-}
-
-/** 相机当前所在位置（绕 target 的球面坐标） */
-function orbitPosition(): [number, number, number] {
-  const cosPitch = Math.cos(pitch)
-  return [
-    target[0] + radius * cosPitch * Math.sin(yaw),
-    target[1] + radius * Math.sin(pitch),
-    target[2] + radius * cosPitch * Math.cos(yaw),
-  ]
-}
-
-/** 近远裁剪面跟着观察距离走：固定 0.1/2000 在几百格的距离上深度精度不够，会互相啃面 */
-function syncClipPlanes(): void {
-  const camera = (renderer as unknown as { camera?: THREE.PerspectiveCamera } | null)?.camera
-  if (!camera) return
-  camera.near = Math.max(0.05, radius / 400)
-  camera.far = radius * 12 + 512
-  camera.updateProjectionMatrix()
-}
+let target: Vec3 = [0, 0, 0]
+let voxel: { blocks: Uint16Array; palette: readonly string[]; size: [number, number, number]; airIndex: number } | null = null
+let vanilla: Awaited<ReturnType<typeof getVanillaBase>> | null = null
 
 function applyCamera(): void {
   if (!renderer) return
-  syncClipPlanes()
+  syncClipPlanes(renderer, radius)
   renderer.setCameraTarget(target)
-  renderer.setCameraPosition(orbitPosition())
+  renderer.setCameraPosition(orbitPosition(target, radius, yaw, pitch))
 }
 
 function disposeRenderer(): void {
@@ -117,32 +96,33 @@ async function loadScene(): Promise<void> {
   disposed = false
   loading.value = true
   try {
-    const [vanilla, packed] = await Promise.all([
+    const [vanillaPack, packed] = await Promise.all([
       getVanillaBase(),
       schematicVolume(props.sessionId),
     ])
+    vanilla = vanillaPack
     const blocks = await decodeZlibU16(packed.blocksBase64)
-    const built = buildStructure(
-      { blocks, palette: packed.palette, size: packed.size, airIndex: packed.airIndex },
-      vanilla.resources,
-    )
+    voxel = { blocks, palette: packed.palette, size: packed.size, airIndex: packed.airIndex }
+    const built = buildStructure(voxel, vanillaPack.resources, {
+      cullOccluded: cullOccluded.value,
+    })
     const [sx, sy, sz] = packed.size
     target = [sx / 2, sy / 2, sz / 2]
     maxRadius = Math.hypot(sx, sy, sz) * 1.6
     radius = Math.max(sx, sy, sz) * 1.15
     const canvas = canvasEl.value
     if (!canvas) return
-    renderer = new ThreeStructureRenderer(canvas, built.structure, vanilla.resources, {
+    renderer = new ThreeStructureRenderer(canvas, built.structure, vanillaPack.resources, {
       antialias: true,
       // 阴影贴图默认只覆盖 100×100，投影动辄上百格，整片结构落在范围外会满屏斑驳
       sunlight: { shadow: { enabled: false }, fog: { density: 0 } },
     })
     applyViewport()
     applyCamera()
-    alignMaterials()
+    alignMaterials(renderer)
     await renderer.whenReady()
     if (disposed || !renderer) return
-    stats.value = `显示 ${built.kept.toLocaleString()} 方块（遮挡剔除后 / 非空气 ${built.total.toLocaleString()}）`
+    stats.value = `显示 ${built.kept.toLocaleString()} 方块（非空气 ${built.total.toLocaleString()}）`
     observeResize()
     startLoop()
   } catch (e) {
@@ -152,39 +132,19 @@ async function loadScene(): Promise<void> {
   }
 }
 
-/**
- * 把渲染器的材质参数对齐到参考实现的做法。两处都会在画面上留下杂色：
- *
- * 1. 图集每个方块只占 16×16，开着 mipmap 时远处采样会混进相邻方块的像素，
- *    大片同种方块的地面浮出一层规则条纹 —— 像素风必须用最近邻采样。
- * 2. 片元的透明度阈值只判 0.01，树叶、草这类贴图的半透明边缘会被硬画成实心，
- *    树冠和地面上就散着一层毛刺。参考实现用 0.08。
- */
-function alignMaterials(): void {
-  const internals = renderer as unknown as {
-    atlasTexture?: THREE.Texture
-    opaqueMaterial?: THREE.RawShaderMaterial
-    transparentMaterial?: THREE.RawShaderMaterial
-  } | null
-  if (!internals) return
+/** 切换精简渲染后只重建结构，不重新拉取体素数据 */
+function rebuildStructure(): void {
+  if (!renderer || !voxel || !vanilla) return
+  const built = buildStructure(voxel, vanilla.resources, { cullOccluded: cullOccluded.value })
+  renderer.setStructure(built.structure)
+  renderer.updateStructureBuffers()
+  stats.value = `显示 ${built.kept.toLocaleString()} 方块（非空气 ${built.total.toLocaleString()}）`
+  applyCamera()
+}
 
-  const texture = internals.atlasTexture
-  if (texture) {
-    texture.magFilter = THREE.NearestFilter
-    texture.minFilter = THREE.NearestFilter
-    texture.generateMipmaps = false
-    texture.needsUpdate = true
-  }
-
-  for (const material of [internals.opaqueMaterial, internals.transparentMaterial]) {
-    if (!material || typeof material.fragmentShader !== 'string') continue
-    if (!material.fragmentShader.includes('texColor.a < 0.01')) continue
-    material.fragmentShader = material.fragmentShader.replace(
-      'texColor.a < 0.01',
-      'texColor.a < 0.08',
-    )
-    material.needsUpdate = true
-  }
+function toggleCulling(): void {
+  cullOccluded.value = !cullOccluded.value
+  rebuildStructure()
 }
 
 function observeResize(): void {
@@ -222,25 +182,7 @@ function onPointerMove(event: PointerEvent): void {
   lastX = event.clientX
   lastY = event.clientY
   if (panning) {
-    // 屏幕位移换算成世界位移：把画布高度对应的可视高度取出来，再乘方向基向量
-    const canvas = canvasEl.value
-    const viewHeight = 2 * radius * Math.tan((FOV * Math.PI) / 360)
-    const scale = viewHeight / Math.max(canvas?.clientHeight ?? 600, 1)
-    const cosYaw = Math.cos(yaw)
-    const sinYaw = Math.sin(yaw)
-    const sinPitch = Math.sin(pitch)
-    const cosPitch = Math.cos(pitch)
-    // right 与 up 是相机基底在世界的向量
-    const rightX = cosYaw;
-    const rightZ = -sinYaw;
-    const upX = -sinPitch * sinYaw;
-    const upY = cosPitch;
-    const upZ = -sinPitch * cosYaw;
-    target = [
-      target[0] - rightX * dx * scale + upX * dy * scale,
-      target[1] + upY * dy * scale,
-      target[2] - rightZ * dx * scale + upZ * dy * scale,
-    ];
+    target = panTarget(target, radius, yaw, pitch, dx, dy, canvasEl.value?.clientHeight ?? 600)
   } else {
     yaw -= dx * 0.008
     pitch = clamp(pitch + dy * 0.008, -1.45, 1.45)
@@ -276,6 +218,13 @@ onBeforeUnmount(disposeRenderer)
         左键旋转 · 右键/Shift 平移 · 滚轮缩放
       </span>
       <span class="ml-auto flex shrink-0 items-center gap-2 text-xs">
+        <button
+          class="rounded-sm border border-gray-200 px-2 py-1 text-gray-600 hover:border-blue-400 hover:bg-blue-50"
+          :class="cullOccluded ? 'border-blue-400 bg-blue-50 text-blue-600' : ''"
+          @click="toggleCulling"
+        >
+          精简渲染
+        </button>
         <button
           class="rounded-sm border border-gray-200 px-2 py-1 text-gray-600 hover:border-blue-400 hover:bg-blue-50"
           :class="autoRotate ? 'border-blue-400 bg-blue-50 text-blue-600' : ''"

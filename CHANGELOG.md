@@ -8,6 +8,13 @@
 
 ### 新增
 
+#### 投影：默认不剔除内部方块、逐层视图移入右列
+
+- **透视/缺面**：默认关掉遮挡剔除（[`structure.ts`](src/utils/schematic/structure.ts)）。渲染器并不知道被剔掉的位置原本有方块，会把这些洞当成「邻居不存在」，把内侧的面也画出来；方块一多，画面上就是一片梳齿状的缺口。现在默认把全部非空气方块交给渲染器，由它自己剔除相邻面。「精简渲染」按钮可以手动打开，大投影省几何时用（[`SchematicScene.vue`](src/views/tools/storage/schematic/SchematicScene.vue)）。
+- **布局**（[`SchematicPage.vue`](src/views/tools/storage/schematic/SchematicPage.vue)）：逐层视图从页面底部移到右侧列，与方块列表同列；左列由 3D 预览独占整高。窄屏仍是单列。
+- **顺手**：相机数学抽到 [`camera.ts`](src/utils/schematic/camera.ts)，渲染器修正抽到 [`renderer-fixes.ts`](src/utils/schematic/renderer-fixes.ts)，组件回到 300 行以内。
+- **测试**：`structure.test.ts` 扩到 5 例，新增「默认保留全部方块」。
+
 #### 投影：方块名改中文、图集关掉 mipmap、逐层视图并入右侧空间
 
 - **方块条纹/破面**（[`SchematicScene.vue`](src/views/tools/storage/schematic/SchematicScene.vue)）：材质参数逐项对齐参考实现（`scene.ts` 的 `createMaterial`）——

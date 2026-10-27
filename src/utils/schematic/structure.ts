@@ -27,8 +27,23 @@ const NEIGHBOURS: ReadonlyArray<readonly [number, number, number]> = [
   [1, 0, 0], [-1, 0, 0], [0, 1, 0], [0, -1, 0], [0, 0, 1], [0, 0, -1],
 ];
 
-/** 建结构并做遮挡剔除 */
-export function buildStructure(volume: VoxelVolume, resources: Resources): BuildStructureResult {
+export interface BuildOptions {
+  /**
+   * 是否剔除被完全遮挡的内部方块。
+   *
+   * 剔除能大幅压低方块数，但渲染器不知道那些位置原本有方块，会把这些洞当成
+   * 「邻居不存在」而把内侧的面也画出来。默认关掉，宁可多渲染也不出错。
+   */
+  cullOccluded?: boolean
+}
+
+/** 建结构 */
+export function buildStructure(
+  volume: VoxelVolume,
+  resources: Resources,
+  options: BuildOptions = {},
+): BuildStructureResult {
+  const cullOccluded = options.cullOccluded === true;
   const { blocks, palette, size, airIndex } = volume
   const [sx, sy, sz] = size
   const layerSize = sx * sz
@@ -40,7 +55,7 @@ export function buildStructure(volume: VoxelVolume, resources: Resources): Build
 
   // 每种调色板条目只查一次不透明度；液体记为实心参与剔除，避免整片水都留下
   const cullMask = new Uint8Array(palette.length)
-  for (let i = 0; i < palette.length; i++) {
+  for (let i = 0; cullOccluded && i < palette.length; i++) {
     const state = states[i]
     const flags = resources.getBlockFlags(state.getName())
     const fluid = state.isFluid()
@@ -59,7 +74,7 @@ export function buildStructure(volume: VoxelVolume, resources: Resources): Build
         const id = blocks[at(x, y, z)]
         if (id === airIndex) continue
         total += 1;
-        const mask = cullMask[id] ?? 0
+        const mask = cullOccluded ? cullMask[id] ?? 0 : 0
         if (mask !== 0) {
           let hidden = true;
           for (const [dx, dy, dz] of NEIGHBOURS) {
