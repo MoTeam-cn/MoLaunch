@@ -4,6 +4,8 @@
 
 ## [Unreleased]
 
+## [0.3.13-rc.2] - 2026-10-27
+
 ### 新增
 
 #### 投影预览：层密度条与等轴测立体图
@@ -18,7 +20,7 @@
 
 #### 与主控交互的协议迁入私有仓库
 
-- 新增私有仓库 [`MoLaunch-Protocol`](https://github.com/MoTeam-cn/MoLaunch-Protocol)（crate `molaunch-protocol` v0.1.0），承载与主控交互的全部协议实现：MoSign-v1 设备认证、MoSign-v2 机器鉴权、加密原语与 ECIES 信封、工作量证明、DataChannel 帧格式、联机信令类型。
+- 新增私有仓库 [`MoLaunch-Protocol`](https://github.com/MoTeam-cn/MoLaunch-Protocol)（crate `molaunch-protocol`，按 tag 固定版本），承载与主控交互的全部协议实现：MoSign-v1 设备认证、MoSign-v2 机器鉴权、加密原语与 ECIES 信封、工作量证明、DataChannel 帧格式、联机信令类型。
 - [`Cargo.toml`](src-tauri/Cargo.toml)：新增私有 git 依赖（按 tag 固定版本），协议实现不再出现在公开仓库。
 - [`online/crypto.rs`](src-tauri/src/minecraft/online/crypto.rs)、[`ecies.rs`](src-tauri/src/minecraft/online/ecies.rs)、[`pow.rs`](src-tauri/src/minecraft/online/pow.rs)、[`protocol.rs`](src-tauri/src/minecraft/online/protocol.rs)、[`auth/`](src-tauri/src/minecraft/online/auth/mod.rs)、[`signaling/types/`](src-tauri/src/minecraft/online/signaling/types/mod.rs)：改为转发协议库，调用路径保持不变；对应实现与测试文件从本仓库删除。
 - [`storage.rs`](src-tauri/src/minecraft/online/storage.rs)：`DeviceCredentials` 结构改由协议库维护，本仓库只保留加密持久化。
