@@ -20,14 +20,14 @@ pub(super) async fn validate_cf_api_key() -> Result<(), String> {
     let (enabled, api_key) = secure_storage::get_config_async().await;
     if !enabled {
         return Err(
-            "CurseForge 整合包安装需要 API Key。请在「设置 → 社区资源」中启用 CurseForge 官方源并填写 API Key，或将下载源切换为「尽量镜像」使用镜像站。"
+            "CurseForge 整合包安装需要 API Key。请到「设置 → 进阶设置」的「CurseForge API Key」区块打开开关并填写 Key；或在同页「社区资源」把来源策略改成「尽量镜像」后保存。"
                 .to_string(),
         );
     }
     let key_empty = api_key.as_deref().is_none_or(|k| k.is_empty());
     if key_empty {
         return Err(
-            "CurseForge 整合包安装需要 API Key。已在设置中启用但未填写 API Key，请补全后重试，或将下载源切换为「尽量镜像」使用镜像站。"
+            "CurseForge API Key 已启用但内容为空。请到「设置 → 进阶设置 → CurseForge API Key」补全，或把同页「社区资源」的来源策略改成「尽量镜像」后保存。"
                 .to_string(),
         );
     }

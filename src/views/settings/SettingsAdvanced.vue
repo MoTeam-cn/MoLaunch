@@ -199,7 +199,9 @@ watch(logShareProvider, (v) => markDirty('logShareProvider', v))
           <div class="flex items-center justify-between gap-4">
             <div class="min-w-0">
               <p class="text-sm font-medium text-gray-900">启用 API Key</p>
-              <p class="text-xs text-gray-500 mt-0.5">启用后使用官方 API，未配置 Key 时仍回退到镜像</p>
+              <p class="text-xs text-gray-500 mt-0.5">
+                启用后使用官方 API。未启用或未填写 Key 时，CurseForge 整合包安装会失败，可改用下方「社区资源」的来源策略「尽量镜像」
+              </p>
             </div>
             <div class="flex-none w-40">
               <Select
