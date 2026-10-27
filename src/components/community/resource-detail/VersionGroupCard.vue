@@ -87,14 +87,14 @@ const { contentClassOf, iconClassOf } = useCollapseAnimation({
 <template>
   <div
     class="border border-gray-200 rounded-md overflow-hidden transition-colors duration-200"
-    :class="expanded ? 'border-primary-200 bg-primary-50/30' : 'bg-white hover:border-gray-300'"
+    :class="expanded ? 'border-primary-200 bg-primary-50' : 'bg-white hover:border-gray-300'"
   >
     <!-- 卡片标题栏（点击折叠/展开） -->
     <!-- 保留原生 button：折叠头（w-full justify-between + active 状态 + 图标旋转），
          Button.vue 的 scoped size 类与布局不适合折叠头 -->
     <button
       class="w-full flex items-center justify-between px-3 py-2.5 transition-colors duration-200"
-      :class="expanded ? 'bg-primary-50/50 hover:bg-primary-100/50' : 'bg-gray-50 hover:bg-gray-100'"
+      :class="expanded ? 'bg-primary-50 hover:bg-primary-100' : 'bg-gray-50 hover:bg-gray-100'"
       @click="emit('toggle')"
     >
       <div class="flex items-center gap-1.5">

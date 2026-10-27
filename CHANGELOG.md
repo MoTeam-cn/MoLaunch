@@ -6,9 +6,14 @@
 
 ### 修复
 
-#### 暗色主题：展开态的选中卡片整块发白
+#### 暗色主题：浅色阶在深底上刺眼，`/NN` 透明度全部失效
 
-- [`theme-dark.scss`](src/assets/styles/theme-dark.scss)：补齐带透明度的主色浅底（`bg-primary-50/30`、`bg-primary-100/50` 等 7 个变体，连同 `bg-blue-50/40`、`bg-red-50/50`）。这类类名在构建时被编译成字面 `rgb(var(--color-primary-rgb-50) / 1)`，变量重映射完全够不着，必须在覆盖层逐条列出；漏掉的会直接回退到 `#eff2ff` 这类实心浅色，而同一卡片里的文字已随变量转成浅灰，深色主题下就是浅底浅字、基本读不出来。资源详情的版本卡片展开时用的正是这一批。
+两件事同源：[`tailwind.config.js`](tailwind.config.js) 用的是 v3 的 `<alpha-value>` 占位符，项目却跑在 Tailwind v4.3.3 上——v4 把它当字面量，解析失败后一律给 `/ 1`。
+
+- [`theme-dark.scss`](src/assets/styles/theme-dark.scss)：原先只覆盖了 `bg-primary-50`、`bg-primary-100` 与 `bg-primary-50/60`。资源详情的版本卡片展开态用的是 `bg-primary-50/30`，没有规则命中，回退到 `:root` 的 `#eff2ff` 实心浅蓝，而同一卡片的文字已随变量转浅——浅底浅字，基本读不出来。现补齐主色浅底各档透明度变体，并补上 `border-primary-100/200/300`、`bg-primary-200`、`text-primary-400` 以及 `border-blue/red/amber/green/yellow/emerald-100~300`、`bg-blue-200`、`bg-red-200` 这些浅色阶的深色取值。
+- 主色档位不能改 `--color-primary-rgb-*`：它由 `applyPrimaryColor()` 写成内联样式，优先级高过任何选择器，只能逐档覆盖最终属性。
+- 14 个文件里 21 处 `bg-primary-50/30` 一类写法与不带 `/NN` 完全等价，一并去掉无效修饰符，视觉零变化。
+- 试过把色板搬到 `@theme inline` 让 `/NN` 真正生效：v4 对 `rgb(var(...))` 这种含变量的值推断不出颜色空间，产物仍是 `rgb(var(...))`，已放弃并回滚。
 
 ### 新增
 

@@ -243,7 +243,7 @@ onMounted(() => loadInstalled())
                     <button
                       class="flex w-full items-center gap-3 px-4 py-3 text-left transition-colors hover:bg-gray-50"
                       :class="ver.id === selectedId
-                        ? 'border-l-2 border-primary-500 bg-primary-50/50'
+                        ? 'border-l-2 border-primary-500 bg-primary-50'
                         : 'border-l-2 border-transparent'"
                       @click="selectVersion(ver.id)"
                     >

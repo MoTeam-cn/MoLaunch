@@ -47,15 +47,15 @@ const topPillMeta = computed(() => {
   }
   const t = authStore.currentUser?.login_type
   if (authStore.isLoggedIn && t === 'Microsoft') {
-    return { isRunning: false, label: '正版账号', icon: ShieldCheckIcon, bgClass: 'bg-primary-50/60', textClass: 'text-primary-700', iconClass: 'text-primary-600' }
+    return { isRunning: false, label: '正版账号', icon: ShieldCheckIcon, bgClass: 'bg-primary-50', textClass: 'text-primary-700', iconClass: 'text-primary-600' }
   }
   if (authStore.isLoggedIn && t === 'AuthlibInjector') {
-    return { isRunning: false, label: '外置账号', icon: ServerStackIcon, bgClass: 'bg-primary-50/60', textClass: 'text-primary-700', iconClass: 'text-purple-600' }
+    return { isRunning: false, label: '外置账号', icon: ServerStackIcon, bgClass: 'bg-primary-50', textClass: 'text-primary-700', iconClass: 'text-purple-600' }
   }
   if (authStore.isLoggedIn) {
-    return { isRunning: false, label: '离线账号', icon: UserIcon, bgClass: 'bg-primary-50/60', textClass: 'text-primary-700', iconClass: 'text-gray-400' }
+    return { isRunning: false, label: '离线账号', icon: UserIcon, bgClass: 'bg-primary-50', textClass: 'text-primary-700', iconClass: 'text-gray-400' }
   }
-  return { isRunning: false, label: '未登录', icon: UserIcon, bgClass: 'bg-primary-50/60', textClass: 'text-gray-500', iconClass: 'text-gray-400' }
+  return { isRunning: false, label: '未登录', icon: UserIcon, bgClass: 'bg-primary-50', textClass: 'text-gray-500', iconClass: 'text-gray-400' }
 })
 
 // 启动按钮状态：白底 + 主题色细边框 + 主题色文字，文字色=边框色

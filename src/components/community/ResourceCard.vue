@@ -60,7 +60,7 @@ const platformLabel = computed(() => props.project.platform)
 
 <template>
   <div
-    class="flex items-center gap-3 px-4 py-2.5 bg-white rounded-md border border-transparent hover:border-primary-200 hover:bg-primary-50/30 transition-all cursor-pointer group"
+    class="flex items-center gap-3 px-4 py-2.5 bg-white rounded-md border border-transparent hover:border-primary-200 hover:bg-primary-50 transition-all cursor-pointer group"
     style="height: 64px;"
     @click="emit('click', project)"
   >

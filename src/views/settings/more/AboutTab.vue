@@ -125,7 +125,7 @@ async function onCheckUpdate() {
           <button
             v-for="dep in frontendDeps"
             :key="dep.name"
-            class="flex items-center justify-between rounded-md border border-gray-100 px-3 py-2 text-left transition-colors hover:border-primary-200 hover:bg-primary-50/30"
+            class="flex items-center justify-between rounded-md border border-gray-100 px-3 py-2 text-left transition-colors hover:border-primary-200 hover:bg-primary-50"
             @click="openLink(dep.url)"
           >
             <div class="min-w-0">
@@ -146,7 +146,7 @@ async function onCheckUpdate() {
           <button
             v-for="dep in frontendDevDeps"
             :key="dep.name"
-            class="flex items-center justify-between rounded-md border border-gray-100 px-3 py-2 text-left transition-colors hover:border-primary-200 hover:bg-primary-50/30"
+            class="flex items-center justify-between rounded-md border border-gray-100 px-3 py-2 text-left transition-colors hover:border-primary-200 hover:bg-primary-50"
             @click="openLink(dep.url)"
           >
             <div class="min-w-0">
@@ -167,7 +167,7 @@ async function onCheckUpdate() {
           <button
             v-for="dep in backendDeps"
             :key="dep.name"
-            class="flex items-center justify-between rounded-md border border-gray-100 px-3 py-2 text-left transition-colors hover:border-primary-200 hover:bg-primary-50/30"
+            class="flex items-center justify-between rounded-md border border-gray-100 px-3 py-2 text-left transition-colors hover:border-primary-200 hover:bg-primary-50"
             @click="openLink(dep.url)"
           >
             <div class="min-w-0">

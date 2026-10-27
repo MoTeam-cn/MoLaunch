@@ -194,7 +194,7 @@ onMounted(async () => {
           v-for="item in items"
           :key="item.path"
           class="flex items-center gap-3 px-3 py-2.5 cursor-pointer transition-colors"
-          :class="selectedPaths.has(item.path) ? 'bg-primary-50/60' : 'hover:bg-gray-50'"
+          :class="selectedPaths.has(item.path) ? 'bg-primary-50' : 'hover:bg-gray-50'"
           @click="toggleSelect(item.path)"
         >
           <Checkbox

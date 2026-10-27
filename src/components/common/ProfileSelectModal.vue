@@ -60,7 +60,7 @@ function handleClose() {
               v-for="profile in profiles"
               :key="profile.id"
               type="button"
-              class="flex w-full items-center gap-3 rounded-lg border border-gray-200 px-4 py-3 text-left transition-all hover:border-primary-400 hover:bg-primary-50/30"
+              class="flex w-full items-center gap-3 rounded-lg border border-gray-200 px-4 py-3 text-left transition-all hover:border-primary-400 hover:bg-primary-50"
               :disabled="loading"
               @click="handleSelect(profile)"
             >

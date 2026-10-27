@@ -151,7 +151,7 @@ const {
               <!-- 保留原生 button：卡片式 CTA 使用 flex-col 列布局 + 虚线边框 + min-height，
                    Button.vue 为行内 flex 且 svg 有 margin，不适合卡片列布局 -->
               <button
-                class="flex h-full w-full flex-col items-center justify-center rounded-xl border-2 border-dashed border-gray-200 p-4 text-gray-400 transition-all hover:border-primary-400 hover:bg-primary-50/30 hover:text-primary-500"
+                class="flex h-full w-full flex-col items-center justify-center rounded-xl border-2 border-dashed border-gray-200 p-4 text-gray-400 transition-all hover:border-primary-400 hover:bg-primary-50 hover:text-primary-500"
                 style="min-height: 200px;"
                 @click="addAccount"
               >

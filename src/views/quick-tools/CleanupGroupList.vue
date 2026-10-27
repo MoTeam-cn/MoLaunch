@@ -139,7 +139,7 @@ const { contentClassOf, iconClassOf } = useCollapseAnimation({
               class="flex items-center gap-3 px-3 py-2.5 transition-colors cursor-pointer"
               :class="
                 selectedPaths.has(item.path)
-                  ? 'bg-primary-50/60'
+                  ? 'bg-primary-50'
                   : 'bg-white hover:bg-gray-50'
               "
               @click="emit('toggleSelect', item.path)"

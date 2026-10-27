@@ -169,7 +169,7 @@ watch(
     <!-- 整合包信息卡 -->
     <div
       v-else-if="enabled && localMeta"
-      class="modpack-fade-in px-3 py-2.5 bg-primary-50/40 rounded-sm border border-primary-100 space-y-1.5"
+      class="modpack-fade-in px-3 py-2.5 bg-primary-50 rounded-sm border border-primary-100 space-y-1.5"
     >
       <div class="flex items-center gap-2">
         <CubeIcon class="w-4 h-4 text-primary-600 shrink-0" />

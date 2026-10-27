@@ -242,7 +242,7 @@ onUnmounted(() => {
     </header>
     
     <!-- 主内容区：跟随主题色（primary-100/30）的淡色调背景 -->
-    <main class="app-main flex-1 overflow-hidden p-2 bg-primary-100/30">
+    <main class="app-main flex-1 overflow-hidden p-2 bg-primary-100">
       <slot />
     </main>
 

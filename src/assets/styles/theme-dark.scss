@@ -175,6 +175,56 @@ html[data-theme='dark'],
   color: color-mix(in oklab, var(--color-primary-500) 55%, white);
 }
 
+/* ------------------------------------------------------------
+   浅色阶的边框与底色
+   ------------------------------------------------------------
+   100~300 这几档在浅色主题里是淡色描边/浅底，深色主题下保持原值
+   就是浅蓝、浅红压在深底上，刺眼且盖过内容。主色档位还有一个额外
+   约束：--color-primary-rgb-* 由 applyPrimaryColor() 写成内联样式，
+   优先级高于任何选择器，改不动变量，只能逐档覆盖最终属性。
+   注意这些类名直接吃 rgb(var(...))，不带 /NN（见 CHANGELOG 里关于
+   Tailwind v4 不认 <alpha-value> 的记录）。 */
+[data-theme='dark'] .border-primary-100,
+[data-theme='dark'] .border-primary-200,
+[data-theme='dark'] .border-primary-300 {
+  border-color: color-mix(in oklab, var(--color-primary-500) 38%, transparent);
+}
+[data-theme='dark'] .bg-primary-200 {
+  background-color: color-mix(in oklab, var(--color-primary-500) 26%, transparent);
+}
+[data-theme='dark'] .text-primary-400 {
+  color: color-mix(in oklab, var(--color-primary-500) 72%, white);
+}
+[data-theme='dark'] .border-blue-100,
+[data-theme='dark'] .border-blue-200 {
+  border-color: rgb(37 99 235 / 0.38);
+}
+[data-theme='dark'] .border-red-100,
+[data-theme='dark'] .border-red-200,
+[data-theme='dark'] .border-red-300 {
+  border-color: rgb(220 38 38 / 0.38);
+}
+[data-theme='dark'] .border-amber-200,
+[data-theme='dark'] .border-amber-300 {
+  border-color: rgb(217 119 6 / 0.38);
+}
+[data-theme='dark'] .border-green-200 {
+  border-color: rgb(22 163 74 / 0.38);
+}
+[data-theme='dark'] .border-yellow-200,
+[data-theme='dark'] .border-yellow-300 {
+  border-color: rgb(202 138 4 / 0.38);
+}
+[data-theme='dark'] .border-emerald-300 {
+  border-color: rgb(5 150 105 / 0.38);
+}
+[data-theme='dark'] .bg-blue-200 {
+  background-color: rgb(37 99 235 / 0.26);
+}
+[data-theme='dark'] .bg-red-200 {
+  background-color: rgb(220 38 38 / 0.26);
+}
+
 /* 语义色浅底 */
 [data-theme='dark'] .bg-red-50,
 [data-theme='dark'] .bg-red-100 {

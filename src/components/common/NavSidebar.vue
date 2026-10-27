@@ -186,7 +186,7 @@ useTabPersistence(
                 child.disabled || child.sealed
                   ? 'text-gray-300 cursor-not-allowed'
                   : modelValue === child.id
-                    ? 'text-primary-700 bg-primary-50/50 font-medium cursor-pointer'
+                    ? 'text-primary-700 bg-primary-50 font-medium cursor-pointer'
                     : 'text-gray-600 hover:bg-gray-50 cursor-pointer',
               ]"
               @click="child.disabled ? null : emit('update:modelValue', child.id)"

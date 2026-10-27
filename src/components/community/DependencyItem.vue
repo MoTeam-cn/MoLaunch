@@ -42,7 +42,7 @@ const hasCompatibleVersion = () => props.dep.suggestedVersion !== null
   <div
     class="flex items-center gap-3 px-3 py-2 rounded-md border transition-colors"
     :class="selected
-      ? 'border-primary-200 bg-primary-50/50'
+      ? 'border-primary-200 bg-primary-50'
       : 'border-gray-200 bg-white hover:bg-gray-50'"
   >
     <!-- 复选框 -->
