@@ -94,7 +94,7 @@ function applyViewport(): void {
   if (!canvas || !renderer) return
   const width = Math.max(canvas.clientWidth, 1)
   const height = Math.max(canvas.clientHeight, 1)
-  renderer.setViewport(0, 0, width, height, window.devicePixelRatio)
+  renderer.setViewport(0, 0, width, height, Math.min(window.devicePixelRatio || 1, 2))
 }
 
 function startLoop(): void {
@@ -139,7 +139,7 @@ async function loadScene(): Promise<void> {
     })
     applyViewport()
     applyCamera()
-    fixAtlasSampling()
+    alignMaterials()
     await renderer.whenReady()
     if (disposed || !renderer) return
     stats.value = `显示 ${built.kept.toLocaleString()} 方块（遮挡剔除后 / 非空气 ${built.total.toLocaleString()}）`
@@ -153,16 +153,38 @@ async function loadScene(): Promise<void> {
 }
 
 /**
- * 图集里每个方块只占 16×16，开着 mipmap 时远处会采样到相邻方块的像素，
- * 大片同种方块的地面就会浮出一层规则条纹。像素风本来就该用最近邻采样。
+ * 把渲染器的材质参数对齐到参考实现的做法。两处都会在画面上留下杂色：
+ *
+ * 1. 图集每个方块只占 16×16，开着 mipmap 时远处采样会混进相邻方块的像素，
+ *    大片同种方块的地面浮出一层规则条纹 —— 像素风必须用最近邻采样。
+ * 2. 片元的透明度阈值只判 0.01，树叶、草这类贴图的半透明边缘会被硬画成实心，
+ *    树冠和地面上就散着一层毛刺。参考实现用 0.08。
  */
-function fixAtlasSampling(): void {
-  const texture = (renderer as unknown as { atlasTexture?: THREE.Texture } | null)?.atlasTexture
-  if (!texture) return
-  texture.magFilter = THREE.NearestFilter
-  texture.minFilter = THREE.NearestFilter
-  texture.generateMipmaps = false
-  texture.needsUpdate = true
+function alignMaterials(): void {
+  const internals = renderer as unknown as {
+    atlasTexture?: THREE.Texture
+    opaqueMaterial?: THREE.RawShaderMaterial
+    transparentMaterial?: THREE.RawShaderMaterial
+  } | null
+  if (!internals) return
+
+  const texture = internals.atlasTexture
+  if (texture) {
+    texture.magFilter = THREE.NearestFilter
+    texture.minFilter = THREE.NearestFilter
+    texture.generateMipmaps = false
+    texture.needsUpdate = true
+  }
+
+  for (const material of [internals.opaqueMaterial, internals.transparentMaterial]) {
+    if (!material || typeof material.fragmentShader !== 'string') continue
+    if (!material.fragmentShader.includes('texColor.a < 0.01')) continue
+    material.fragmentShader = material.fragmentShader.replace(
+      'texColor.a < 0.01',
+      'texColor.a < 0.08',
+    )
+    material.needsUpdate = true
+  }
 }
 
 function observeResize(): void {
