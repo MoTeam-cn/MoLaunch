@@ -6,6 +6,14 @@
 
 ### 修复
 
+#### 社区资源页给出 CurseForge 配置入口
+
+- [`Community.vue`](src/views/Community.vue)：检测到 CurseForge 未启用或没有 API Key 时，页面顶部显示一条说明，并附「去设置」按钮，通过 `?tab=advanced` 直达设置里的对应区块。不改设置页结构，只把入口搬到用得到的地方。
+
+### 新增
+
+### 修复
+
 #### CurseForge 缺 API Key 时不再阻断安装，按既定策略回退镜像
 
 前置检查在 reset_stages 之前就返回错误，把请求层早已实现的镜像回退路径完全挡掉——用户被告知去一个并不存在的「设置 → 社区资源」改配置，改对了地方也不生效。
@@ -13,6 +21,7 @@
 - [`shared.rs`](src-tauri/src/commands/community/install/modpack/shared.rs)：`validate_cf_api_key` 改为不拦截安装，仅在未配置可用 Key 时记录本次走镜像源。走官方还是镜像由请求层的 `get_cf_config` 决定，无 Key 时本就回退到 `mod.mcimirror.top`。
 - [`SettingsAdvanced.vue`](src/views/settings/SettingsAdvanced.vue)：开关说明原写「未配置 Key 时仍回退到镜像」，与后端行为矛盾，改为说明未配置时安装会失败以及替代路径。
 - [`SettingsDownload.vue`](src/views/settings/SettingsDownload.vue)、[`CommunityConfigCard.vue`](src/components/community/CommunityConfigCard.vue)：「下载」页的下载源与社区资源的来源策略互相指路，避免改错设置项。
+
 
 ## [0.3.13] - 2026-10-27
 

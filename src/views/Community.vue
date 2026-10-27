@@ -4,7 +4,11 @@
  * 搜索栏 + 单列结果列表 + 分页 + 详情弹窗
  */
 
-import { ref, watch, defineAsyncComponent } from 'vue'
+import { ref, watch, onMounted, defineAsyncComponent } from 'vue'
+import { useRouter } from 'vue-router'
+import { getConfigMap } from '@/utils/api/config'
+import Alert from '@/components/common/Alert.vue'
+import Button from '@/components/common/Button.vue'
 import type { ResourceType, ResourceProject, SearchResult } from '@/types/community'
 import { searchResources } from '@/utils/api/community'
 import { toastError, toastInfo } from '@/utils/toast'
@@ -17,6 +21,27 @@ const ResourceDetail = defineAsyncComponent(() => import('@/components/community
 
 const props = defineProps<{ resourceType: ResourceType }>()
 const versionStore = useVersionStore()
+const router = useRouter()
+
+/** CurseForge 没有可用的 API Key：不影响使用，但请求会走镜像源 */
+const cfKeyMissing = ref(false)
+
+/** 读一次配置判断状态；读失败按已配置处理，不打扰用户 */
+async function checkCurseforge(): Promise<void> {
+  try {
+    const cfg = await getConfigMap()
+    cfKeyMissing.value = !cfg.curseforgeEnabled || !cfg.curseforgeApiKey
+  } catch {
+    cfKeyMissing.value = false
+  }
+}
+
+/** 直达设置里的 CurseForge / 社区资源区块 */
+function openCurseforgeSettings(): void {
+  router.push({ path: '/apps/settings', query: { tab: 'advanced' } })
+}
+
+onMounted(checkCurseforge)
 
 const query = ref('')
 const gameVersion = ref('')
@@ -98,6 +123,14 @@ watch(() => props.resourceType, () => {
 
 <template>
   <div class="h-full flex flex-col">
+    <!-- CurseForge 未配置 API Key：不阻断使用，但会走镜像源，这里给一条直达设置的入口 -->
+    <div v-if="cfKeyMissing" class="shrink-0 border-b border-gray-100 bg-white px-4 py-2">
+      <Alert variant="soft" type="warning">
+        <span>CurseForge 未配置 API Key，资源请求正走镜像源，刚更新的资源可能搜不到或下载较慢。</span>
+        <Button type="text" size="mini" class="ml-1 align-baseline" @click="openCurseforgeSettings">去设置</Button>
+      </Alert>
+    </div>
+
     <!-- 搜索区 -->
     <div class="px-4 py-3 bg-white border-b border-gray-100 shrink-0">
       <SearchBar
