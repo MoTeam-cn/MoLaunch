@@ -139,7 +139,12 @@ function destroyViewer() {
 
 /** 监听 props 变化 */
 watch(() => props.skinUrl, (newUrl) => {
-  if (!viewer.value || !newUrl) return
+  if (!newUrl) return
+  // 编辑器里皮肤是挂载后才载入的，此时 viewer 还没建，只更新皮肤会什么都看不到
+  if (!viewer.value) {
+    initViewer()
+    return
+  }
   viewer.value.loadSkin(newUrl, props.variant === 'slim' ? { model: 'slim' } : {})
 })
 

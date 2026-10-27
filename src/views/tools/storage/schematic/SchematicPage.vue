@@ -90,7 +90,7 @@ const editor = useSchematicEditor()
                 第 {{ editor.layer.value + 1 }} 层 · y = {{ editor.layer.value }}
               </span>
             </div>
-            <div class="flex min-w-0 items-start gap-2 overflow-auto">
+            <div class="flex min-w-0 items-start gap-2 overflow-x-hidden overflow-y-auto">
               <SchematicLayerBar
                 v-if="editor.overview.value"
                 :layer-counts="editor.overview.value.layerCounts"

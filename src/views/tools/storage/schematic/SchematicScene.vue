@@ -14,7 +14,7 @@ import Tooltip from '@/components/common/Tooltip.vue'
 import { schematicVolume } from '@/utils/api/tools/schematic'
 import { decodeZlibU16 } from '@/utils/schematic/decode'
 import { MIN_RADIUS, clamp, orbitPosition, panTarget, type Vec3 } from '@/utils/schematic/camera'
-import { alignMaterials, syncClipPlanes } from '@/utils/schematic/renderer-fixes'
+import { fixAtlasSampling, syncClipPlanes } from '@/utils/schematic/renderer-fixes'
 import { buildStructure } from '@/utils/schematic/structure'
 import { getVanillaBase } from '@/utils/resourcepack/previewResources'
 
@@ -123,12 +123,14 @@ async function loadScene(): Promise<void> {
     if (!canvas) return
     renderer = new ThreeStructureRenderer(canvas, built.structure, vanillaPack.resources, {
       antialias: true,
+      // 分帧构建：上百万方块一次性同步生成网格会把界面卡住好几秒
+      asyncBuild: true,
       // 阴影贴图默认只覆盖 100×100，投影动辄上百格，整片结构落在范围外会满屏斑驳
       sunlight: { shadow: { enabled: false }, fog: { density: 0 } },
     })
     applyViewport()
     applyCamera()
-    alignMaterials(renderer)
+    fixAtlasSampling(renderer)
     await renderer.whenReady()
     if (disposed || !renderer) return
     stats.value = `显示 ${built.kept.toLocaleString()} 方块（非空气 ${built.total.toLocaleString()}）`

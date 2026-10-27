@@ -6,7 +6,7 @@
  * browse（只悬停）、pan（拖拽平移）、brush（拖拽涂抹）、rect（框选）、point（形状落点）。
  */
 
-import { computed, ref, watch } from 'vue'
+import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { blockColor, type SchematicSlice } from '@/utils/schematic/decode'
 import { drawTexture, resolveTexture, type BlockAtlas } from '@/utils/schematic/textures'
 import type { CanvasInteraction } from './types'
@@ -40,8 +40,20 @@ const cursor = ref<{ x: number; y: number } | null>(null)
 const lastPan = ref<{ x: number; y: number } | null>(null)
 const painted = ref<Set<string>>(new Set())
 
-const pixelWidth = computed(() => props.slice.width * props.cellSize)
-const pixelHeight = computed(() => props.slice.height * props.cellSize)
+/** 外层容器给到的可用宽度，用来把格子收进栏宽，避免出现横向滚动条 */
+const available = ref(0)
+const rootEl = ref<HTMLDivElement | null>(null)
+let observer: ResizeObserver | null = null
+
+/** 期望格子大小与实际能放下的取小值 */
+const effectiveCell = computed(() => {
+  if (available.value <= 0) return props.cellSize
+  const fit = Math.floor((available.value - 16) / Math.max(props.slice.width, 1))
+  return Math.max(1, Math.min(props.cellSize, fit))
+})
+
+const pixelWidth = computed(() => props.slice.width * effectiveCell.value)
+const pixelHeight = computed(() => props.slice.height * effectiveCell.value)
 
 const brushSize = computed(() => Math.max(props.brushSize ?? 1, 1))
 
@@ -66,7 +78,7 @@ function redraw(): void {
   const ctx = canvas.getContext('2d')
   if (!ctx) return
 
-  const size = props.cellSize
+  const size = effectiveCell.value
   const atlas = props.atlas ?? null
   ctx.clearRect(0, 0, canvas.width, canvas.height)
   ctx.imageSmoothingEnabled = false
@@ -215,12 +227,28 @@ function onUp(): void {
   redraw()
 }
 
-watch(() => [props.slice, props.cellSize, props.brushSize, props.atlas], redraw, { immediate: true })
+watch(() => [props.slice, effectiveCell.value, props.brushSize, props.atlas], redraw, { immediate: true })
+
+onMounted(() => {
+  const parent = rootEl.value?.parentElement
+  if (!parent) return
+  observer = new ResizeObserver(() => {
+    available.value = parent.clientWidth
+  })
+  observer.observe(parent)
+  available.value = parent.clientWidth
+})
+
+onBeforeUnmount(() => {
+  observer?.disconnect()
+  observer = null
+})
 </script>
 
 <template>
   <div
-    class="inline-flex rounded border border-gray-300 bg-[repeating-conic-gradient(#f2f3f5_0_25%,#ffffff_0_50%)] bg-[length:12px_12px] p-1"
+    ref="rootEl"
+    class="inline-flex max-w-full rounded border border-gray-300 bg-[repeating-conic-gradient(#f2f3f5_0_25%,#ffffff_0_50%)] bg-[length:12px_12px] p-1"
   >
     <canvas
       ref="canvasRef"

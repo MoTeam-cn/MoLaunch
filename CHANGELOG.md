@@ -4,6 +4,19 @@
 
 ## [Unreleased]
 
+### 修复
+
+#### 皮肤编辑器：载入皮肤后 3D 预览不出人物
+
+- [`SkinModel3D.vue`](src/components/common/SkinModel3D.vue)：编辑器里皮肤是挂载之后才载入的，而组件只在挂载那一刻有皮肤才创建查看器；等皮肤到了，监听回调发现查看器还不存在就直接返回，于是永远建不起来。改为数据到达时补建。
+
+#### 投影：逐层视图不再溢出、首次载入不再卡顿
+
+- [`SchematicCanvas.vue`](src/views/tools/storage/schematic/SchematicCanvas.vue)：格子大小跟着容器宽度收（期望值与能放下的取小值），逐层画布不再撑出横向滚动条，也不会顶破外框。
+- [`SchematicPage.vue`](src/views/tools/storage/schematic/SchematicPage.vue)：容器改纵向滚动，横向交给自适应。
+- [`SchematicScene.vue`](src/views/tools/storage/schematic/SchematicScene.vue)：渲染器改分帧构建（`asyncBuild`）。上百万方块一次性同步生成网格会把界面卡住好几秒。
+- [`renderer-fixes.ts`](src/utils/schematic/renderer-fixes.ts)：撤销上一版对片元透明度阈值的改动，回到渲染库自己的取值——调高会把贴图里本就偏透明的像素整块丢掉，方块表面会露出背后的天空。图集最近邻采样保留。
+
 ## [0.3.13-rc.6] - 2026-10-27
 
 ### 修复
