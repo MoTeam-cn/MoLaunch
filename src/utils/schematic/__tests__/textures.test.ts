@@ -62,4 +62,16 @@ describe('resolveTexture', () => {
     expect(resolveTexture(atlas, 'minecraft:air')).toBeNull()
     expect(resolveTexture(null, 'minecraft:stone')).toBeNull()
   })
+
+  it('should resolve texture when the block state carries properties', () => {
+    const atlas = makeAtlas(LAYOUT)
+    // 属性只影响朝向与形状，不能影响取到哪张贴图
+    expect(resolveTexture(atlas, 'minecraft:jungle_slab[half=top]')).toEqual(
+      resolveTexture(atlas, 'minecraft:jungle_slab'),
+    )
+    expect(resolveTexture(atlas, 'minecraft:stone[facing=east]')).toEqual([0, 0, 16, 16])
+    expect(resolveTexture(atlas, 'minecraft:stone_brick_slab[half=top,waterlogged=true]')).toEqual([
+      48, 0, 16, 16,
+    ])
+  })
 })

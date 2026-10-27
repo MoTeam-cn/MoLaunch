@@ -7,7 +7,7 @@
  */
 
 import { computed, ref, defineAsyncComponent } from 'vue'
-import { blockColor } from '@/utils/schematic/decode'
+import { blockBaseName, blockColor } from '@/utils/schematic/decode'
 import { resolveTexture, type BlockAtlas } from '@/utils/schematic/textures'
 
 const Input = defineAsyncComponent(() => import('@/components/common/Input.vue'))
@@ -57,6 +57,11 @@ function swatchStyle(item: { color: string; texture: [number, number, number, nu
     backgroundPosition: `-${rect[0] * scale}px -${rect[1] * scale}px`,
   }
 }
+
+/** 列表里只显示方块名，朝向等属性在完整提示中查看 */
+function displayName(id: string): string {
+  return blockBaseName(id).replace('minecraft:', '')
+}
 </script>
 
 <template>
@@ -75,7 +80,7 @@ function swatchStyle(item: { color: string; texture: [number, number, number, nu
           class="h-4 w-4 shrink-0 rounded-sm border border-gray-300"
           :style="swatchStyle(item)"
         />
-        <span class="flex-1 truncate">{{ item.id.replace('minecraft:', '') }}</span>
+        <span class="flex-1 truncate">{{ displayName(item.id) }}</span>
         <span v-if="item.count" class="text-gray-400">{{ item.count.toLocaleString() }}</span>
       </button>
     </div>

@@ -6,7 +6,7 @@
  */
 
 import { computed, defineAsyncComponent } from 'vue'
-import { blockColor } from '@/utils/schematic/decode'
+import { blockBaseName, blockColor } from '@/utils/schematic/decode'
 import { resolveTexture, type BlockAtlas } from '@/utils/schematic/textures'
 import type { SchematicBlockCount } from '@/utils/api/tools/schematic'
 
@@ -67,7 +67,7 @@ function swatchStyle(row: { color: string; texture: [number, number, number, num
           :style="swatchStyle(row)"
         />
         <Tooltip :text="row.id" block>
-          <span class="flex-1 truncate text-gray-700">{{ row.id.replace('minecraft:', '') }}</span>
+          <span class="flex-1 truncate text-gray-700">{{ blockBaseName(row.id).replace('minecraft:', '') }}</span>
         </Tooltip>
         <span class="tabular-nums text-gray-500">{{ row.count.toLocaleString() }}</span>
         <span class="w-12 text-right tabular-nums text-gray-400">{{ row.percent.toFixed(1) }}%</span>

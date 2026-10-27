@@ -15,6 +15,7 @@
 - **遮挡剔除**（[`structure.ts`](src/utils/schematic/structure.ts)）：六个邻居都不透明的实心方块谁也看不见，建结构前直接丢掉；液体额外按"同种液体也算实心"处理，只保留表层。5,531,904 方块的地形剔除后只剩几万个，百万级对象的内存开销也就没了。
 - **交互**：拖拽旋转、滚轮缩放、自动旋转开关、重置视角；相机距离按投影尺寸自适应，落地即正对整体。
 - **移除**：`SchematicOverview.vue` 与 `isometric.ts`（2D 等轴测实现）不再使用，层密度条保留。
+- **显示**：方块列表与统计只显示方块名，朝向等属性移到完整提示里；属性不影响取哪张贴图（[SchematicPalette.vue](src/views/tools/storage/schematic/SchematicPalette.vue)、[SchematicStats.vue](src/views/tools/storage/schematic/SchematicStats.vue)）。
 - **测试**：`structure.test.ts` 4 例（全实心内部剔除、单层不剔除、空腔壁保留、液体不当作不透明）。
 
 #### 投影体素数据接口（3D 预览用）
