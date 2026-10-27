@@ -46,7 +46,7 @@ static DISPATCHER: Lazy<Dispatcher> = Lazy::new(|| {
         }),
     );
 
-    // 投影工具（8 个）：打开会话 / 概览 / 取切片 / 编辑 / 撤销重做 / 变换 / 导出 / 关闭
+    // 投影工具（9 个）：打开会话 / 概览 / 体素数据 / 取切片 / 编辑 / 撤销重做 / 变换 / 导出 / 关闭
     d.register(
         "schematic_open",
         handler!(_state, _app, params, {
@@ -71,6 +71,15 @@ static DISPATCHER: Lazy<Dispatcher> = Lazy::new(|| {
             let p: SchematicSliceParams =
                 serde_json::from_value(params).map_err(|e| format!("参数解析失败: {}", e))?;
             let r = schematic::slice(p).await?;
+            serde_json::to_value(r).map_err(|e| e.to_string())
+        }),
+    );
+    d.register(
+        "schematic_volume",
+        handler!(_state, _app, params, {
+            let p: SchematicVolumeParams =
+                serde_json::from_value(params).map_err(|e| format!("参数解析失败: {}", e))?;
+            let r = schematic::volume(p).await?;
             serde_json::to_value(r).map_err(|e| e.to_string())
         }),
     );

@@ -89,6 +89,7 @@ export const TOOLS_ACTIONS = {
   NBT_LIST_SAVE_FILES: 'nbt_list_save_files',
   // 投影预览、编辑与导出
   SCHEMATIC_OPEN: 'schematic_open',
+  SCHEMATIC_VOLUME: 'schematic_volume',
   SCHEMATIC_OVERVIEW: 'schematic_overview',
   SCHEMATIC_SLICE: 'schematic_slice',
   SCHEMATIC_EDIT: 'schematic_edit',

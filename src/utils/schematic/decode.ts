@@ -194,6 +194,21 @@ export interface SchematicOverview {
   emptyIndex: number
 }
 
+/** 解压 zlib 流并解码为 u16 小端数组（3D 体素数据用） */
+export async function decodeZlibU16(base64: string): Promise<Uint16Array> {
+  const binary = atob(base64)
+  const bytes = new Uint8Array(binary.length)
+  for (let i = 0; i < binary.length; i++) {
+    bytes[i] = binary.charCodeAt(i)
+  }
+  const stream = new DecompressionStream('deflate')
+  const writer = stream.writable.getWriter()
+  void writer.write(bytes)
+  void writer.close()
+  const buffer = await new Response(stream.readable).arrayBuffer()
+  return new Uint16Array(buffer)
+}
+
 /** 解码概览里的 u16 小端数组 */
 export function decodeU16(base64: string): Uint16Array {
   const binary = atob(base64)

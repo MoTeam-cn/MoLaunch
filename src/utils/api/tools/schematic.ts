@@ -59,6 +59,17 @@ export interface SchematicExportResult {
   bytes: number
 }
 
+export interface SchematicVolumeResult {
+  size: [number, number, number]
+  palette: string[]
+  /** zlib 流的 base64，前端用 DecompressionStream('deflate') 解压 */
+  blocksBase64: string
+  total: number
+  nonAir: number
+  /** 空气在调色板中的下标（-1 表示没有空气） */
+  airIndex: number
+}
+
 export type SliceAxisParam = 'x' | 'y' | 'z'
 
 export async function schematicOpen(path: string): Promise<SchematicOpenResult> {
@@ -69,6 +80,11 @@ export async function schematicOverview(
   sessionId: string,
 ): Promise<SchematicOverviewResult> {
   return toolsManager<SchematicOverviewResult>(TOOLS_ACTIONS.SCHEMATIC_OVERVIEW, { sessionId })
+}
+
+/** 取整体体素数据（3D 预览用） */
+export async function schematicVolume(sessionId: string): Promise<SchematicVolumeResult> {
+  return toolsManager<SchematicVolumeResult>(TOOLS_ACTIONS.SCHEMATIC_VOLUME, { sessionId })
 }
 
 export async function schematicSlice(

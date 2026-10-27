@@ -12,6 +12,7 @@ mod legacy_blocks;
 mod overview;
 mod read;
 mod session;
+mod volume;
 mod write;
 
 #[cfg(test)]
@@ -24,6 +25,7 @@ use crate::commands::tools::types::{
     SchematicExportParams, SchematicExportResult, SchematicHistoryParams, SchematicHistoryResult,
     SchematicOpenParams, SchematicOpenResult, SchematicOverviewParams, SchematicOverviewResult,
     SchematicSliceParams, SchematicSliceResult, SchematicTransformParams, SchematicTransformResult,
+    SchematicVolumeParams, SchematicVolumeResult,
 };
 
 /// 单次返回的方块统计条目上限
@@ -73,6 +75,22 @@ pub async fn overview(params: SchematicOverviewParams) -> Result<SchematicOvervi
         top_index_base64: overview::encode_u16(&data.top_index),
         top_height_base64: overview::encode_u16(&data.top_height),
         empty_index: overview::EMPTY_INDEX,
+    })
+}
+
+/// 取整体体素数据（3D 预览用，zlib 压缩后一次传完）
+pub async fn volume(params: SchematicVolumeParams) -> Result<SchematicVolumeResult, String> {
+    let session_id = params.session_id;
+    let built = tokio::task::spawn_blocking(move || volume::build(&session_id))
+        .await
+        .map_err(|e| format!("体素打包任务异常: {}", e))??;
+    Ok(SchematicVolumeResult {
+        size: built.size,
+        palette: built.palette,
+        blocks_base64: built.blocks_base64,
+        total: built.total,
+        non_air: built.non_air,
+        air_index: built.air_index,
     })
 }
 

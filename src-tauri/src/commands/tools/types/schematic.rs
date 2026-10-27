@@ -61,6 +61,27 @@ pub struct SchematicOverviewResult {
     pub empty_index: u16,
 }
 
+/// 取整体体素数据（3D 渲染用）
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SchematicVolumeParams {
+    pub session_id: String,
+}
+
+/// 体素数据：zlib 压缩的 u16 小端方块索引数组
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SchematicVolumeResult {
+    pub size: [u32; 3],
+    pub palette: Vec<String>,
+    /// zlib 流的 base64（浏览器 DecompressionStream 的 deflate）
+    pub blocks_base64: String,
+    pub total: u64,
+    pub non_air: u64,
+    /// 空气在调色板中的下标（-1 表示没有空气）
+    pub air_index: i32,
+}
+
 /// 取切片：按轴 + 层 + 视口窗口取一小块
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]

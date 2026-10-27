@@ -8,6 +8,13 @@
 
 ### 新增
 
+#### 投影体素数据接口（3D 预览用）
+
+- [`volume.rs`](src-tauri/src/commands/tools/schematic/volume.rs)：把整个体积的方块索引压成一条 zlib 流返回。u16 数组对有地形的投影压缩后通常只剩原始体积的几个百分点，因此整份压一次传完，不必按块往返；超过 1600 万方块直接拒绝并提示改用逐层浏览，避免前端解包卡死。
+- [`dispatcher.rs`](src-tauri/src/commands/tools/dispatcher.rs)：投影 action 增至 9 个，新增 `schematic_volume`。
+- [`schematic.ts`](src/utils/api/tools/schematic.ts) + [`decode.ts`](src/utils/schematic/decode.ts)：前端封装与 `decodeZlibU16`（`DecompressionStream('deflate')` 解压）。
+- **测试**：新增 3 例（压缩往返索引一致、调色板保留 blockstate 属性、未知会话报错）。
+
 #### 投影保留方块状态属性
 
 - **问题**：调色板只存方块名，`jungle_slab[half=top]`、`oak_stairs[facing=east,half=top]`、`oak_log[axis=x]` 这些属性全部丢弃，导入后再导出形状就变了——上半砖变下半砖，楼梯朝向翻转，原木纹理方向错。
