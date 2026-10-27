@@ -46,6 +46,8 @@ export interface MeshFace {
   uv: [number, number, number, number]
   /** 该面朝哪一侧；有值时邻居不透明即可跳过 */
   cullface?: FaceDirection
+  /** 生物群系着色，null 表示按贴图原色 */
+  tint?: [number, number, number] | null
   /** 法线 */
   normal: [number, number, number]
 }
@@ -62,6 +64,8 @@ export interface MeshData {
   positions: Float32Array
   normals: Float32Array
   uvs: Float32Array
+  /** 每个顶点的着色（0-1），未着色的方块为白色 */
+  colors: Float32Array
   indices: Uint32Array
   /** 面数 */
   faceCount: number

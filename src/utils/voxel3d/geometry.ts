@@ -5,15 +5,22 @@
  * 每个面按「左上、左下、右下、右上」的顺序对应 uv 的四个角。
  */
 import { parseBlockState, resolveModel, resolveTextureRef, selectVariant } from './model'
+import { resolveTint } from './tints'
 import type { BlockGeometry, FaceDirection, MeshFace, PackData, TextureRect } from './types'
 
 type Vec3 = [number, number, number]
 
-/** 六个面的顶点顺序（逆时针朝外）与对应的 uv 角序 */
+/**
+ * 六个面的顶点顺序（逆时针朝外）与对应的 uv 角序
+ *
+ * uv 的四个角按 [左上, 左下, 右下, 右上] 编号，uvOrder 表示每个顶点各取哪个角。
+ * 判断「哪个顶点是左上」必须站在该面外侧看：屏幕上的「右」对 north 是 -x、
+ * 对 south 是 +x、对 up 是 +x 且「上」是 -z、对 down 是 +x 且「上」是 +z。
+ */
 const FACE_LAYOUT: Record<FaceDirection, { corners: [Vec3, Vec3, Vec3, Vec3]; uvOrder: [number, number, number, number]; normal: Vec3 }> = {
   down: {
     corners: [[0, 0, 0], [1, 0, 0], [1, 0, 1], [0, 0, 1]],
-    uvOrder: [1, 3, 2, 0],
+    uvOrder: [0, 3, 2, 1],
     normal: [0, -1, 0],
   },
   up: {
@@ -23,12 +30,12 @@ const FACE_LAYOUT: Record<FaceDirection, { corners: [Vec3, Vec3, Vec3, Vec3]; uv
   },
   north: {
     corners: [[0, 0, 0], [0, 1, 0], [1, 1, 0], [1, 0, 0]],
-    uvOrder: [3, 2, 0, 1],
+    uvOrder: [2, 3, 0, 1],
     normal: [0, 0, -1],
   },
   south: {
     corners: [[1, 0, 1], [1, 1, 1], [0, 1, 1], [0, 0, 1]],
-    uvOrder: [3, 2, 0, 1],
+    uvOrder: [2, 3, 0, 1],
     normal: [0, 0, 1],
   },
   west: {
@@ -84,6 +91,11 @@ function faceUv(rect: TextureRect, uv: [number, number, number, number], atlas: 
   return corners
 }
 
+/** 多元素模型每层的外扩比例，单元素模型不扩 */
+function elementSpread(elementCount: number): number {
+  return elementCount > 1 ? 0.0012 : 0
+}
+
 /** 生成单个方块的全部面；结果按方块状态缓存 */
 export function buildBlockGeometry(
   state: string,
@@ -111,9 +123,14 @@ export function buildBlockGeometry(
   const rotX = variant.x ?? 0
   const rotY = variant.y ?? 0
 
-  for (const element of model.elements) {
+  // 草方块这类模型有两个完全共面的元素（本体 + 侧面覆盖层），
+  // 深度相同时会互相啃出斑驳，按元素顺序把后面的略微外扩千分之一
+  const spread = 1 + elementSpread(model.elements.length)
+
+  for (const [elementIndex, element] of model.elements.entries()) {
     const from = element.from ?? [0, 0, 0]
     const to = element.to ?? [16, 16, 16]
+    const factor = 1 + elementIndex * (spread - 1)
     const lo: Vec3 = [from[0] / 16, from[1] / 16, from[2] / 16]
     const hi: Vec3 = [to[0] / 16, to[1] / 16, to[2] / 16]
 
@@ -134,7 +151,13 @@ export function buildBlockGeometry(
           corner[1] === 0 ? lo[1] : hi[1],
           corner[2] === 0 ? lo[2] : hi[2],
         ]
-        let rotated = rotateX(point, rotX)
+        // 从方块中心向外微扩，保证后出现的元素压在前一层之上
+        const pushed: Vec3 = [
+          0.5 + (point[0] - 0.5) * factor,
+          0.5 + (point[1] - 0.5) * factor,
+          0.5 + (point[2] - 0.5) * factor,
+        ]
+        let rotated = rotateX(pushed, rotX)
         rotated = rotateY(rotated, rotY)
         return rotated
       })
@@ -154,6 +177,7 @@ export function buildBlockGeometry(
         uvCorners: uvCornersForVertices,
         uv,
         cullface: face.cullface,
+        tint: resolveTint(name, face.tintindex),
         normal: layout.normal,
       })
     }

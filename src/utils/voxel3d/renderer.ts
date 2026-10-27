@@ -53,6 +53,7 @@ export class VoxelRenderer {
       map: texture,
       alphaTest: ALPHA_TEST,
       transparent: false,
+      vertexColors: true,
       side: THREE.FrontSide,
     })
     this.translucentMaterial = new THREE.MeshLambertMaterial({
@@ -61,6 +62,7 @@ export class VoxelRenderer {
       transparent: true,
       opacity: 0.75,
       depthWrite: false,
+      vertexColors: true,
       side: THREE.DoubleSide,
     })
 
@@ -165,12 +167,14 @@ function makeGeometry(mesh: {
   positions: Float32Array
   normals: Float32Array
   uvs: Float32Array
+  colors: Float32Array
   indices: Uint32Array
 }): THREE.BufferGeometry {
   const geometry = new THREE.BufferGeometry()
   geometry.setAttribute('position', new THREE.BufferAttribute(mesh.positions, 3))
   geometry.setAttribute('normal', new THREE.BufferAttribute(mesh.normals, 3))
   geometry.setAttribute('uv', new THREE.BufferAttribute(mesh.uvs, 2))
+  geometry.setAttribute('color', new THREE.BufferAttribute(mesh.colors, 3))
   geometry.setIndex(new THREE.BufferAttribute(mesh.indices, 1))
   geometry.computeBoundingSphere()
   return geometry

@@ -30,6 +30,7 @@ const EMPTY_MESH: MeshData = {
   positions: new Float32Array(0),
   normals: new Float32Array(0),
   uvs: new Float32Array(0),
+  colors: new Float32Array(0),
   indices: new Uint32Array(0),
   faceCount: 0,
 }
@@ -89,6 +90,7 @@ export function meshVolume(
       positions: new Float32Array(counts.opaque * 12),
       normals: new Float32Array(counts.opaque * 12),
       uvs: new Float32Array(counts.opaque * 8),
+      colors: new Float32Array(counts.opaque * 12),
       indices: new Uint32Array(counts.opaque * 6),
       cursor: 0,
       vertexBase: 0,
@@ -97,6 +99,7 @@ export function meshVolume(
       positions: new Float32Array(counts.translucent * 12),
       normals: new Float32Array(counts.translucent * 12),
       uvs: new Float32Array(counts.translucent * 8),
+      colors: new Float32Array(counts.translucent * 12),
       indices: new Uint32Array(counts.translucent * 6),
       cursor: 0,
       vertexBase: 0,
@@ -133,6 +136,9 @@ export function meshVolume(
             const corner = face.uvCorners[v]
             target.uvs[uvBase + v * 2] = corner[0]
             target.uvs[uvBase + v * 2 + 1] = corner[1]
+            target.colors[pBase + v * 3] = face.tint ? face.tint[0] : 1
+            target.colors[pBase + v * 3 + 1] = face.tint ? face.tint[1] : 1
+            target.colors[pBase + v * 3 + 2] = face.tint ? face.tint[2] : 1
           }
 
           const iBase = target.cursor * 6
@@ -158,6 +164,7 @@ export function meshVolume(
           positions: b.positions,
           normals: b.normals,
           uvs: b.uvs,
+          colors: b.colors,
           indices: b.indices,
           faceCount: b.cursor,
         }
