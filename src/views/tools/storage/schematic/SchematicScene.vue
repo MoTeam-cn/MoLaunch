@@ -2,21 +2,26 @@
 /**
  * 投影 3D 预览
  *
- * 按原版方块模型绘制整个投影：台阶是半个、楼梯是阶梯、花草是十字面。
- * 体素数据压缩后一次取回，默认整份交给渲染器，由它自己剔除相邻面。
+ * 用自研体素渲染器画整个投影：按原版方块模型展开几何，相邻面自动剔除，
+ * 台阶是半个、楼梯是阶梯、花草是十字面。体素数据压缩后一次取回。
  * 左键旋转、右键或按住 Shift 平移、滚轮缩放。
  */
 
 import { onBeforeUnmount, ref, watch } from 'vue'
-import { ThreeStructureRenderer } from '@mattzh72/lodestone'
 import { ArrowsPointingOutIcon, CubeTransparentIcon, HandRaisedIcon } from '@heroicons/vue/24/outline'
 import Tooltip from '@/components/common/Tooltip.vue'
 import { schematicVolume } from '@/utils/api/tools/schematic'
 import { decodeZlibU16 } from '@/utils/schematic/decode'
-import { MIN_RADIUS, clamp, orbitPosition, panTarget, type Vec3 } from '@/utils/schematic/camera'
-import { fixAtlasSampling, syncClipPlanes } from '@/utils/schematic/renderer-fixes'
-import { buildStructure } from '@/utils/schematic/structure'
-import { getVanillaBase } from '@/utils/resourcepack/previewResources'
+import {
+  MIN_RADIUS,
+  VoxelRenderer,
+  clamp,
+  loadVoxelPack,
+  orbitPosition,
+  panTarget,
+  type Vec3,
+  type VoxelVolume,
+} from '@/utils/voxel3d'
 
 const props = defineProps<{
   sessionId: string
@@ -32,10 +37,8 @@ const loading = ref(false)
 const error = ref('')
 const stats = ref('')
 const autoRotate = ref(false)
-/** 精简渲染：剔掉被完全包围的内部方块，大投影能省下大量几何 */
-const cullOccluded = ref(false)
 
-let renderer: ThreeStructureRenderer | null = null
+let renderer: VoxelRenderer | null = null
 let resizeObserver: ResizeObserver | null = null
 let rafId = 0
 let disposed = false
@@ -48,18 +51,10 @@ let dragging = false
 let lastX = 0
 let lastY = 0
 let target: Vec3 = [0, 0, 0]
-let voxel: { blocks: Uint16Array; palette: readonly string[]; size: [number, number, number]; airIndex: number } | null = null
-let lastClipRadius = -1
-let vanilla: Awaited<ReturnType<typeof getVanillaBase>> | null = null
 
 function applyCamera(): void {
   if (!renderer) return
-  if (radius !== lastClipRadius) {
-    syncClipPlanes(renderer, radius)
-    lastClipRadius = radius
-  }
-  renderer.setCameraTarget(target)
-  renderer.setCameraPosition(orbitPosition(target, radius, yaw, pitch))
+  renderer.setCamera(orbitPosition(target, radius, yaw, pitch), target)
 }
 
 function disposeRenderer(): void {
@@ -70,19 +65,19 @@ function disposeRenderer(): void {
   resizeObserver = null
   renderer?.dispose()
   renderer = null
-  voxel = null
-  vanilla = null
-  lastClipRadius = -1
 }
 
 function applyViewport(): void {
   const canvas = canvasEl.value
   if (!canvas || !renderer) return
-  const width = Math.max(canvas.clientWidth, 1)
-  const height = Math.max(canvas.clientHeight, 1)
-  renderer.setViewport(0, 0, width, height, Math.min(window.devicePixelRatio || 1, 2))
+  renderer.setViewport(
+    Math.max(canvas.clientWidth, 1),
+    Math.max(canvas.clientHeight, 1),
+    Math.min(window.devicePixelRatio || 1, 2),
+  )
 }
 
+/** 自动旋转走独立的渲染循环，开启时才跑 */
 function startLoop(): void {
   const loop = () => {
     if (disposed || !renderer) return
@@ -90,7 +85,7 @@ function startLoop(): void {
       yaw += 0.004
       applyCamera()
     }
-    renderer.drawStructure()
+    renderer.renderOnce()
     rafId = requestAnimationFrame(loop)
   }
   rafId = requestAnimationFrame(loop)
@@ -103,63 +98,32 @@ async function loadScene(): Promise<void> {
   disposed = false
   loading.value = true
   try {
-    const [vanillaPack, packed] = await Promise.all([
-      getVanillaBase(),
-      schematicVolume(props.sessionId),
-    ])
+    const [loaded, packed] = await Promise.all([loadVoxelPack(), schematicVolume(props.sessionId)])
     if (disposed) return
-    vanilla = vanillaPack
     const blocks = await decodeZlibU16(packed.blocksBase64)
     if (disposed) return
-    voxel = { blocks, palette: packed.palette, size: packed.size, airIndex: packed.airIndex }
-    const built = buildStructure(voxel, vanillaPack.resources, {
-      cullOccluded: cullOccluded.value,
-    })
+
+    const volume: VoxelVolume = {
+      blocks,
+      palette: packed.palette,
+      size: packed.size,
+      airIndex: packed.airIndex,
+    }
+
     const [sx, sy, sz] = packed.size
     target = [sx / 2, sy / 2, sz / 2]
     maxRadius = Math.hypot(sx, sy, sz) * 1.6
     radius = Math.max(sx, sy, sz) * 1.15
+
     const canvas = canvasEl.value
     if (!canvas) return
-    renderer = new ThreeStructureRenderer(canvas, built.structure, vanillaPack.resources, {
-      antialias: true,
-      // 分帧构建：上百万方块一次性同步生成网格会把界面卡住好几秒
-      asyncBuild: true,
-      // 阴影贴图默认只覆盖 100×100，投影动辄上百格，整片结构落在范围外会满屏斑驳
-      sunlight: { shadow: { enabled: false }, fog: { density: 0 } },
-    })
+    renderer = new VoxelRenderer(canvas, loaded.pack, loaded.atlas)
+    const faces = renderer.setVolume(volume)
     applyViewport()
     applyCamera()
-    fixAtlasSampling(renderer)
-    await renderer.whenReady()
-    if (disposed || !renderer) return
-    stats.value = `显示 ${built.kept.toLocaleString()} 方块（非空气 ${built.total.toLocaleString()}）`
+    stats.value = `方块 ${packed.total.toLocaleString()} · 可见面 ${faces.toLocaleString()}`
     observeResize()
     startLoop()
-  } catch (e) {
-    error.value = e instanceof Error ? e.message : String(e)
-  } finally {
-    loading.value = false
-  }
-}
-
-/** 切换精简渲染：只重建结构，不重新拉取体素数据 */
-async function toggleCulling(): Promise<void> {
-  if (!renderer || !voxel || !vanilla) return
-  cullOccluded.value = !cullOccluded.value
-  loading.value = true
-  error.value = ''
-  // 重建是同步且耗时的，先让加载遮罩画出来，否则界面直接冻住、看不出在做事
-  await new Promise((resolve) => requestAnimationFrame(() => resolve(null)))
-  try {
-    const built = buildStructure(voxel, vanilla.resources, {
-      cullOccluded: cullOccluded.value,
-    })
-    if (disposed || !renderer) return
-    // setStructure 内部会重建全部 chunk，不能再调 updateStructureBuffers，否则重复构建
-    renderer.setStructure(built.structure)
-    stats.value = `显示 ${built.kept.toLocaleString()} 方块（非空气 ${built.total.toLocaleString()}）`
-    applyCamera()
   } catch (e) {
     error.value = e instanceof Error ? e.message : String(e)
   } finally {
@@ -173,8 +137,8 @@ function observeResize(): void {
   if (!stage) return
   resizeObserver = new ResizeObserver(() => {
     applyViewport()
-    if (renderer) renderer.drawStructure()
-  });
+    renderer?.renderOnce()
+  })
   resizeObserver.observe(stage)
 }
 
@@ -240,13 +204,6 @@ onBeforeUnmount(disposeRenderer)
       <span class="ml-auto flex shrink-0 items-center gap-2 text-xs">
         <button
           class="rounded-sm border border-gray-200 px-2 py-1 text-gray-600 hover:border-blue-400 hover:bg-blue-50"
-          :class="cullOccluded ? 'border-blue-400 bg-blue-50 text-blue-600' : ''"
-          @click="toggleCulling"
-        >
-          精简渲染
-        </button>
-        <button
-          class="rounded-sm border border-gray-200 px-2 py-1 text-gray-600 hover:border-blue-400 hover:bg-blue-50"
           :class="autoRotate ? 'border-blue-400 bg-blue-50 text-blue-600' : ''"
           @click="autoRotate = !autoRotate"
         >
@@ -272,7 +229,7 @@ onBeforeUnmount(disposeRenderer)
         @wheel.prevent="onWheel"
       ></canvas>
       <div v-if="loading" class="absolute inset-0 grid place-items-center bg-slate-900/80 text-sm text-gray-300">
-        正在构建立体场景…（方块多时需要几秒）
+        正在构建立体场景…
       </div>
       <div
         v-if="error && !loading"

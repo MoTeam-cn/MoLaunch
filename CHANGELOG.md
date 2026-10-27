@@ -4,18 +4,37 @@
 
 ## [Unreleased]
 
+### 新增
+
+#### 可复用的体素 3D 渲染模块
+
+[`src/utils/voxel3d/`](src/utils/voxel3d/) 提供「方块状态 + 扁平索引」体素数据的立体渲染，只依赖 three.js，模型解析、面剔除、网格生成、轨道相机全部自研，不绑定任何第三方渲染库的行为。
+
+- [`model.ts`](src/utils/voxel3d/model.ts)：blockstate 变体选择（属性精确匹配、无匹配时回退首个）、模型 parent 链继承、`#变量` 贴图引用解析。
+- [`geometry.ts`](src/utils/voxel3d/geometry.ts)：元素 → 四边形，六个面按「从外侧看逆时针」定顶点序，UV 逐顶点存放（不是矩形对角——四个角不一定构成矩形），支持 blockstate 的 x/y 整模型旋转。
+- [`mesher.ts`](src/utils/voxel3d/mesher.ts)：遍历体素、按 `cullface` 判断邻居是否遮挡并跳过该面，不透明与半透明分两组输出；两遍遍历先统计后填充，精确分配，不做扩容。
+- [`renderer.ts`](src/utils/voxel3d/renderer.ts)：不透明网格写深度、半透明网格混合且不写深度，避免互相遮挡出错；近远裁剪面跟着观察距离走。
+- [`loader.ts`](src/utils/voxel3d/loader.ts)、[`atlas.ts`](src/utils/voxel3d/atlas.ts)：资源包读取与图集纹理，最近邻采样、不生成 mipmap。
+- [`orbit.ts`](src/utils/voxel3d/orbit.ts)：球面坐标相机与拖拽平移换算。
+
+几何生成为纯函数，因此**首次有了覆盖真实资源包的单元测试**：`geometry.test.ts` 10 例直接读取内置资源包的 blockstates 与模型，校验整方块六面、半砖只占下半、双半砖占满整格、楼梯面数多于整方块、原木按 `axis` 转向；`mesher.test.ts` 7 例校验面剔除（相邻共享面、实心体只剩外壳、透明方块不作为遮挡）；`performance.test.ts` 在 147×256×147 规模上 281 ms 出 86,957 面。
+
 ### 修复
+
+#### 投影 3D 预览改用自研渲染，镂空/穿模问题消除
+
+- [`SchematicScene.vue`](src/views/tools/storage/schematic/SchematicScene.vue)：换成 [`VoxelRenderer`](src/utils/voxel3d/renderer.ts)。此前用第三方渲染库，它对不完整结构会按「邻居不存在」把内侧的面也画出来，表面就出现成片的梳齿状缺口；现在面剔除由我们自己按体素数据判断，结构完整与否不再影响结果。
+- 移除「精简渲染」开关：它原本是为了绕开上述问题的权宜之计，现在剔面是逐面进行的，既省几何又不会留洞。
+- 删除被取代的 `schematic/structure.ts`、`schematic/camera.ts`、`schematic/renderer-fixes.ts` 及其测试。
 
 #### 皮肤编辑器：载入皮肤后 3D 预览不出人物
 
 - [`SkinModel3D.vue`](src/components/common/SkinModel3D.vue)：编辑器里皮肤是挂载之后才载入的，而组件只在挂载那一刻有皮肤才创建查看器；等皮肤到了，监听回调发现查看器还不存在就直接返回，于是永远建不起来。改为数据到达时补建。
 
-#### 投影：逐层视图不再溢出、首次载入不再卡顿
+#### 投影：逐层视图不再溢出
 
 - [`SchematicCanvas.vue`](src/views/tools/storage/schematic/SchematicCanvas.vue)：格子大小跟着容器宽度收（期望值与能放下的取小值），逐层画布不再撑出横向滚动条，也不会顶破外框。
 - [`SchematicPage.vue`](src/views/tools/storage/schematic/SchematicPage.vue)：容器改纵向滚动，横向交给自适应。
-- [`SchematicScene.vue`](src/views/tools/storage/schematic/SchematicScene.vue)：渲染器改分帧构建（`asyncBuild`）。上百万方块一次性同步生成网格会把界面卡住好几秒。
-- [`renderer-fixes.ts`](src/utils/schematic/renderer-fixes.ts)：撤销上一版对片元透明度阈值的改动，回到渲染库自己的取值——调高会把贴图里本就偏透明的像素整块丢掉，方块表面会露出背后的天空。图集最近邻采样保留。
 
 ## [0.3.13-rc.6] - 2026-10-27
 
