@@ -3,8 +3,8 @@
  * 投影 3D 预览
  *
  * 按原版方块模型绘制整个投影：台阶是半个、楼梯是阶梯、花草是十字面。
- * 体素数据压缩后一次取回，遮挡剔除再交给渲染器。
- * 左键旋转、右键或按住 Shift 平移、滚轮缩放（向光标位置推进）。
+ * 体素数据压缩后一次取回，默认整份交给渲染器，由它自己剔除相邻面。
+ * 左键旋转、右键或按住 Shift 平移、滚轮缩放。
  */
 
 import { onBeforeUnmount, ref, watch } from 'vue'
@@ -49,11 +49,15 @@ let lastX = 0
 let lastY = 0
 let target: Vec3 = [0, 0, 0]
 let voxel: { blocks: Uint16Array; palette: readonly string[]; size: [number, number, number]; airIndex: number } | null = null
+let lastClipRadius = -1
 let vanilla: Awaited<ReturnType<typeof getVanillaBase>> | null = null
 
 function applyCamera(): void {
   if (!renderer) return
-  syncClipPlanes(renderer, radius)
+  if (radius !== lastClipRadius) {
+    syncClipPlanes(renderer, radius)
+    lastClipRadius = radius
+  }
   renderer.setCameraTarget(target)
   renderer.setCameraPosition(orbitPosition(target, radius, yaw, pitch))
 }
@@ -66,6 +70,9 @@ function disposeRenderer(): void {
   resizeObserver = null
   renderer?.dispose()
   renderer = null
+  voxel = null
+  vanilla = null
+  lastClipRadius = -1
 }
 
 function applyViewport(): void {
@@ -100,8 +107,10 @@ async function loadScene(): Promise<void> {
       getVanillaBase(),
       schematicVolume(props.sessionId),
     ])
+    if (disposed) return
     vanilla = vanillaPack
     const blocks = await decodeZlibU16(packed.blocksBase64)
+    if (disposed) return
     voxel = { blocks, palette: packed.palette, size: packed.size, airIndex: packed.airIndex }
     const built = buildStructure(voxel, vanillaPack.resources, {
       cullOccluded: cullOccluded.value,
@@ -132,19 +141,28 @@ async function loadScene(): Promise<void> {
   }
 }
 
-/** 切换精简渲染后只重建结构，不重新拉取体素数据 */
-function rebuildStructure(): void {
+/** 切换精简渲染：只重建结构，不重新拉取体素数据 */
+async function toggleCulling(): Promise<void> {
   if (!renderer || !voxel || !vanilla) return
-  const built = buildStructure(voxel, vanilla.resources, { cullOccluded: cullOccluded.value })
-  renderer.setStructure(built.structure)
-  renderer.updateStructureBuffers()
-  stats.value = `显示 ${built.kept.toLocaleString()} 方块（非空气 ${built.total.toLocaleString()}）`
-  applyCamera()
-}
-
-function toggleCulling(): void {
   cullOccluded.value = !cullOccluded.value
-  rebuildStructure()
+  loading.value = true
+  error.value = ''
+  // 重建是同步且耗时的，先让加载遮罩画出来，否则界面直接冻住、看不出在做事
+  await new Promise((resolve) => requestAnimationFrame(() => resolve(null)))
+  try {
+    const built = buildStructure(voxel, vanilla.resources, {
+      cullOccluded: cullOccluded.value,
+    })
+    if (disposed || !renderer) return
+    // setStructure 内部会重建全部 chunk，不能再调 updateStructureBuffers，否则重复构建
+    renderer.setStructure(built.structure)
+    stats.value = `显示 ${built.kept.toLocaleString()} 方块（非空气 ${built.total.toLocaleString()}）`
+    applyCamera()
+  } catch (e) {
+    error.value = e instanceof Error ? e.message : String(e)
+  } finally {
+    loading.value = false
+  }
 }
 
 function observeResize(): void {
@@ -252,7 +270,7 @@ onBeforeUnmount(disposeRenderer)
         @wheel.prevent="onWheel"
       ></canvas>
       <div v-if="loading" class="absolute inset-0 grid place-items-center bg-slate-900/80 text-sm text-gray-300">
-        正在构建立体场景…
+        正在构建立体场景…（方块多时需要几秒）
       </div>
       <div
         v-if="error && !loading"

@@ -31,16 +31,15 @@ function buildNameMap(): Map<string, string> {
   return map
 }
 
-function lookup(state: string): Map<string, string> {
+function ensureNameMap(): Map<string, string> {
   if (!nameMap) nameMap = buildNameMap()
-  void state
   return nameMap
 }
 
 /** 方块状态 → 中文名；查不到时返回去掉命名空间的英文名 */
 export function blockDisplayName(state: string): string {
   const base = blockBaseName(state)
-  const map = lookup(base)
+  const map = ensureNameMap()
   const zh = map.get(base)
   if (zh) return zh
   return base.replace(/^minecraft:/, '')

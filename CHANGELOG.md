@@ -12,8 +12,9 @@
 
 - **透视/缺面**：默认关掉遮挡剔除（[`structure.ts`](src/utils/schematic/structure.ts)）。渲染器并不知道被剔掉的位置原本有方块，会把这些洞当成「邻居不存在」，把内侧的面也画出来；方块一多，画面上就是一片梳齿状的缺口。现在默认把全部非空气方块交给渲染器，由它自己剔除相邻面。「精简渲染」按钮可以手动打开，大投影省几何时用（[`SchematicScene.vue`](src/views/tools/storage/schematic/SchematicScene.vue)）。
 - **布局**（[`SchematicPage.vue`](src/views/tools/storage/schematic/SchematicPage.vue)）：逐层视图从页面底部移到右侧列，与方块列表同列；左列由 3D 预览独占整高。窄屏仍是单列。
-- **顺手**：相机数学抽到 [`camera.ts`](src/utils/schematic/camera.ts)，渲染器修正抽到 [`renderer-fixes.ts`](src/utils/schematic/renderer-fixes.ts)，组件回到 300 行以内。
-- **测试**：`structure.test.ts` 扩到 5 例，新增「默认保留全部方块」。
+- **顺手**：相机数学抽到 [`camera.ts`](src/utils/schematic/camera.ts)，渲染器修正抽到 [`renderer-fixes.ts`](src/utils/schematic/renderer-fixes.ts)，组件回到 300 行以内；裁剪面只在观察距离变化时重算，拖拽时不再每帧重建投影矩阵。
+- **切换精简渲染**：重建前先让加载遮罩画出来，避免同步构建期间界面冻住却没有任何反馈；`setStructure` 内部已经重建全部 chunk，去掉多余的 `updateStructureBuffers` 调用（否则一次切换会构建三遍）。
+- **测试**：`structure.test.ts` 5 例（默认全量、剔除模式、单层、空腔、液体不当作不透明），`camera.test.ts` 7 例（球面坐标、拖拽方向、缩放比例、边界裁剪）。
 
 #### 投影：方块名改中文、图集关掉 mipmap、逐层视图并入右侧空间
 
