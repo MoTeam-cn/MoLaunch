@@ -21,7 +21,7 @@ const editor = useSchematicEditor()
 </script>
 
 <template>
-  <section class="flex flex-col gap-4 rounded-lg border border-gray-300 bg-white p-4">
+  <section class="flex min-h-0 flex-col gap-3 rounded-lg border border-gray-300 bg-white p-4">
     <SchematicToolbar
       v-model:axis="editor.axis.value"
       v-model:layer="editor.layer.value"
@@ -50,7 +50,7 @@ const editor = useSchematicEditor()
 
     <p v-if="!editor.session.value" class="text-xs text-gray-500">
       支持 Sponge（.schem / .schematic，v1 与 v2）、Litematica（.litematic）、原版结构（.nbt）
-      与旧版 MCEdit 投影。打开后按视口分片加载，大投影也能流畅浏览；方块实体随编辑与导出保留。
+      与旧版 MCEdit 投影。打开后可看 3D 立体预览，也能逐层编辑；方块实体随编辑与导出保留。
     </p>
 
     <template v-else>
@@ -69,53 +69,66 @@ const editor = useSchematicEditor()
         </button>
       </div>
 
-      <div class="flex flex-wrap items-start gap-4">
-        <div class="flex gap-3">
-          <SchematicLayerBar
-            v-if="editor.overview.value"
-            :layer-counts="editor.overview.value.layerCounts"
-            :current="editor.layer.value"
-            @pick="editor.layer.value = $event"
+      <!-- 主视图：3D 预览占主位，侧栏在宽屏贴右、窄屏落到下方 -->
+      <div class="flex min-h-0 flex-col gap-3 xl:flex-row">
+        <div class="min-w-0 flex-1">
+          <SchematicScene
+            :session-id="editor.session.value.sessionId"
+            :size="editor.session.value.size"
+            :revision="editor.revision.value"
           />
-          <div class="flex flex-col gap-2">
-            <SchematicCanvas
-              v-if="editor.slice.value"
-              :slice="editor.slice.value"
-              :palette="editor.session.value.palette"
-              :air-index="editor.airIndex.value"
-              :cell-size="editor.cellSize.value"
-              :interaction="editor.interaction.value"
-              :brush-size="editor.brushSize.value"
-              :atlas="editor.atlas.value"
-              @hover="editor.hover.value = $event"
-              @select="editor.onSelect"
-              @paint="editor.onPaint"
-              @point="editor.onPoint"
-              @pan="editor.onPan"
-            />
-            <span class="h-4 text-xs text-gray-500">{{ editor.hoverLabel.value }}</span>
-          </div>
         </div>
-
-        <SchematicSidePanel
-          v-model:selected-block="editor.selectedBlock.value"
-          v-model:replace-from="editor.replaceFrom.value"
-          :palette="editor.session.value.palette"
-          :counts="editor.paletteCounts.value"
-          :top-counts="editor.session.value.counts"
-          :non-air="editor.nonAir.value"
-          :total="editor.session.value.total"
-          :show-picker="editor.needsBlock.value"
-          :show-from="editor.tool.value === 'replace'"
-          :atlas="editor.atlas.value"
-        />
+        <div class="flex w-full shrink-0 flex-col xl:w-[320px]">
+          <SchematicSidePanel
+            v-model:selected-block="editor.selectedBlock.value"
+            v-model:replace-from="editor.replaceFrom.value"
+            :palette="editor.session.value.palette"
+            :counts="editor.paletteCounts.value"
+            :top-counts="editor.session.value.counts"
+            :non-air="editor.nonAir.value"
+            :total="editor.session.value.total"
+            :show-picker="editor.needsBlock.value"
+            :show-from="editor.tool.value === 'replace'"
+            :atlas="editor.atlas.value"
+          />
+        </div>
       </div>
 
-      <SchematicScene
-        :session-id="editor.session.value.sessionId"
-        :size="editor.session.value.size"
-        :revision="editor.revision.value"
-      />
+      <!-- 逐层视图：辅助定位与编辑 -->
+      <div class="flex flex-col gap-2">
+        <div class="flex flex-wrap items-center gap-2">
+          <span class="text-xs font-medium text-gray-500">逐层视图</span>
+          <span class="text-xs text-gray-400">
+            第 {{ editor.layer.value + 1 }} 层 · y = {{ editor.layer.value }} · 悬停查看坐标与方块
+          </span>
+        </div>
+      </div>
+      <div class="flex min-w-0 items-start gap-3 overflow-x-auto">
+        <SchematicLayerBar
+          v-if="editor.overview.value"
+          :layer-counts="editor.overview.value.layerCounts"
+          :current="editor.layer.value"
+          @pick="editor.layer.value = $event"
+        />
+        <div class="flex min-w-0 flex-col gap-2">
+          <SchematicCanvas
+            v-if="editor.slice.value"
+            :slice="editor.slice.value"
+            :palette="editor.session.value.palette"
+            :air-index="editor.airIndex.value"
+            :cell-size="editor.cellSize.value"
+            :interaction="editor.interaction.value"
+            :brush-size="editor.brushSize.value"
+            :atlas="editor.atlas.value"
+            @hover="editor.hover.value = $event"
+            @select="editor.onSelect"
+            @paint="editor.onPaint"
+            @point="editor.onPoint"
+            @pan="editor.onPan"
+          />
+          <span class="h-4 text-xs text-gray-500">{{ editor.hoverLabel.value }}</span>
+        </div>
+      </div>
     </template>
   </section>
 </template>

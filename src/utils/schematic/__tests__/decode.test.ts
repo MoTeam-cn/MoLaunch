@@ -117,21 +117,22 @@ describe('palette helpers', () => {
 })
 
 describe('surfaceLayer', () => {
-  it('should pick the topmost dense layer when terrain fills the bottom', () => {
-    // 模拟带地形的建筑投影：y=0..63 整层石头，y=64 整层草地，y=65 以上只有零星建筑方块
-    const counts = new Array(256).fill(0);
-    for (let y = 0; y <= 64; y++) counts[y] = 20000;
-    counts[65] = 800;
-    counts[66] = 400;
-    expect(surfaceLayer(counts)).toBe(64);
+  it('should land on the middle of a sloped terrain when heights vary', () => {
+    // 山坡从 y=40 爬到 y=90（topHeight 存的是 y+1），中位数落在 y=65
+    const heights = [41, 61, 71, 91, 51];
+    expect(surfaceLayer(heights)).toBe(60);
   });
 
-  it('should pick the densest layer when nothing reaches half of peak', () => {
-    const counts = [0, 10, 40, 12, 0];
-    expect(surfaceLayer(counts)).toBe(2);
+  it('should land on the roof when the build is floating with a flat top', () => {
+    // 悬空建筑：所有列都止于 y=80
+    expect(surfaceLayer([81, 81, 81, 81])).toBe(80);
   });
 
-  it('should return -1 when every layer is empty', () => {
+  it('should return -1 when every column is empty', () => {
     expect(surfaceLayer([0, 0, 0])).toBe(-1);
+  });
+
+  it('should never return a negative layer for a single-block build', () => {
+    expect(surfaceLayer([1, 0, 0])).toBe(0);
   });
 });

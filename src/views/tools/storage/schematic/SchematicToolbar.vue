@@ -90,141 +90,152 @@ function onNumber(event: Event, key: 'brushSize' | 'radius' | 'cylinderHeight'):
 </script>
 
 <template>
-  <div class="flex flex-col gap-3">
+  <div class="flex flex-col gap-2">
+    <!-- 文件 -->
     <div class="flex flex-wrap items-center gap-2">
+      <span class="w-10 shrink-0 text-xs font-medium text-gray-500">文件</span>
       <Button :loading="loading" @click="emit('open')">
         <FolderOpenIcon class="h-4 w-4" />
         打开投影
       </Button>
       <template v-if="session">
-        <span class="text-xs text-gray-500">
+        <span class="min-w-0 max-w-[420px] truncate text-xs text-gray-500">
           {{ session.name }} · {{ session.format }} ·
           {{ session.size[0] }}×{{ session.size[1] }}×{{ session.size[2] }} ·
           {{ nonAir.toLocaleString() }} 方块
         </span>
-        <span class="mx-1 h-5 w-px bg-gray-200" />
+        <Button type="outline" :loading="busy" @click="emit('export')">
+          <ArrowDownTrayIcon class="h-4 w-4" />
+          导出
+        </Button>
         <SegmentedButtons
           :model-value="exportFormat"
           :options="formatOptions"
           @update:model-value="emit('update:exportFormat', String($event))"
         />
-        <Button type="outline" :loading="busy" @click="emit('export')">
-          <ArrowDownTrayIcon class="h-4 w-4" />
-          导出
-        </Button>
       </template>
     </div>
 
-    <div v-if="session" class="flex flex-wrap items-center gap-3">
-      <SegmentedButtons
-        :model-value="axis"
-        :options="axisOptions"
-        @update:model-value="emit('update:axis', $event as SliceAxisParam)"
-      />
-      <div class="flex min-w-[180px] flex-1 items-center gap-2">
-        <span class="text-xs text-gray-600">第 {{ layer + 1 }} / {{ planeLayers }} 层</span>
-        <input
-          :value="layer"
-          type="range"
-          min="0"
-          :max="Math.max(planeLayers - 1, 0)"
-          class="flex-1 accent-brand-2"
-          @input="emit('update:layer', Number(($event.target as HTMLInputElement).value))"
+    <template v-if="session">
+      <!-- 逐层视图 -->
+      <div class="flex flex-wrap items-center gap-2">
+        <span class="w-10 shrink-0 text-xs font-medium text-gray-500">视图</span>
+        <SegmentedButtons
+          :model-value="axis"
+          :options="axisOptions"
+          @update:model-value="emit('update:axis', $event as SliceAxisParam)"
         />
+        <div class="flex min-w-[220px] flex-1 items-center gap-2">
+          <span class="shrink-0 text-xs text-gray-600">第 {{ layer + 1 }} / {{ planeLayers }} 层</span>
+          <input
+            :value="layer"
+            type="range"
+            min="0"
+            :max="Math.max(planeLayers - 1, 0)"
+            class="min-w-0 flex-1 accent-brand-2"
+            @input="emit('update:layer', Number(($event.target as HTMLInputElement).value))"
+          />
+        </div>
+        <Button size="small" type="outline" :disabled="!canUndo" @click="emit('undo')">
+          <ArrowUturnLeftIcon class="h-4 w-4" />
+        </Button>
+        <Button size="small" type="outline" :disabled="!canRedo" @click="emit('redo')">
+          <ArrowUturnRightIcon class="h-4 w-4" />
+        </Button>
+        <Button v-if="hasOverview" size="small" type="outline" @click="emit('jumpDense')">
+          跳到最密层
+        </Button>
+        <Button size="small" type="outline" @click="emit('zoom', -1)">
+          <MagnifyingGlassMinusIcon class="h-4 w-4" />
+        </Button>
+        <Button size="small" type="outline" @click="emit('zoom', 1)">
+          <MagnifyingGlassPlusIcon class="h-4 w-4" />
+        </Button>
       </div>
-      <Button size="small" type="outline" :disabled="!canUndo" @click="emit('undo')">
-        <ArrowUturnLeftIcon class="h-4 w-4" />
-      </Button>
-      <Button size="small" type="outline" :disabled="!canRedo" @click="emit('redo')">
-        <ArrowUturnRightIcon class="h-4 w-4" />
-      </Button>
-    </div>
 
-    <div v-if="session" class="flex flex-wrap items-center gap-2">
-      <SegmentedButtons
-        :model-value="tool"
-        :options="toolOptions"
-        @update:model-value="emit('update:tool', $event as SchematicTool)"
-      />
-      <label v-if="tool === 'brush'" class="flex items-center gap-2 text-xs text-gray-600">
-        笔尖
-        <input
-          :value="brushSize"
-          type="range"
-          min="1"
-          max="15"
-          class="w-24 accent-brand-2"
-          @input="onNumber($event, 'brushSize')"
+      <!-- 编辑工具 -->
+      <div class="flex flex-wrap items-center gap-2">
+        <span class="w-10 shrink-0 text-xs font-medium text-gray-500">工具</span>
+        <SegmentedButtons
+          :model-value="tool"
+          :options="toolOptions"
+          @update:model-value="emit('update:tool', $event as SchematicTool)"
         />
-        <span class="w-6 text-right">{{ brushSize }}</span>
-      </label>
-      <label v-if="tool === 'sphere' || tool === 'cylinder'" class="flex items-center gap-2 text-xs text-gray-600">
-        半径
-        <input
-          :value="radius"
-          type="range"
-          min="1"
-          max="32"
-          class="w-24 accent-brand-2"
-          @input="onNumber($event, 'radius')"
-        />
-        <span class="w-6 text-right">{{ radius }}</span>
-      </label>
-      <label v-if="tool === 'cylinder'" class="flex items-center gap-2 text-xs text-gray-600">
-        高度
-        <input
-          :value="cylinderHeight"
-          type="range"
-          min="1"
-          max="64"
-          class="w-24 accent-brand-2"
-          @input="onNumber($event, 'cylinderHeight')"
-        />
-        <span class="w-6 text-right">{{ cylinderHeight }}</span>
-      </label>
-    </div>
+        <label v-if="tool === 'brush'" class="flex items-center gap-2 text-xs text-gray-600">
+          笔尖
+          <input
+            :value="brushSize"
+            type="range"
+            min="1"
+            max="15"
+            class="w-24 accent-brand-2"
+            @input="onNumber($event, 'brushSize')"
+          />
+          <span class="w-6 text-right">{{ brushSize }}</span>
+        </label>
+        <label
+          v-if="tool === 'sphere' || tool === 'cylinder'"
+          class="flex items-center gap-2 text-xs text-gray-600"
+        >
+          半径
+          <input
+            :value="radius"
+            type="range"
+            min="1"
+            max="32"
+            class="w-24 accent-brand-2"
+            @input="onNumber($event, 'radius')"
+          />
+          <span class="w-6 text-right">{{ radius }}</span>
+        </label>
+        <label v-if="tool === 'cylinder'" class="flex items-center gap-2 text-xs text-gray-600">
+          高度
+          <input
+            :value="cylinderHeight"
+            type="range"
+            min="1"
+            max="64"
+            class="w-24 accent-brand-2"
+            @input="onNumber($event, 'cylinderHeight')"
+          />
+          <span class="w-6 text-right">{{ cylinderHeight }}</span>
+        </label>
+      </div>
 
-    <div v-if="session" class="flex flex-wrap items-center gap-2">
-      <span class="text-xs text-gray-600">变换</span>
-      <Button size="small" type="outline" :loading="busy" @click="emit('transform', 'rotate_cw')">
-        <ArrowPathRoundedSquareIcon class="h-4 w-4" />
-        顺时针
-      </Button>
-      <Button size="small" type="outline" :loading="busy" @click="emit('transform', 'rotate_ccw')">
-        逆时针
-      </Button>
-      <Button size="small" type="outline" :loading="busy" @click="emit('transform', 'mirror_x')">
-        镜像 X
-      </Button>
-      <Button size="small" type="outline" :loading="busy" @click="emit('transform', 'mirror_z')">
-        镜像 Z
-      </Button>
-      <Button size="small" type="outline" :loading="busy" @click="emit('transform', 'flip_y')">
-        上下翻转
-      </Button>
-      <span class="mx-1 h-5 w-px bg-gray-200" />
-      <span class="text-xs text-gray-600">视口</span>
-      <Button size="small" type="outline" @click="emit('pan', 0, -1)">
-        <ChevronUpIcon class="h-4 w-4" />
-      </Button>
-      <Button size="small" type="outline" @click="emit('pan', 0, 1)">
-        <ChevronDownIcon class="h-4 w-4" />
-      </Button>
-      <Button size="small" type="outline" @click="emit('pan', -1, 0)">
-        <ChevronLeftIcon class="h-4 w-4" />
-      </Button>
-      <Button size="small" type="outline" @click="emit('pan', 1, 0)">
-        <ChevronRightIcon class="h-4 w-4" />
-      </Button>
-      <Button v-if="hasOverview" size="small" type="outline" @click="emit('jumpDense')">
-        跳到最密层
-      </Button>
-      <Button size="small" type="outline" @click="emit('zoom', -1)">
-        <MagnifyingGlassMinusIcon class="h-4 w-4" />
-      </Button>
-      <Button size="small" type="outline" @click="emit('zoom', 1)">
-        <MagnifyingGlassPlusIcon class="h-4 w-4" />
-      </Button>
-    </div>
+      <!-- 变换与平移 -->
+      <div class="flex flex-wrap items-center gap-2">
+        <span class="w-10 shrink-0 text-xs font-medium text-gray-500">变换</span>
+        <Button size="small" type="outline" :loading="busy" @click="emit('transform', 'rotate_cw')">
+          <ArrowPathRoundedSquareIcon class="h-4 w-4" />
+          顺时针
+        </Button>
+        <Button size="small" type="outline" :loading="busy" @click="emit('transform', 'rotate_ccw')">
+          逆时针
+        </Button>
+        <Button size="small" type="outline" :loading="busy" @click="emit('transform', 'mirror_x')">
+          镜像 X
+        </Button>
+        <Button size="small" type="outline" :loading="busy" @click="emit('transform', 'mirror_z')">
+          镜像 Z
+        </Button>
+        <Button size="small" type="outline" :loading="busy" @click="emit('transform', 'flip_y')">
+          上下翻转
+        </Button>
+        <span class="mx-1 h-5 w-px shrink-0 bg-gray-200" />
+        <span class="shrink-0 text-xs text-gray-600">平移画布</span>
+        <Button size="small" type="outline" @click="emit('pan', 0, -1)">
+          <ChevronUpIcon class="h-4 w-4" />
+        </Button>
+        <Button size="small" type="outline" @click="emit('pan', 0, 1)">
+          <ChevronDownIcon class="h-4 w-4" />
+        </Button>
+        <Button size="small" type="outline" @click="emit('pan', -1, 0)">
+          <ChevronLeftIcon class="h-4 w-4" />
+        </Button>
+        <Button size="small" type="outline" @click="emit('pan', 1, 0)">
+          <ChevronRightIcon class="h-4 w-4" />
+        </Button>
+      </div>
+    </template>
   </div>
 </template>

@@ -182,7 +182,7 @@ loadBlockAtlas().then((loaded) => {
       tool.value = 'browse'
       await loadOverview()
       // 打开后落在地面层：带地形的投影最密层在地底，取密度过半的最上层才看得到建筑
-      const dense = overview.value ? surfaceLayer(overview.value.layerCounts) : -1
+      const dense = overview.value ? surfaceLayer(overview.value.topHeight) : -1
       layer.value = dense >= 0 ? Math.min(dense, plane.value.layers - 1) : Math.floor(plane.value.layers / 2)
       centerViewport()
       await refreshSlice()

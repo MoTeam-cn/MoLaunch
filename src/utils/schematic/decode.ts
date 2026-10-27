@@ -235,21 +235,22 @@ export function densestLayer(layerCounts: readonly number[]): number {
 /**
  * 打开投影时该定位到的层。
  *
- * 带地形的投影（地表建筑）最密集的层在地底——整层石头，直接跳过去只能看到一片岩层。
- * 这里取「密度不低于峰值一半的最上层」，对地形投影正好落在最上面那层完整地面，
- * 对悬空建筑则落在实体最多的那一层。
+ * 用每列最高方块的高度取中位数：带地形的建筑投影正好落在山坡中部，既看得到地形
+ * 也看得到建筑；按层密度挑会落进实心岩层，整屏灰色剖面，等于没定位。
+ * 悬空建筑没有地形起伏，中位数就是屋顶所在的层。
+ *
+ * `topHeight` 的取值是「列内最高方块 y + 1」，0 表示该列全空。
  */
-export function surfaceLayer(layerCounts: readonly number[]): number {
-  let peak = 0
-  for (const count of layerCounts) {
-    if (count > peak) peak = count
+export function surfaceLayer(topHeight: ArrayLike<number>): number {
+  const heights: number[] = []
+  for (let i = 0; i < topHeight.length; i++) {
+    const height = topHeight[i]
+    if (height > 0) heights.push(height)
   }
-  if (peak === 0) return -1
-  const threshold = peak * 0.5
-  for (let index = layerCounts.length - 1; index >= 0; index--) {
-    if (layerCounts[index] >= threshold) return index
-  }
-  return -1
+  if (!heights.length) return -1
+  heights.sort((a, b) => a - b)
+  const median = heights[Math.floor(heights.length / 2)]
+  return Math.max(0, median - 1)
 }
 
 /** 距离指定层最近的非空层（找不到返回 -1） */
