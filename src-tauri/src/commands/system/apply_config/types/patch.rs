@@ -28,6 +28,9 @@ pub struct DownloadPatch {
     pub max_threads: Option<u32>,
     #[serde(rename = "chunkCount")]
     pub chunk_count: Option<u32>,
+    /// 受限 CurseForge 文件自动推导 CDN 地址（开发者选项，默认关闭）
+    #[serde(rename = "cfDeriveUrl")]
+    pub cf_derive_url: Option<bool>,
     /// 双层 Option：外层 Some 表示"要更新此字段"，内层 None 表示"清空"
     #[serde(rename = "mirrorUrl")]
     pub mirror_url: Option<Option<String>>,

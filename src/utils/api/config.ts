@@ -30,6 +30,8 @@ export interface ConfigSnapshot {
   maxDownloadSpeed: number
   maxDownloadThreads: number
   chunkCount: number
+  /** 受限 CurseForge 文件是否自动推导 CDN 下载地址（开发者选项，默认关闭） */
+  cfDeriveUrl: boolean
   // 内存
   memoryMode: string
   minMemory: number
@@ -121,6 +123,8 @@ export interface ConfigPatch {
   maxDownloadSpeed?: number
   maxDownloadThreads?: number
   chunkCount?: number
+  /** 受限 CurseForge 文件自动推导 CDN 地址（开发者选项） */
+  cfDeriveUrl?: boolean
   mirrorUrl?: string | null                               // null 表示清空
   // 内存
   memoryMode?: string                                      // "auto" / "custom"

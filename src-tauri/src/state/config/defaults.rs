@@ -69,6 +69,7 @@ impl Default for AppConfig {
                 mirror_url_meta: None,
                 mirror_url_download: None,
                 mirror_mode: 0,
+                cf_derive_url: false,
             },
             memory: MemoryConfig {
                 mode: "auto".to_string(),

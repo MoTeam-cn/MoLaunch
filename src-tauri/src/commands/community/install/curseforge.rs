@@ -4,9 +4,9 @@
 //! 批量查询 project slug（用于 mcmod 译名 + 应用 community_filename_format）→
 //! 并发下载到 mods 目录。
 
-use crate::log_info;
 use crate::minecraft::community::secure_storage;
 use crate::state::AppState;
+use crate::{log_info, log_warn};
 use serde::Deserialize;
 
 /// CF manifest.json 结构
@@ -212,23 +212,34 @@ pub(super) async fn install_cf_mods(
         file_translated.insert(fid, translated);
     }
 
-    // 4. 读取用户设置的文件名格式
-    let filename_format = state.config.lock().await.community.filename_format;
+    // 4. 读取用户设置：文件名格式 + 受限文件地址推导开关（开发者选项）
+    let (filename_format, derive_cf_url) = {
+        let config = state.config.lock().await;
+        (
+            config.community.filename_format,
+            config.download.cf_derive_url,
+        )
+    };
 
     // 5. 构造下载列表（CF 通常只有一个 download_url，包装为单元素数组）
     //    根据 modules 字段分流到 mods / resourcepacks / shaderpacks 目录
     let mut download_list: Vec<(Vec<String>, String, u64)> = Vec::with_capacity(batch.data.len());
     let mut total_bytes: u64 = 0;
+    // 作者禁止第三方分发且未开启推导的文件：收集后统一报错，
+    // 避免"安装完成但 mods 目录少文件"这种静默残缺
+    let mut restricted: Vec<(i64, String)> = Vec::new();
     let resourcepacks_dir = instance_dir.join("resourcepacks");
     let shaderpacks_dir = instance_dir.join("shaderpacks");
     for entry in &batch.data {
-        let primary_url = entry
-            .download_url
-            .clone()
-            .filter(|u| !u.is_empty())
-            .unwrap_or_else(|| {
-                super::helpers::construct_cf_edge_url(entry.file_id, &entry.file_name)
-            });
+        let Some(primary_url) = super::helpers::resolve_cf_download_url(
+            entry.download_url.as_deref(),
+            entry.file_id,
+            &entry.file_name,
+            derive_cf_url,
+        ) else {
+            restricted.push((entry.file_id, entry.file_name.clone()));
+            continue;
+        };
         // 构造官方 + 镜像双 URL 列表，交给 DownloadManager 自动 fallback
         let urls = crate::minecraft::sources::cdn_urls(&primary_url);
         // 应用 community_filename_format（无译名时 apply_filename_format 返回原名）
@@ -256,6 +267,27 @@ pub(super) async fn install_cf_mods(
             entry.file_length,
         ));
         total_bytes += entry.file_length;
+    }
+
+    // 有文件既没下发地址又不允许推导：直接报错（下面 download_list 是不完整的，
+    // 继续下载会得到"安装完成但缺 mod"的残缺实例）
+    if !restricted.is_empty() {
+        for (file_id, file_name) in &restricted {
+            log_warn!(
+                "[Community] CF 文件被作者限制第三方分发: file_id={} name={}",
+                file_id,
+                file_name
+            );
+        }
+        return Err(format!(
+            "有 {} 个文件被作者禁止第三方分发，CurseForge 不提供下载地址：\n{}\n\n可在「开发者 → 实验性功能」中开启「自动推导受限 CurseForge 文件地址」后重试；\n或按文件名到 CurseForge 页面手动下载后放入 mods 目录。",
+            restricted.len(),
+            restricted
+                .iter()
+                .map(|(file_id, file_name)| format!("  - {}（file_id {}）", file_name, file_id))
+                .collect::<Vec<_>>()
+                .join("\n")
+        ));
     }
 
     log_info!(

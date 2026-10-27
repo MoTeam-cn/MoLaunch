@@ -30,6 +30,9 @@ pub struct DownloadSnapshot {
     pub max_threads: u32,
     #[serde(rename = "chunkCount")]
     pub chunk_count: u32,
+    /// 受限 CurseForge 文件自动推导 CDN 地址（开发者选项）
+    #[serde(rename = "cfDeriveUrl")]
+    pub cf_derive_url: bool,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]

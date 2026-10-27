@@ -83,6 +83,10 @@ pub fn load_config() -> Result<Option<AppConfig>, String> {
     if let Some(mode) = config.get("Download", "mirror_mode") {
         app_config.download.mirror_mode = mode.parse().unwrap_or(app_config.download.mirror_mode);
     }
+    // 受限 CurseForge 文件自动推导（开发者选项，缺省关闭）
+    if let Some(derive) = config.get("Download", "cf_derive_url") {
+        app_config.download.cf_derive_url = derive == "true" || derive == "1";
+    }
 
     // Mirror
     app_config.download.mirror_url = config.get("Mirror", "url");

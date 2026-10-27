@@ -124,6 +124,10 @@ impl AppState {
             }
         };
 
+        // 把「受限 CurseForge 文件地址推导」开关镜像到进程级标志：
+        // 社区资源的转换层是同步纯函数，拿不到这里的异步配置锁
+        crate::minecraft::community::cf_policy::set_enabled(config.download.cf_derive_url);
+
         // 尝试加载 SDK lite
         let sdk = match crate::sdk::SdkInstance::load() {
             Ok(sdk) => {

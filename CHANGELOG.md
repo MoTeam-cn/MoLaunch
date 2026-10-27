@@ -4,15 +4,33 @@
 
 ## [Unreleased]
 
+### 新增
+
+#### 开发者页：受限 CurseForge 文件地址推导开关
+
+作者禁止第三方分发的 CurseForge 文件，官方 API 不返回下载地址，此前启动器**无条件**按 fileId 推导 CDN 地址。推导依赖 CurseForge 未公开的路径布局，属于「需要时才用」的能力，现改为开发者选项，默认关闭。
+
+- [`ExperimentalTab.vue`](src/views/settings/developer/ExperimentalTab.vue)：开发者页「实验性功能」下新增「下载实验开关」卡片，一个复选框即改即存，并说明开启/关闭后的具体行为。
+- [`models.rs`](src-tauri/src/state/config/models.rs)、[`defaults.rs`](src-tauri/src/state/config/defaults.rs)、[`load.rs`](src-tauri/src/config/load.rs)、[`save.rs`](src-tauri/src/config/save.rs)：新增 `download.cf_derive_url`（INI `[Download] cf_derive_url`），默认 `false`；旧配置缺该键时按默认值处理。
+- [`patch.rs`](src-tauri/src/commands/system/apply_config/types/patch.rs)、[`snapshot.rs`](src-tauri/src/commands/system/apply_config/types/snapshot.rs)、[`entry.rs`](src-tauri/src/commands/system/apply_config/types/entry.rs)、[`fields.rs`](src-tauri/src/commands/system/apply_config/apply/fields.rs)：配置补丁/快照字段 `cfDeriveUrl` 贯通，走既有的 `apply_config` / `get_config` 通道。
+- [`config.ts`](src/utils/api/config.ts)：前端 `ConfigSnapshot` / `ConfigPatch` 同步 `cfDeriveUrl`。
+- [`cf_policy.rs`](src-tauri/src/minecraft/community/cf_policy.rs)：新增进程级开关镜像。社区资源的版本转换层是同步纯函数，拿不到 `AppState` 的异步配置锁，故在启动加载配置（[`app.rs`](src-tauri/src/state/app.rs)）与保存配置（[`fields.rs`](src-tauri/src/commands/system/apply_config/apply/fields.rs)）时各写一次 `AtomicBool`，读取端零成本，开关改动立即生效、无需重启。
+- [`curseforge.rs`](src-tauri/src/commands/community/install/curseforge.rs)：整合包安装按开关决定是否推导。开关关闭时**先收集**受限文件、再一次性报错并列出文件名与 fileId，附上「开启开关」与「手动下载后放入 mods」两条出路——不再出现「安装完成但 mods 目录少文件」的静默残缺。
+
 ### 修复
+
+#### 受限 CurseForge 文件地址推导：路径布局与文件名编码都不对
+
+受限文件的 CDN 地址推导此前有两份各自独立的实现，且**两份都不对**。
+
+- [`convert.rs`](src-tauri/src/minecraft/community/curseforge/convert.rs)：社区资源版本转换里的推导把 fileId 按「末四位」切段并**完全丢掉了文件名**（`6767951` → `/files/676/7951`，正确应为 `/files/6767/951/<文件名>`），单 mod 安装拿到的是必然 404 的地址；且不看开关，关不掉。
+- [`helpers.rs`](src-tauri/src/commands/community/install/helpers.rs)：整合包路径里的推导虽然拼了文件名，却直接拼原文——`jei 1.21.5+neoforge.jar` 这类名字会被 CDN 当成空格与端口分隔符，同样 404。
+- 现统一为 [`construct_edge_url`](src-tauri/src/minecraft/community/curseforge/convert.rs)：布局恒为 `files/{id/1000}/{id%1000}/{百分号编码后的文件名}`，文件名按 path segment 编码（`+`→`%2B`、空格→`%20`），`/` 与 `..` 随之失效，顺带补齐路径穿越防护；整合包路径调用同一实现，不再有第二份。
+- [`helpers_test.rs`](src-tauri/src/commands/community/install/helpers_test.rs)：4 例单测钉住布局与编码（标准 URL、六位 fileId 的拆段、路径穿越被编码、开关语义）。
 
 #### 下载设置页直接指路社区资源配置
 
 - [`SettingsDownload.vue`](src/views/settings/SettingsDownload.vue)：「下载源」区块下方说明这里只管游戏本体、库文件与加载器安装包，并给出「你是来找 CurseForge 或 Modrinth 的下载配置的吗？点我前往」的链接，经 `?tab=advanced` 直达进阶设置里的社区资源区块。两个设置项名称相近，改错地方是常态，直接给一条路比改文案有效。
-
-### 新增
-
-### 修复
 
 #### CurseForge 缺 API Key 时不再阻断安装，按既定策略回退镜像
 
@@ -21,6 +39,32 @@
 - [`shared.rs`](src-tauri/src/commands/community/install/modpack/shared.rs)：`validate_cf_api_key` 改为不拦截安装，仅在未配置可用 Key 时记录本次走镜像源。走官方还是镜像由请求层的 `get_cf_config` 决定，无 Key 时本就回退到 `mod.mcimirror.top`。
 - [`SettingsAdvanced.vue`](src/views/settings/SettingsAdvanced.vue)：开关说明原写「未配置 Key 时仍回退到镜像」，与后端行为矛盾，改为说明未配置时安装会失败以及替代路径。
 - [`SettingsDownload.vue`](src/views/settings/SettingsDownload.vue)、[`CommunityConfigCard.vue`](src/components/community/CommunityConfigCard.vue)：「下载」页的下载源与社区资源的来源策略互相指路，避免改错设置项。
+
+### 优化
+
+#### 镜像并发闸门与限流冷却
+
+公共镜像（OpenBMCLAPI / MCIM / 自建 mocdn）对高并发 Range 请求很敏感：默认 8 文件 × 4 分片最多 32 条并发打过去，很容易触发 429，随后整批回落到官方源反而更慢，而 429 此前只是「跳过该 URL」、没有退避。
+
+- [`mirror_gate.rs`](src-tauri/src/minecraft/download/mirror_gate.rs)、[`mirror_gate_test.rs`](src-tauri/src/minecraft/download/mirror_gate_test.rs)：新增镜像闸门模块——按**主机名**识别镜像域并分桶限流（OpenBMCLAPI / MCIM 每主机 4 条，自建 mocdn 8 条，一个慢镜像不会占掉另一个的额度）；收到 429/503 时按 `Retry-After` 或指数退避（2s→4s→8s→16s→30s 封顶）给该主机设冷却，2xx 立即清除。5 例单测覆盖退避序列、主机归并、镜像识别与冷却查询。
+- [`download.rs`](src-tauri/src/minecraft/download/chunk/download.rs)、[`stream.rs`](src-tauri/src/minecraft/download/downloader/stream.rs)：请求前申请槽位、响应后登记限流状态；许可持有到响应体读完，排队才真正生效。
+- [`retry.rs`](src-tauri/src/minecraft/download/downloader/retry.rs)：镜像处于冷却期时直接换下一个候选源，不再把 3 次重试浪费在必然被拒的镜像上；只有「已经是最后一个候选」才短暂等待（上限 5s）后照常尝试——冷却只是启发式，不能因此判定无源可用。
+
+#### 大文件分片数按文件大小自适应
+
+分片数此前恒等于用户设置（默认 4），大文件拿不到并行度上限；直接把默认值调高又会拖累小文件与低配网络。
+
+- [`api.rs`](src-tauri/src/minecraft/download/chunk/api.rs)：新增 `plan_chunk_count`——用户设置作为**下限**，按 16 MiB/片 推导，最多翻一倍且硬上限 12，小文件保持原值。规划只依赖（文件大小, 用户设置），同一文件换源重试得到相同分片布局，`.part` 续传因此仍可复用。
+- [`api_test.rs`](src-tauri/src/minecraft/download/chunk/api_test.rs)：5 例单测覆盖单流不放大、小文件保持、大文件最多翻倍、硬上限、结果稳定。
+
+#### 假活线路：低速换源与 Range 支持记忆
+
+连接「假活」（连得上、有数据但吞吐极低）时，此前只能等 15s 无数据才失败，一条烂线路能把整个整合包拖住；另外每个文件都要先发一次 Range 探测，批量下载白付一轮往返。
+
+- [`slow.rs`](src-tauri/src/minecraft/download/slow.rs)、[`slow_test.rs`](src-tauri/src/minecraft/download/slow_test.rs)：新增慢速判定——只有 5s 窗口内**整文件聚合**吞吐低于 256 KiB/s、且剩余数据 ≥1 MiB 才判慢（单看一条连接会把「8 条各 100KiB/s」误判成低速，收尾阶段也不判），5 例单测钉住阈值边界与探测器窗口。
+- [`stream.rs`](src-tauri/src/minecraft/download/downloader/stream.rs)、[`api.rs`](src-tauri/src/minecraft/download/chunk/api.rs)：单流用滑动窗口、分片用采样任务（RAII 守卫，任意返回路径都会中止，避免任务泄漏）汇总聚合吞吐；命中即中止当前源。
+- [`retry.rs`](src-tauri/src/minecraft/download/downloader/retry.rs)：**只在后面还有别的候选源时**才允许判慢换源——唯一候选宁可慢慢下完，也不能因为线路慢直接失败；分片判慢时不再回退到同一 URL 的单流。
+- [`probe.rs`](src-tauri/src/minecraft/download/chunk/probe.rs)：新增「已确认支持 Range」的主机缓存，同一次运行里同主机后续文件直接进分片、跳过探测；只做正向缓存，反向不缓存（服务端灰度或临时故障都会让「这次不支持」很快过期）。
 
 
 ## [0.3.13] - 2026-10-27

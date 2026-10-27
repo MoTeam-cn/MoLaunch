@@ -1,6 +1,7 @@
 //! 社区资源模块：对接 CurseForge 和 Modrinth 两大平台 API
 
 pub mod cache;
+pub mod cf_policy;
 pub mod common;
 mod config;
 pub mod curseforge;

@@ -25,6 +25,14 @@ pub struct DownloadConfig {
     pub mirror_url_meta: Option<String>,
     pub mirror_url_download: Option<String>,
     pub mirror_mode: u32,
+    /// 受限 CurseForge 文件是否自动推导 CDN 下载地址（开发者选项，默认关闭）
+    ///
+    /// CurseForge 作者可以禁止第三方分发，此时官方 API 不返回下载地址。开启后按
+    /// fileId 与文件名推导 `edge.forgecdn.net` 地址直接下载；关闭时这些文件不做
+    /// 推导，由调用方给出手动下载提示。推导依赖 CurseForge 未公开的 CDN 路径布局，
+    /// 因此默认关闭，只在「开发者 → 实验性功能」显式开启后生效。
+    #[serde(default)]
+    pub cf_derive_url: bool,
 }
 
 /// 内存配置

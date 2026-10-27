@@ -69,6 +69,7 @@ pub fn build_snapshot(
             max_speed: config.download.max_speed,
             max_threads: config.download.max_threads,
             chunk_count: config.download.chunk_count,
+            cf_derive_url: config.download.cf_derive_url,
         },
         memory: MemorySnapshot {
             mode: config.memory.mode.clone(),

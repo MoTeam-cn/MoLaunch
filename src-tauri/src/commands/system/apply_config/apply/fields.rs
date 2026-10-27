@@ -91,6 +91,12 @@ pub(super) fn apply_download(config: &mut crate::state::AppConfig, patch: &Confi
         log_info!("[Config] chunk_count = {}", count);
         config.download.chunk_count = count;
     }
+    if let Some(derive) = patch.download.cf_derive_url {
+        log_info!("[Config] cf_derive_url = {}", derive);
+        config.download.cf_derive_url = derive;
+        // 同步进程级标志：社区资源转换层（同步函数）据此决定是否推导下载地址
+        crate::minecraft::community::cf_policy::set_enabled(derive);
+    }
     if let Some(ref url_opt) = patch.download.mirror_url {
         log_info!("[Config] mirror_url = {:?}", url_opt);
         config.download.mirror_url = url_opt.clone();

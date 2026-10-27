@@ -82,6 +82,15 @@ pub fn save_config(config: &AppConfig) -> Result<(), String> {
         "mirror_mode",
         &config.download.mirror_mode.to_string(),
     );
+    ini.set(
+        "Download",
+        "cf_derive_url",
+        if config.download.cf_derive_url {
+            "true"
+        } else {
+            "false"
+        },
+    );
 
     // Mirror
     if let Some(ref url) = config.download.mirror_url {
