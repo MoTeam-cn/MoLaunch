@@ -3,15 +3,33 @@
  *
  * 草方块顶面、树叶、水这些贴图本身是灰度的，颜色靠渲染时乘上一个 tint。
  * 这里用平原群系的默认取值，足以让颜色正确；不追求按群系逐个还原。
+ *
+ * 顶点色在 three.js 里按线性空间使用，不做 sRGB 转换，所以色号在这里就要转成线性，
+ * 否则草地上屏会偏亮偏艳。
  */
 export type Rgb = [number, number, number]
 
+/** sRGB 分量转线性 */
+function linear(srgb: number): number {
+  return srgb <= 0.04045 ? srgb / 12.92 : ((srgb + 0.055) / 1.055) ** 2.4
+}
+
+function fromHex(hex: number): Rgb {
+  return [
+    linear(((hex >> 16) & 0xff) / 255),
+    linear(((hex >> 8) & 0xff) / 255),
+    linear((hex & 0xff) / 255),
+  ]
+}
+
 /** 草地：平原 */
-const GRASS: Rgb = [0x91 / 255, 0xbd / 255, 0x59 / 255]
+const GRASS = fromHex(0x91bd59)
 /** 树叶：多数树种共用 */
-const FOLIAGE: Rgb = [0x59 / 255, 0xae / 255, 0x30 / 255]
+const FOLIAGE = fromHex(0x59ae30)
 /** 水 */
-const WATER: Rgb = [0x3f / 255, 0x76 / 255, 0xe4 / 255]
+const WATER = fromHex(0x3f76e4)
+/** 有 tintindex 但拿不准色号时保持原色 */
+const NEUTRAL: Rgb = [1, 1, 1]
 
 const GRASS_BLOCKS = new Set([
   'grass_block',
@@ -35,5 +53,5 @@ export function resolveTint(blockName: string, tintindex: number | undefined): R
   if (GRASS_BLOCKS.has(blockName)) return GRASS
   if (blockName.endsWith('_leaves')) return FOLIAGE
   if (blockName === 'water' || blockName === 'bubble_column') return WATER
-  return [1, 1, 1]
+  return NEUTRAL
 }
