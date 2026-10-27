@@ -82,4 +82,5 @@ pub fn build(session_id: &str) -> Result<Volume, String> {
 }
 
 #[cfg(test)]
+#[path = "volume_test.rs"]
 mod volume_test;

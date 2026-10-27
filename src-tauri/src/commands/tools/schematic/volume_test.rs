@@ -2,9 +2,7 @@
 
 use std::io::Read;
 
-use super::read::SchematicData;
-use super::session;
-use super::volume;
+use crate::commands::tools::schematic::{read::SchematicData, session, volume};
 
 fn sample() -> SchematicData {
     SchematicData {
@@ -54,7 +52,7 @@ fn test_volume_keeps_blockstate_properties_in_palette() {
     assert!(packed
         .palette
         .iter()
-        .any(|entry| entry == "minecraft:jungle_slab[half=top]"));
+        .any(|entry| entry.as_str() == "minecraft:jungle_slab[half=top]"));
     session::close(&id);
 }
 
