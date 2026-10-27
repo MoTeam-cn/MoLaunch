@@ -9,6 +9,9 @@ pub mod probe;
 
 // 对外暴露探测能力：retry 需要「是否支持 Range + 声明大小」一起拿到，
 // 避免为了判断分片可行性多发一次请求
-pub use probe::{probe_file_size, probe_range, supports_range, RangeProbe};
+pub use probe::{
+    probe_file_size, probe_range, range_support_known, remember_range_support, supports_range,
+    RangeProbe,
+};
 
 pub use api::{download_chunked, ChunkDownloadResult};

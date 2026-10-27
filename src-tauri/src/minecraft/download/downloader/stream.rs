@@ -7,9 +7,12 @@ use std::sync::Mutex as StdMutex;
 use std::time::{Duration, Instant};
 use tokio::sync::Mutex;
 
+use crate::log_warn;
 use futures_util::StreamExt;
 
+use super::super::mirror_gate;
 use super::super::rate_limiter::RateLimiter;
+use super::super::slow::SlowDetector;
 use super::super::types::GlobalProgress;
 
 #[allow(clippy::too_many_arguments)]
@@ -23,12 +26,16 @@ pub(super) async fn download_from_url(
     url: &str,
     local_path: &str,
     expected_size: u64,
+    allow_slow_abort: bool,
     rate_limiter: Option<Arc<Mutex<RateLimiter>>>,
     timeout: Duration,
     progress: Option<Arc<StdMutex<GlobalProgress>>>,
     pause_flag: Option<Arc<std::sync::atomic::AtomicBool>>,
     cancel_flag: Option<Arc<std::sync::atomic::AtomicBool>>,
 ) -> Result<(u64, u64, u64), Box<dyn std::error::Error + Send + Sync>> {
+    // 镜像并发闸门：与分片下载共用同一组槽位，避免单流与分片同时打满镜像
+    let _mirror_permit = mirror_gate::acquire(url).await;
+
     // 连接 + 响应头阶段用 tokio::time::timeout 包裹 send()（5s/10s）
     // 覆盖全局客户端的 30s timeout 为 24h 兜底，避免大文件 body 读取被误杀
     // 实际超时由下方 loop 里的"无数据流动 15s"控制
@@ -43,6 +50,15 @@ pub(super) async fn download_from_url(
     .map_err(|e| -> Box<dyn std::error::Error + Send + Sync> {
         crate::http::request_error_msg(&e).into()
     })?;
+
+    // 记录限流状态：429/503 给该镜像设冷却，retry 层据此换源
+    if let Some(cooldown) = mirror_gate::observe(url, &response) {
+        log_warn!(
+            "[Mirror] {} 被限流，冷却 {:.1}s（本次单流失败，交给重试换源）",
+            url,
+            cooldown.as_secs_f64()
+        );
+    }
 
     if !response.status().is_success() {
         return Err(format!("HTTP 错误：{}", response.status()).into());
@@ -73,6 +89,8 @@ pub(super) async fn download_from_url(
 
     let mut downloaded: u64 = 0;
     let start_time = Instant::now();
+    // 慢速探测：只有后续还有别的候选源时才启用（由 retry 决定）
+    let mut slow_detector = SlowDetector::new();
 
     // 下载流字节数上限：已知期望大小时允许 2 倍冗余，否则使用绝对上限。
     // 压缩响应例外：期望大小可能是压缩后长度（远小于解压后字节），按它设上限会截断正常文件
@@ -186,6 +204,19 @@ pub(super) async fn download_from_url(
         if let Some(ref p) = progress {
             let mut p = p.lock().unwrap();
             p.downloaded_bytes = p.downloaded_bytes.saturating_add(chunk_size);
+        }
+
+        // 慢速判定：只有「后面还有别的候选源」时才启用（retry 传入），命中即中止
+        // 当前源、交给调用方换源；唯一候选时按原逻辑慢慢下完，不判死
+        if allow_slow_abort {
+            slow_detector.add(chunk_size);
+            let remaining = expected_size.saturating_sub(downloaded);
+            if let Some(bytes_per_second) = slow_detector.poll(remaining) {
+                rollback_progress(downloaded, &progress);
+                let error: Box<dyn std::error::Error + Send + Sync> =
+                    Box::new(crate::minecraft::download::slow::SlowRouteError { bytes_per_second });
+                return Err(error);
+            }
         }
 
         // max_bytes 上限校验，防止被劫持镜像源返回无限流导致磁盘耗尽

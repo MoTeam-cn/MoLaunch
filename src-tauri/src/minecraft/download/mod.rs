@@ -1,6 +1,6 @@
 //! 下载管理模块 - 完整版本下载流程
 //! 子模块：config / session / version_list / full_download / stages / fix / util
-//! assets / chunk / downloader / manager / rate_limiter / types
+//! assets / chunk / downloader / manager / mirror_gate / rate_limiter / slow / types
 
 pub mod assets;
 pub mod chunk;
@@ -9,8 +9,10 @@ pub mod downloader;
 pub mod fix;
 pub mod full_download;
 pub mod manager;
+pub mod mirror_gate;
 pub mod rate_limiter;
 pub mod session;
+pub mod slow;
 pub mod stages;
 pub mod types;
 pub mod util;

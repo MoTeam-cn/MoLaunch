@@ -6,6 +6,8 @@
 //! 2. 探测请求默认会协商 gzip，此时 Content-Length / Content-Range 报的是**压缩后**长度，
 //!    与实际落盘的解压长度不一致 —— 因此探测统一带 `Accept-Encoding: identity`。
 
+use std::collections::HashSet;
+use std::sync::{Mutex, OnceLock};
 use std::time::Duration;
 
 use crate::log_debug;
@@ -85,6 +87,45 @@ pub async fn probe_range(client: &reqwest::Client, url: &str) -> RangeProbe {
 /// 检测服务器是否真正支持 Range 请求
 pub async fn supports_range(client: &reqwest::Client, url: &str) -> bool {
     probe_range(client, url).await.supports_range
+}
+
+/// 本次运行中「已确认支持 Range」的主机集合
+///
+/// 同一 CDN 下每个文件都先探测一次会白付一个往返（批量下载时尤其明显）。
+/// 这里只做**正向**缓存：确认支持后同主机后续文件直接走分片；反向不做缓存，
+/// 因为「这次 200 忽略 Range」不代表之后都不支持（服务端灰度、临时故障都常见）。
+fn range_support_hosts() -> &'static Mutex<HashSet<String>> {
+    static HOSTS: OnceLock<Mutex<HashSet<String>>> = OnceLock::new();
+    HOSTS.get_or_init(|| Mutex::new(HashSet::new()))
+}
+
+/// 取 URL 的 host（小写）；解析失败返回 None
+fn probe_host(url: &str) -> Option<String> {
+    reqwest::Url::parse(url)
+        .ok()?
+        .host_str()
+        .map(str::to_ascii_lowercase)
+}
+
+/// 该主机是否已被确认支持 Range（命中后调用方可以跳过探测）
+pub fn range_support_known(url: &str) -> bool {
+    let Some(host) = probe_host(url) else {
+        return false;
+    };
+    range_support_hosts()
+        .lock()
+        .map(|hosts| hosts.contains(&host))
+        .unwrap_or(false)
+}
+
+/// 记录一次「分片下载成功」，把该主机标记为支持 Range
+pub fn remember_range_support(url: &str) {
+    let Some(host) = probe_host(url) else {
+        return;
+    };
+    if let Ok(mut hosts) = range_support_hosts().lock() {
+        hosts.insert(host);
+    }
 }
 
 /// 探测远程文件大小（0 表示无法探测）

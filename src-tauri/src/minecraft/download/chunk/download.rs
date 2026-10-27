@@ -8,6 +8,7 @@ use std::time::Duration;
 use futures_util::StreamExt;
 use tokio::sync::Mutex;
 
+use super::super::mirror_gate;
 use super::super::rate_limiter::RateLimiter;
 use super::super::types::GlobalProgress;
 use crate::utils::format;
@@ -34,6 +35,7 @@ pub(super) async fn download_chunk(
     file_progress: Option<Arc<StdMutex<GlobalProgress>>>,
     pause_flag: Option<Arc<AtomicBool>>,
     cancel_flag: Option<Arc<AtomicBool>>,
+    slow_abort: Option<Arc<AtomicBool>>,
 ) -> Result<u64, Box<dyn std::error::Error + Send + Sync>> {
     let expected_chunk_bytes = end.saturating_sub(start).saturating_add(1);
 
@@ -90,6 +92,11 @@ pub(super) async fn download_chunk(
     // 实际超时由下方 loop 里的"无数据流动 15s"控制，reqwest timeout 仅作 24h 兜底
     // 必须禁用压缩：Range 切的是原始字节，带 Content-Encoding 时返回的是压缩流片段，
     // 解码会失败（error decoding response body），即使不失败合并出来也是坏文件
+    //
+    // 镜像并发闸门：公共镜像（BMCLAPI / MCIM / mocdn）对高并发 Range 请求敏感，
+    // 在途数超过上限时在此排队；许可持有到本分片响应体读完，避免排队形同虚设。
+    let _mirror_permit = mirror_gate::acquire(url).await;
+
     let response = client
         .get(url)
         .header("Range", &range_header)
@@ -100,6 +107,15 @@ pub(super) async fn download_chunk(
         .map_err(|e| -> Box<dyn std::error::Error + Send + Sync> {
             crate::http::request_error_msg(&e).into()
         })?;
+
+    // 记录限流状态：429/503 会给该镜像设冷却，retry 层据此直接换源
+    if let Some(cooldown) = mirror_gate::observe(url, &response) {
+        log_warn!(
+            "[Mirror] {} 被限流，冷却 {:.1}s（本次分片失败，交给重试换源）",
+            url,
+            cooldown.as_secs_f64()
+        );
+    }
 
     if !response.status().is_success() && response.status().as_u16() != 206 {
         return Err(format!("HTTP 错误：{}", response.status()).into());
@@ -139,6 +155,15 @@ pub(super) async fn download_chunk(
                 rollback(downloaded, &file_progress);
                 return Err("下载已取消".into());
             }
+        }
+
+        // 整文件聚合吞吐持续过低：立刻退出本分片，交由调用方换源
+        if slow_abort
+            .as_ref()
+            .is_some_and(|flag| flag.load(Ordering::Relaxed))
+        {
+            rollback(downloaded, &file_progress);
+            return Err("线路持续低速，已中止当前源".into());
         }
 
         // 检查暂停信号：暂停时 sleep 等待恢复或取消

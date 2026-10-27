@@ -1,7 +1,7 @@
 //! 分片下载调度：ChunkDownloadResult / download_chunked
 
 use std::path::Path;
-use std::sync::atomic::AtomicBool;
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex as StdMutex};
 use std::time::Instant;
 use tokio::sync::Mutex;
@@ -10,10 +10,46 @@ use crate::utils::format;
 use crate::{log_debug, log_warn};
 
 use super::super::rate_limiter::RateLimiter;
+use super::super::slow;
 use super::super::types::{DownloadStatus, GlobalProgress};
 use super::download::download_chunk;
 use super::merge::merge_chunks;
 use super::probe::probe_file_size;
+
+/// 目标分片字节数：文件越大分片越多
+///
+/// 分段过小只会放大各源 Range 实现的差异与往返开销；16 MiB 是「并行收益明显、
+/// 单片失败代价可接受」的折中值。
+const TARGET_SEGMENT_BYTES: u64 = 16 * 1024 * 1024;
+
+/// 分片数硬上限（在用户设置之外最多再翻一倍，且不超过这个值）
+const MAX_PLANNED_CHUNKS: usize = 12;
+
+/// 规划实际使用的分片数
+///
+/// 用户设置的分片数是**下限**：大文件按 [`TARGET_SEGMENT_BYTES`] 推导出更多分片，
+/// 最多翻一倍且不超过 [`MAX_PLANNED_CHUNKS`]；小文件保持用户设置，不做缩减。
+///
+/// 规划只依赖 (文件大小, 用户设置)，同一文件多次重试或换源都会得到相同的分片
+/// 布局，`.part` 分片才能被续传复用。
+fn plan_chunk_count(file_size: u64, requested: usize) -> usize {
+    if requested <= 1 {
+        return requested;
+    }
+    let upper = requested.saturating_mul(2).min(MAX_PLANNED_CHUNKS).max(1);
+    let lower = requested.min(upper);
+    let by_size = usize::try_from(file_size / TARGET_SEGMENT_BYTES).unwrap_or(upper);
+    by_size.clamp(lower, upper)
+}
+
+/// 采样任务的 RAII 守卫：本函数任意路径返回都会中止采样，避免任务泄漏
+struct SlowSamplerGuard(tokio::task::JoinHandle<()>);
+
+impl Drop for SlowSamplerGuard {
+    fn drop(&mut self) {
+        self.0.abort();
+    }
+}
 
 /// 分片下载结果
 pub struct ChunkDownloadResult {
@@ -22,6 +58,8 @@ pub struct ChunkDownloadResult {
     pub speed: u64,
     pub status: DownloadStatus,
     pub error: Option<String>,
+    /// 是否因「线路持续低速」被中止：调用方应换源，而不是在本 URL 上继续重试
+    pub slow: bool,
 }
 
 #[allow(clippy::too_many_arguments)]
@@ -53,6 +91,7 @@ pub async fn download_chunked(
                 speed: 0,
                 status: DownloadStatus::Failed,
                 error: Some("无法探测文件大小".into()),
+                slow: false,
             };
         }
         // 探测到的真实大小回写到全局 total_bytes（download_batch 初始化时按 expected_size=0 求和，
@@ -63,6 +102,9 @@ pub async fn download_chunked(
         }
     }
 
+    // 大文件按大小放大分片数（用户设置为下限），小文件保持原设置
+    let chunk_count = plan_chunk_count(file_size, chunk_count);
+
     if file_size == 0 || chunk_count <= 1 {
         return ChunkDownloadResult {
             downloaded: 0,
@@ -70,6 +112,7 @@ pub async fn download_chunked(
             speed: 0,
             status: DownloadStatus::Failed,
             error: Some("invalid chunk params".into()),
+            slow: false,
         };
     }
 
@@ -81,6 +124,7 @@ pub async fn download_chunked(
                 speed: 0,
                 status: DownloadStatus::Failed,
                 error: Some(format!("创建目录失败：{}", e)),
+                slow: false,
             };
         }
     }
@@ -94,6 +138,7 @@ pub async fn download_chunked(
             speed: 0,
             status: DownloadStatus::Failed,
             error: Some("file size too small to chunk".into()),
+            slow: false,
         };
     }
     let mut ranges: Vec<(u64, u64)> = Vec::with_capacity(chunk_count);
@@ -120,6 +165,38 @@ pub async fn download_chunked(
     let chunk_progress: Arc<Vec<StdMutex<u64>>> =
         Arc::new((0..chunk_count).map(|_| StdMutex::new(0u64)).collect());
 
+    // 慢速采样：每 0.5s 汇总全文件已下字节，按 5s 窗口判定聚合吞吐。
+    // 只看单条连接会把「8 条各 100KiB/s」误判成低速，所以必须按整文件聚合。
+    let slow_abort = Arc::new(AtomicBool::new(false));
+    let sampler_slow_abort = slow_abort.clone();
+    let sampler_progress = chunk_progress.clone();
+    let _slow_sampler = SlowSamplerGuard(tokio::spawn(async move {
+        let mut window_started = Instant::now();
+        let mut window_bytes = 0_u64;
+        loop {
+            tokio::time::sleep(std::time::Duration::from_millis(500)).await;
+            if sampler_slow_abort.load(Ordering::Relaxed) {
+                return;
+            }
+            let elapsed = window_started.elapsed();
+            if elapsed < slow::WINDOW {
+                continue;
+            }
+            let downloaded: u64 = sampler_progress
+                .iter()
+                .map(|slot| *slot.lock().unwrap_or_else(|poisoned| poisoned.into_inner()))
+                .sum();
+            let delta = downloaded.saturating_sub(window_bytes);
+            let remaining = file_size.saturating_sub(downloaded);
+            if slow::is_slow(delta, elapsed, remaining).is_some() {
+                sampler_slow_abort.store(true, Ordering::Relaxed);
+                return;
+            }
+            window_started = Instant::now();
+            window_bytes = downloaded;
+        }
+    }));
+
     let start_time = Instant::now();
     let mut handles = Vec::with_capacity(chunk_count);
 
@@ -132,10 +209,12 @@ pub async fn download_chunked(
         let file_prog = file_progress.clone();
         let pause = pause_flag.clone();
         let cancel = cancel_flag.clone();
+        let slow_flag = slow_abort.clone();
 
         let handle = tokio::spawn(async move {
             let result = download_chunk(
                 &client, &url, &part_path, start, end, limiter, prog, i, file_prog, pause, cancel,
+                slow_flag,
             )
             .await;
             (i, result)
@@ -169,6 +248,9 @@ pub async fn download_chunked(
     }
 
     if !all_ok {
+        // 采样器因低速置位时，失败原因要报「低速」而不是某个分片的普通错误：
+        // 调用方据此换源，而不是在本 URL 上继续重试
+        let slow = slow_abort.load(Ordering::Relaxed);
         // 断点续传：不清理 .part 文件，保留用于重试时续传
         // 回滚 file_progress：本次分片下载增量加的部分无效（文件将被重新下载），
         // 避免重试时 downloaded_bytes 持续累加导致进度偏高/超过 total
@@ -181,7 +263,12 @@ pub async fn download_chunked(
             total: file_size,
             speed: 0,
             status: DownloadStatus::Failed,
-            error: Some(last_error),
+            slow,
+            error: Some(if slow {
+                "线路持续低速，已中止当前源".to_string()
+            } else {
+                last_error
+            }),
         };
     }
 
@@ -202,6 +289,7 @@ pub async fn download_chunked(
             speed: 0,
             status: DownloadStatus::Failed,
             error: Some(format!("合并分片失败：{}", e)),
+            slow: false,
         };
     }
 
@@ -231,5 +319,10 @@ pub async fn download_chunked(
         speed,
         status: DownloadStatus::Completed,
         error: None,
+        slow: false,
     }
 }
+
+#[cfg(test)]
+#[path = "api_test.rs"]
+mod api_test;

@@ -7,7 +7,9 @@ use std::time::Duration;
 use tokio::sync::Mutex;
 
 use super::super::super::super::sources::DownloadSourceMode;
+use super::super::super::mirror_gate;
 use super::super::super::rate_limiter::RateLimiter;
+use super::super::super::slow;
 use super::super::super::types::{
     ContentValidator, DownloadProgress, DownloadStatus, DownloadTask, GlobalProgress,
 };
@@ -46,9 +48,34 @@ pub(super) async fn download_with_retries(
         let _ = std::fs::remove_file(&task.local_path);
         rollback_progress(&progress, downloaded);
     };
-    'url_loop: for url in urls {
-        let timeout = request_timeout(source_mode, url);
+    'url_loop: for (url_index, url) in urls.iter().enumerate() {
+        // 镜像刚被限流时，冷却期内直接换下一个候选；没有别的候选才短暂等待
+        if let Some(remaining) = mirror_gate::cooldown_remaining(url) {
+            if url_index + 1 < urls.len() {
+                // 还有别的候选（通常是官方源）：冷却期内直接换源，不要把三次重试
+                // 浪费在必然被拒的镜像上
+                log_warn!(
+                    "[Download] 镜像冷却中（剩余 {:.1}s），换源: {}",
+                    remaining.as_secs_f64(),
+                    url
+                );
+                continue 'url_loop;
+            }
+            // 最后一个候选：冷却只是启发式，短暂等待后照常尝试，避免无源可用
+            let wait = remaining.min(mirror_gate::MAX_COOLDOWN_WAIT);
+            log_debug!(
+                "[Download] 镜像冷却中（剩余 {:.1}s），等待后重试: {}",
+                remaining.as_secs_f64(),
+                url
+            );
+            tokio::time::sleep(wait).await;
+        }
+        let timeout = request_timeout(source_mode, url.as_str());
         let mut chunk_disabled = false;
+        // 后面还有别的候选源时，才允许「判慢换源」：唯一候选宁可慢慢下完，
+        // 也不能因为一条虽慢但可用的线路直接失败
+        let has_next_url = url_index + 1 < urls.len();
+        let allow_slow_abort = has_next_url;
         for attempt in 1..=MAX_RETRIES {
             if is_cancelled(&cancel_flag) {
                 break 'url_loop;
@@ -57,7 +84,15 @@ pub(super) async fn download_with_retries(
                 if attempt == 1 {
                     log_debug!("[Download] 检测分片支持: {}", url);
                 }
-                let probe = chunk::probe_range(client, url).await;
+                // 已知支持 Range 的主机跳过探测（同一次运行里同一 CDN 少一次往返）
+                let probe = if file_size > 0 && chunk::range_support_known(url.as_str()) {
+                    chunk::RangeProbe {
+                        supports_range: true,
+                        total: file_size,
+                    }
+                } else {
+                    chunk::probe_range(client, url.as_str()).await
+                };
                 if file_size == 0 && probe.total > 0 {
                     file_size = probe.total;
                 }
@@ -67,7 +102,7 @@ pub(super) async fn download_with_retries(
                         .unwrap_or_else(|| Arc::new(Mutex::new(RateLimiter::new(0))));
                     let result = chunk::download_chunked(
                         client,
-                        url,
+                        url.as_str(),
                         &task.local_path,
                         file_size,
                         chunk_count,
@@ -75,6 +110,7 @@ pub(super) async fn download_with_retries(
                         progress.clone(),
                         pause_flag.clone(),
                         cancel_flag.clone(),
+                        allow_slow_abort,
                     )
                     .await;
                     if file_size == 0 && result.total > 0 {
@@ -99,6 +135,7 @@ pub(super) async fn download_with_retries(
                                     continue 'url_loop;
                                 }
                             }
+                            chunk::remember_range_support(url.as_str());
                             if let Some(ref ids) = chunked_task_ids {
                                 ids.lock().unwrap().insert(task.id.clone());
                             }
@@ -118,6 +155,10 @@ pub(super) async fn download_with_retries(
                     {
                         log_debug!("[Download] 分片返回 404，禁用分片改走单流: {}", url);
                         chunk_disabled = true;
+                    }
+                    if result.slow && has_next_url {
+                        log_warn!("[Download] 分片下载因线路持续低速中止，换源: {}", url);
+                        break;
                     }
                     log_debug!("[Chunk] 分片下载失败: {:?}, 回退单流", result.error);
                 } else {
@@ -139,9 +180,10 @@ pub(super) async fn download_with_retries(
             // 只传可信大小：探测值可能是压缩后长度，传进去会让字节上限与进度失真
             match super::super::stream::download_from_url(
                 client,
-                url,
+                url.as_str(),
                 &task.local_path,
                 trusted_size,
+                allow_slow_abort,
                 rate_limiter.clone(),
                 timeout,
                 progress.clone(),
@@ -171,6 +213,11 @@ pub(super) async fn download_with_retries(
                     return Some(verify::completed(task, downloaded, total, speed));
                 }
                 Err(e) => {
+                    // 线路判慢：还有别的候选就立刻换源，别再在同一个 URL 上耗三次
+                    if has_next_url && e.downcast_ref::<slow::SlowRouteError>().is_some() {
+                        log_warn!("[Download] 线路持续低速，换源: {}", url);
+                        break;
+                    }
                     log_debug!(
                         "从 {} 下载失败 (尝试 {}/{}): {}",
                         url,
