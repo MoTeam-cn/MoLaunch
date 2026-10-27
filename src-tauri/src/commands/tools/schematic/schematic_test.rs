@@ -223,11 +223,11 @@ fn test_legacy_block_table_covers_common_blocks() {
     // 半砖 bit3 = 上半砖，楼梯低 2 位朝向 + bit3 上下
     assert_eq!(
         legacy_block_name(44, 8).as_deref(),
-        Some("minecraft:stone_slab[half=top]")
+        Some("minecraft:smooth_stone_slab[half=top]")
     );
     assert_eq!(
         legacy_block_name(44, 0).as_deref(),
-        Some("minecraft:stone_slab[half=bottom]")
+        Some("minecraft:smooth_stone_slab[half=bottom]")
     );
     assert_eq!(
         legacy_block_name(53, 3).as_deref(),
