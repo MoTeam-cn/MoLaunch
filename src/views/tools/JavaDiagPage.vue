@@ -30,7 +30,7 @@ const activeSubTab = ref('downloader')
     <SubTabBar v-model="activeSubTab" :tabs="subTabs" sticky />
 
     <div class="p-6">
-      <div class="mx-auto max-w-3xl">
+      <div class="w-full">
         <JavaDownloader v-if="activeSubTab === 'downloader'" />
         <JavaEnvCheck v-else-if="activeSubTab === 'env-check'" />
         <JavaManager v-else-if="activeSubTab === 'manager'" />

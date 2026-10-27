@@ -15,7 +15,7 @@ const MemoryOptimizer = defineAsyncComponent(() => import('./quick-tools/MemoryO
 </script>
 
 <template>
-  <div class="mx-auto max-w-3xl space-y-6">
+  <div class="grid gap-6 xl:grid-cols-2">
     <!-- 清理游戏垃圾 -->
     <CleanupTool />
 

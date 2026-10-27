@@ -38,7 +38,7 @@ const activeSubTab = ref('luck')
     <SubTabBar v-model="activeSubTab" :tabs="subTabs" sticky />
 
     <div class="p-6">
-      <div class="mx-auto max-w-3xl">
+      <div class="w-full">
         <LuckyTool v-if="activeSubTab === 'luck'" />
         <QuickTools v-else-if="activeSubTab === 'quick'" />
         <CoordCalculator v-else-if="activeSubTab === 'coord'" />

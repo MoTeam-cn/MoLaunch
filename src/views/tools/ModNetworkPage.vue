@@ -35,7 +35,7 @@ const activeSubTab = ref('dependency')
     <SubTabBar v-model="activeSubTab" :tabs="subTabs" sticky />
 
     <div class="p-6">
-      <div class="mx-auto max-w-3xl">
+      <div class="w-full">
         <ModDependencyChecker v-if="activeSubTab === 'dependency'" />
         <ModDedupScanner v-else-if="activeSubTab === 'dedup'" />
         <ServerPinger v-else-if="activeSubTab === 'server'" />

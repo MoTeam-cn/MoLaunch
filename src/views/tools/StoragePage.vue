@@ -41,7 +41,7 @@ const activeSubTab = ref('archive')
     <SubTabBar v-model="activeSubTab" :tabs="subTabs" sticky />
 
     <div class="p-6">
-      <div class="mx-auto" :class="activeSubTab === 'resourcepack-editor' ? 'max-w-6xl' : 'max-w-3xl'">
+      <div class="w-full">
         <ArchiveManager v-if="activeSubTab === 'archive'" />
         <NbtViewer v-else-if="activeSubTab === 'nbt'" />
         <ScreenshotManager v-else-if="activeSubTab === 'screenshot'" />

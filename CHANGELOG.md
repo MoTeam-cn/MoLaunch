@@ -8,6 +8,12 @@
 
 ### 新增
 
+#### 工具页各子页面改为自适应宽度，不再挤在居中的窄栏里
+
+- **问题**：五个一级分类页（常用工具 / 创作指令 / Java 诊断 / Mod 网络 / 存档资源）的内容都被包在一层 `mx-auto max-w-3xl` 里。窗口拉宽到 1920 时内容仍然只有 768px 宽并居中，左右各空出一大截，投影工具的逐层视图、3D 预览、方块选择器全被压在这个窄栏里。
+- **改法**：[CommonPage](src/views/tools/CommonPage.vue)、[CreateCmdPage](src/views/tools/CreateCmdPage.vue)、[JavaDiagPage](src/views/tools/JavaDiagPage.vue)、[ModNetworkPage](src/views/tools/ModNetworkPage.vue)、[StoragePage](src/views/tools/StoragePage.vue) 的包装层统一改为 `w-full`，内容占满可用宽度，跟随窗口缩放。
+- **配套**：[QuickTools](src/views/QuickTools.vue) 的两张卡片在 1280px 以上并排；[SkinFetcher](src/views/tools/network/SkinFetcher.vue) 的输入行限制在 `max-w-2xl`，避免全宽后输入框拉成一条。
+
 #### 投影 3D 预览：可任意平移、修掉满屏破面、布局随窗口自适应
 
 - **满屏破面**：渲染器的阴影贴图默认只覆盖 100×100 格，而投影动辄上百格、相机在几百格外，整片结构落在阴影范围外，深度采样错位就成了满屏斑驳——看着像穿模，其实是阴影。现在关掉阴影、关掉雾，近远裁剪面改成跟着观察距离走（原本固定 0.1~2000，远距离深度精度不足会互相啃面），并开启抗锯齿。

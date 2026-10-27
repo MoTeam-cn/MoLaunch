@@ -113,7 +113,7 @@ async function saveImage(kind: 'skin' | 'cape') {
       />
 
       <!-- 输入区 -->
-      <div class="flex items-end gap-3">
+      <div class="flex max-w-2xl items-end gap-3">
         <div class="flex-1">
           <label class="mb-1 block text-xs font-medium text-gray-700">玩家名</label>
           <Input

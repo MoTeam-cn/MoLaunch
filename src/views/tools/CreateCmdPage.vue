@@ -49,7 +49,7 @@ const activeSubTab = ref('gradient-text')
     <SubTabBar v-model="activeSubTab" :tabs="subTabs" sticky />
 
     <div class="p-6">
-      <div class="mx-auto max-w-3xl">
+      <div class="w-full">
         <GradientTextPage v-if="activeSubTab === 'gradient-text'" />
         <RecipeGeneratorPage v-else-if="activeSubTab === 'recipe-generator'" />
         <ItemEditor v-else-if="activeSubTab === 'item'" />
