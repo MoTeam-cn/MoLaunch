@@ -6,9 +6,9 @@
 
 ### 修复
 
-#### 社区资源页给出 CurseForge 配置入口
+#### 下载设置页直接指路社区资源配置
 
-- [`Community.vue`](src/views/Community.vue)：检测到 CurseForge 未启用或没有 API Key 时，页面顶部显示一条说明，并附「去设置」按钮，通过 `?tab=advanced` 直达设置里的对应区块。不改设置页结构，只把入口搬到用得到的地方。
+- [`SettingsDownload.vue`](src/views/settings/SettingsDownload.vue)：「下载源」区块下方说明这里只管游戏本体、库文件与加载器安装包，并给出「你是来找 CurseForge 或 Modrinth 的下载配置的吗？点我前往」的链接，经 `?tab=advanced` 直达进阶设置里的社区资源区块。两个设置项名称相近，改错地方是常态，直接给一条路比改文案有效。
 
 ### 新增
 

@@ -1,8 +1,17 @@
 <script setup lang="ts">
 import { ref, watch, defineAsyncComponent } from 'vue'
+import { useRouter } from 'vue-router'
 import { useConfigPage } from '@/composables/useConfigPage'
 const Select = defineAsyncComponent(() => import('@/components/common/Select.vue'))
+const Button = defineAsyncComponent(() => import('@/components/common/Button.vue'))
 const Slider = defineAsyncComponent(() => import('@/components/common/Slider.vue'))
+
+const router = useRouter()
+
+/** 社区资源（CurseForge / Modrinth）的来源策略在进阶设置，这里的下载源管不到它 */
+function gotoCommunitySource(): void {
+  router.push({ path: '/apps/settings', query: { tab: 'advanced' } })
+}
 
 const maxThreads = ref(8)
 const chunkCount = ref(4)
@@ -74,7 +83,8 @@ watch(chunkCount, (v) => markDirty('chunkCount', v))
     <div class="bg-white rounded-lg border border-gray-300 overflow-hidden">
       <h3 class="text-sm font-semibold text-gray-900 px-5 pt-5 pb-3">下载源</h3>
       <p class="px-5 pb-2 text-xs text-gray-500">
-        仅影响游戏本体、库文件与加载器安装包；Mod、整合包等社区资源的来源在「进阶设置 → 社区资源」中单独设置
+        仅影响游戏本体、库文件与加载器安装包。你是来找 CurseForge 或 Modrinth 的下载配置的吗？
+        <Button type="text" size="mini" class="!h-auto !p-0 align-baseline text-xs" @click="gotoCommunitySource">点我前往</Button>
       </p>
       <div class="divide-y divide-gray-200">
         <!-- 版本列表源 -->
