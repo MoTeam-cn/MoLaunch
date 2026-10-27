@@ -8,7 +8,7 @@
  */
 
 import { onBeforeUnmount, ref, watch } from 'vue'
-import type { PerspectiveCamera } from 'three'
+import * as THREE from 'three'
 import { ThreeStructureRenderer } from '@mattzh72/lodestone'
 import { ArrowsPointingOutIcon, CubeTransparentIcon, HandRaisedIcon } from '@heroicons/vue/24/outline'
 import Tooltip from '@/components/common/Tooltip.vue'
@@ -65,7 +65,7 @@ function orbitPosition(): [number, number, number] {
 
 /** 近远裁剪面跟着观察距离走：固定 0.1/2000 在几百格的距离上深度精度不够，会互相啃面 */
 function syncClipPlanes(): void {
-  const camera = (renderer as unknown as { camera?: PerspectiveCamera } | null)?.camera
+  const camera = (renderer as unknown as { camera?: THREE.PerspectiveCamera } | null)?.camera
   if (!camera) return
   camera.near = Math.max(0.05, radius / 400)
   camera.far = radius * 12 + 512
@@ -139,6 +139,7 @@ async function loadScene(): Promise<void> {
     })
     applyViewport()
     applyCamera()
+    fixAtlasSampling()
     await renderer.whenReady()
     if (disposed || !renderer) return
     stats.value = `显示 ${built.kept.toLocaleString()} 方块（遮挡剔除后 / 非空气 ${built.total.toLocaleString()}）`
@@ -149,6 +150,19 @@ async function loadScene(): Promise<void> {
   } finally {
     loading.value = false
   }
+}
+
+/**
+ * 图集里每个方块只占 16×16，开着 mipmap 时远处会采样到相邻方块的像素，
+ * 大片同种方块的地面就会浮出一层规则条纹。像素风本来就该用最近邻采样。
+ */
+function fixAtlasSampling(): void {
+  const texture = (renderer as unknown as { atlasTexture?: THREE.Texture } | null)?.atlasTexture
+  if (!texture) return
+  texture.magFilter = THREE.NearestFilter
+  texture.minFilter = THREE.NearestFilter
+  texture.generateMipmaps = false
+  texture.needsUpdate = true
 }
 
 function observeResize(): void {

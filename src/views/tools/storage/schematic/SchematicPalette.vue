@@ -7,7 +7,8 @@
  */
 
 import { computed, ref, defineAsyncComponent } from 'vue'
-import { blockBaseName, blockColor } from '@/utils/schematic/decode'
+import { blockDisplayName } from '@/utils/schematic/block-names'
+import { blockColor } from '@/utils/schematic/decode'
 import { resolveTexture, type BlockAtlas } from '@/utils/schematic/textures'
 
 const Input = defineAsyncComponent(() => import('@/components/common/Input.vue'))
@@ -58,9 +59,9 @@ function swatchStyle(item: { color: string; texture: [number, number, number, nu
   }
 }
 
-/** 列表里只显示方块名，朝向等属性在完整提示中查看 */
+/** 列表里只显示中文名，完整 id 与朝向放在悬停提示 */
 function displayName(id: string): string {
-  return blockBaseName(id).replace('minecraft:', '')
+  return blockDisplayName(id)
 }
 </script>
 
