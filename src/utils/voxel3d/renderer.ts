@@ -10,7 +10,8 @@ import * as THREE from 'three'
 import { createAtlasTexture, type AtlasSource } from './atlas'
 import { meshVolume, type MesherCache, createMesherCache } from './mesher'
 import type { PackData, VoxelVolume } from './types'
-import { FOV } from './orbit'
+import { FOV, type Vec3 } from './orbit'
+import { SORT_CAMERA_EPSILON, sortFacesByDepth } from './sort'
 
 export interface VoxelRendererOptions {
   antialias?: boolean
@@ -33,6 +34,8 @@ export class VoxelRenderer {
   private readonly translucentMaterial: THREE.MeshLambertMaterial
   private opaqueMesh: THREE.Mesh | null = null
   private translucentMesh: THREE.Mesh | null = null
+  private translucentSource: { indices: Uint32Array; centers: Float32Array } | null = null
+  private lastSortPosition: Vec3 | null = null
   private rafId = 0
   private disposed = false
   private faceCount = 0
@@ -86,6 +89,11 @@ export class VoxelRenderer {
       this.translucentMesh = new THREE.Mesh(makeGeometry(mesh.translucent), this.translucentMaterial)
       this.translucentMesh.renderOrder = 1
       this.scene.add(this.translucentMesh)
+      this.translucentSource = {
+        indices: mesh.translucent.indices.slice(),
+        centers: mesh.translucent.centers,
+      }
+      this.lastSortPosition = null
     }
 
     this.faceCount = mesh.faceCount
@@ -115,6 +123,23 @@ export class VoxelRenderer {
     this.camera.near = Math.max(0.05, distance / 400)
     this.camera.far = distance * 12 + 512
     this.camera.updateProjectionMatrix()
+    this.sortTranslucent([position[0], position[1], position[2]])
+  }
+
+  /** 相机移动到位后重排半透明面，远的先画 */
+  private sortTranslucent(position: Vec3): void {
+    const source = this.translucentSource
+    const geometry = this.translucentMesh?.geometry
+    if (!source || !geometry) return
+    if (this.lastSortPosition) {
+      const dx = position[0] - this.lastSortPosition[0]
+      const dy = position[1] - this.lastSortPosition[1]
+      const dz = position[2] - this.lastSortPosition[2]
+      if (dx * dx + dy * dy + dz * dz < SORT_CAMERA_EPSILON * SORT_CAMERA_EPSILON) return
+    }
+    const sorted = sortFacesByDepth(source.indices, source.centers, position)
+    geometry.setIndex(new THREE.BufferAttribute(sorted, 1))
+    this.lastSortPosition = [position[0], position[1], position[2]]
   }
 
   setFov(fov: number): void {
@@ -150,6 +175,8 @@ export class VoxelRenderer {
     }
     this.opaqueMesh = null
     this.translucentMesh = null
+    this.translucentSource = null
+    this.lastSortPosition = null
   }
 
   dispose(): void {
@@ -168,6 +195,7 @@ function makeGeometry(mesh: {
   normals: Float32Array
   uvs: Float32Array
   colors: Float32Array
+  centers: Float32Array
   indices: Uint32Array
 }): THREE.BufferGeometry {
   const geometry = new THREE.BufferGeometry()

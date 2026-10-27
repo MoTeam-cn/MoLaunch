@@ -66,6 +66,8 @@ export interface MeshData {
   uvs: Float32Array
   /** 每个顶点的着色（0-1），未着色的方块为白色 */
   colors: Float32Array
+  /** 每个面的中心点（每面 3 个分量），半透明网格按它排序 */
+  centers: Float32Array
   indices: Uint32Array
   /** 面数 */
   faceCount: number

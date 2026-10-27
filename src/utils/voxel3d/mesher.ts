@@ -31,6 +31,7 @@ const EMPTY_MESH: MeshData = {
   normals: new Float32Array(0),
   uvs: new Float32Array(0),
   colors: new Float32Array(0),
+  centers: new Float32Array(0),
   indices: new Uint32Array(0),
   faceCount: 0,
 }
@@ -91,6 +92,7 @@ export function meshVolume(
       normals: new Float32Array(counts.opaque * 12),
       uvs: new Float32Array(counts.opaque * 8),
       colors: new Float32Array(counts.opaque * 12),
+      centers: new Float32Array(counts.opaque * 3),
       indices: new Uint32Array(counts.opaque * 6),
       cursor: 0,
       vertexBase: 0,
@@ -100,6 +102,7 @@ export function meshVolume(
       normals: new Float32Array(counts.translucent * 12),
       uvs: new Float32Array(counts.translucent * 8),
       colors: new Float32Array(counts.translucent * 12),
+      centers: new Float32Array(counts.translucent * 3),
       indices: new Uint32Array(counts.translucent * 6),
       cursor: 0,
       vertexBase: 0,
@@ -141,6 +144,12 @@ export function meshVolume(
             target.colors[pBase + v * 3 + 2] = face.tint ? face.tint[2] : 1
           }
 
+          // 面中心，供半透明网格按视角排序
+          const cBase = target.cursor * 3
+          target.centers[cBase] = (face.vertices[0][0] + face.vertices[1][0] + face.vertices[2][0] + face.vertices[3][0]) / 4 + x
+          target.centers[cBase + 1] = (face.vertices[0][1] + face.vertices[1][1] + face.vertices[2][1] + face.vertices[3][1]) / 4 + y
+          target.centers[cBase + 2] = (face.vertices[0][2] + face.vertices[1][2] + face.vertices[2][2] + face.vertices[3][2]) / 4 + z
+
           const iBase = target.cursor * 6
           const v0 = target.vertexBase
           target.indices[iBase] = v0
@@ -165,6 +174,7 @@ export function meshVolume(
           normals: b.normals,
           uvs: b.uvs,
           colors: b.colors,
+          centers: b.centers,
           indices: b.indices,
           faceCount: b.cursor,
         }
