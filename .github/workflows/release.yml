@@ -130,18 +130,21 @@ jobs:
       - name: Install frontend dependencies
         run: npm ci --prefer-offline --no-audit --no-fund
 
+      # 私有协议库（molaunch-protocol）需要独立凭据。
+      # 必须清掉 actions/checkout 留下的 http.<url>.extraheader，否则 git 会优先用
+      # 仓库的 GITHUB_TOKEN 访问私有库，结果恒为 Repository not found。
       - name: Authorize private protocol repo
         # Windows runner 默认 shell 是 pwsh，下面全是 bash 语法，必须显式指定
         shell: bash
         env:
           PROTOCOL_TOKEN: ${{ secrets.PROTOCOL_REPO_TOKEN }}
         run: |
-          echo "token length: ${#PROTOCOL_TOKEN}"
-          echo "token sha: $(printf '%s' "$PROTOCOL_TOKEN" | sha256sum | cut -c1-12)"
+          if [ -z "$PROTOCOL_TOKEN" ]; then echo "::error::PROTOCOL_REPO_TOKEN 为空"; exit 1; fi
+          git config --local --unset-all "http.https://github.com/.extraheader" || true
+          git config --global --unset-all "http.https://github.com/.extraheader" || true
           git config --global credential.helper store
           printf 'https://x-access-token:%s@github.com\n' "$PROTOCOL_TOKEN" > "$HOME/.git-credentials"
           chmod 600 "$HOME/.git-credentials"
-          if [ -z "$PROTOCOL_TOKEN" ]; then echo "::error::PROTOCOL_REPO_TOKEN is empty"; exit 1; fi
           git ls-remote --heads https://github.com/MoTeam-cn/MoLaunch-Protocol > /dev/null
           echo "private protocol repo reachable"
 
