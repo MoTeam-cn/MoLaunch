@@ -154,6 +154,18 @@ html[data-theme='dark'],
 [data-theme='dark'] .bg-primary-50\/60 {
   background-color: color-mix(in oklab, var(--color-primary-500) 16%, transparent);
 }
+/* 主色浅底的透明度变体：v4 会把 /NN 编译成字面 rgba，变量重映射够不着，
+   必须逐条列出。展开态的选中卡片（bg-primary-50/30 一类）就落在这里，
+   漏掉的话深色主题下整块发白——文字还是深色，几乎没法看。 */
+[data-theme='dark'] .bg-primary-50\/30,
+[data-theme='dark'] .bg-primary-50\/40,
+[data-theme='dark'] .bg-primary-50\/50 {
+  background-color: color-mix(in oklab, var(--color-primary-500) 14%, transparent);
+}
+[data-theme='dark'] .bg-primary-100\/30,
+[data-theme='dark'] .bg-primary-100\/50 {
+  background-color: color-mix(in oklab, var(--color-primary-500) 20%, transparent);
+}
 /* 主色文字：深色下必须提亮，否则强调色压深底（实测 2.1:1 看不清）。
    用 color-mix 跟动态主色走——之前钉死 #6ea8ff，换紫色/绿色主色时就串味了。 */
 [data-theme='dark'] .text-primary-500,
@@ -168,6 +180,9 @@ html[data-theme='dark'],
 [data-theme='dark'] .bg-red-100 {
   background-color: rgb(220 38 38 / 0.16);
 }
+[data-theme='dark'] .bg-red-50\/50 {
+  background-color: rgb(220 38 38 / 0.16);
+}
 [data-theme='dark'] .bg-amber-50,
 [data-theme='dark'] .bg-amber-100 {
   background-color: rgb(217 119 6 / 0.16);
@@ -178,6 +193,10 @@ html[data-theme='dark'],
 }
 [data-theme='dark'] .bg-blue-50,
 [data-theme='dark'] .bg-blue-100 {
+  background-color: rgb(37 99 235 / 0.16);
+}
+[data-theme='dark'] .bg-blue-50\/40,
+[data-theme='dark'] .bg-blue-50\/50 {
   background-color: rgb(37 99 235 / 0.16);
 }
 [data-theme='dark'] .text-red-700 {
