@@ -20,6 +20,8 @@ const props = defineProps<{
   sessionId: string
   /** 世界尺寸，用于相机初始距离 */
   size: [number, number, number]
+  /** 方块数据版本号，变化后重建场景 */
+  revision?: number
 }>()
 
 const canvasEl = ref<HTMLCanvasElement | null>(null)
@@ -139,7 +141,7 @@ function onWheel(event: WheelEvent): void {
   radius = clamp(radius * factor, 4, Math.max(props.size[0], props.size[1], props.size[2]) * 6)
 }
 
-watch(() => props.sessionId, loadScene, { immediate: true })
+watch(() => [props.sessionId, props.revision], loadScene, { immediate: true })
 onBeforeUnmount(disposeRenderer)
 </script>
 

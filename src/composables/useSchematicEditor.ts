@@ -67,6 +67,8 @@ export function useSchematicEditor() {
   const overview = ref<SchematicOverview | null>(null)
 /** 方块贴图图集：加载失败时为 null，画布退回纯色 */
 const atlas = ref<BlockAtlas | null>(null)
+  /** 方块数据版本号：编辑、撤销重做、旋转镜像后自增，供 3D 场景知道该重建 */
+  const revision = ref(0)
 loadBlockAtlas().then((loaded) => {
   atlas.value = loaded
 })
@@ -221,6 +223,7 @@ loadBlockAtlas().then((loaded) => {
         points: params.points ?? [],
       })
       nonAir.value = result.nonAir
+      revision.value += 1
       canUndo.value = result.canUndo
       canRedo.value = result.canRedo
       await refreshSlice()
@@ -271,6 +274,7 @@ loadBlockAtlas().then((loaded) => {
     try {
       const result = await schematicHistory(session.value.sessionId, action)
       nonAir.value = result.nonAir
+      revision.value += 1
       canUndo.value = result.canUndo
       canRedo.value = result.canRedo
       await refreshSlice()
@@ -288,6 +292,7 @@ loadBlockAtlas().then((loaded) => {
       const result = await schematicTransform(session.value.sessionId, kind)
       session.value = { ...session.value, size: result.size }
       nonAir.value = result.nonAir
+      revision.value += 1
       canUndo.value = false
       canRedo.value = false
       await loadOverview()
@@ -397,6 +402,7 @@ loadBlockAtlas().then((loaded) => {
     jumpToNearestOccupied,
     jumpToDensest,
     atlas,
+    revision,
     zoom,
   }
 }

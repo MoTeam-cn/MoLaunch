@@ -114,6 +114,7 @@ const editor = useSchematicEditor()
       <SchematicScene
         :session-id="editor.session.value.sessionId"
         :size="editor.session.value.size"
+        :revision="editor.revision.value"
       />
     </template>
   </section>
