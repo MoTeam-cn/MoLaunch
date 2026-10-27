@@ -70,7 +70,9 @@ const filenameOptions = [
             <div class="flex items-center justify-between mb-2">
               <div>
                 <p class="text-sm font-medium text-gray-900">来源</p>
-                <p class="text-xs text-gray-500 mt-0.5">CurseForge 与 Modrinth 资源请求的源策略</p>
+                <p class="text-xs text-gray-500 mt-0.5">
+                CurseForge 与 Modrinth 资源请求的源策略，与「下载」页的下载源互不影响
+              </p>
               </div>
               <div class="w-72">
                 <Select v-model="source" :options="sourceOptions" custom-option>

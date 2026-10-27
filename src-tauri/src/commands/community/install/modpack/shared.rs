@@ -1,14 +1,18 @@
 //! 整合包安装共享逻辑（online / local 共用）
 
-use crate::log_info;
 use crate::minecraft::community::secure_storage;
 use crate::state::{AppState, StageStatus};
+use crate::{log_info, log_warn};
 
 use super::super::concurrent;
 use super::super::modpack_stages::{copy_external_logo, migrate_modpack_config};
 use super::super::types::{ModpackFormat, ModpackInfo};
 
-/// 校验 CurseForge API Key（source=0 强制镜像时跳过）
+/// 记录 CurseForge API Key 状态
+///
+/// 不拦截安装：请求层（`curseforge::http::get_cf_config`）在没有 Key 时本来就会
+/// 改用镜像源，前置检查若直接报错反而把已经可用的回退路径挡掉。
+/// 这里只把实际会走的路径写进日志，便于排查「为什么这次走的是镜像」。
 ///
 /// 在线安装在 reset_stages 前按 platform 调用；本地安装在 detect 后按 format 调用。
 pub(super) async fn validate_cf_api_key() -> Result<(), String> {
@@ -18,18 +22,14 @@ pub(super) async fn validate_cf_api_key() -> Result<(), String> {
         return Ok(());
     }
     let (enabled, api_key) = secure_storage::get_config_async().await;
-    if !enabled {
-        return Err(
-            "CurseForge 整合包安装需要 API Key。请到「设置 → 进阶设置」的「CurseForge API Key」区块打开开关并填写 Key；或在同页「社区资源」把来源策略改成「尽量镜像」后保存。"
-                .to_string(),
-        );
-    }
     let key_empty = api_key.as_deref().is_none_or(|k| k.is_empty());
-    if key_empty {
-        return Err(
-            "CurseForge API Key 已启用但内容为空。请到「设置 → 进阶设置 → CurseForge API Key」补全，或把同页「社区资源」的来源策略改成「尽量镜像」后保存。"
-                .to_string(),
+    if !enabled || key_empty {
+        log_warn!(
+            "[Community] CF 未配置可用的 API Key（enabled={}, key_empty={}），本次请求走镜像源；如需官方源请在「设置 → 进阶设置」的「CurseForge API Key」中启用并填写",
+            enabled,
+            key_empty
         );
+        return Ok(());
     }
     log_info!("[Community] CF API Key 检查通过 (source={})", source);
     Ok(())

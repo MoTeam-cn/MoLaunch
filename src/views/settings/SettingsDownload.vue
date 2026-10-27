@@ -73,6 +73,9 @@ watch(chunkCount, (v) => markDirty('chunkCount', v))
     <!-- 下载源 -->
     <div class="bg-white rounded-lg border border-gray-300 overflow-hidden">
       <h3 class="text-sm font-semibold text-gray-900 px-5 pt-5 pb-3">下载源</h3>
+      <p class="px-5 pb-2 text-xs text-gray-500">
+        仅影响游戏本体、库文件与加载器安装包；Mod、整合包等社区资源的来源在「进阶设置 → 社区资源」中单独设置
+      </p>
       <div class="divide-y divide-gray-200">
         <!-- 版本列表源 -->
         <div class="px-5 py-4">
