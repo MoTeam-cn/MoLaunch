@@ -132,6 +132,8 @@ jobs:
 
       # 私有协议库（molaunch-protocol）需要凭据：写 git 凭据文件并校验可访问
       - name: Authorize private protocol repo
+        # Windows runner 默认 shell 是 pwsh，下面的写法是 bash 语法，必须显式指定
+        shell: bash
         env:
           PROTOCOL_TOKEN: ${{ secrets.PROTOCOL_REPO_TOKEN }}
         run: |

@@ -133,6 +133,7 @@ jobs:
           workspaces: src-tauri
       # 私有协议库（molaunch-protocol）需要凭据：写 git 凭据文件并校验可访问
       - name: Authorize private protocol repo
+        shell: bash
         env:
           PROTOCOL_TOKEN: ${{ secrets.PROTOCOL_REPO_TOKEN }}
         run: |
@@ -192,6 +193,7 @@ jobs:
 
       # 私有协议库（molaunch-protocol）需要凭据：写 git 凭据文件并校验可访问
       - name: Authorize private protocol repo
+        shell: bash
         env:
           PROTOCOL_TOKEN: ${{ secrets.PROTOCOL_REPO_TOKEN }}
         run: |
