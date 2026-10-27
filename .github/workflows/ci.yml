@@ -131,8 +131,11 @@ jobs:
       - uses: Swatinem/rust-cache@v2
         with:
           workspaces: src-tauri
-      # 私有协议库（molaunch-protocol）需要凭据：写 git 凭据文件并校验可访问
+      # 私有协议库（molaunch-protocol）需要凭据。
+      # 只写 credential store，不把 token 拼进 url.insteadOf——那样 token 会落进
+      # ~/.gitconfig，一旦被命令回显就会暴露并触发自动吊销。
       - name: Authorize private protocol repo
+        # Windows runner 默认 shell 是 pwsh，下面全是 bash 语法，必须显式指定
         shell: bash
         env:
           PROTOCOL_TOKEN: ${{ secrets.PROTOCOL_REPO_TOKEN }}
@@ -140,8 +143,8 @@ jobs:
           git config --global credential.helper store
           printf 'https://x-access-token:%s@github.com\n' "$PROTOCOL_TOKEN" > "$HOME/.git-credentials"
           chmod 600 "$HOME/.git-credentials"
-          git config --global url."https://x-access-token:$PROTOCOL_TOKEN@github.com/".insteadOf "https://github.com/"
-          git ls-remote --heads https://github.com/MoTeam-cn/MoLaunch-Protocol | head -3
+          git ls-remote --heads https://github.com/MoTeam-cn/MoLaunch-Protocol > /dev/null
+          echo "private protocol repo reachable"
 
       # generate_context! 宏要求 frontendDist(../dist) 存在（tauri-build 校验）
       - name: Ensure frontend dist directory
@@ -191,8 +194,11 @@ jobs:
           version: 1.0
           execute_install_scripts: true
 
-      # 私有协议库（molaunch-protocol）需要凭据：写 git 凭据文件并校验可访问
+      # 私有协议库（molaunch-protocol）需要凭据。
+      # 只写 credential store，不把 token 拼进 url.insteadOf——那样 token 会落进
+      # ~/.gitconfig，一旦被命令回显就会暴露并触发自动吊销。
       - name: Authorize private protocol repo
+        # Windows runner 默认 shell 是 pwsh，下面全是 bash 语法，必须显式指定
         shell: bash
         env:
           PROTOCOL_TOKEN: ${{ secrets.PROTOCOL_REPO_TOKEN }}
@@ -200,8 +206,8 @@ jobs:
           git config --global credential.helper store
           printf 'https://x-access-token:%s@github.com\n' "$PROTOCOL_TOKEN" > "$HOME/.git-credentials"
           chmod 600 "$HOME/.git-credentials"
-          git config --global url."https://x-access-token:$PROTOCOL_TOKEN@github.com/".insteadOf "https://github.com/"
-          git ls-remote --heads https://github.com/MoTeam-cn/MoLaunch-Protocol | head -3
+          git ls-remote --heads https://github.com/MoTeam-cn/MoLaunch-Protocol > /dev/null
+          echo "private protocol repo reachable"
 
       - uses: dtolnay/rust-toolchain@stable
       - uses: Swatinem/rust-cache@v2
