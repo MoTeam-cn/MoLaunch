@@ -199,7 +199,7 @@ onBeforeUnmount(disposeRenderer)
       </Tooltip>
       <span class="flex shrink-0 items-center gap-1 text-xs text-gray-400">
         <HandRaisedIcon class="h-3.5 w-3.5" />
-        左键旋转 · 右键/Shift 平移 · 滚轮缩放
+        可拖拽旋转
       </span>
       <span class="ml-auto flex shrink-0 items-center gap-2 text-xs">
         <button
@@ -228,6 +228,16 @@ onBeforeUnmount(disposeRenderer)
         @contextmenu.prevent
         @wheel.prevent="onWheel"
       ></canvas>
+      <!-- 常驻操作说明：画布本身没有可见的控件，不写清楚没人知道能拖 -->
+      <div
+        class="pointer-events-none absolute bottom-2 left-2 rounded-sm bg-slate-900/70 px-2 py-1 text-[11px] leading-relaxed text-gray-300"
+      >
+        <span>左键按住拖动：旋转视角</span>
+        <span class="mx-1 text-gray-500">·</span>
+        <span>右键或 Shift 按住拖动：平移</span>
+        <span class="mx-1 text-gray-500">·</span>
+        <span>滚轮：缩放</span>
+      </div>
       <div v-if="loading" class="absolute inset-0 grid place-items-center bg-slate-900/80 text-sm text-gray-300">
         正在构建立体场景…
       </div>

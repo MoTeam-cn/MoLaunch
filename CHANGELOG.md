@@ -37,6 +37,10 @@
 
 - [`SkinModel3D.vue`](src/components/common/SkinModel3D.vue)：编辑器里皮肤是挂载之后才载入的，而组件只在挂载那一刻有皮肤才创建查看器；等皮肤到了，监听回调发现查看器还不存在就直接返回，于是永远建不起来。改为数据到达时补建。
 
+#### 投影：3D 预览标注操作方式
+
+- [`SchematicScene.vue`](src/views/tools/storage/schematic/SchematicScene.vue)：画布左下角常驻操作说明——左键按住拖动旋转、右键或 Shift 按住拖动平移、滚轮缩放。之前只有标题栏一行小字，容易被忽略成只能缩放。
+
 #### 投影：逐层视图不再溢出
 
 - [`SchematicCanvas.vue`](src/views/tools/storage/schematic/SchematicCanvas.vue)：格子大小跟着容器宽度收（期望值与能放下的取小值），逐层画布不再撑出横向滚动条，也不会顶破外框。
