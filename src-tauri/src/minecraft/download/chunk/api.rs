@@ -43,11 +43,13 @@ fn plan_chunk_count(file_size: u64, requested: usize) -> usize {
 }
 
 /// 采样任务的 RAII 守卫：本函数任意路径返回都会中止采样，避免任务泄漏
-struct SlowSamplerGuard(tokio::task::JoinHandle<()>);
+struct SlowSamplerGuard(Option<tokio::task::JoinHandle<()>>);
 
 impl Drop for SlowSamplerGuard {
     fn drop(&mut self) {
-        self.0.abort();
+        if let Some(handle) = self.0.as_ref() {
+            handle.abort();
+        }
     }
 }
 
@@ -79,6 +81,7 @@ pub async fn download_chunked(
     file_progress: Option<Arc<StdMutex<GlobalProgress>>>,
     pause_flag: Option<Arc<AtomicBool>>,
     cancel_flag: Option<Arc<AtomicBool>>,
+    allow_slow_abort: bool,
 ) -> ChunkDownloadResult {
     // file_size=0 时自动探测（GET + Range:bytes=0-0，通过 Content-Range 拿总大小）
     // 不用 HEAD 是因为 Modrinth CDN 307 重定向后 HEAD 不返回 Content-Length
@@ -170,32 +173,37 @@ pub async fn download_chunked(
     let slow_abort = Arc::new(AtomicBool::new(false));
     let sampler_slow_abort = slow_abort.clone();
     let sampler_progress = chunk_progress.clone();
-    let _slow_sampler = SlowSamplerGuard(tokio::spawn(async move {
-        let mut window_started = Instant::now();
-        let mut window_bytes = 0_u64;
-        loop {
-            tokio::time::sleep(std::time::Duration::from_millis(500)).await;
-            if sampler_slow_abort.load(Ordering::Relaxed) {
-                return;
+    // 只有「后面还有别的候选源」时才需要判慢（见 retry），否则连采样任务都不必起
+    let _slow_sampler = SlowSamplerGuard(if allow_slow_abort {
+        Some(tokio::spawn(async move {
+            let mut window_started = Instant::now();
+            let mut window_bytes = 0_u64;
+            loop {
+                tokio::time::sleep(std::time::Duration::from_millis(500)).await;
+                if sampler_slow_abort.load(Ordering::Relaxed) {
+                    return;
+                }
+                let elapsed = window_started.elapsed();
+                if elapsed < slow::WINDOW {
+                    continue;
+                }
+                let downloaded: u64 = sampler_progress
+                    .iter()
+                    .map(|slot| *slot.lock().unwrap_or_else(|poisoned| poisoned.into_inner()))
+                    .sum();
+                let delta = downloaded.saturating_sub(window_bytes);
+                let remaining = file_size.saturating_sub(downloaded);
+                if slow::is_slow(delta, elapsed, remaining).is_some() {
+                    sampler_slow_abort.store(true, Ordering::Relaxed);
+                    return;
+                }
+                window_started = Instant::now();
+                window_bytes = downloaded;
             }
-            let elapsed = window_started.elapsed();
-            if elapsed < slow::WINDOW {
-                continue;
-            }
-            let downloaded: u64 = sampler_progress
-                .iter()
-                .map(|slot| *slot.lock().unwrap_or_else(|poisoned| poisoned.into_inner()))
-                .sum();
-            let delta = downloaded.saturating_sub(window_bytes);
-            let remaining = file_size.saturating_sub(downloaded);
-            if slow::is_slow(delta, elapsed, remaining).is_some() {
-                sampler_slow_abort.store(true, Ordering::Relaxed);
-                return;
-            }
-            window_started = Instant::now();
-            window_bytes = downloaded;
-        }
-    }));
+        }))
+    } else {
+        None
+    });
 
     let start_time = Instant::now();
     let mut handles = Vec::with_capacity(chunk_count);
@@ -213,8 +221,18 @@ pub async fn download_chunked(
 
         let handle = tokio::spawn(async move {
             let result = download_chunk(
-                &client, &url, &part_path, start, end, limiter, prog, i, file_prog, pause, cancel,
-                slow_flag,
+                &client,
+                &url,
+                &part_path,
+                start,
+                end,
+                limiter,
+                prog,
+                i,
+                file_prog,
+                pause,
+                cancel,
+                Some(slow_flag),
             )
             .await;
             (i, result)
