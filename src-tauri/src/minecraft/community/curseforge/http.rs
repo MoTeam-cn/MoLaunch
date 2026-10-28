@@ -4,7 +4,7 @@
 
 use std::time::Instant;
 
-use super::super::common::fmt_elapsed;
+use super::super::common::{fmt_elapsed, HEDGE_DELAY};
 
 /// CurseForge 官方 API 基地址
 pub(crate) const CF_OFFICIAL_BASE: &str = "https://api.curseforge.com/v1";
@@ -46,6 +46,24 @@ pub(crate) async fn get_cf_config() -> (String, Option<String>, u8) {
     (CF_MIRROR_BASE.to_string(), None, source)
 }
 
+/// 发一次 CF GET 并解析（官方与镜像共用）
+async fn cf_request<T: serde::de::DeserializeOwned>(
+    url: &str,
+    api_key: Option<&str>,
+) -> Result<T, String> {
+    let resp = build_cf_request(url, api_key).send().await.map_err(|e| {
+        crate::log_warn!("[Community] CF 请求失败: {} ({:?})", url, e);
+        format!(
+            "CurseForge 请求失败: {}",
+            crate::http::request_error_msg(&e)
+        )
+    })?;
+    resp.json::<T>().await.map_err(|e| {
+        crate::log_warn!("[Community] CF 响应解析失败: {} ({})", url, e);
+        format!("CurseForge 响应解析失败: {}", e)
+    })
+}
+
 /// 发送 GET 请求并附加 API Key header（如果配置了）
 ///
 /// source=1（缓慢时换镜像）时，若官方请求失败/超时，自动回退到镜像源重试
@@ -59,60 +77,44 @@ pub(crate) async fn cf_get<T: serde::de::DeserializeOwned>(path: &str) -> Result
     let is_official = base == CF_OFFICIAL_BASE;
     let start = Instant::now();
 
-    let result = if is_official {
-        // 官方请求加超时，超时视为"缓慢"，触发回退
-        let req = build_cf_request(&url, api_key.as_deref());
-        match tokio::time::timeout(
+    // source=1：官方领先 2s，超时就并发打镜像，先成功者胜出——不再干等 10s 超时
+    let result = if !is_official {
+        cf_request::<T>(&url, api_key.as_deref()).await
+    } else if source == 1 {
+        let mirror_url = format!("{}{}", CF_MIRROR_BASE, path);
+        let official = tokio::time::timeout(
             std::time::Duration::from_secs(CF_OFFICIAL_TIMEOUT_SECS),
-            req.send(),
-        )
-        .await
-        {
-            Ok(Ok(resp)) => resp.json::<T>().await.map_err(|e| {
-                crate::log_warn!("[Community] CF 响应解析失败: {} ({})", url, e);
-                format!("CurseForge 响应解析失败: {}", e)
-            }),
-            Ok(Err(e)) => {
-                crate::log_warn!("[Community] CF 请求失败: {} ({:?})", url, e);
-                Err(format!(
-                    "CurseForge 请求失败: {}",
-                    crate::http::request_error_msg(&e)
-                ))
-            }
-            Err(_) => {
-                crate::log_warn!(
-                    "[Community] CF 官方请求超时（{}s），{}",
-                    CF_OFFICIAL_TIMEOUT_SECS,
-                    if source == 1 {
-                        "回退镜像"
-                    } else {
-                        "报错"
-                    }
-                );
-                Err(format!(
-                    "CurseForge 官方请求超时（{}s）",
-                    CF_OFFICIAL_TIMEOUT_SECS
-                ))
-            }
+            cf_request::<T>(&url, api_key.as_deref()),
+        );
+        let hedged = async move {
+            tokio::time::sleep(HEDGE_DELAY).await;
+            crate::log_warn!(
+                "[Community] CF 官方请求 {}s 未返回，并发打镜像: {}",
+                HEDGE_DELAY.as_secs(),
+                mirror_url
+            );
+            // 镜像不带用户 API Key（镜像站自带），build_cf_request 也会兜底剥离
+            cf_request::<T>(&mirror_url, None).await
+        };
+        tokio::select! {
+            result = official => match result {
+                Ok(value) => value,
+                Err(_) => {
+                    crate::log_warn!(
+                        "[Community] CF 官方请求超时（{}s），回退镜像",
+                        CF_OFFICIAL_TIMEOUT_SECS
+                    );
+                    Err(format!(
+                        "CurseForge 官方请求超时（{}s）",
+                        CF_OFFICIAL_TIMEOUT_SECS
+                    ))
+                }
+            },
+            result = hedged => result,
         }
     } else {
-        // 镜像请求不加超时（镜像本身可能较慢，让其自然完成）
-        let req = build_cf_request(&url, api_key.as_deref());
-        req.send()
-            .await
-            .map_err(|e| {
-                crate::log_warn!("[Community] CF 请求失败: {} ({:?})", url, e);
-                format!(
-                    "CurseForge 请求失败: {}",
-                    crate::http::request_error_msg(&e)
-                )
-            })?
-            .json::<T>()
-            .await
-            .map_err(|e| {
-                crate::log_warn!("[Community] CF 响应解析失败: {} ({})", url, e);
-                format!("CurseForge 响应解析失败: {}", e)
-            })
+        // source=2：官方不设短超时，让慢但可用的官方请求自然完成
+        cf_request::<T>(&url, api_key.as_deref()).await
     };
 
     match result {

@@ -2,7 +2,13 @@
 //!
 //! 供 curseforge / modrinth / preload / sources 等模块复用。
 
-use std::time::Instant;
+use std::time::{Duration, Instant};
+
+/// 元数据请求的双线路对冲延迟
+///
+/// 官方线路在这个时间内没返回，就并发打镜像线路，先成功者胜出。取 2s：
+/// 正常官方响应通常在数百毫秒内，2s 已能判定「这条线路慢了」。
+pub(crate) const HEDGE_DELAY: Duration = Duration::from_secs(2);
 
 /// 格式化耗时：< 1000ms 显示 ms，>= 1000ms 显示 s
 ///

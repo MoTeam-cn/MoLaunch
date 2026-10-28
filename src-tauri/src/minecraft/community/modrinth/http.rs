@@ -4,8 +4,43 @@
 
 use std::time::Instant;
 
-use super::super::common::fmt_elapsed;
+use super::super::common::{fmt_elapsed, HEDGE_DELAY};
 use super::types::{MR_MIRROR_BASE, MR_OFFICIAL_BASE};
+
+/// 解析响应：404 单独处理（避免空 body 触发 "EOF while parsing" 警告混淆）
+async fn parse_resp<T: serde::de::DeserializeOwned>(
+    resp: reqwest::Response,
+    url: &str,
+) -> Result<T, String> {
+    let status = resp.status();
+    if status == reqwest::StatusCode::NOT_FOUND {
+        // 404 视为正常 "未找到"，记 INFO 不报警告（用户查不到 mod 不算异常）
+        crate::log_info!("[Community] MR 资源不存在 (404): {}", url);
+        return Err(format!("Modrinth 资源不存在: {}", url));
+    }
+    if !status.is_success() {
+        let code = status.as_u16();
+        crate::log_warn!("[Community] MR 响应非 2xx: {} ({})", url, code);
+        return Err(format!("Modrinth 响应异常: HTTP {}", code));
+    }
+    resp.json::<T>().await.map_err(|e| {
+        crate::log_warn!("[Community] MR 响应解析失败: {} ({})", url, e);
+        format!("Modrinth 响应解析失败: {}", e)
+    })
+}
+
+/// 发一次 GET 并解析（官方与镜像共用）
+async fn mr_fetch<T: serde::de::DeserializeOwned>(url: &str) -> Result<T, String> {
+    let resp = crate::http::get_client()
+        .get(url)
+        .send()
+        .await
+        .map_err(|e| {
+            crate::log_warn!("[Community] MR 请求失败: {} ({:?})", url, e);
+            format!("Modrinth 请求失败: {}", crate::http::request_error_msg(&e))
+        })?;
+    parse_resp::<T>(resp, url).await
+}
 
 /// 根据 source 策略选择 Modrinth 基地址
 ///
@@ -38,45 +73,27 @@ pub(crate) async fn mr_get<T: serde::de::DeserializeOwned>(path: &str) -> Result
     let is_official = base == MR_OFFICIAL_BASE;
     let start = Instant::now();
 
-    /// 解析响应：404 单独处理（避免空 body 触发 "EOF while parsing" 警告混淆）
-    async fn parse_resp<T: serde::de::DeserializeOwned>(
-        resp: reqwest::Response,
-        url: &str,
-    ) -> Result<T, String> {
-        let status = resp.status();
-        if status == reqwest::StatusCode::NOT_FOUND {
-            // 404 视为正常 "未找到"，记 INFO 不报警告（用户查不到 mod 不算异常）
-            crate::log_info!("[Community] MR 资源不存在 (404): {}", url);
-            return Err(format!("Modrinth 资源不存在: {}", url));
-        }
-        if !status.is_success() {
-            let code = status.as_u16();
-            crate::log_warn!("[Community] MR 响应非 2xx: {} ({})", url, code);
-            return Err(format!("Modrinth 响应异常: HTTP {}", code));
-        }
-        resp.json::<T>().await.map_err(|e| {
-            crate::log_warn!("[Community] MR 响应解析失败: {} ({})", url, e);
-            format!("Modrinth 响应解析失败: {}", e)
-        })
-    }
-
-    let result = if is_official {
-        // source=1 时官方请求加超时，超时触发回退；source=2 时不加超时
-        if source == 1 {
-            match tokio::time::timeout(
-                std::time::Duration::from_secs(MR_OFFICIAL_TIMEOUT_SECS),
-                crate::http::get_client().get(&url).send(),
-            )
-            .await
-            {
-                Ok(Ok(resp)) => parse_resp::<T>(resp, &url).await,
-                Ok(Err(e)) => {
-                    crate::log_warn!("[Community] MR 请求失败: {} ({:?})", url, e);
-                    Err(format!(
-                        "Modrinth 请求失败: {}",
-                        crate::http::request_error_msg(&e)
-                    ))
-                }
+    // source=1：官方领先 2s，超时就并发打镜像，先成功者胜出——不再干等 20s 超时
+    let result = if !is_official {
+        mr_fetch::<T>(&url).await
+    } else if source == 1 {
+        let mirror_url = format!("{}{}", MR_MIRROR_BASE, path);
+        let official = tokio::time::timeout(
+            std::time::Duration::from_secs(MR_OFFICIAL_TIMEOUT_SECS),
+            mr_fetch::<T>(&url),
+        );
+        let hedged = async move {
+            tokio::time::sleep(HEDGE_DELAY).await;
+            crate::log_warn!(
+                "[Community] MR 官方请求 {}s 未返回，并发打镜像: {}",
+                HEDGE_DELAY.as_secs(),
+                mirror_url
+            );
+            mr_fetch::<T>(&mirror_url).await
+        };
+        tokio::select! {
+            result = official => match result {
+                Ok(value) => value,
                 Err(_) => {
                     crate::log_warn!(
                         "[Community] MR 官方请求超时（{}s），回退镜像",
@@ -87,30 +104,12 @@ pub(crate) async fn mr_get<T: serde::de::DeserializeOwned>(path: &str) -> Result
                         MR_OFFICIAL_TIMEOUT_SECS
                     ))
                 }
-            }
-        } else {
-            // source=2：官方请求不加超时
-            let resp = crate::http::get_client()
-                .get(&url)
-                .send()
-                .await
-                .map_err(|e| {
-                    crate::log_warn!("[Community] MR 请求失败: {} ({:?})", url, e);
-                    format!("Modrinth 请求失败: {}", crate::http::request_error_msg(&e))
-                })?;
-            parse_resp::<T>(resp, &url).await
+            },
+            result = hedged => result,
         }
     } else {
-        // 镜像请求不加超时
-        let resp = crate::http::get_client()
-            .get(&url)
-            .send()
-            .await
-            .map_err(|e| {
-                crate::log_warn!("[Community] MR 请求失败: {} ({:?})", url, e);
-                format!("Modrinth 请求失败: {}", crate::http::request_error_msg(&e))
-            })?;
-        parse_resp::<T>(resp, &url).await
+        // source=2：官方请求不加短超时，让慢但可用的官方请求自然完成
+        mr_fetch::<T>(&url).await
     };
 
     match result {

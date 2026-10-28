@@ -77,6 +77,35 @@
 - [`retry.rs`](src-tauri/src/minecraft/download/downloader/retry.rs)：**只在后面还有别的候选源时**才允许判慢换源——唯一候选宁可慢慢下完，也不能因为线路慢直接失败；分片判慢时不再回退到同一 URL 的单流。
 - [`probe.rs`](src-tauri/src/minecraft/download/chunk/probe.rs)：新增「已确认支持 Range」的主机缓存，同一次运行里同主机后续文件直接进分片、跳过探测；只做正向缓存，反向不缓存（服务端灰度或临时故障都会让「这次不支持」很快过期）。
 
+#### 下载走 HTTP/2 大窗口客户端
+
+下载此前复用全局客户端（HTTP/1.1，未开 `http2`），8 个并发文件就是 8 次 TCP + TLS 握手；同一 CDN 上的并发连接纯属重复建链。另外默认 64 KiB 的流窗口在长肥管道上要几十个 RTT 才爬满带宽。
+
+- [`Cargo.toml`](src-tauri/Cargo.toml)：`reqwest` 打开 `http2` feature。
+- [`client.rs`](src-tauri/src/http/client.rs)、[`http.rs`](src-tauri/src/http.rs)：新增下载专用客户端（`build_download_client` / `get_download_client`）——HTTP/2 自适应流控 + 单流初始窗口 1 MiB + 连接级窗口 64 MiB + 每 host 保留 8 条空闲连接；与 API/鉴权请求分开，互不挤占连接池策略。代理、TLS 信任源与「逐跳校验」重定向策略沿用原逻辑。
+- [`core.rs`](src-tauri/src/minecraft/download/manager/core.rs)：下载管理器改用下载专用客户端。
+
+#### 下载域名解析结果进程内缓存
+
+一次批量下载里同一个 CDN 域名会被解析上百次（每个分片、每次换源各一次），系统解析器每次都要走一遍缓存与上游。
+
+- [`dns.rs`](src-tauri/src/http/dns.rs)、[`dns_test.rs`](src-tauri/src/http/dns_test.rs)：新增带 60s TTL 的解析缓存并挂到下载客户端上；单次解析 6s 超时（卡住就快速失败交给换源，不让下载停在握手阶段），空结果不入缓存，时间顺序异常按已过期处理。TTL 取短不取长：缓存太久等于把客户端钉死在一个可能已经失效的边缘节点上。5 例单测覆盖新鲜度边界、时间倒退、覆盖写入与并发共享。
+
+#### 换源升档：第二条线路拿到更高分片并行度
+
+分片数只按文件大小规划一次，第一条线路若被限速，换到第二条线路仍是同样的并行度，等于把「这条线更快」的机会浪费掉。
+
+- [`api.rs`](src-tauri/src/minecraft/download/chunk/api.rs)：`plan_chunk_count` 增加升档系数，用户设置仍是下限、硬上限仍是 12；新增 `clear_part_files` 清理分片临时文件。
+- [`retry.rs`](src-tauri/src/minecraft/download/downloader/retry.rs)：判慢或失败换到下一条线路时并行度翻倍（封顶 2 倍）并清掉旧分片——布局变了旧 `.part` 的偏移就对不上新 Range 区间，不清会合并出坏文件。
+- [`api_test.rs`](src-tauri/src/minecraft/download/chunk/api_test.rs)、[`retry_test.rs`](src-tauri/src/minecraft/download/downloader/retry_test.rs)：补充升档、单流不被强改多流、档位异常按 1 处理、升档后布局稳定与升档封顶共 9 例。
+
+#### 元数据请求双线路对冲
+
+社区资源的元数据此前是「官方 10~20s 超时才回退镜像」，首屏白等；镜像本身通常几百毫秒就能出结果。
+
+- [`common.rs`](src-tauri/src/minecraft/community/common.rs)：新增 2s 对冲延迟常量。
+- [`curseforge/http.rs`](src-tauri/src/minecraft/community/curseforge/http.rs)、[`modrinth/http.rs`](src-tauri/src/minecraft/community/modrinth/http.rs)：官方线路领先 2s，超过就并发打镜像，先成功者胜出（慢的那条被取消）；官方与镜像的请求/解析合并为同一实现，404 互不重试的语义保持不变，镜像请求仍不带用户 API Key。
+
 
 ## [0.3.13] - 2026-10-27
 
