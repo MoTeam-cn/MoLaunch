@@ -14,4 +14,4 @@ pub use probe::{
     RangeProbe,
 };
 
-pub use api::{download_chunked, ChunkDownloadResult};
+pub use api::{clear_part_files, download_chunked, ChunkDownloadResult};

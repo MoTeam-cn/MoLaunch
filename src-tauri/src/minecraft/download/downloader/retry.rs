@@ -20,6 +20,9 @@ use crate::{log_debug, log_warn};
 
 const MAX_RETRIES: usize = 3;
 
+/// 换源升档的上限系数：判慢/失败换到下一条线路时并行度最多翻到 2 倍
+const MAX_SEGMENT_BOOST: u32 = 2;
+
 #[allow(clippy::too_many_arguments)]
 pub(super) async fn download_with_retries(
     client: &reqwest::Client,
@@ -41,6 +44,10 @@ pub(super) async fn download_with_retries(
     // 部分服务端（如 Fabric 官方元数据）会把压缩后的长度写进 Content-Range（1401），
     // 实际落盘的是解压后的字节（2778），拿探测值校验必然误杀正常文件。
     let trusted_size = file_size;
+
+    // 换源升档：首轮用 1，判慢或失败换到下一条线路时翻倍（封顶 MAX_SEGMENT_BOOST）。
+    // 档位改变会改变分片布局，所以升档时必须先清掉旧分片，否则续传偏移会错位。
+    let mut segment_boost: u32 = 1;
 
     // 内容校验失败：删除文件、回滚已计进度、继续下一 URL（镜像坏文件自动回退官方等保底源）
     let invalid_content = |err: String, downloaded: u64| {
@@ -111,6 +118,7 @@ pub(super) async fn download_with_retries(
                         pause_flag.clone(),
                         cancel_flag.clone(),
                         allow_slow_abort,
+                        segment_boost,
                     )
                     .await;
                     if file_size == 0 && result.total > 0 {
@@ -158,6 +166,8 @@ pub(super) async fn download_with_retries(
                     }
                     if result.slow && has_next_url {
                         log_warn!("[Download] 分片下载因线路持续低速中止，换源: {}", url);
+                        segment_boost = bump_segment_boost(segment_boost);
+                        chunk::clear_part_files(&task.local_path);
                         break;
                     }
                     log_debug!("[Chunk] 分片下载失败: {:?}, 回退单流", result.error);
@@ -216,6 +226,8 @@ pub(super) async fn download_with_retries(
                     // 线路判慢：还有别的候选就立刻换源，别再在同一个 URL 上耗三次
                     if has_next_url && e.downcast_ref::<slow::SlowRouteError>().is_some() {
                         log_warn!("[Download] 线路持续低速，换源: {}", url);
+                        segment_boost = bump_segment_boost(segment_boost);
+                        chunk::clear_part_files(&task.local_path);
                         break;
                     }
                     log_debug!(
@@ -275,6 +287,11 @@ fn stream_expected(trusted_size: u64, response_total: u64) -> u64 {
 
 /// 分片最小文件大小：低于此值分片只会多花往返开销，还会放大各源 Range 实现的差异
 const MIN_CHUNK_BYTES: u64 = 1024 * 1024;
+
+/// 换源升档：并行度翻倍，封顶 [`MAX_SEGMENT_BOOST`]
+fn bump_segment_boost(current: u32) -> u32 {
+    current.saturating_mul(2).min(MAX_SEGMENT_BOOST)
+}
 
 /// 是否值得分片下载
 ///

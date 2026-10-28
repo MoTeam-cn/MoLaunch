@@ -25,20 +25,35 @@ const TARGET_SEGMENT_BYTES: u64 = 16 * 1024 * 1024;
 /// 分片数硬上限（在用户设置之外最多再翻一倍，且不超过这个值）
 const MAX_PLANNED_CHUNKS: usize = 12;
 
+/// 清理某个文件的所有分片临时文件
+///
+/// 分片布局一旦改变（换源升档并行度），旧 `.part` 的字节偏移就不再对应新的
+/// Range 区间，续传会把错误偏移当成已下载量，合并出来是坏文件。所以改变布局
+/// 之前必须清干净。
+pub fn clear_part_files(local_path: &str) {
+    for index in 0..=MAX_PLANNED_CHUNKS {
+        let _ = std::fs::remove_file(format!("{}.part{}", local_path, index));
+    }
+}
+
 /// 规划实际使用的分片数
 ///
 /// 用户设置的分片数是**下限**：大文件按 [`TARGET_SEGMENT_BYTES`] 推导出更多分片，
 /// 最多翻一倍且不超过 [`MAX_PLANNED_CHUNKS`]；小文件保持用户设置，不做缩减。
 ///
-/// 规划只依赖 (文件大小, 用户设置)，同一文件多次重试或换源都会得到相同的分片
-/// 布局，`.part` 分片才能被续传复用。
-fn plan_chunk_count(file_size: u64, requested: usize) -> usize {
+/// 规划只依赖 (文件大小, 用户设置, 档位)：同一档位下多次重试或换源都会得到相同的
+/// 分片布局，`.part` 分片才能被续传复用；换源升档会改变布局，调用方需先清分片。
+///
+/// `boost` 是换源升档系数：首次尝试为 1，判慢或失败换源后翻倍，让「第一次没跑满
+/// 带宽」的大文件在下一条线路上拿到更高的并行度。
+fn plan_chunk_count(file_size: u64, requested: usize, boost: u32) -> usize {
     if requested <= 1 {
         return requested;
     }
-    // 上限：最多翻一倍，且不超过硬上限（clamp 的 min 恒小于 max，不会 panic）
-    let upper = requested.saturating_mul(2).clamp(1, MAX_PLANNED_CHUNKS);
-    let lower = requested.min(upper);
+    let target = requested.saturating_mul(boost.max(1) as usize);
+    // 上限：最多再翻一倍，且不超过硬上限（clamp 的 min 恒小于 max，不会 panic）
+    let upper = target.saturating_mul(2).clamp(1, MAX_PLANNED_CHUNKS);
+    let lower = target.min(upper);
     let by_size = usize::try_from(file_size / TARGET_SEGMENT_BYTES).unwrap_or(upper);
     by_size.clamp(lower, upper)
 }
@@ -83,6 +98,7 @@ pub async fn download_chunked(
     pause_flag: Option<Arc<AtomicBool>>,
     cancel_flag: Option<Arc<AtomicBool>>,
     allow_slow_abort: bool,
+    segment_boost: u32,
 ) -> ChunkDownloadResult {
     // file_size=0 时自动探测（GET + Range:bytes=0-0，通过 Content-Range 拿总大小）
     // 不用 HEAD 是因为 Modrinth CDN 307 重定向后 HEAD 不返回 Content-Length
@@ -107,7 +123,7 @@ pub async fn download_chunked(
     }
 
     // 大文件按大小放大分片数（用户设置为下限），小文件保持原设置
-    let chunk_count = plan_chunk_count(file_size, chunk_count);
+    let chunk_count = plan_chunk_count(file_size, chunk_count, segment_boost);
 
     if file_size == 0 || chunk_count <= 1 {
         return ChunkDownloadResult {

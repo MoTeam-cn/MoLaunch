@@ -1,6 +1,8 @@
 //! 分片策略测试
 
-use super::{chunkable_size, stream_expected, MIN_CHUNK_BYTES};
+use super::{
+    bump_segment_boost, chunkable_size, stream_expected, MAX_SEGMENT_BOOST, MIN_CHUNK_BYTES,
+};
 
 #[test]
 fn test_chunkable_大文件且多分片时成立() {
@@ -35,4 +37,12 @@ fn test_stream_expected_响应无长度时不校验大小() {
     // 压缩响应被解码、或 chunked 传输：服务端自报长度不可信，跳过大小校验
     assert_eq!(stream_expected(1401, 0), 0);
     assert_eq!(stream_expected(10_000, 0), 0);
+}
+
+#[test]
+fn test_bump_segment_boost_翻倍并封顶() {
+    assert_eq!(bump_segment_boost(1), 2);
+    assert_eq!(bump_segment_boost(2), MAX_SEGMENT_BOOST);
+    // 已到上限后继续调用不再增长（多次换源不会无限升档）
+    assert_eq!(bump_segment_boost(MAX_SEGMENT_BOOST), MAX_SEGMENT_BOOST);
 }
