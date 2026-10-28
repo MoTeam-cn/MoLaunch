@@ -50,6 +50,9 @@ fn apply_cdn_mirrors(url: &str) -> Vec<String> {
 /// - source=1（缓慢时换镜像）：返回官方 URL（fallback 由 `cdn_urls` 处理）
 /// - source=2（尽量官方）：返回官方 URL
 pub fn replace_cdn(url: &str) -> String {
+    // 先还原退役地址：老 manifest 里的死链一律换成官方地址再谈镜像
+    let normalized = super::retired::normalize(url);
+    let url = normalized.as_ref();
     let source = crate::minecraft::community::get_source_pref();
     if source == 0 {
         apply_cdn_mirrors(url)
@@ -67,6 +70,8 @@ pub fn replace_cdn(url: &str) -> String {
 /// - source=1（缓慢时换镜像）：`[官方URL, mocdn镜像URL]`（官方优先，失败自动 fallback）
 /// - source=2（尽量官方）：`[官方URL]`
 pub fn cdn_urls(url: &str) -> Vec<String> {
+    let normalized = super::retired::normalize(url);
+    let url = normalized.as_ref();
     let source = crate::minecraft::community::get_source_pref();
     let mirrors = apply_cdn_mirrors(url);
     let is_cdn = !mirrors.is_empty();

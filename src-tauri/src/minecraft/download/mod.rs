@@ -10,6 +10,7 @@ pub mod downloader;
 pub mod edge;
 pub mod fix;
 pub mod full_download;
+pub mod host_profile;
 pub mod manager;
 pub mod mirror_gate;
 pub mod rate_limiter;

@@ -1,8 +1,9 @@
 //! File verification module - SHA1/MD5/SHA256/file size checking
 
 use serde::{Deserialize, Serialize};
-use std::io::Read;
 use std::path::Path;
+
+use super::hash;
 
 /// File checker
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -106,24 +107,29 @@ impl FileChecker {
 
         if let Some(ref hash) = self.hash {
             if !hash.is_empty() {
-                let computed_hash = if hash.len() < 35 {
-                    compute_file_hash(local_path, HashMethod::Md5)
-                } else if hash.len() == 64 {
-                    compute_file_hash(local_path, HashMethod::Sha256)
-                } else {
-                    compute_file_hash(local_path, HashMethod::Sha1)
-                };
-
-                match computed_hash {
-                    Ok(actual_hash) => {
-                        if hash.to_lowercase() != actual_hash.to_lowercase() {
-                            return Some(format!(
-                                "Hash mismatch: expected {}, got {}",
-                                hash, actual_hash
-                            ));
+                if hash::is_verified(path, hash) {
+                    // 命中文档身份证明：大小与时间戳都没变，不必重读整个文件
+                    crate::log_debug!("File check: 命中验证证明，跳过重算: {}", local_path);
+                } else if let Some(algorithm) = hash::HashAlgorithm::from_expected(hash) {
+                    match hash::hash_file(path, algorithm) {
+                        Ok(actual_hash) => {
+                            if hash.to_lowercase() != actual_hash.to_lowercase() {
+                                return Some(format!(
+                                    "Hash mismatch: expected {}, got {}",
+                                    hash, actual_hash
+                                ));
+                            }
+                            hash::remember(path, hash);
                         }
+                        Err(e) => return Some(format!("Hash computation failed: {}", e)),
                     }
-                    Err(e) => return Some(format!("Hash computation failed: {}", e)),
+                } else {
+                    // 长度不是 32/40/64/128：认不出算法。绝不能当成 sha1 去比，那会永远不匹配
+                    crate::log_warn!(
+                        "File check: 无法识别的哈希长度（{}），跳过哈希校验: {}",
+                        hash.len(),
+                        local_path
+                    );
                 }
             }
         }
@@ -148,39 +154,6 @@ impl FileChecker {
     pub fn is_valid(&self, local_path: &str) -> bool {
         self.check(local_path).is_none()
     }
-}
-
-pub enum HashMethod {
-    Md5,
-    Sha1,
-    Sha256,
-}
-
-pub fn compute_file_hash(file_path: &str, method: HashMethod) -> anyhow::Result<String> {
-    let mut file = std::fs::File::open(file_path)?;
-    let mut buffer = Vec::new();
-    file.read_to_end(&mut buffer)?;
-
-    let hash_bytes = match method {
-        HashMethod::Md5 => {
-            let digest = md5::compute(&buffer);
-            digest.to_vec()
-        }
-        HashMethod::Sha1 => {
-            use sha1::Digest;
-            let mut hasher = sha1::Sha1::new();
-            hasher.update(&buffer);
-            hasher.finalize().to_vec()
-        }
-        HashMethod::Sha256 => {
-            use sha2::Digest;
-            let mut hasher = sha2::Sha256::new();
-            hasher.update(&buffer);
-            hasher.finalize().to_vec()
-        }
-    };
-
-    Ok(hex::encode(hash_bytes))
 }
 
 /// 计算字节的 SHA1，返回小写十六进制字符串

@@ -3,9 +3,14 @@
 //! 块划分只依赖 (文件大小, 块长)，与源无关——换源、重试、多源并行共享同一张表，
 //! 因此「哪个源下哪一块」随时可以重新分配，而不会破坏已完成的字节。
 //! 位图可落盘（`.partmap`），用于失败后复用已完成块、以及按「块的来源」定位可疑块。
+//! 每块还带一个写入时算出的 SHA256：崩溃/掉电后恢复时先验这段字节确实在盘上，
+//! 位图说「完成」但数据其实是空洞的脏状态不会被当成已完成。
 
-use std::path::Path;
-use std::sync::Mutex;
+use std::collections::HashMap;
+use std::path::{Path, PathBuf};
+use std::sync::{Mutex, OnceLock};
+
+use crate::log_warn;
 
 /// 默认块长
 pub(crate) const DEFAULT_SEG_LEN: u64 = 2 * 1024 * 1024;
@@ -17,10 +22,16 @@ pub(crate) const MAX_SEGS: u64 = 65536;
 pub(crate) const MAX_SEG_FAILURES: u8 = 3;
 
 /// 位图文件头（含版本，格式变更时直接判为无效而不是读出脏数据）
-const MAP_MAGIC: &[u8; 6] = b"MPSEG2";
+const MAP_MAGIC: &[u8; 6] = b"MPSEG3";
 
 /// 文件头长度：magic(6) + 文件大小(8) + 块长(8) + 块数(8) + 续传指纹(8)
 const MAP_HEADER_LEN: usize = 38;
+
+/// 每块追加的 SHA256 长度
+const BLOCK_HASH_LEN: usize = 32;
+
+/// 每块在位图里的字节数：状态(1) + 来源(1) + 写入时的 SHA256(32)
+const ENTRY_LEN: usize = 2 + BLOCK_HASH_LEN;
 
 /// 来源未知（未完成或未记录）
 const SOURCE_UNKNOWN: u8 = u8::MAX;
@@ -39,6 +50,8 @@ struct Seg {
     failures: u8,
     /// 这一块是谁下下来的（源下标），用于内容校验失败时定位可疑块
     source: u8,
+    /// 写入时算出的 SHA256；全零表示未知（旧位图或尚未写入）
+    hash: [u8; BLOCK_HASH_LEN],
 }
 
 /// 一个待下载的块（闭区间）
@@ -92,6 +105,7 @@ impl SegmentTable {
                 status: Status::Pending,
                 failures: 0,
                 source: SOURCE_UNKNOWN,
+                hash: [0; BLOCK_HASH_LEN],
             })
             .collect();
         Self {
@@ -142,13 +156,14 @@ impl SegmentTable {
         None
     }
 
-    /// 标记完成，并记下这一块的来源
-    pub(crate) fn complete(&self, index: usize, source: usize) {
+    /// 标记完成，记下这一块的来源与写入时的 SHA256
+    pub(crate) fn complete(&self, index: usize, source: usize, hash: [u8; BLOCK_HASH_LEN]) {
         let mut segs = self.lock();
         if let Some(seg) = segs.get_mut(index) {
             if seg.status == Status::InFlight || seg.status == Status::Quarantined {
                 seg.status = Status::Done;
                 seg.source = u8::try_from(source).unwrap_or(SOURCE_UNKNOWN);
+                seg.hash = hash;
             }
         }
     }
@@ -245,17 +260,28 @@ impl SegmentTable {
     /// 文件大小相同但内容换了的场景（同名模组更新）靠它拒绝复用旧位图。
     pub(crate) fn save(&self, path: &Path, resume_key: u64) -> std::io::Result<()> {
         let segs = self.lock();
-        let mut bytes = Vec::with_capacity(MAP_HEADER_LEN + segs.len() * 2);
+        let mut bytes = Vec::with_capacity(MAP_HEADER_LEN + segs.len() * ENTRY_LEN);
         bytes.extend_from_slice(MAP_MAGIC);
         bytes.extend_from_slice(&self.file_size.to_le_bytes());
         bytes.extend_from_slice(&self.seg_len.to_le_bytes());
         bytes.extend_from_slice(&(segs.len() as u64).to_le_bytes());
         bytes.extend_from_slice(&resume_key.to_le_bytes());
+        let mut done = 0_u64;
         for seg in segs.iter() {
-            bytes.push(u8::from(seg.status == Status::Done));
+            let finished = seg.status == Status::Done;
+            if finished {
+                done += 1;
+            }
+            bytes.push(u8::from(finished));
             bytes.push(seg.source);
+            bytes.extend_from_slice(&seg.hash);
         }
         drop(segs);
+        // 记下「刚写过」：同一次尝试里重跑时不必把刚写下的字节再读一遍验证
+        recent_saves()
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner())
+            .insert(path.to_path_buf(), (resume_key, done));
         std::fs::write(path, bytes)
     }
 
@@ -268,6 +294,7 @@ impl SegmentTable {
         file_size: u64,
         data_len: u64,
         resume_key: u64,
+        data: Option<&Path>,
     ) -> Option<Self> {
         let raw = std::fs::read(path).ok()?;
         if raw.len() < MAP_HEADER_LEN || &raw[0..6] != MAP_MAGIC {
@@ -294,18 +321,22 @@ impl SegmentTable {
         if stored_count != expected_count {
             return None;
         }
-        if raw.len() < MAP_HEADER_LEN + (stored_count as usize) * 2 {
+        if raw.len() < MAP_HEADER_LEN + (stored_count as usize) * ENTRY_LEN {
             return None;
         }
+        let mut done_in_file = 0_u64;
         {
             let mut segs = table.lock();
             for (index, seg) in segs.iter_mut().enumerate() {
-                let base = MAP_HEADER_LEN + index * 2;
+                let base = MAP_HEADER_LEN + index * ENTRY_LEN;
                 let done = raw[base] == 1;
                 let source = raw[base + 1];
+                let mut hash = [0_u8; BLOCK_HASH_LEN];
+                hash.copy_from_slice(&raw[base + 2..base + ENTRY_LEN]);
                 if !done {
                     continue;
                 }
+                done_in_file += 1;
                 // 文件里还没写到的块不算完成
                 let end = table.bounds(index).map(|(_, end)| end + 1).unwrap_or(0);
                 if end > data_len {
@@ -313,9 +344,71 @@ impl SegmentTable {
                 }
                 seg.status = Status::Done;
                 seg.source = source;
+                seg.hash = hash;
+            }
+        }
+        // 本进程刚写过的位图直接信；否则逐块验证数据确实在盘上（掉电后页缓存可能丢）
+        let trusted = recent_saves()
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner())
+            .get(path)
+            .is_some_and(|(key, done)| *key == resume_key && *done == done_in_file);
+        if !trusted {
+            if let Some(data) = data {
+                verify_done_blocks(&table, data);
             }
         }
         Some(table)
+    }
+}
+
+/// 本进程刚写过的位图：(续传指纹, 已完成块数)
+fn recent_saves() -> &'static Mutex<HashMap<PathBuf, (u64, u64)>> {
+    static SAVES: OnceLock<Mutex<HashMap<PathBuf, (u64, u64)>>> = OnceLock::new();
+    SAVES.get_or_init(|| Mutex::new(HashMap::new()))
+}
+
+/// 测试用：模拟「进程重启」，让下一次 `load` 走真实的自校验路径
+#[cfg(test)]
+pub(crate) fn forget_recent_save(path: &Path) {
+    recent_saves()
+        .lock()
+        .unwrap_or_else(|poisoned| poisoned.into_inner())
+        .remove(path);
+}
+
+/// 逐块验证「位图说完成」的数据确实在盘上：读回该区间重算 SHA256 比对
+fn verify_done_blocks(table: &SegmentTable, data: &Path) {
+    let mut dropped = 0_usize;
+    let mut kept = 0_usize;
+    {
+        let mut segs = table.lock();
+        for index in 0..segs.len() {
+            if segs[index].status != Status::Done {
+                continue;
+            }
+            let Some((start, end)) = table.bounds(index) else {
+                continue;
+            };
+            let len = end - start + 1;
+            let verified = crate::minecraft::utils::hash::sha256_range(data, start, len)
+                .map(|actual| actual == segs[index].hash)
+                .unwrap_or(false);
+            if verified {
+                kept += 1;
+            } else {
+                segs[index].status = Status::Pending;
+                segs[index].hash = [0; BLOCK_HASH_LEN];
+                dropped += 1;
+            }
+        }
+    }
+    if dropped > 0 {
+        log_warn!(
+            "[Segment] 位图自校验丢弃 {} 块（数据未落盘或已损坏），保留 {} 块",
+            dropped,
+            kept
+        );
     }
 }
 

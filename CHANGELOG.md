@@ -195,6 +195,17 @@
 - [`http.rs`](src-tauri/src/minecraft/sources/http.rs)：`is_mirror_url` 认阿里云公共仓，因此「仅官方源」模式下不会走它。
 - [`multi.rs`](src-tauri/src/minecraft/download/chunk/multi.rs)：候选源多于连接额度时，排在后面的源一开始分不到 worker；前面的源全被判死后唤醒一条，避免「没人试过所以永远不试」。
 
+#### 校验与续传：流式哈希、验证证明、位图自校验、主机记忆、退役地址还原
+
+这轮把「校验读盘」和「跨文件经验」两块补齐，顺手修掉两个真问题。
+
+- [`hash.rs`](src-tauri/src/minecraft/utils/hash.rs)、[`hash_test.rs`](src-tauri/src/minecraft/utils/hash_test.rs)（新）：**流式**哈希（64 KiB 缓冲，2 GB 整合包也不顶内存），按期望值长度识别 md5/sha1/sha256/**sha512**；**验证证明缓存**记录「路径 + 大小 + 修改/创建时间」，验证过的文件元数据没变就不重算。
+- [`file_checker.rs`](src-tauri/src/minecraft/utils/file_checker.rs)：改用上述实现，并修掉一个真 bug——此前按「长度 64 当 sha256、其余当 sha1」猜算法，**128 字符的 sha512 会被当成 sha1 去比，永远不匹配**，导致反复重下；长度认不出时改为跳过哈希校验并告警，不再瞎猜。
+- [`table.rs`](src-tauri/src/minecraft/download/chunk/table.rs)：位图升到 `MPSEG3`，每块额外存**写入时算出的 SHA256**；恢复时逐块读回验证，「位图说完成、数据其实是空洞」的脏状态会被丢弃并告警。同一次尝试内的重跑信任刚写下的位图，不重复读盘。
+- [`block.rs`](src-tauri/src/minecraft/download/chunk/block.rs)、[`multi.rs`](src-tauri/src/minecraft/download/chunk/multi.rs)：边写边算块哈希，完成后随块一起记入位图。
+- [`host_profile.rs`](src-tauri/src/minecraft/download/host_profile.rs)、[`host_profile_test.rs`](src-tauri/src/minecraft/download/host_profile_test.rs)（新）：**主机脾气记忆**——把每个主机学到的并发目标与吞吐（EMA）留下来，下一个文件直接从上次的结论起步，不必重新试错；记忆 30 分钟过期，并发取历史最大值（只是起点，方向不对引擎两个窗口内自己收回）。
+- [`retired.rs`](src-tauri/src/minecraft/sources/retired.rs)、[`retired_test.rs`](src-tauri/src/minecraft/sources/retired_test.rs)（新）：**退役镜像地址还原**——老 manifest 里的 `cdn-alt.modrinth.com`、`mod.tianpao.top` 按路径前缀换成官方地址（`/data/`→Modrinth、`/files/`→CF edge、`/media/`→CF media），查询串原样保留，对不上的原样返回不猜。
+
 
 
 ## [0.3.13] - 2026-10-27

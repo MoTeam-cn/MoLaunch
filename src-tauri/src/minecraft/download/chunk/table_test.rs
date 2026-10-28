@@ -1,6 +1,7 @@
 //! 段表单测：块划分、认领、失败隔离、来源作废、位图落盘
 
 use super::{seg_len_for, segments_for, SegmentTable, DEFAULT_SEG_LEN, MAX_SEGS, MAX_SEG_FAILURES};
+use crate::minecraft::utils::hash::sha256_range;
 use std::path::PathBuf;
 
 /// 测试用的续传指纹
@@ -57,12 +58,12 @@ fn test_complete_累加字节并可判定完成() {
     assert!(!table.is_complete());
     assert_eq!(table.done_bytes(), 0);
     let seg = table.claim(false).expect("应能认领");
-    table.complete(seg.index, 0);
+    table.complete(seg.index, 0, [0; 32]);
     assert_eq!(table.done_bytes(), DEFAULT_SEG_LEN);
     assert_eq!(table.done_count(), 1);
     assert!(!table.is_complete());
     let seg = table.claim(false).expect("应能认领");
-    table.complete(seg.index, 0);
+    table.complete(seg.index, 0, [0; 32]);
     assert!(table.is_complete());
     assert_eq!(table.done_bytes(), 2 * DEFAULT_SEG_LEN);
 }
@@ -90,7 +91,7 @@ fn test_fail_达到阈值后隔离且镜像不能再领() {
 fn test_完成后再失败不影响已有进度() {
     let table = SegmentTable::new(DEFAULT_SEG_LEN);
     let seg = table.claim(false).expect("应能认领");
-    table.complete(seg.index, 0);
+    table.complete(seg.index, 0, [0; 32]);
     table.fail(seg.index);
     assert_eq!(table.done_bytes(), DEFAULT_SEG_LEN);
     assert!(table.is_complete());
@@ -102,10 +103,10 @@ fn test_invalidate_others_只作废非指定源的块() {
     // 块 2 由源 0（官方）完成，块 1 由源 1（镜像）完成；认领总是从表尾开始
     let seg = table.claim(false).expect("应能认领");
     assert_eq!(seg.index, 2);
-    table.complete(2, 0);
+    table.complete(2, 0, [0; 32]);
     let seg = table.claim(false).expect("应能认领");
     assert_eq!(seg.index, 1);
-    table.complete(1, 1);
+    table.complete(1, 1, [0; 32]);
     assert_eq!(table.done_count(), 2);
 
     let invalidated = table.invalidate_others(0);
@@ -121,15 +122,15 @@ fn test_save_load_往返保留完成块与来源() {
     let table = SegmentTable::new(3 * DEFAULT_SEG_LEN);
     let seg = table.claim(false).expect("应能认领");
     assert_eq!(seg.index, 2);
-    table.complete(2, 0);
+    table.complete(2, 0, [0; 32]);
     let seg = table.claim(false).expect("应能认领");
     assert_eq!(seg.index, 1);
-    table.complete(1, 1);
+    table.complete(1, 1, [0; 32]);
     assert_eq!(table.done_count(), 2);
     table.save(&path, KEY).expect("保存位图");
 
     let file_size = 3 * DEFAULT_SEG_LEN;
-    let restored = SegmentTable::load(&path, file_size, file_size, KEY).expect("应能读回");
+    let restored = SegmentTable::load(&path, file_size, file_size, KEY, None).expect("应能读回");
     assert_eq!(restored.done_count(), 2);
     assert_eq!(restored.done_bytes(), 2 * DEFAULT_SEG_LEN);
     // 只保留官方源 -> 镜像那块的来源信息仍在，作废时能定位
@@ -142,7 +143,7 @@ fn test_load_文件大小不匹配则拒绝() {
     let path = temp_map("mismatch.partmap");
     let table = SegmentTable::new(2 * DEFAULT_SEG_LEN);
     table.save(&path, KEY).expect("保存位图");
-    assert!(SegmentTable::load(&path, 4 * DEFAULT_SEG_LEN, u64::MAX, KEY).is_none());
+    assert!(SegmentTable::load(&path, 4 * DEFAULT_SEG_LEN, u64::MAX, KEY, None).is_none());
     let _ = std::fs::remove_file(&path);
 }
 
@@ -153,13 +154,13 @@ fn test_load_数据文件没写到的块不算完成() {
     let table = SegmentTable::new(file_size);
     for _ in 0..2 {
         let seg = table.claim(false).expect("应能认领");
-        table.complete(seg.index, 0);
+        table.complete(seg.index, 0, [0; 32]);
     }
     assert_eq!(table.done_count(), 2);
     table.save(&path, KEY).expect("保存位图");
     // 数据文件只有半块长：两块都应被判为未完成
     let restored =
-        SegmentTable::load(&path, file_size, DEFAULT_SEG_LEN / 2, KEY).expect("应能读回");
+        SegmentTable::load(&path, file_size, DEFAULT_SEG_LEN / 2, KEY, None).expect("应能读回");
     assert_eq!(restored.done_count(), 0);
     let _ = std::fs::remove_file(&path);
 }
@@ -168,7 +169,7 @@ fn test_load_数据文件没写到的块不算完成() {
 fn test_load_损坏的位图返回None() {
     let path = temp_map("broken.partmap");
     std::fs::write(&path, b"broken").expect("写入脏数据");
-    assert!(SegmentTable::load(&path, DEFAULT_SEG_LEN, u64::MAX, KEY).is_none());
+    assert!(SegmentTable::load(&path, DEFAULT_SEG_LEN, u64::MAX, KEY, None).is_none());
     let _ = std::fs::remove_file(&path);
 }
 
@@ -177,7 +178,7 @@ fn test_invalidate_all_全部作废() {
     let table = SegmentTable::new(2 * DEFAULT_SEG_LEN);
     for _ in 0..2 {
         let seg = table.claim(false).expect("应能认领");
-        table.complete(seg.index, 1);
+        table.complete(seg.index, 1, [0; 32]);
     }
     assert!(table.is_complete());
     assert_eq!(table.invalidate_all(), 2);
@@ -190,9 +191,52 @@ fn test_load_续传指纹不匹配则拒绝() {
     let path = temp_map("key.partmap");
     let table = SegmentTable::new(2 * DEFAULT_SEG_LEN);
     let seg = table.claim(false).expect("应能认领");
-    table.complete(seg.index, 0);
+    table.complete(seg.index, 0, [0; 32]);
     table.save(&path, KEY).expect("保存位图");
     // 同名文件但内容换了（同名模组更新）-> 指纹不同，不复用
-    assert!(SegmentTable::load(&path, 2 * DEFAULT_SEG_LEN, u64::MAX, KEY + 1).is_none());
+    assert!(SegmentTable::load(&path, 2 * DEFAULT_SEG_LEN, u64::MAX, KEY + 1, None).is_none());
     let _ = std::fs::remove_file(&path);
+}
+
+#[test]
+fn test_load_自校验发现数据不符则作废() {
+    let map = temp_map("verify_bad.partmap");
+    let data = temp_map("verify_bad.bin");
+    let file_size = DEFAULT_SEG_LEN;
+    std::fs::write(&data, vec![7_u8; file_size as usize]).expect("写数据文件");
+
+    let table = SegmentTable::new(file_size);
+    let seg = table.claim(false).expect("应能认领");
+    // 哈希与盘上内容不符：相当于位图说有、实际没写或写坏了
+    table.complete(seg.index, 0, [9; 32]);
+    table.save(&map, KEY).expect("保存位图");
+    super::forget_recent_save(&map);
+
+    let restored =
+        SegmentTable::load(&map, file_size, file_size, KEY, Some(&data)).expect("应能读回");
+    assert_eq!(restored.done_count(), 0, "哈希不符的块必须作废");
+    let _ = std::fs::remove_file(&map);
+    let _ = std::fs::remove_file(&data);
+}
+
+#[test]
+fn test_load_自校验通过则保留() {
+    let map = temp_map("verify_ok.partmap");
+    let data = temp_map("verify_ok.bin");
+    let file_size = DEFAULT_SEG_LEN;
+    std::fs::write(&data, vec![5_u8; file_size as usize]).expect("写数据文件");
+    let digest = sha256_range(&data, 0, file_size).expect("算区间哈希");
+
+    let table = SegmentTable::new(file_size);
+    let seg = table.claim(false).expect("应能认领");
+    table.complete(seg.index, 0, digest);
+    table.save(&map, KEY).expect("保存位图");
+    super::forget_recent_save(&map);
+
+    let restored =
+        SegmentTable::load(&map, file_size, file_size, KEY, Some(&data)).expect("应能读回");
+    assert_eq!(restored.done_count(), 1, "哈希一致的块应保留");
+    assert_eq!(restored.done_bytes(), file_size);
+    let _ = std::fs::remove_file(&map);
+    let _ = std::fs::remove_file(&data);
 }

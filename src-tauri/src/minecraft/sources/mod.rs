@@ -8,6 +8,7 @@ mod http;
 mod library_chain;
 mod mode;
 mod paths;
+mod retired;
 
 // 公开 API re-export（外部调用方通过 sources::xxx 访问）
 pub use cdn::{
@@ -31,6 +32,7 @@ pub use paths::{
     bmclapi_forge_path, fabric_profile_url, forge_installer_url, forge_versions_url,
     liteloader_json_url, neoforge_installer_url,
 };
+pub use retired::normalize as normalize_retired;
 
 #[cfg(test)]
 #[path = "../sources_tests.rs"]

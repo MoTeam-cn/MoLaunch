@@ -12,6 +12,7 @@ use super::super::mirror_gate;
 use super::super::rate_limiter::RateLimiter;
 use super::super::types::GlobalProgress;
 use super::table::Segment;
+use crate::minecraft::utils::hash::{HashAlgorithm, IncrementalHash};
 
 /// 单块下载失败原因
 #[derive(Debug)]
@@ -46,7 +47,7 @@ pub(crate) async fn download_block(
     source_bytes: &AtomicU64,
     pause_flag: &Option<Arc<AtomicBool>>,
     cancel_flag: &Option<Arc<AtomicBool>>,
-) -> Result<u64, BlockError> {
+) -> Result<([u8; 32], u64), BlockError> {
     let expected = segment.len();
     // 镜像闸门：许可持有到响应体读完，公共镜像的高并发 Range 才有节制
     let _permit = mirror_gate::acquire(url).await;
@@ -81,6 +82,8 @@ pub(crate) async fn download_block(
         .map_err(|e| BlockError::Failed(format!("定位写入偏移失败: {}", e)))?;
 
     let mut downloaded = 0_u64;
+    // 边写边算这块的 SHA256：位图靠它证明「这段字节确实落盘了」
+    let mut hasher = IncrementalHash::new(HashAlgorithm::Sha256);
     let mut stream = response.bytes_stream();
     loop {
         if cancel_requested(cancel_flag) {
@@ -116,6 +119,7 @@ pub(crate) async fn download_block(
             cancel_flag,
         )
         .await?;
+        hasher.update(&chunk);
         source_bytes.fetch_add(chunk_len, Ordering::Relaxed);
         if let Some(progress) = file_progress {
             let mut guard = progress
@@ -131,7 +135,10 @@ pub(crate) async fn download_block(
             downloaded, expected
         )));
     }
-    Ok(downloaded)
+    let digest = hasher
+        .finish_sha256()
+        .map_err(|e| BlockError::Failed(format!("块哈希计算失败: {}", e)))?;
+    Ok((digest, downloaded))
 }
 
 fn cancel_requested(cancel_flag: &Option<Arc<AtomicBool>>) -> bool {

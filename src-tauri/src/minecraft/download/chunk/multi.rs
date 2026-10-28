@@ -15,6 +15,7 @@ use crate::{log_debug, log_warn};
 
 use super::super::budget;
 use super::super::edge;
+use super::super::host_profile;
 use super::super::rate_limiter::RateLimiter;
 use super::super::types::GlobalProgress;
 use super::block::{download_block, BlockError};
@@ -66,6 +67,8 @@ struct SourceSlot {
     target: AtomicUsize,
     /// 本轮窗口内该源下载的字节（每轮清零）
     bytes: AtomicU64,
+    /// 全程累计字节（用于结束时上报吞吐给主机记忆）
+    total_bytes: AtomicU64,
 }
 
 struct Engine {
@@ -113,6 +116,7 @@ pub(crate) async fn download_multi(
 ) -> SegmentOutcome {
     // 占用一个活跃文件名额：文件下完（或被取消）自动归还，额度让给还在下的文件
     let _lease = budget::FileLease::open();
+    let started_at = std::time::Instant::now();
     if urls.is_empty() || file_size == 0 {
         return SegmentOutcome {
             downloaded: 0,
@@ -124,7 +128,13 @@ pub(crate) async fn download_multi(
     }
     let map_path = format!("{}.partmap", path);
     let data_len = std::fs::metadata(path).map(|meta| meta.len()).unwrap_or(0);
-    let table = match SegmentTable::load(Path::new(&map_path), file_size, data_len, resume_key) {
+    let table = match SegmentTable::load(
+        Path::new(&map_path),
+        file_size,
+        data_len,
+        resume_key,
+        Some(Path::new(path)),
+    ) {
         Some(restored) => {
             log_debug!(
                 "[Segment] 复用已完成块: {} 块 / {} 字节",
@@ -159,6 +169,7 @@ pub(crate) async fn download_multi(
                 active: AtomicUsize::new(0),
                 target: AtomicUsize::new(0),
                 bytes: AtomicU64::new(0),
+                total_bytes: AtomicU64::new(0),
             })
         })
         .collect();
@@ -190,7 +201,13 @@ pub(crate) async fn download_multi(
         ceiling
     );
     let mut set: JoinSet<()> = JoinSet::new();
-    let initial = initial_workers(sources.len(), initial_budget);
+    let mut initial = initial_workers(sources.len(), initial_budget);
+    // 主机记忆：记得这台 CDN 适合几条流，就从几条起步（不超过本轮份额）
+    for (index, count) in initial.iter_mut().enumerate() {
+        if let Some(remembered) = host_profile::suggest(&sources[index].url) {
+            *count = (*count).max(remembered.min(initial_budget));
+        }
+    }
     for (index, count) in initial.iter().enumerate() {
         sources[index].target.store(*count, Ordering::Relaxed);
         if sources[index].dead.load(Ordering::Relaxed) {
@@ -244,7 +261,11 @@ pub(crate) async fn download_multi(
         let window_secs = SAMPLE_INTERVAL.as_secs().max(1);
         let rates: Vec<u64> = sources
             .iter()
-            .map(|slot| slot.bytes.swap(0, Ordering::Relaxed) / window_secs)
+            .map(|slot| {
+                let window = slot.bytes.swap(0, Ordering::Relaxed);
+                slot.total_bytes.fetch_add(window, Ordering::Relaxed);
+                window / window_secs
+            })
             .collect();
         let active_total: usize = sources
             .iter()
@@ -323,6 +344,14 @@ pub(crate) async fn download_multi(
 
     engine.stop.store(true, Ordering::Relaxed);
     while set.join_next().await.is_some() {}
+
+    // 把每条源这次学到的结论留给下一个文件
+    let elapsed_secs = started_at.elapsed().as_secs_f64().max(0.001);
+    for slot in sources.iter() {
+        let bytes = slot.total_bytes.load(Ordering::Relaxed);
+        let target = slot.target.load(Ordering::Relaxed).max(1);
+        host_profile::observe(&slot.url, target, (bytes as f64 / elapsed_secs) as u64);
+    }
 
     let downloaded = table.done_bytes();
     let complete = table.is_complete();
@@ -406,7 +435,7 @@ async fn run_worker(args: Arc<WorkerArgs>, source_index: usize) {
         )
         .await;
         match outcome {
-            Ok(Ok(_)) => engine.table.complete(segment.index, source_index),
+            Ok(Ok((hash, _bytes))) => engine.table.complete(segment.index, source_index, hash),
             Ok(Err(BlockError::RangeUnsupported)) => {
                 log_debug!("[Segment] 源不支持 Range，停用: {}", slot.url);
                 slot.dead.store(true, Ordering::Relaxed);
