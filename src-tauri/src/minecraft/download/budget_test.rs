@@ -1,6 +1,6 @@
 //! 连接额度分摊的纯函数测试
 
-use super::{per_file_share_of, set_total, total, FileLease};
+use super::{per_file_share_of, set_total, total, total_for_tasks, FileLease};
 
 #[test]
 fn test_per_file_share_按活跃文件数均分() {
@@ -44,4 +44,12 @@ fn test_file_lease_打开与归还() {
         assert!(super::active_files() >= before + 1);
     }
     assert!(super::active_files() >= before);
+}
+
+#[test]
+fn test_total_for_tasks_按每任务两条折算() {
+    assert_eq!(total_for_tasks(8), 16, "默认 8 线程 -> 16 条总预算");
+    assert_eq!(total_for_tasks(1), 2);
+    assert_eq!(total_for_tasks(100), 64, "收敛到上限");
+    assert_eq!(total_for_tasks(0), 1, "零线程也留一条");
 }

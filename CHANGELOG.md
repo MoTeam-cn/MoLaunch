@@ -180,7 +180,8 @@
 
 - [`budget.rs`](src-tauri/src/minecraft/download/budget.rs)、[`budget_test.rs`](src-tauri/src/minecraft/download/budget_test.rs)（新）：总预算 + 活跃文件计数；份额 = `总预算 / 活跃文件数`，受单文件上限（用户设的分片数）约束，且**永远保底 1 条**——再拥挤也给每个文件留一条，否则它会永远排不上。活跃名额用 RAII 租约（`FileLease`）管理，失败、取消都不会漏归还。
 - [`multi.rs`](src-tauri/src/minecraft/download/chunk/multi.rs)：每轮采样后重算份额——别的文件下完额度会变大（自动加速），文件变多则收缩；本文件连接数超过当前份额时无条件减一条，不必等它变慢。
-- [`manager/core.rs`](src-tauri/src/minecraft/download/manager/core.rs)：构造下载会话时把 `max_threads` 写入总预算。单文件下载时份额仍等于用户设的分片数（8 线程 + 4 分片 = 4 条，与之前一致）；多文件并发时总量不再超标——想要更高就调大「最大线程数」。
+- [`budget.rs`](src-tauri/src/minecraft/download/budget.rs)：总预算 = **最大线程数 × 2**（上限 64）。不能直接用最大线程数——分片下载至少要 2 条连接才可能快于单流，文件一多每个文件只剩 1 条，批量安装反而退化。默认 8 线程 → 16 条总预算：单文件下载拿满分片数（与之前一致），8 个文件并行时每个仍有 2 条，而此前是 8 × 4 = 32 条。
+- [`manager/core.rs`](src-tauri/src/minecraft/download/manager/core.rs)：构造下载会话时把折算后的总预算写入池子。想要更高吞吐就调大「最大线程数」，各文件会自动按份额加速。
 
 
 

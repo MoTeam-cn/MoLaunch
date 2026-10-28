@@ -12,10 +12,24 @@ const DEFAULT_TOTAL: usize = 8;
 /// 总预算上限：再大也没有意义，反而会拖慢彼此
 const MAX_TOTAL: usize = 64;
 
+/// 每个任务平均折算几条连接
+///
+/// 分片下载至少要 2 条连接才可能快于单流（1 条等于串行）；直接用 `max_threads` 当总预算的话，
+/// 文件一多每个文件就只剩 1 条，批量安装反而退化。所以按「每任务 2 条」折算：
+/// 默认 8 线程 → 16 条总预算，8 个文件并行时每个仍有 2 条。
+const CONNECTIONS_PER_TASK: usize = 2;
+
 static TOTAL: AtomicUsize = AtomicUsize::new(DEFAULT_TOTAL);
 static ACTIVE_FILES: AtomicUsize = AtomicUsize::new(0);
 
-/// 设置全局连接总预算（每个下载会话开始时由 `max_threads` 写入）
+/// 由「最大线程数」折算全局连接总预算
+pub(crate) fn total_for_tasks(max_threads: usize) -> usize {
+    max_threads
+        .saturating_mul(CONNECTIONS_PER_TASK)
+        .clamp(1, MAX_TOTAL)
+}
+
+/// 设置全局连接总预算（每个下载会话开始时由 `max_threads` 折算写入）
 pub(crate) fn set_total(total: usize) {
     TOTAL.store(total.clamp(1, MAX_TOTAL), Ordering::Relaxed);
 }

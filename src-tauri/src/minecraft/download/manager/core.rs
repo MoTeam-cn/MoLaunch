@@ -47,7 +47,7 @@ impl DownloadManager {
     ) -> Self {
         let client = crate::http::get_download_client();
         // 「最大线程数」是全局连接总预算，跨文件分摊；每个文件每轮自己算份额
-        super::super::budget::set_total(max_threads);
+        super::super::budget::set_total(super::super::budget::total_for_tasks(max_threads));
 
         Self {
             client,
