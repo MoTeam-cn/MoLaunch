@@ -321,7 +321,7 @@ async fn probe_host(host: &str, url: &str) -> Option<(SocketAddr, u64)> {
                 .get_or_insert_with(|| ProbeBudget::new(Instant::now()));
             budget.charge(Instant::now(), PROBE_RANGE_BYTES);
         }
-        if best.map_or(true, |(_, current)| throughput > current) {
+        if best.is_none_or(|(_, current)| throughput > current) {
             best = Some((addr, throughput));
         }
         let exhausted = {
