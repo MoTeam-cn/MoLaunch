@@ -10,7 +10,8 @@ import { listen } from '@tauri-apps/api/event'
 import { useVersionStore } from '@/stores/version'
 import { toastSuccess } from '@/utils/toast'
 import { isDownloading, getDownloadProgress } from '@/utils/api/system'
-import type { DownloadStage, RawDownloadProgress, RawDownloadStage } from '@/types/download'
+import type { RawDownloadProgress } from '@/types/download'
+import { toProgressSnapshot } from '@/utils/downloadProgress'
 import { safeCall } from '@/utils/async'
 
 /** 防止 initDownloadStream 被多次调用注册重复 listener */
@@ -39,40 +40,7 @@ function handleProgress(progress: RawDownloadProgress) {
     return
   }
 
-  const stages: DownloadStage[] = progress.stages.map((s: RawDownloadStage) => ({
-    name: s.name,
-    progress: s.progress,
-    weight: s.weight,
-    status: s.status,
-    bytes_downloaded: s.bytes_downloaded,
-    bytes_total: s.bytes_total,
-    files_downloaded: s.files_downloaded || 0,
-    files_total: s.files_total || 0,
-    group: s.group ?? null,
-  }))
-
-  // 检测暂停状态：任意 stage 携带 is_paused=true 即表示全局暂停
-  const isPaused = progress.stages.some((s: RawDownloadStage) => s.is_paused === true)
-
-  let weightedProgress = 0
-  let totalWeight = 0
-  for (const stage of stages) {
-    totalWeight += stage.weight
-    weightedProgress += stage.progress * stage.weight
-  }
-  const percentage = totalWeight > 0
-    ? Math.min(100, parseFloat(((weightedProgress / totalWeight) * 100).toFixed(1)))
-    : 0
-
-  versionStore.updateProgress({
-    stages,
-    current_stage_index: progress.current_stage_index ?? 0,
-    global_speed: progress.global_speed ?? 0,
-    global_bytes_downloaded: progress.global_bytes_downloaded ?? 0,
-    global_bytes_total: progress.global_bytes_total ?? 0,
-    percentage,
-    isPaused,
-  })
+  versionStore.updateProgress(toProgressSnapshot(progress))
 
   if (progress.is_complete) {
     if (import.meta.env.DEV) {

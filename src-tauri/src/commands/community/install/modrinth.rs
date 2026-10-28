@@ -121,6 +121,10 @@ pub(super) async fn install_mr_files(
         }
     }
 
+    // 查询期间给一点伪进度（见 QUERY_TICKER），真实字节进来后让位
+    let query_ticker =
+        crate::commands::version::install::loader_helpers::start_query_ticker(state, stage_index);
+
     // 2. 批量查询 project info 拿 slug，再查 mcmod 译名
     let slug_map =
         crate::minecraft::community::modrinth::batch_get_project_slugs(&all_project_ids).await;
@@ -223,6 +227,9 @@ pub(super) async fn install_mr_files(
         download_list.len(),
         crate::utils::format::bytes(total_bytes)
     );
+
+    // 真实字节即将进来，伪进度让位
+    query_ticker.stop();
 
     super::concurrent::download_files_concurrent(state, stage_index, &download_list, total_bytes)
         .await?;

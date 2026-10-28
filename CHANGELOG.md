@@ -6,6 +6,23 @@
 
 ### 修复
 
+#### 下载浮动按钮层级压过抽屉与弹窗
+素材：右下角那颗按钮的 `z-index` 是 `10001`，比抽屉（1000/1001）和所有弹窗（1200）都高，于是它会浮在安装确认弹窗上面，正好压住弹窗右下角的按钮。
+
+- [`DownloadPanel.vue`](src/components/common/DownloadPanel.vue)：层级降到 `900`，并在组件头写明这个刻度——浮动按钮在抽屉与弹窗**之下**，`Toast` 依旧在最上（10001）。
+
+#### 解析阶段进度看起来卡在 0%
+两处原因，分别修：
+
+- **百分比被权重稀释**：总体百分比按阶段权重折算，而「解析整合包」权重是 1（总权重 56），它的进度再怎么动也只能把总数推到 1-2%，观感就是纹丝不动。[`downloadProgress.ts`](src/utils/downloadProgress.ts) 新增 `resolveDisplayPercentage`：还没有任何字节时（解析 / 批量查询 / 复制配置）改显示**当前阶段自身**的进度，一旦开始有字节就回到总体值——那才是真正剩下的工作量；任何阶段都不会显示到 100%，最多 99.9。
+- **阶段内根本没有进度**：CF/MR 依赖列表要先批量查文件信息与 slug，两次往返期间一个字节都没下。[`loader_helpers.rs`](src-tauri/src/commands/version/install/loader_helpers.rs) 新增 `start_query_ticker`（0→10% @2%/s，用 `TickerGuard` 的 `Drop` 保证任何提前返回都会停），[`curseforge.rs`](src-tauri/src/commands/community/install/curseforge.rs) 与 [`modrinth.rs`](src-tauri/src/commands/community/install/modrinth.rs) 在查询期间启动、真实字节进来前显式停掉；只给 10% 是为了避免伪造值过高后「先到 50% 再退回 2%」的倒车。
+
+#### 进度快照构造去重
+- [`useDownloadStream.ts`](src/composables/useDownloadStream.ts) 与 [`useDownloadPageRestore.ts`](src/composables/useDownloadPageRestore.ts) 原本各写一份「Raw → 稳定结构 + 加权百分比」，合并为 `toProgressSnapshot`（`downloadProgress.ts`），顺带补上 `stage_percentage` 字段（[`types/download.ts`](src/types/download.ts)）。
+- [`download-progress.test.ts`](src/utils/__tests__/download-progress.test.ts)：9 个用例覆盖加权百分比、当前阶段百分比、索引越界回退、可选字段默认值、暂停标记，以及展示值的四种分支。
+
+### 修复
+
 #### 设置页「点我前往」点击没反应
 整条链路只有一半：按钮本身是好的，`router.push` 也确实执行了，但**设置页从来不读 URL 上的 `?tab=`**。
 

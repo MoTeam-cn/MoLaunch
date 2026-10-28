@@ -19,7 +19,7 @@ import { decideIdleAction } from '@/utils/downloadPageGuard'
 const DownloadStatsPanel = defineAsyncComponent(() => import('./downloads/DownloadStatsPanel.vue'))
 const TaskGroupCard = defineAsyncComponent(() => import('@/components/downloads/TaskGroupCard.vue'))
 import { safeCall } from '@/utils/async'
-import { applyProgressPatch } from '@/utils/downloadProgress'
+import { applyProgressPatch, resolveDisplayPercentage } from '@/utils/downloadProgress'
 
 const versionStore = useVersionStore()
 const router = useRouter()
@@ -75,7 +75,15 @@ const isPaused = computed(() => progress.value?.isPaused ?? false)
 const now = useNowTicker()
 const percentageStartTime = ref<number | null>(null)
 
-const realPercentage = computed(() => progress.value?.percentage || 0)
+const realPercentage = computed(() => {
+  const value = progress.value
+  if (!value) return 0
+  return resolveDisplayPercentage({
+    weighted: value.percentage,
+    globalBytesTotal: value.global_bytes_total,
+    stage: value.stage_percentage,
+  })
+})
 
 // 监听真实进度，在进入 95% 区间时记录起始时间（副作用放 watch，不放 computed）
 watch(realPercentage, (val) => {

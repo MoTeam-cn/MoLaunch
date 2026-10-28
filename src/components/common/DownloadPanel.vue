@@ -12,6 +12,7 @@ import { useRouter } from 'vue-router'
 import { useVersionStore } from '@/stores/version'
 import { ArrowDownTrayIcon } from '@heroicons/vue/24/solid'
 import { backToTopVisible, stopGameVisible } from '@/composables/useFloatingButtonState'
+import { resolveDisplayPercentage } from '@/utils/downloadProgress'
 
 const router = useRouter()
 const versionStore = useVersionStore()
@@ -25,6 +26,20 @@ const positionClass = computed(() => {
   if (stopGameVisible.value) return 'bottom-40'
   if (backToTopVisible.value) return 'bottom-24'
   return 'bottom-6'
+})
+
+/**
+ * 进度环百分比：还没有任何字节时（解析整合包 / 批量查询 / 复制配置），总体百分比
+ * 会被小权重稀释在 0-2%，看着像卡死；这时改显示当前阶段自身的进度。
+ */
+const ringPercentage = computed(() => {
+  const progress = versionStore.downloadProgress
+  if (!progress) return 0
+  return resolveDisplayPercentage({
+    weighted: progress.percentage,
+    globalBytesTotal: progress.global_bytes_total,
+    stage: progress.stage_percentage,
+  })
 })
 
 function goToDownloads() {
@@ -65,7 +80,7 @@ function goToDownloads() {
           stroke-width="2"
           stroke-linecap="round"
           stroke-dasharray="125.66"
-          :stroke-dashoffset="125.66 - (125.66 * (versionStore.downloadProgress?.percentage || 0) / 100)"
+          :stroke-dashoffset="125.66 - (125.66 * ringPercentage / 100)"
           class="transition-all duration-300"
         />
       </svg>
@@ -77,7 +92,7 @@ function goToDownloads() {
 .download-panel-btn {
   position: fixed;
   right: 24px;
-  z-index: 10001;
+  z-index: 900;
   width: 44px;
   height: 44px;
   border-radius: 50%;

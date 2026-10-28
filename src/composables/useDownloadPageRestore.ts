@@ -11,22 +11,7 @@
 import { useVersionStore } from '@/stores/version'
 import { getDownloadProgress, isDownloading } from '@/utils/api/system'
 import { safeCall } from '@/utils/async'
-import type { DownloadStage, RawDownloadStage } from '@/types/download'
-
-/** 后端 stages → 前端 stages */
-function mapStages(raw: RawDownloadStage[]): DownloadStage[] {
-  return raw.map((s) => ({
-    name: s.name,
-    progress: s.progress,
-    weight: s.weight,
-    status: s.status,
-    bytes_downloaded: s.bytes_downloaded,
-    bytes_total: s.bytes_total,
-    files_downloaded: s.files_downloaded || 0,
-    files_total: s.files_total || 0,
-    group: s.group ?? null,
-  }))
-}
+import { toProgressSnapshot } from '@/utils/downloadProgress'
 
 /**
  * 从后端恢复下载进度到 store
@@ -49,25 +34,6 @@ export async function restoreDownloadFromBackend(): Promise<boolean> {
   versionStore.startDownload(raw.version_name || versionStore.downloadingVersion || '')
   if (!raw.stages || raw.stages.length === 0) return true
 
-  const stages = mapStages(raw.stages)
-  let weightedProgress = 0
-  let totalWeight = 0
-  for (const s of stages) {
-    totalWeight += s.weight
-    weightedProgress += s.progress * s.weight
-  }
-  const percentage = totalWeight > 0
-    ? Math.min(100, parseFloat(((weightedProgress / totalWeight) * 100).toFixed(1)))
-    : 0
-
-  versionStore.updateProgress({
-    stages,
-    current_stage_index: raw.current_stage_index ?? 0,
-    global_speed: raw.global_speed ?? 0,
-    global_bytes_downloaded: raw.global_bytes_downloaded ?? 0,
-    global_bytes_total: raw.global_bytes_total ?? 0,
-    percentage,
-    isPaused: raw.stages.some((s) => s.is_paused === true),
-  })
+  versionStore.updateProgress(toProgressSnapshot(raw))
   return true
 }

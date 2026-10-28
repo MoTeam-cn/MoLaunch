@@ -29,7 +29,10 @@ export interface DownloadProgress {
   global_speed: number
   global_bytes_downloaded: number
   global_bytes_total: number
+  /** 按阶段权重折算的总体百分比（0-100）：真实、但会被「不产生字节」的阶段稀释 */
   percentage: number
+  /** 当前阶段自身的百分比（0-100）：解析/复制/查询这类阶段只有它有动静 */
+  stage_percentage: number
   /** 是否已暂停（由前端 pause 按钮控制） */
   isPaused?: boolean
 }

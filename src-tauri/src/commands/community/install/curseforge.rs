@@ -120,6 +120,10 @@ pub(super) async fn install_cf_mods(
         );
     }
 
+    // 查询期间给一点伪进度：两次批量查询可能耗时十几秒，停在 0% 会被当成卡死
+    let query_ticker =
+        crate::commands::version::install::loader_helpers::start_query_ticker(state, stage_index);
+
     // 1. 批量查询下载信息
     // file_id 为 None 的项跳过
     let file_ids: Vec<i64> = effective_files.iter().filter_map(|f| f.file_id).collect();
@@ -296,7 +300,8 @@ pub(super) async fn install_cf_mods(
         crate::utils::format::bytes(total_bytes)
     );
 
-    // 6. 并发下载
+    // 6. 并发下载（真实字节即将进来，伪进度让位）
+    query_ticker.stop();
     super::concurrent::download_files_concurrent(state, stage_index, &download_list, total_bytes)
         .await?;
 

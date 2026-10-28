@@ -28,6 +28,13 @@ const FORGE_TICKER: &[(f64, f64)] = &[(30.0, 1.5), (60.0, 1.0), (85.0, 0.6), (95
 /// 90→95% @0.3%/s = 16秒
 const FABRIC_TICKER: &[(f64, f64)] = &[(40.0, 3.0), (70.0, 2.0), (90.0, 1.0), (95.0, 0.3)];
 
+/// 依赖列表查询伪进度曲线：0→10% @2%/s
+///
+/// 「下载 MOD」阶段一进来要先批量查文件信息与 slug，这段时间一个字节都没下，
+/// 停在 0% 会让人以为卡死。封顶只给 10%：真实字节一进来就被真实进度盖过去，
+/// 也不会因为伪进度太高而出现「先到 50% 再退回 2%」的倒车。
+const QUERY_TICKER: &[(f64, f64)] = &[(10.0, 2.0)];
+
 /// 整合包解析伪进度曲线：0→90% @5%/s
 ///
 /// 解析完成前缓慢上涨，解析完成后 stop 并跳 100%
@@ -237,4 +244,30 @@ pub(crate) fn start_progress_ticker(
 /// 0→90% @5%/s，解析完成后 stop 并跳 100%
 pub(crate) fn start_parse_ticker(state: &AppState, stage_index: usize) -> Arc<AtomicBool> {
     start_progress_ticker(state, Some(stage_index), PARSE_TICKER)
+}
+/// 伪进度 ticker 的收尾守卫
+///
+/// 查询类阶段有多个提前 `return Err` 的出口，逐处手写 stop 迟早会漏一处；
+/// 用 Drop 保证离开作用域时一定停，显式 `stop()` 则用于「真实进度要接管了」的时刻。
+pub(crate) struct TickerGuard(Arc<AtomicBool>);
+
+impl TickerGuard {
+    pub(crate) fn stop(&self) {
+        self.0.store(true, Ordering::Relaxed);
+    }
+}
+
+impl Drop for TickerGuard {
+    fn drop(&mut self) {
+        self.0.store(true, Ordering::Relaxed);
+    }
+}
+
+/// 依赖列表批量查询期间的伪进度（见 `QUERY_TICKER`）
+pub(crate) fn start_query_ticker(state: &AppState, stage_index: usize) -> TickerGuard {
+    TickerGuard(start_progress_ticker(
+        state,
+        Some(stage_index),
+        QUERY_TICKER,
+    ))
 }
