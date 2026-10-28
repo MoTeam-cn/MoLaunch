@@ -16,12 +16,12 @@ pub fn relative_artifact_path(maven_name: Option<&str>, local_path: &str) -> Str
     if let Some(name) = maven_name.filter(|name| name.matches(':').count() >= 2) {
         return crate::minecraft::utils::maven::maven_to_relative_path(name);
     }
-    local_path
-        .replace('\\', "/")
-        .split("/libraries/")
-        .last()
-        .unwrap_or("")
-        .to_string()
+    // 只有确实是 `<game>/libraries/<相对路径>` 才敢截取，否则拼出来的候选地址都是垃圾
+    let normalized = local_path.replace('\\', "/");
+    match normalized.split_once("/libraries/") {
+        Some((_, relative)) => relative.to_string(),
+        None => String::new(),
+    }
 }
 
 /// 按 groupId 前缀猜这类老构件原本在哪个仓库
