@@ -159,7 +159,7 @@ pub(crate) async fn download_multi(
         .iter()
         .enumerate()
         .map(|(index, url)| {
-            let keep = only_source.map_or(true, |keep| keep == index);
+            let keep = only_source.is_none_or(|keep| keep == index);
             Arc::new(SourceSlot {
                 url: url.clone(),
                 official: index == official_index || urls.len() == 1 || only_source == Some(index),

@@ -102,10 +102,6 @@ impl SegmentTable {
         self.seg_len
     }
 
-    pub(crate) fn file_size(&self) -> u64 {
-        self.file_size
-    }
-
     fn bounds(&self, index: usize) -> Option<(u64, u64)> {
         let start = index as u64 * self.seg_len;
         if start >= self.file_size {
@@ -221,21 +217,6 @@ impl SegmentTable {
         self.lock()
             .iter()
             .any(|seg| matches!(seg.status, Status::Pending | Status::Quarantined))
-    }
-
-    /// 已完成块的最大结束偏移：用于校验「数据文件确实含这些字节」
-    pub(crate) fn max_done_end(&self) -> u64 {
-        let segs = self.lock();
-        let mut max_end = 0_u64;
-        for (index, seg) in segs.iter().enumerate() {
-            if seg.status != Status::Done {
-                continue;
-            }
-            if let Some((_, end)) = self.bounds(index) {
-                max_end = max_end.max(end + 1);
-            }
-        }
-        max_end
     }
 
     /// 落盘位图（每块 2 字节：状态 + 来源）
