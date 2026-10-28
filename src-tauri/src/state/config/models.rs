@@ -13,11 +13,6 @@ pub struct ProxyConfig {
     pub ip_version: String,
 }
 
-/// serde 默认 true（旧配置缺键时按启用处理）
-fn default_true() -> bool {
-    true
-}
-
 /// 下载配置
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct DownloadConfig {
