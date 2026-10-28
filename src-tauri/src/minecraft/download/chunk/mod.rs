@@ -1,23 +1,12 @@
-//! 单文件分片并发下载模块
-//! 将大文件拆分为多个 chunk，使用 HTTP Range 请求并发下载，最后合并。
-//! 子模块：`probe`（Range 探测）、`download`（分片下载）、`merge`（合并）、`api`（旧调度）、
-//! `table` + `block` + `multi`（段表引擎：按块多源并行）
+//! 下载块引擎：段表 + 按块多源并行
+//!
+//! 子模块：`table`（段表与位图）、`block`（单块下载）、`multi`（多源调度）、`probe`（大小探测）。
+//! 单一引擎：小文件与探测不到大小的文件由下载层直接走单流，不再有第二套分片实现。
 
-mod api;
 mod block;
-pub mod download;
-pub mod merge;
 mod multi;
 pub mod probe;
-pub mod segment_table;
-mod split;
 mod table;
 
-// 对外暴露探测能力：retry 需要「是否支持 Range + 声明大小」一起拿到，
-// 避免为了判断分片可行性多发一次请求
-pub use probe::{
-    probe_file_size, probe_range, range_support_known, remember_range_support, supports_range,
-    RangeProbe,
-};
-
-pub use api::{clear_part_files, download_chunked, ChunkDownloadResult};
+pub use multi::{download_multi, SegmentOutcome};
+pub use probe::probe_file_size;

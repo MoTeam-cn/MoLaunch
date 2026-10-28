@@ -108,11 +108,6 @@ pub(super) fn apply_download(config: &mut crate::state::AppConfig, patch: &Confi
         config.download.doh = doh;
         crate::http::doh::set_enabled(doh);
     }
-    if let Some(table) = patch.download.segment_table {
-        log_info!("[Config] segment_table = {}", table);
-        config.download.segment_table = table;
-        crate::minecraft::download::chunk::segment_table::set_enabled(table);
-    }
     if let Some(ref url_opt) = patch.download.mirror_url {
         log_info!("[Config] mirror_url = {:?}", url_opt);
         config.download.mirror_url = url_opt.clone();

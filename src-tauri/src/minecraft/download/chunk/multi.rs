@@ -62,6 +62,14 @@ pub(crate) fn should_grow(rate: u64, avg: u64, active_total: usize, budget: usiz
     (rate as f64) >= (avg as f64) * GROW_FACTOR
 }
 
+/// 是否该给某条源减少一条连接
+///
+/// 只在该源明显低于均值（不足一半）且当前多于 1 条时才减：单源永远保底 1 条，
+/// 否则一条慢源会被自己饿死，反而更慢。
+pub(crate) fn should_shrink(rate: u64, avg: u64, current: usize) -> bool {
+    current > 1 && avg > 0 && rate.saturating_mul(2) < avg
+}
+
 /// 引擎结果
 #[derive(Debug)]
 pub(crate) struct SegmentOutcome {
@@ -78,6 +86,8 @@ struct SourceSlot {
     official: bool,
     dead: AtomicBool,
     active: AtomicUsize,
+    /// 目标连接数：worker 在每次认领前发现 active > target 就自行退出（AIMD 收缩）
+    target: AtomicUsize,
     /// 本轮窗口内该源下载的字节（每轮清零）
     bytes: AtomicU64,
 }
@@ -165,6 +175,7 @@ pub(crate) async fn download_multi(
                 official: index == official_index || urls.len() == 1 || only_source == Some(index),
                 dead: AtomicBool::new(!keep),
                 active: AtomicUsize::new(0),
+                target: AtomicUsize::new(0),
                 bytes: AtomicU64::new(0),
             })
         })
@@ -194,7 +205,9 @@ pub(crate) async fn download_multi(
         budget
     );
     let mut set: JoinSet<()> = JoinSet::new();
-    for (index, count) in initial_workers(sources.len(), budget).iter().enumerate() {
+    let initial = initial_workers(sources.len(), budget);
+    for (index, count) in initial.iter().enumerate() {
+        sources[index].target.store(*count, Ordering::Relaxed);
         if sources[index].dead.load(Ordering::Relaxed) {
             continue;
         }
@@ -265,7 +278,6 @@ pub(crate) async fn download_multi(
             }
         }
 
-        // 扩容：给本轮最快且明显高于均值的源加一条连接
         let usable: Vec<usize> = sources
             .iter()
             .enumerate()
@@ -277,9 +289,31 @@ pub(crate) async fn download_multi(
         }
         let sum: u64 = usable.iter().map(|index| rates[*index]).sum();
         let avg = sum / usable.len().max(1) as u64;
+
+        // 收缩：明显低于均值的源减一条；worker 在下次认领前自行退出
+        for index in usable.iter().copied() {
+            let current = sources[index].target.load(Ordering::Relaxed);
+            if should_shrink(rates[index], avg, current) {
+                sources[index].target.store(current - 1, Ordering::Relaxed);
+                log_debug!(
+                    "[Segment] 收缩: {} (-1 连接, {} B/s, 均值 {} B/s)",
+                    sources[index].url,
+                    rates[index],
+                    avg
+                );
+            }
+        }
+
+        // 扩容：给本轮最快且明显高于均值的源加一条连接
         let best = usable.iter().copied().max_by_key(|index| rates[*index]);
+        let total_target: usize = sources
+            .iter()
+            .map(|slot| slot.target.load(Ordering::Relaxed))
+            .sum();
         if let Some(best) = best {
-            if should_grow(rates[best], avg, active_total, budget) {
+            let current = sources[best].target.load(Ordering::Relaxed);
+            if should_grow(rates[best], avg, total_target, budget) {
+                sources[best].target.store(current + 1, Ordering::Relaxed);
                 sources[best].active.fetch_add(1, Ordering::Relaxed);
                 spawn_worker(&mut set, &args, best);
                 log_debug!(
@@ -339,6 +373,10 @@ async fn run_worker(args: Arc<WorkerArgs>, source_index: usize) {
     let engine = &args.engine;
     let slot = &engine.sources[source_index];
     while !engine.stop.load(Ordering::Relaxed) && !slot.dead.load(Ordering::Relaxed) {
+        // AIMD 收缩：超出目标连接数的那几条在认领前退出，不打断进行中的块
+        if slot.active.load(Ordering::Relaxed) > slot.target.load(Ordering::Relaxed) {
+            break;
+        }
         let Some(segment) = engine.table.claim(slot.official) else {
             if engine.table.is_complete() {
                 break;

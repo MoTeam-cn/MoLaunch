@@ -105,16 +105,6 @@ pub fn save_config(config: &AppConfig) -> Result<(), String> {
         "doh",
         if config.download.doh { "true" } else { "false" },
     );
-    ini.set(
-        "Download",
-        "segment_table",
-        if config.download.segment_table {
-            "true"
-        } else {
-            "false"
-        },
-    );
-
     // Mirror
     if let Some(ref url) = config.download.mirror_url {
         ini.set("Mirror", "url", url);

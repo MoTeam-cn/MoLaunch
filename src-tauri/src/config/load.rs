@@ -95,11 +95,6 @@ pub fn load_config() -> Result<Option<AppConfig>, String> {
     if let Some(doh) = config.get("Download", "doh") {
         app_config.download.doh = doh == "true" || doh == "1";
     }
-    // 段表引擎（缺省开启，关闭即回到旧实现）
-    if let Some(table) = config.get("Download", "segment_table") {
-        app_config.download.segment_table = table == "true" || table == "1";
-    }
-
     // Mirror
     app_config.download.mirror_url = config.get("Mirror", "url");
     app_config.download.mirror_url_meta = config.get("Mirror", "url_meta");

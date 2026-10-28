@@ -1,39 +1,16 @@
-//! 探测：服务器 Range 支持检测与远程文件大小探测
+//! 远程文件大小探测
 //!
-//! 两个坑必须同时规避：
-//! 1. Range 请求拿到的是**压缩实体**的字节（服务器对 206 也可能带 Content-Encoding），
-//!    分片合并出来是 gzip 流而不是原文 —— 因此响应带 Content-Encoding 时一律判为不支持分片。
-//! 2. 探测请求默认会协商 gzip，此时 Content-Length / Content-Range 报的是**压缩后**长度，
-//!    与实际落盘的解压长度不一致 —— 因此探测统一带 `Accept-Encoding: identity`。
+//! 用 GET + `Range: bytes=0-0` 而不是 HEAD：部分 CDN 的 HEAD 会虚假声明支持 Range，
+//! 只有真实 GET 才反映服务端的实际行为。探测统一带 `Accept-Encoding: identity`，
+//! 因为协商 gzip 后 Content-Length / Content-Range 报的是压缩后长度，与落盘字节数不符。
 
-use std::collections::HashSet;
-use std::sync::{Mutex, OnceLock};
 use std::time::Duration;
 
 use crate::log_debug;
 use crate::utils::format;
 
-/// Range 探测结果
-pub struct RangeProbe {
-    /// 服务端是否真的支持分片（206 且响应未被压缩）
-    pub supports_range: bool,
-    /// 服务端声明的文件大小：206 取 Content-Range 的 total，200 取 Content-Length；0 表示未知
-    ///
-    /// 注意：部分服务端（如 Fabric 官方元数据）会把**压缩后**的长度写进 Content-Range，
-    /// 与完整 GET 解压后的字节数不一致，因此该值只用于分片切分与进度估算，不可作为校验依据。
-    pub total: u64,
-}
-
-/// 探测服务端对 Range 的真实支持情况与文件大小
-///
-/// 不用 HEAD 预检：CF CDN（edge.forgecdn.net）HEAD 会虚假返回 `accept-ranges: bytes`，
-/// 但实际 GET + Range 返回 404，导致分片必然失败。GET + Range 能准确反映真实响应。
-pub async fn probe_range(client: &reqwest::Client, url: &str) -> RangeProbe {
-    let unknown = RangeProbe {
-        supports_range: false,
-        total: 0,
-    };
-
+/// 探测远程文件大小（0 表示无法探测）
+pub async fn probe_file_size(client: &reqwest::Client, url: &str) -> u64 {
     let resp = match client
         .get(url)
         .header(reqwest::header::RANGE, "bytes=0-0")
@@ -42,27 +19,22 @@ pub async fn probe_range(client: &reqwest::Client, url: &str) -> RangeProbe {
         .send()
         .await
     {
-        Ok(r) => r,
+        Ok(resp) => resp,
         Err(e) => {
             log_debug!(
-                "[Chunk] Range 探测失败: {}",
+                "[Chunk] 大小探测失败: {}",
                 crate::http::request_error_msg(&e)
             );
-            return unknown;
+            return 0;
         }
     };
 
     let status = resp.status().as_u16();
-    // 响应被压缩时，Range 切的是压缩流的字节，合并必然得到损坏文件
-    let encoded = resp
-        .headers()
-        .contains_key(reqwest::header::CONTENT_ENCODING);
-
     let total = if status == 206 {
         parse_content_range_total(
             resp.headers()
                 .get(reqwest::header::CONTENT_RANGE)
-                .and_then(|cr| cr.to_str().ok()),
+                .and_then(|value| value.to_str().ok()),
         )
     } else if resp.status().is_success() {
         resp.content_length().unwrap_or(0)
@@ -70,67 +42,10 @@ pub async fn probe_range(client: &reqwest::Client, url: &str) -> RangeProbe {
         0
     };
 
-    if status == 206 && encoded {
-        log_debug!("[Chunk] 服务端对 Range 响应做了压缩，禁用分片: {}", url);
-    }
     if total > 0 {
         log_debug!("[Chunk] 探测文件大小: {} ({})", format::bytes(total), url);
     }
-
-    RangeProbe {
-        // 206 = 正确响应 Range；200 = 忽略了 Range（返回完整文件）；404 = 文件不存在
-        supports_range: status == 206 && !encoded,
-        total,
-    }
-}
-
-/// 检测服务器是否真正支持 Range 请求
-pub async fn supports_range(client: &reqwest::Client, url: &str) -> bool {
-    probe_range(client, url).await.supports_range
-}
-
-/// 本次运行中「已确认支持 Range」的主机集合
-///
-/// 同一 CDN 下每个文件都先探测一次会白付一个往返（批量下载时尤其明显）。
-/// 这里只做**正向**缓存：确认支持后同主机后续文件直接走分片；反向不做缓存，
-/// 因为「这次 200 忽略 Range」不代表之后都不支持（服务端灰度、临时故障都常见）。
-fn range_support_hosts() -> &'static Mutex<HashSet<String>> {
-    static HOSTS: OnceLock<Mutex<HashSet<String>>> = OnceLock::new();
-    HOSTS.get_or_init(|| Mutex::new(HashSet::new()))
-}
-
-/// 取 URL 的 host（小写）；解析失败返回 None
-fn probe_host(url: &str) -> Option<String> {
-    reqwest::Url::parse(url)
-        .ok()?
-        .host_str()
-        .map(str::to_ascii_lowercase)
-}
-
-/// 该主机是否已被确认支持 Range（命中后调用方可以跳过探测）
-pub fn range_support_known(url: &str) -> bool {
-    let Some(host) = probe_host(url) else {
-        return false;
-    };
-    range_support_hosts()
-        .lock()
-        .map(|hosts| hosts.contains(&host))
-        .unwrap_or(false)
-}
-
-/// 记录一次「分片下载成功」，把该主机标记为支持 Range
-pub fn remember_range_support(url: &str) {
-    let Some(host) = probe_host(url) else {
-        return;
-    };
-    if let Ok(mut hosts) = range_support_hosts().lock() {
-        hosts.insert(host);
-    }
-}
-
-/// 探测远程文件大小（0 表示无法探测）
-pub async fn probe_file_size(client: &reqwest::Client, url: &str) -> u64 {
-    probe_range(client, url).await.total
+    total
 }
 
 /// 解析 `Content-Range: bytes 0-0/1234` 里的总长度（无法解析返回 0）

@@ -45,12 +45,6 @@ pub struct DownloadConfig {
     /// 第三方解析商，属于隐私边界，不替用户默认决定。
     #[serde(default)]
     pub doh: bool,
-    /// 是否启用「段表 + 跨源并行」下载引擎（默认开启）
-    ///
-    /// 关闭后退回逐源重试 + 分片下载的旧实现。保留该开关是为了在新引擎出现问题时
-    /// 能一键回到旧路径，不必降级版本。
-    #[serde(default = "default_true")]
-    pub segment_table: bool,
     /// 是否对公开 CDN 做边缘节点优选（实验，默认关闭）
     ///
     /// 开启后对 `cdn.modrinth.com` 这类多边缘域名解析出的多个 IP 各拉一小段
