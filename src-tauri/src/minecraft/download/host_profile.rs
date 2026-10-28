@@ -7,6 +7,7 @@
 //! 记忆会落盘（`cache/download/host_profiles.json`），重启后仍然有效；条目带时间戳，
 //! 超过 TTL 自动作废，条数上限 64，格式带版本号，读不懂就当成没有——不猜、不迁移。
 
+use std::cmp::Reverse;
 use std::collections::HashMap;
 use std::path::Path;
 use std::sync::{Mutex, OnceLock};
@@ -95,7 +96,7 @@ fn ema(previous: u64, sample: u64) -> u64 {
 pub(crate) fn suggest(url: &str) -> Option<usize> {
     let host = host_of(url)?;
     let mut guard = state().lock().unwrap_or_else(|p| p.into_inner());
-    ensure_loaded(&mut *guard);
+    ensure_loaded(&mut guard);
     let profiles = &guard.as_ref()?.profiles;
     let profile = profiles.get(&host)?;
     if profile.learned_at.elapsed() > TTL {
@@ -115,7 +116,7 @@ pub(crate) fn observe(url: &str, target: usize, throughput: u64) {
     }
     let now = Instant::now();
     let mut guard = state().lock().unwrap_or_else(|p| p.into_inner());
-    ensure_loaded(&mut *guard);
+    ensure_loaded(&mut guard);
     let Some(state) = guard.as_mut() else {
         return;
     };
@@ -154,7 +155,7 @@ fn prune(state: &mut State) {
         .iter()
         .map(|(host, profile)| (host.clone(), profile.learned_at))
         .collect();
-    order.sort_by(|left, right| right.1.cmp(&left.1));
+    order.sort_by_key(|entry| Reverse(entry.1));
     let keep: Vec<String> = order
         .into_iter()
         .take(MAX_ENTRIES)
@@ -169,16 +170,16 @@ fn snapshot(state: &State) -> Store {
     let profiles = state
         .profiles
         .iter()
-        .filter_map(|(host, profile)| {
+        .map(|(host, profile)| {
             let elapsed = profile.learned_at.elapsed().as_millis() as u64;
-            Some((
+            (
                 host.clone(),
                 PersistedProfile {
                     target: profile.target,
                     throughput: profile.throughput,
                     learned_epoch_ms: now.saturating_sub(elapsed),
                 },
-            ))
+            )
         })
         .collect();
     Store {
