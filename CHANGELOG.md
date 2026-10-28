@@ -243,6 +243,13 @@
 - [`host_profile.rs`](src-tauri/src/minecraft/download/host_profile.rs)：读回记忆前先看文件大小，超过 1 MB 直接当没有——正常只有几十 KB，突然变大说明文件被写坏，没理由把内存交给它。
 - [`external.rs`](src-tauri/src/commands/frp/binary/external.rs) 的域名白名单通配符没有点边界：`*.example.com` 会匹配 `evilexample.com`，攻击者注册一个后缀相同的域名即可混进白名单（同样影响复用它做服务器地址白名单的沙箱校验）。改为按 `strip_suffix` + 点边界判断。
 
+#### 变更：两处安全策略按「可用性优先」定案
+
+评审提出的两个决策点，结论都是**维持现状**，并补测试把行为锁死，避免被后来的人当漏洞顺手改掉。
+
+- **哈希长度认不出时跳过哈希、只校验大小**（[`file_checker.rs`](src-tauri/src/minecraft/utils/file_checker.rs)）。元数据里哈希写坏的老版本不少，fail-closed 会让这些版本反复重下、永远装不完；代价是这类文件只能靠大小与后续内容校验兜底。函数内已注明这是取舍而非漏写的分支，[`file_checker_test.rs`](src-tauri/src/minecraft/utils/file_checker_test.rs) 用 4 个用例锁定：大小不符失败、哈希不符失败、**长度认不出放行**、无大小无哈希不放行。
+- **没有 sha1 的库仍保留镜像候选**（[`download.rs`](src-tauri/src/minecraft/version/libraries/download.rs)）。顺序上声明来源与官方永远在前，镜像只做兜底；砍掉镜像会让老版本直接下不来。哈希可用时由 `FileChecker` 逐字节校验，镜像给的文件对不上会失败重下。[`download_test.rs`](src-tauri/src/minecraft/version/libraries/download_test.rs) 锁定三条：声明来源排首位、无哈希仍有镜像与 Central 兜底、用户自配镜像优先且候选不重复。
+
 
 
 ## [0.3.13] - 2026-10-27

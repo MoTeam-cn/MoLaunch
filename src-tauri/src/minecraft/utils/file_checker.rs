@@ -124,7 +124,12 @@ impl FileChecker {
                         Err(e) => return Some(format!("Hash computation failed: {}", e)),
                     }
                 } else {
-                    // 长度不是 32/40/64/128：认不出算法。绝不能当成 sha1 去比，那会永远不匹配
+                    // 长度不是 32/40/64/128：认不出算法，当 sha1 去比会永远不匹配
+                    //
+                    // 这里**刻意**选择「跳过哈希、只保留大小校验」而不是判失败：
+                    // 元数据里哈希写坏的老版本不少，fail-closed 会让这些版本反复重下、
+                    // 永远装不完。代价是这类文件只能靠大小和后续内容校验兜底，
+                    // 属于已知取舍，不是漏写的分支——要收紧请先确认上游元数据已修好。
                     crate::log_warn!(
                         "File check: 无法识别的哈希长度（{}），跳过哈希校验: {}",
                         hash.len(),
@@ -166,3 +171,7 @@ pub fn compute_sha1_hex(bytes: &[u8]) -> String {
     hasher.update(bytes);
     hex::encode(hasher.finalize())
 }
+
+#[cfg(test)]
+#[path = "file_checker_test.rs"]
+mod file_checker_test;
