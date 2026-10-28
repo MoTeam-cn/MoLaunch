@@ -12,7 +12,9 @@ const SettingsOnline = defineAsyncComponent(() => import('./settings/SettingsOnl
 const SettingsPerformance = defineAsyncComponent(() => import('./settings/SettingsPerformance.vue'))
 const NavSidebar = defineAsyncComponent(() => import('@/components/common/NavSidebar.vue'))
 const DisclaimerDialog = defineAsyncComponent(() => import('@/components/common/DisclaimerDialog.vue'))
+import { useRoute } from 'vue-router'
 import { getConfigMap } from '@/utils/api/config'
+import { resolveSettingsTab } from '@/utils/settings-tab'
 import { hasAgreedToday } from '@/utils/disclaimer'
 import {
   RocketLaunchIcon,
@@ -30,6 +32,8 @@ import { safeCall } from '@/utils/async'
 import { toastError } from '@/utils/toast'
 
 const activeCategory = ref('launch')
+
+const route = useRoute()
 
 // 基础菜单项（始终显示）
 const baseCategories = [
@@ -64,6 +68,22 @@ const categories = computed(() => {
 })
 
 const activeDesc = () => categories.value.find(c => c.id === activeCategory.value)?.desc ?? ''
+
+/** 全部已知分类 id：开发者分类要等开关加载完才进菜单，校验时按这里的全集来 */
+const allCategoryIds = [...baseCategories.map(c => c.id), developerCategory.id]
+
+/**
+ * 支持 `?tab=<分类 id>` 直接打开指定分类
+ *
+ * 别的页面（如「下载配置」里指路社区资源的那句）只能靠改 URL 跳过来，
+ * 而分类本身是本地 ref，不读查询参数的话 URL 变了页面也不动——点击就像没反应。
+ */
+function applyTabFromQuery(raw: unknown): void {
+  const tab = resolveSettingsTab(raw, allCategoryIds)
+  if (tab) activeCategory.value = tab
+}
+
+watch(() => route.query.tab, applyTabFromQuery, { immediate: true })
 
 /** 开发者选项声明抽屉：进入开发者分类且当日未同意时弹出（同意后当日不再提醒） */
 const disclaimerVisible = ref(false)

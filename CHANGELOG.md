@@ -4,6 +4,17 @@
 
 ## [Unreleased]
 
+### 修复
+
+#### 设置页「点我前往」点击没反应
+整条链路只有一半：按钮本身是好的，`router.push` 也确实执行了，但**设置页从来不读 URL 上的 `?tab=`**。
+
+- [`Settings.vue`](src/views/Settings.vue)：分类由左侧菜单的 `v-model` 驱动，页面挂载后不再看查询参数，于是「跳到 `/apps/settings?tab=advanced`」只改了地址栏，内容一动不动。新增 `route.query.tab` 监听（含挂载时立即生效），按分类 id 校验后切换。
+- [`settings-tab.ts`](src/utils/settings-tab.ts)（新）：把「查询参数 → 合法分类 id」抽成纯函数，重复参数、拼错、大小写不符一律忽略并保持当前分类，不让页面白屏。
+- [`settings-tab.test.ts`](src/utils/__tests__/settings-tab.test.ts)：5 个用例覆盖正常、未知、缺失、数组参数、前后空格、大小写。
+- 同一处缺陷连带修好另外三条早就跳不过去的深链：[`Online.vue`](src/views/Online.vue) 的「去设置联机」与「教程」按钮、[`useEasyTierInstall.ts`](src/composables/useEasyTierInstall.ts) 的安装引导。
+- 「教程」的二级深链 `?subtab=tutorial` 由 `SubTabBar` 内置的持久化恢复，一级分类能切换后它才真正生效。
+
 ## [0.3.14-rc.1] - 2026-10-28
 
 ### 修复
