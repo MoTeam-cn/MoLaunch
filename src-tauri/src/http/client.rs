@@ -19,6 +19,8 @@ pub struct ClientBuildParams<'a> {
     pub h2_tuned: bool,
     /// 是否挂载带缓存的 DNS 解析器（仅下载客户端）
     pub cache_dns: bool,
+    /// 把某个 host 钉到指定地址（边缘节点优选用；不影响其它 host）
+    pub dns_pin: Option<(&'a str, std::net::SocketAddr)>,
 }
 
 /// HTTP/2 单流初始窗口（1 MiB）
@@ -58,7 +60,39 @@ pub fn build_download_client(
         no_timeout: true,
         h2_tuned: true,
         cache_dns: true,
+        dns_pin: None,
     })
+}
+
+/// 构建把指定 host 钉到指定地址的下载客户端（边缘节点优选专用）
+///
+/// 证书校验、Host 头、SNI 都仍是原域名，只把连接地址换掉——直接请求 IP 会因为
+/// 证书与 Host 不匹配而失败，这也是优选能安全工作的前提。
+pub fn build_pinned_client(host: &str, addr: std::net::SocketAddr) -> Option<reqwest::Client> {
+    let (mode, kind, url, ip_version, trust_mode) = current_http_config();
+    try_build_client_inner(ClientBuildParams {
+        proxy_mode: &mode,
+        proxy_type: &kind,
+        proxy_url: &url,
+        ip_version: &ip_version,
+        timeout: Duration::from_secs(0),
+        trust_mode: &trust_mode,
+        ignore_tls: crate::commands::system::developer::is_ignore_tls(),
+        redirect: None,
+        user_agent: None,
+        no_timeout: true,
+        h2_tuned: true,
+        cache_dns: false,
+        dns_pin: Some((host, addr)),
+    })
+}
+
+/// 是否配置了代理
+///
+/// 走代理时换 IP 没有意义（流量全进代理隧道），边缘优选必须整段跳过。
+pub fn proxy_configured() -> bool {
+    let (mode, _, _, _, _) = current_http_config();
+    mode == "custom" || mode == "system"
 }
 
 /// 构建流式专用 HTTP 客户端（无客户端级整体超时）。
@@ -83,6 +117,7 @@ pub fn build_stream_client(
         no_timeout: true,
         h2_tuned: false,
         cache_dns: false,
+        dns_pin: None,
     })
 }
 
@@ -109,6 +144,7 @@ pub fn build_client(
         no_timeout: false,
         h2_tuned: false,
         cache_dns: false,
+        dns_pin: None,
     })
 }
 
@@ -133,6 +169,7 @@ pub fn build_client_with_redirect(
         no_timeout: false,
         h2_tuned: false,
         cache_dns: false,
+        dns_pin: None,
     })
 }
 
@@ -158,6 +195,7 @@ pub fn build_no_redirect_client(
         no_timeout: false,
         h2_tuned: false,
         cache_dns: false,
+        dns_pin: None,
     })
 }
 
@@ -179,6 +217,7 @@ pub fn build_client_with_user_agent(user_agent: &str, timeout_ms: Option<u64>) -
         no_timeout: false,
         h2_tuned: false,
         cache_dns: false,
+        dns_pin: None,
     })
 }
 
@@ -207,6 +246,11 @@ fn current_http_config() -> (String, String, String, String, String) {
 }
 
 fn build_client_inner(params: ClientBuildParams<'_>) -> reqwest::Client {
+    try_build_client_inner(params).expect("Failed to build HTTP client")
+}
+
+/// 构建失败返回 None（调用方自行决定降级，不 panic）
+fn try_build_client_inner(params: ClientBuildParams<'_>) -> Option<reqwest::Client> {
     let user_agent = params
         .user_agent
         .map(str::to_string)
@@ -229,6 +273,9 @@ fn build_client_inner(params: ClientBuildParams<'_>) -> reqwest::Client {
     if params.h2_tuned {
         builder = apply_download_tuning(builder);
     }
+    if let Some((host, addr)) = params.dns_pin {
+        builder = builder.resolve_to_addrs(host, &[addr]);
+    }
     if params.cache_dns {
         builder = builder.dns_resolver(std::sync::Arc::new(super::dns::CacheResolver::new()));
     }
@@ -240,7 +287,7 @@ fn build_client_inner(params: ClientBuildParams<'_>) -> reqwest::Client {
         params.proxy_type,
         params.proxy_url,
     );
-    builder.build().expect("Failed to build HTTP client")
+    builder.build().ok()
 }
 
 /// 下载专用传输层调优

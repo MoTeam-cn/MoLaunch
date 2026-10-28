@@ -33,6 +33,13 @@ pub struct DownloadConfig {
     /// 因此默认关闭，只在「开发者 → 实验性功能」显式开启后生效。
     #[serde(default)]
     pub cf_derive_url: bool,
+    /// 是否对公开 CDN 做边缘节点优选（实验，默认关闭）
+    ///
+    /// 开启后对 `cdn.modrinth.com` 这类多边缘域名解析出的多个 IP 各拉一小段
+    /// 真实文件测吞吐，挑最快的钉住使用（证书与 Host 仍是原域名）。会消耗少量
+    /// 探测流量（每小时上限 64 MiB），且只在不走代理、未关闭证书校验时生效。
+    #[serde(default)]
+    pub edge_select: bool,
 }
 
 /// 内存配置

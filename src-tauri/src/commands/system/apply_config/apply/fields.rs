@@ -97,6 +97,12 @@ pub(super) fn apply_download(config: &mut crate::state::AppConfig, patch: &Confi
         // 同步进程级标志：社区资源转换层（同步函数）据此决定是否推导下载地址
         crate::minecraft::community::cf_policy::set_enabled(derive);
     }
+    if let Some(edge) = patch.download.edge_select {
+        log_info!("[Config] edge_select = {}", edge);
+        config.download.edge_select = edge;
+        // 同步进程级标志：下载层是同步取客户端的地方，读不到这里的异步配置锁
+        crate::minecraft::download::edge::set_enabled(edge);
+    }
     if let Some(ref url_opt) = patch.download.mirror_url {
         log_info!("[Config] mirror_url = {:?}", url_opt);
         config.download.mirror_url = url_opt.clone();

@@ -7,6 +7,7 @@ use std::time::Duration;
 use tokio::sync::Mutex;
 
 use super::super::super::super::sources::DownloadSourceMode;
+use super::super::super::edge;
 use super::super::super::mirror_gate;
 use super::super::super::rate_limiter::RateLimiter;
 use super::super::super::slow;
@@ -83,6 +84,9 @@ pub(super) async fn download_with_retries(
         // 也不能因为一条虽慢但可用的线路直接失败
         let has_next_url = url_index + 1 < urls.len();
         let allow_slow_abort = has_next_url;
+        // 边缘节点优选：命中缓存时换用「钉住该 IP」的客户端，证书与 Host 仍是原域名；
+        // 未命中时由 edge 在后台探测，本次先用传入的兜底客户端
+        let url_client = edge::client_for(url.as_str(), client);
         for attempt in 1..=MAX_RETRIES {
             if is_cancelled(&cancel_flag) {
                 break 'url_loop;
@@ -98,7 +102,7 @@ pub(super) async fn download_with_retries(
                         total: file_size,
                     }
                 } else {
-                    chunk::probe_range(client, url.as_str()).await
+                    chunk::probe_range(&url_client, url.as_str()).await
                 };
                 if file_size == 0 && probe.total > 0 {
                     file_size = probe.total;
@@ -108,7 +112,7 @@ pub(super) async fn download_with_retries(
                         .clone()
                         .unwrap_or_else(|| Arc::new(Mutex::new(RateLimiter::new(0))));
                     let result = chunk::download_chunked(
-                        client,
+                        &url_client,
                         url.as_str(),
                         &task.local_path,
                         file_size,
@@ -189,7 +193,7 @@ pub(super) async fn download_with_retries(
             );
             // 只传可信大小：探测值可能是压缩后长度，传进去会让字节上限与进度失真
             match super::super::stream::download_from_url(
-                client,
+                &url_client,
                 url.as_str(),
                 &task.local_path,
                 trusted_size,
@@ -230,6 +234,8 @@ pub(super) async fn download_with_retries(
                         chunk::clear_part_files(&task.local_path);
                         break;
                     }
+                    // 传输层失败计入边缘节点健康度：连续两次就作废该节点重新优选
+                    edge::note_failure(url.as_str());
                     log_debug!(
                         "从 {} 下载失败 (尝试 {}/{}): {}",
                         url,

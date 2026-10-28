@@ -28,6 +28,16 @@
 - [`cf_policy.rs`](src-tauri/src/minecraft/community/cf_policy.rs)：新增进程级开关镜像。社区资源的版本转换层是同步纯函数，拿不到 `AppState` 的异步配置锁，故在启动加载配置（[`app.rs`](src-tauri/src/state/app.rs)）与保存配置（[`fields.rs`](src-tauri/src/commands/system/apply_config/apply/fields.rs)）时各写一次 `AtomicBool`，读取端零成本，开关改动立即生效、无需重启。
 - [`curseforge.rs`](src-tauri/src/commands/community/install/curseforge.rs)：整合包安装按开关决定是否推导。开关关闭时**先收集**受限文件、再一次性报错并列出文件名与 fileId，附上「开启开关」与「手动下载后放入 mods」两条出路——不再出现「安装完成但 mods 目录少文件」的静默残缺。
 
+#### 边缘节点优选（开发者开关，默认关闭）
+
+多边缘 CDN 的「最近节点」是 DNS 按解析器位置算出来的，不是按实际链路，经常给出绕路或拥塞的边缘。现在可以对同一域名解析出的多个 IP 各拉一小段真实文件测吞吐，挑最快的钉住使用。
+
+- [`edge.rs`](src-tauri/src/minecraft/download/edge.rs)、[`edge_test.rs`](src-tauri/src/minecraft/download/edge_test.rs)：新增优选模块——候选池来自系统解析结果（过滤内网、保留段、`198.18/15` 与 `100.64/10` 这类代理假地址），逐个用 `Range: bytes=0-4MiB` 采样测速，结果缓存 5 分钟；新节点要比当前快 **25% 以上**才切换（避免抖动横跳），连续 2 次传输失败直接作废重选；探测流量按每小时 64 MiB 记账，用完即停。只在 `cdn.modrinth.com` / `cdn.curseforge.com` / `edge.forgecdn.net` 等公开 CDN 域名生效，自家 CDN 与公共镜像不参与。
+- [`client.rs`](src-tauri/src/http/client.rs)、[`http.rs`](src-tauri/src/http.rs)：新增 `build_pinned_client`（把 host 钉到指定地址，SNI/Host/证书校验仍是原域名）与 `proxy_configured`；配置了代理或关闭了证书校验时整段跳过优选——这两种情况下换 IP 要么无意义、要么失去「TLS 失败即作废候选」这道防线。
+- [`retry.rs`](src-tauri/src/minecraft/download/downloader/retry.rs)：每条候选 URL 取客户端时查询优选结果，传输层失败上报健康度。
+- [`models.rs`](src-tauri/src/state/config/models.rs)、[`defaults.rs`](src-tauri/src/state/config/defaults.rs)、[`load.rs`](src-tauri/src/config/load.rs)、[`save.rs`](src-tauri/src/config/save.rs)、[`patch.rs`](src-tauri/src/commands/system/apply_config/types/patch.rs)、[`snapshot.rs`](src-tauri/src/commands/system/apply_config/types/snapshot.rs)、[`entry.rs`](src-tauri/src/commands/system/apply_config/types/entry.rs)、[`fields.rs`](src-tauri/src/commands/system/apply_config/apply/fields.rs)、[`app.rs`](src-tauri/src/state/app.rs)：新增 `download.edge_select`（INI `[Download] edge_select`），默认 `false`，启动与保存配置时同步到进程级标志。
+- [`ExperimentalTab.vue`](src/views/settings/developer/ExperimentalTab.vue)、[`config.ts`](src/utils/api/config.ts)：开发者页「下载实验开关」新增该选项。
+
 ### 修复
 
 #### 受限 CurseForge 文件地址推导：路径布局与文件名编码都不对

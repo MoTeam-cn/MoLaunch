@@ -33,6 +33,9 @@ pub struct DownloadSnapshot {
     /// 受限 CurseForge 文件自动推导 CDN 地址（开发者选项）
     #[serde(rename = "cfDeriveUrl")]
     pub cf_derive_url: bool,
+    /// 边缘节点优选（实验）
+    #[serde(rename = "edgeSelect")]
+    pub edge_select: bool,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]

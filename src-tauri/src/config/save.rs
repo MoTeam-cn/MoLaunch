@@ -91,6 +91,15 @@ pub fn save_config(config: &AppConfig) -> Result<(), String> {
             "false"
         },
     );
+    ini.set(
+        "Download",
+        "edge_select",
+        if config.download.edge_select {
+            "true"
+        } else {
+            "false"
+        },
+    );
 
     // Mirror
     if let Some(ref url) = config.download.mirror_url {

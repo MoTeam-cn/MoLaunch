@@ -32,6 +32,8 @@ export interface ConfigSnapshot {
   chunkCount: number
   /** 受限 CurseForge 文件是否自动推导 CDN 下载地址（开发者选项，默认关闭） */
   cfDeriveUrl: boolean
+  /** 边缘节点优选（实验，默认关闭） */
+  edgeSelect: boolean
   // 内存
   memoryMode: string
   minMemory: number
@@ -125,6 +127,7 @@ export interface ConfigPatch {
   chunkCount?: number
   /** 受限 CurseForge 文件自动推导 CDN 地址（开发者选项） */
   cfDeriveUrl?: boolean
+  edgeSelect?: boolean
   mirrorUrl?: string | null                               // null 表示清空
   // 内存
   memoryMode?: string                                      // "auto" / "custom"

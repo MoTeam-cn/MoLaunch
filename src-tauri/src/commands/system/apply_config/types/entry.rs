@@ -70,6 +70,7 @@ pub fn build_snapshot(
             max_threads: config.download.max_threads,
             chunk_count: config.download.chunk_count,
             cf_derive_url: config.download.cf_derive_url,
+            edge_select: config.download.edge_select,
         },
         memory: MemorySnapshot {
             mode: config.memory.mode.clone(),

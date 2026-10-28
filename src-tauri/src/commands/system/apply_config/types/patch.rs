@@ -31,6 +31,9 @@ pub struct DownloadPatch {
     /// 受限 CurseForge 文件自动推导 CDN 地址（开发者选项，默认关闭）
     #[serde(rename = "cfDeriveUrl")]
     pub cf_derive_url: Option<bool>,
+    /// 边缘节点优选（实验，默认关闭）
+    #[serde(rename = "edgeSelect")]
+    pub edge_select: Option<bool>,
     /// 双层 Option：外层 Some 表示"要更新此字段"，内层 None 表示"清空"
     #[serde(rename = "mirrorUrl")]
     pub mirror_url: Option<Option<String>>,

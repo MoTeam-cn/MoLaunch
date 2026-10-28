@@ -87,6 +87,10 @@ pub fn load_config() -> Result<Option<AppConfig>, String> {
     if let Some(derive) = config.get("Download", "cf_derive_url") {
         app_config.download.cf_derive_url = derive == "true" || derive == "1";
     }
+    // 边缘节点优选（开发者选项，缺省关闭）
+    if let Some(edge) = config.get("Download", "edge_select") {
+        app_config.download.edge_select = edge == "true" || edge == "1";
+    }
 
     // Mirror
     app_config.download.mirror_url = config.get("Mirror", "url");

@@ -3,7 +3,7 @@
  * 开发者 - 实验性功能子页签
  *
  * 包含更新检测分支、检查更新源切换，以及下载侧实验开关
- * （受限 CurseForge 文件地址推导）。
+ * （受限 CurseForge 文件地址推导、边缘节点优选）。
  */
 import { ref, onMounted, defineAsyncComponent } from 'vue'
 import {
@@ -80,6 +80,22 @@ async function onUpdateSourceChange(v: string | number) {
   }
 }
 
+// ==================== 边缘节点优选 ====================
+/** 是否对公开 CDN 做边缘 IP 测速优选（实验，默认关闭） */
+const edgeSelect = ref(false)
+
+async function onEdgeSelectChange(next: boolean) {
+  try {
+    await applyConfig({ edgeSelect: next })
+    edgeSelect.value = next
+    toastInfo(next ? '已开启边缘节点优选' : '已关闭边缘节点优选')
+  } catch (e) {
+    toastError('切换边缘节点优选失败：' + e)
+    const cfg = await getConfigMap(true)
+    edgeSelect.value = cfg.edgeSelect
+  }
+}
+
 // ==================== 受限 CurseForge 文件地址推导 ====================
 /** 是否允许推导被作者限制分发的 CurseForge 文件 CDN 地址（默认关闭） */
 const cfDeriveUrl = ref(false)
@@ -103,6 +119,7 @@ onMounted(async () => {
       updateSource.value = await getUpdateSource()
       const cfg = await getConfigMap()
       cfDeriveUrl.value = cfg.cfDeriveUrl
+      edgeSelect.value = cfg.edgeSelect
     },
     'load developer config',
     () => toastError('加载开发者配置失败'),
@@ -189,6 +206,30 @@ onMounted(async () => {
         </p>
         <p class="text-xs text-gray-400 mt-1">
           推导依赖 CurseForge 未公开的 CDN 路径布局，可能与官方行为不一致；仅建议在明确需要时开启。
+        </p>
+      </div>
+      <!-- 边缘节点优选 -->
+      <div class="px-5 py-4">
+        <div class="flex items-center justify-between gap-4">
+          <div class="min-w-0">
+            <p class="text-sm font-medium text-gray-900">边缘节点优选</p>
+            <p class="text-xs text-gray-500 mt-0.5">
+              对同一个 CDN 域名解析出的多个边缘 IP 各测一小段速度，挑最快的那个使用
+            </p>
+          </div>
+          <div class="flex-none">
+            <Checkbox :model-value="edgeSelect" @update:model-value="onEdgeSelectChange" />
+          </div>
+        </div>
+        <p class="text-xs text-gray-400 mt-2">
+          {{
+            edgeSelect
+              ? '已开启：每次优选最多消耗 4 MiB 探测流量，每小时上限 64 MiB'
+              : '已关闭（默认）：直接用 DNS 给出的地址，不额外产生探测流量'
+          }}
+        </p>
+        <p class="text-xs text-gray-400 mt-1">
+          仅对公开 CDN 生效，不走代理、未关闭证书校验时才工作；节点连续失败会自动作废并重新优选。
         </p>
       </div>
     </div>

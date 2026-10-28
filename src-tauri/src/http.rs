@@ -6,7 +6,8 @@ mod tls;
 
 pub use client::{
     build_client, build_client_with_redirect, build_client_with_user_agent, build_download_client,
-    build_no_redirect_client, build_stream_client, ClientBuildParams,
+    build_no_redirect_client, build_pinned_client, build_stream_client, proxy_configured,
+    ClientBuildParams,
 };
 pub use tls::ignore_tls_allowed;
 
