@@ -214,10 +214,13 @@ fn validate_download_url(url: &str, allowed_domains: &[String]) -> Result<(), St
 /// 白名单同样需要通配符，如某平台动态节点 `*.qwq.fan`）。
 pub(crate) fn host_matches(host: &str, pattern: &str) -> bool {
     if let Some(rest) = pattern.strip_prefix("*.") {
-        host.ends_with(rest) && host.len() > rest.len()
-    } else {
-        host == pattern
+        // 必须落在点边界上：`*.example.com` 不能匹配 `evilexample.com`，
+        // 否则攻击者注册一个「后缀相同」的域名就能混进白名单
+        return host
+            .strip_suffix(rest)
+            .is_some_and(|prefix| prefix.ends_with('.'));
     }
+    host == pattern
 }
 
 #[cfg(test)]

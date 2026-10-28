@@ -29,6 +29,7 @@ fn test_host_matches_通配符只匹配子域() {
     assert!(host_matches("a.cdn.example.com", "*.cdn.example.com"));
     assert!(!host_matches("cdn.example.com", "*.cdn.example.com"));
     assert!(!host_matches("evilcdn.example.com", "*.cdn.example.com"));
+    assert!(!host_matches("example.com.evil.net", "*.example.com"));
 }
 
 #[test]

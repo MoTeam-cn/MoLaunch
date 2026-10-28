@@ -241,6 +241,7 @@
 
 - [`retired.rs`](src-tauri/src/minecraft/sources/retired.rs)：路径按字节下标裁剪改用 `get()`，越界或落在多字节字符中间时原样返回，不再可能 panic。
 - [`host_profile.rs`](src-tauri/src/minecraft/download/host_profile.rs)：读回记忆前先看文件大小，超过 1 MB 直接当没有——正常只有几十 KB，突然变大说明文件被写坏，没理由把内存交给它。
+- [`external.rs`](src-tauri/src/commands/frp/binary/external.rs) 的域名白名单通配符没有点边界：`*.example.com` 会匹配 `evilexample.com`，攻击者注册一个后缀相同的域名即可混进白名单（同样影响复用它做服务器地址白名单的沙箱校验）。改为按 `strip_suffix` + 点边界判断。
 
 
 
