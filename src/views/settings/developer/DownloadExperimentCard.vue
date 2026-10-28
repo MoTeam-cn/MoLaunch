@@ -2,8 +2,8 @@
 /**
  * 下载实验开关卡片
  *
- * 四个下载侧实验开关：受限 CurseForge 文件地址推导、边缘节点优选、DoH 解析、
- * 段表 + 跨源并行引擎。默认值分别是：关、关、关、开。
+ * 三个下载实验开关：受限 CurseForge 文件地址推导、边缘节点优选、DoH 解析。
+ * 默认值分别是：关、关、关。
  */
 import { ref, onMounted, defineAsyncComponent } from 'vue'
 import { applyConfig, getConfigMap } from '@/utils/api/config'
@@ -14,7 +14,6 @@ const Checkbox = defineAsyncComponent(() => import('@/components/common/Checkbox
 const cfDeriveUrl = ref(false)
 const edgeSelect = ref(false)
 const doh = ref(false)
-const segmentTable = ref(true)
 
 async function onCfDeriveUrlChange(next: boolean) {
   try {
@@ -52,18 +51,6 @@ async function onDohChange(next: boolean) {
   }
 }
 
-async function onSegmentTableChange(next: boolean) {
-  try {
-    await applyConfig({ segmentTable: next })
-    segmentTable.value = next
-    toastInfo(next ? '已启用段表引擎' : '已回退到逐源重试引擎')
-  } catch (e) {
-    toastError('切换下载引擎失败：' + e)
-    const cfg = await getConfigMap(true)
-    segmentTable.value = cfg.segmentTable
-  }
-}
-
 onMounted(async () => {
   await safeCall(
     async () => {
@@ -71,7 +58,6 @@ onMounted(async () => {
       cfDeriveUrl.value = cfg.cfDeriveUrl
       edgeSelect.value = cfg.edgeSelect
       doh.value = cfg.doh
-      segmentTable.value = cfg.segmentTable
     },
     'load download experiment config',
     () => toastError('加载下载实验开关失败'),
@@ -153,30 +139,6 @@ onMounted(async () => {
         </p>
         <p class="text-xs text-gray-400 mt-1">
           域名会发给第三方解析服务商，介意隐私时请保持关闭。
-        </p>
-      </div>
-      <!-- 段表引擎 -->
-      <div class="px-5 py-4">
-        <div class="flex items-center justify-between gap-4">
-          <div class="min-w-0">
-            <p class="text-sm font-medium text-gray-900">段表 + 跨源并行下载</p>
-            <p class="text-xs text-gray-500 mt-0.5">
-              以块为单位调度多个来源，快的源自动多吃块；关闭则回到逐源重试
-            </p>
-          </div>
-          <div class="flex-none">
-            <Checkbox :model-value="segmentTable" @update:model-value="onSegmentTableChange" />
-          </div>
-        </div>
-        <p class="text-xs text-gray-400 mt-2">
-          {{
-            segmentTable
-              ? '已开启（默认）：官方与镜像同时出力，坏的块会被别的源接走'
-              : '已关闭：一次只用一个源，失败再换下一个'
-          }}
-        </p>
-        <p class="text-xs text-gray-400 mt-1">
-          新引擎出问题时关掉这里即可回到旧路径，不必降级版本。
         </p>
       </div>
     </div>

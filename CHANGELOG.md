@@ -151,6 +151,18 @@
 - [`multi.rs`](src-tauri/src/minecraft/download/chunk/multi.rs)：每条源的每次取块都走一次边缘优选（`edge::client_for`），命中钉住 IP 的客户端就用它；块级传输失败上报该源的节点健康度——此前引擎完全绕过了边缘优选。
 - [`table_test.rs`](src-tauri/src/minecraft/download/chunk/table_test.rs)：补位图往返、来源作废、文件大小不匹配、数据文件偏短、位图损坏共 6 例。
 
+#### 下载引擎合并为一套：删掉旧分片实现
+
+此前下载层有两套实现并存（按块多源的段表引擎 + 逐源重试里的 `.part` 分片与单源拆分），
+谁生效取决于文件大小和开关，读代码与排查问题都要同时看两条路径。现在合并为一套。
+
+- 删除 `chunk/api.rs`、`api_test.rs`、`chunk/download.rs`、`chunk/merge.rs`、`chunk/split.rs`、`split_test.rs`（约 1500 行）：`.part{i}` 落盘 + 合并、单源左右拆分、换源并行度升档全部退役；
+- [`retry.rs`](src-tauri/src/minecraft/download/downloader/retry.rs)：变成「段表引擎优先、单流兜底」两层——大文件走引擎，小文件（< 1 MiB）与探测不到大小的文件直接单流，不再有第三、第四条路径；
+- [`probe.rs`](src-tauri/src/minecraft/download/chunk/probe.rs)：只保留文件大小探测，Range 支持判断由引擎在首个块上实测（非首块返回 200 即判定不支持）；
+- 移除开发开关 `download.segment_table` 及对应配置项、前端开关：引擎就是唯一实现，回退不再是「切另一套代码」；
+- [`multi.rs`](src-tauri/src/minecraft/download/chunk/multi.rs)：AIMD 补齐收缩——某条源吞吐跌到均值一半以下且不止一条连接时减一条（worker 在下次认领前自行退出，不打断进行中的块），单条连接永远保底，避免慢源被自己饿死；
+- [`multi_test.rs`](src-tauri/src/minecraft/download/chunk/multi_test.rs)：补 `should_shrink` 三例（明显低于均值才收缩、单连接保底、均值为零不动）。
+
 
 
 ## [0.3.13] - 2026-10-27

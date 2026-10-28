@@ -36,8 +36,6 @@ export interface ConfigSnapshot {
   edgeSelect: boolean
   /** DoH 解析（默认关闭） */
   doh: boolean
-  /** 段表引擎（默认开启） */
-  segmentTable: boolean
   // 内存
   memoryMode: string
   minMemory: number
@@ -133,7 +131,6 @@ export interface ConfigPatch {
   cfDeriveUrl?: boolean
   edgeSelect?: boolean
   doh?: boolean
-  segmentTable?: boolean
   mirrorUrl?: string | null                               // null 表示清空
   // 内存
   memoryMode?: string                                      // "auto" / "custom"
