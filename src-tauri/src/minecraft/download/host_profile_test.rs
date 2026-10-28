@@ -155,3 +155,12 @@ fn test_store_损坏文件读盘报错() {
     assert!(load_from(&path).is_err());
     let _ = std::fs::remove_file(&path);
 }
+
+#[test]
+fn test_store_过大文件被拒() {
+    let path = temp_path("huge.json");
+    let filler = vec![b'0'; 1024 * 1024 + 16];
+    std::fs::write(&path, &filler).expect("写大文件");
+    assert!(load_from(&path).is_err(), "超限的记忆文件应当被拒绝");
+    let _ = std::fs::remove_file(&path);
+}

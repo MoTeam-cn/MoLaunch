@@ -65,15 +65,11 @@ pub fn normalize(url: &str) -> Cow<'_, str> {
         if !host.eq_ignore_ascii_case(rule.host) || !path.starts_with(rule.prefix) {
             continue;
         }
-        if rule.strip > path.len() {
+        // strip 一定落在 ASCII 前缀之后；用 get() 兜底，越界或落在多字节字符中间就原样返回
+        let Some(remainder) = path.get(rule.strip..) else {
             continue;
-        }
-        return Cow::Owned(format!(
-            "https://{}{}{}",
-            rule.target,
-            &path[rule.strip..],
-            tail
-        ));
+        };
+        return Cow::Owned(format!("https://{}{}{}", rule.target, remainder, tail));
     }
     Cow::Borrowed(url)
 }

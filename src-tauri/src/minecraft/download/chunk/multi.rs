@@ -227,7 +227,7 @@ pub(crate) async fn download_multi(
     }
 
     // 监督循环：采样 → 判死 → 收缩/扩容；顺手把位图落盘（几 KB，代价可忽略）
-    let mut last_done = table.done_bytes();
+    let mut last_moved = 0_u64;
     let mut idle_windows = 0_usize;
     loop {
         tokio::time::sleep(SAMPLE_INTERVAL).await;
@@ -241,22 +241,6 @@ pub(crate) async fn download_multi(
         save_map(&engine);
         if let Some(credit) = credit {
             credit.credit(table.done_bytes());
-        }
-        let done = table.done_bytes();
-        if done == last_done {
-            idle_windows += 1;
-        } else {
-            idle_windows = 0;
-        }
-        last_done = done;
-        if idle_windows >= IDLE_WINDOW_LIMIT {
-            log_warn!(
-                "[Segment] {} 个窗口无进展，结束本次并行: {}",
-                idle_windows,
-                path
-            );
-            engine.stop.store(true, Ordering::Relaxed);
-            break;
         }
 
         let alive: Vec<usize> = sources
@@ -277,6 +261,28 @@ pub(crate) async fn download_multi(
                 window / window_secs
             })
             .collect();
+
+        // 判活按「字节有没有在动」算，而不是「有没有块下完」：
+        // 慢源下完一块可能要几十秒，按块算会把还在干活但速度慢的链接判死
+        let moved: u64 = sources
+            .iter()
+            .map(|slot| slot.total_bytes.load(Ordering::Relaxed))
+            .sum();
+        if moved == last_moved {
+            idle_windows += 1;
+        } else {
+            idle_windows = 0;
+        }
+        last_moved = moved;
+        if idle_windows >= IDLE_WINDOW_LIMIT {
+            log_warn!(
+                "[Segment] {} 个窗口没有任何字节流动，结束本次并行: {}",
+                idle_windows,
+                path
+            );
+            engine.stop.store(true, Ordering::Relaxed);
+            break;
+        }
         let active_total: usize = sources
             .iter()
             .map(|slot| slot.active.load(Ordering::Relaxed))

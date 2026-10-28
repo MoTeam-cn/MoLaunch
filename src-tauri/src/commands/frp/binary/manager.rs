@@ -67,7 +67,7 @@ pub async fn ensure_frpc(
             Err(format!("厂商 {} 的 frpc 二进制缺失，请重新安装厂商包", pid))
         }
         "url" => {
-            let path = external::ensure_external_frpc(&pid, &manifest).await?;
+            let path = external::ensure_external_frpc(state, &pid, &manifest).await?;
             // 下载成功后将 manifest 声明的 frpc 版本写入记录
             if let Some(v) = declared_version {
                 write_provider_frpc_version(&pid, v);

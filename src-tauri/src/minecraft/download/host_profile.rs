@@ -39,6 +39,9 @@ const MAX_ENTRIES: usize = 64;
 /// 两次落盘的最小间隔，避免每个文件结束都写一次
 const SAVE_INTERVAL: Duration = Duration::from_secs(60);
 
+/// 记忆文件大小上限：正常只有几十 KB，突然变大说明被写坏了，别把内存交给它
+const STORE_MAX_BYTES: u64 = 1024 * 1024;
+
 /// 一条主机的档案
 #[derive(Clone, Copy, Debug)]
 struct Profile {
@@ -265,6 +268,10 @@ impl Store {
 
 /// 读盘（测试用可指定路径）
 fn load_from(path: &Path) -> anyhow::Result<Store> {
+    let meta = std::fs::metadata(path)?;
+    if meta.len() > STORE_MAX_BYTES {
+        anyhow::bail!("主机记忆文件过大（{} 字节），忽略", meta.len());
+    }
     let text = std::fs::read_to_string(path)?;
     let store: Store = serde_json::from_str(&text)?;
     Ok(store)

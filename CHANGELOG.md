@@ -227,6 +227,21 @@
 
 - [`host_profile.rs`](src-tauri/src/minecraft/download/host_profile.rs)：记忆写入 `cache/download/host_profiles.json`，重启后仍有效；条目带绝对时间戳，超过 30 分钟自动作废，条数上限 64（按最近使用淘汰），格式带版本号，版本不认识就当没有——不猜、不迁移。落盘节流为 60 秒一次。
 
+#### 变更：外部厂商 frpc 下载接入统一下载栈
+
+- 外部厂商（`distribution=url`）的 frpc 二进制此前是自己发请求、整包读进内存再落盘，享受不到分片、重试阶梯与限速。现在改走 [`DownloadManager`](src-tauri/src/minecraft/download/manager/core.rs)：分片并行、多源重试、全局限速、SHA256 校验、大小探测全部复用同一套。
+- 安全边界没有一起交出去：`commands/frp/binary/external.rs` 仍负责 HTTPS 校验、域名白名单与**逐跳**重定向校验，重定向在进下载栈之前就走完；下载用的 `client` 换成不跟随 3xx 的那个，下载阶段再出现跳转一律视为失败，避免「服务器临时把你转到白名单外」。同时关掉镜像替换（`preserve_order` + 官方模式），厂商声明的地址不会被换成任何镜像。
+- 新增 `validate_target_path`：manifest 是云端下发的，`target_path` 里出现 `..`、绝对路径、盘符或反斜杠一律拒绝，防止借厂商配置往目录外写文件（`external_test.rs` 覆盖）。
+
+#### 修复：慢速源被误判为「无进展」
+
+- 并行下载的「无进展」判定原本看「有没有块下完」。块长 2 MiB，一个 100 KB/s 的源下完一块要 20 秒以上，而判定阈值只有十来个采样窗口——**结果慢但在动的源会被直接终止**，最后退化成「并行未完成，保留半成品」。改为看**字节有没有在流动**：只要有数据落盘就不算无进展。
+
+#### 加固：两处越界与不可信输入
+
+- [`retired.rs`](src-tauri/src/minecraft/sources/retired.rs)：路径按字节下标裁剪改用 `get()`，越界或落在多字节字符中间时原样返回，不再可能 panic。
+- [`host_profile.rs`](src-tauri/src/minecraft/download/host_profile.rs)：读回记忆前先看文件大小，超过 1 MB 直接当没有——正常只有几十 KB，突然变大说明文件被写坏，没理由把内存交给它。
+
 
 
 ## [0.3.13] - 2026-10-27
