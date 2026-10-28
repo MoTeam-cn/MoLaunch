@@ -9,13 +9,14 @@ fn test_plan_split_range_偶数长度对半分() {
 }
 
 #[test]
-fn test_plan_split_range_奇数长度左短右长() {
-    // [0, 98] 共 99 字节 → 左 [0, 48]（49 字节），右 [49, 98]（50 字节）
+fn test_plan_split_range_奇数长度前半多一字节() {
+    // [0, 98] 共 99 字节 → 中点 49，左 [0, 49]（50 字节），右 [50, 98]（49 字节）
     let (left_start, left_end, right_start) = plan_split_range(0, 98).expect("应可拆分");
-    assert_eq!((left_start, left_end, right_start), (0, 48, 49));
+    assert_eq!((left_start, left_end, right_start), (0, 49, 50));
     let left_len = left_end - left_start + 1;
     let right_len = 98 - right_start + 1;
     assert_eq!(left_len + right_len, 99);
+    assert_eq!(left_len, right_len + 1);
 }
 
 #[test]
