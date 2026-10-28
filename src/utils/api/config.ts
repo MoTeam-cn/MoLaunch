@@ -34,6 +34,10 @@ export interface ConfigSnapshot {
   cfDeriveUrl: boolean
   /** 边缘节点优选（实验，默认关闭） */
   edgeSelect: boolean
+  /** DoH 解析（默认关闭） */
+  doh: boolean
+  /** 段表引擎（默认开启） */
+  segmentTable: boolean
   // 内存
   memoryMode: string
   minMemory: number
@@ -128,6 +132,8 @@ export interface ConfigPatch {
   /** 受限 CurseForge 文件自动推导 CDN 地址（开发者选项） */
   cfDeriveUrl?: boolean
   edgeSelect?: boolean
+  doh?: boolean
+  segmentTable?: boolean
   mirrorUrl?: string | null                               // null 表示清空
   // 内存
   memoryMode?: string                                      // "auto" / "custom"
