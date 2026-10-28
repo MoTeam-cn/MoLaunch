@@ -3,6 +3,7 @@
 //! assets / chunk / downloader / manager / mirror_gate / rate_limiter / slow / types
 
 pub mod assets;
+pub mod budget;
 pub mod chunk;
 pub mod config;
 pub mod downloader;

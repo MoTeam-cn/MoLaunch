@@ -13,6 +13,7 @@ use tokio::task::JoinSet;
 
 use crate::{log_debug, log_warn};
 
+use super::super::budget;
 use super::super::edge;
 use super::super::rate_limiter::RateLimiter;
 use super::super::types::GlobalProgress;
@@ -110,6 +111,8 @@ pub(crate) async fn download_multi(
     pause_flag: Option<Arc<AtomicBool>>,
     cancel_flag: Option<Arc<AtomicBool>>,
 ) -> SegmentOutcome {
+    // 占用一个活跃文件名额：文件下完（或被取消）自动归还，额度让给还在下的文件
+    let _lease = budget::FileLease::open();
     if urls.is_empty() || file_size == 0 {
         return SegmentOutcome {
             downloaded: 0,
@@ -176,16 +179,18 @@ pub(crate) async fn download_multi(
         cancel_flag,
     });
 
-    let budget = budget.clamp(1, MAX_WORKERS_PER_FILE);
+    let ceiling = budget.clamp(1, MAX_WORKERS_PER_FILE);
+    let initial_budget = budget::per_file_share(ceiling);
     log_debug!(
-        "[Segment] 并行下载: {} (块长 {}, 源 {} 条, 连接额度 {})",
+        "[Segment] 并行下载: {} (块长 {}, 源 {} 条, 连接额度 {}/{})",
         path,
         table.seg_len(),
         urls.len(),
-        budget
+        initial_budget,
+        ceiling
     );
     let mut set: JoinSet<()> = JoinSet::new();
-    let initial = initial_workers(sources.len(), budget);
+    let initial = initial_workers(sources.len(), initial_budget);
     for (index, count) in initial.iter().enumerate() {
         sources[index].target.store(*count, Ordering::Relaxed);
         if sources[index].dead.load(Ordering::Relaxed) {
@@ -264,11 +269,18 @@ pub(crate) async fn download_multi(
         }
         let sum: u64 = usable.iter().map(|index| rates[*index]).sum();
         let avg = sum / usable.len().max(1) as u64;
+        // 每轮重算份额：别的文件下完会让这里的额度变大，反之变小
+        let share = budget::per_file_share(ceiling);
+        let total_target: usize = sources
+            .iter()
+            .map(|slot| slot.target.load(Ordering::Relaxed))
+            .sum();
 
         // 收缩：明显低于均值的源减一条；worker 在下次认领前自行退出
         for index in usable.iter().copied() {
             let current = sources[index].target.load(Ordering::Relaxed);
-            if should_shrink(rates[index], avg, current) {
+            if should_shrink(rates[index], avg, current) || total_target > share {
+                // 明显慢，或本文件已超出当前份额（别的文件也需要额度）
                 sources[index].target.store(current - 1, Ordering::Relaxed);
                 log_debug!(
                     "[Segment] 收缩: {} (-1 连接, {} B/s, 均值 {} B/s)",
@@ -280,13 +292,9 @@ pub(crate) async fn download_multi(
         }
 
         // 扩容：给本轮最快且明显高于均值的源加一条连接
-        let total_target: usize = sources
-            .iter()
-            .map(|slot| slot.target.load(Ordering::Relaxed))
-            .sum();
         if let Some(best) = usable.iter().copied().max_by_key(|index| rates[*index]) {
             let current = sources[best].target.load(Ordering::Relaxed);
-            if should_grow(rates[best], avg, total_target, budget) {
+            if should_grow(rates[best], avg, total_target, share) {
                 sources[best].target.store(current + 1, Ordering::Relaxed);
                 sources[best].active.fetch_add(1, Ordering::Relaxed);
                 spawn_worker(&mut set, &args, best);

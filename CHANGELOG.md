@@ -173,6 +173,15 @@
 - **进度对齐**：每轮跑完把「本文件已计入全局进度的字节」与引擎的当前可信字节对齐，作废块重下会把虚高部分退回去——此前多轮重跑会重复累计。
 - [`schedule.rs`](src-tauri/src/minecraft/download/chunk/schedule.rs)、[`schedule_test.rs`](src-tauri/src/minecraft/download/chunk/schedule_test.rs)（新）：初始分配、扩容、收缩、判死抽成纯函数并补 10 例测试；[`multi.rs`](src-tauri/src/minecraft/download/chunk/multi.rs) 只留编排（起 worker、采样、落盘），`multi_test.rs` 随之退役。
 
+#### 连接额度改成跨文件共享的全局池
+
+此前每个文件独立封顶（最多 12 条连接），而文件并发又按「最大线程数」开：8 个文件同时下就是 32 条连接，
+既压垮本机带宽分配，也容易被 CDN 判定为异常流量。现在把「最大线程数」当作**全局连接总预算**，按活跃文件数分摊。
+
+- [`budget.rs`](src-tauri/src/minecraft/download/budget.rs)、[`budget_test.rs`](src-tauri/src/minecraft/download/budget_test.rs)（新）：总预算 + 活跃文件计数；份额 = `总预算 / 活跃文件数`，受单文件上限（用户设的分片数）约束，且**永远保底 1 条**——再拥挤也给每个文件留一条，否则它会永远排不上。活跃名额用 RAII 租约（`FileLease`）管理，失败、取消都不会漏归还。
+- [`multi.rs`](src-tauri/src/minecraft/download/chunk/multi.rs)：每轮采样后重算份额——别的文件下完额度会变大（自动加速），文件变多则收缩；本文件连接数超过当前份额时无条件减一条，不必等它变慢。
+- [`manager/core.rs`](src-tauri/src/minecraft/download/manager/core.rs)：构造下载会话时把 `max_threads` 写入总预算。单文件下载时份额仍等于用户设的分片数（8 线程 + 4 分片 = 4 条，与之前一致）；多文件并发时总量不再超标——想要更高就调大「最大线程数」。
+
 
 
 ## [0.3.13] - 2026-10-27
