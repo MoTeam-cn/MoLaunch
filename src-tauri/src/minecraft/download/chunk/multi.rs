@@ -267,6 +267,19 @@ pub(crate) async fn download_multi(
         if usable.is_empty() {
             break;
         }
+        // 候选源比连接额度多时，排在后面的源一开始分不到 worker；
+        // 前面的源都被判死后这里唤醒一条，否则「没人试过」的源永远没机会
+        let still_active: usize = sources
+            .iter()
+            .map(|slot| slot.active.load(Ordering::Relaxed))
+            .sum();
+        if still_active == 0 {
+            let index = usable[0];
+            sources[index].target.store(1, Ordering::Relaxed);
+            sources[index].active.fetch_add(1, Ordering::Relaxed);
+            spawn_worker(&mut set, &args, index);
+            log_debug!("[Segment] 唤醒未试过的源: {}", sources[index].url);
+        }
         let sum: u64 = usable.iter().map(|index| rates[*index]).sum();
         let avg = sum / usable.len().max(1) as u64;
         // 每轮重算份额：别的文件下完会让这里的额度变大，反之变小

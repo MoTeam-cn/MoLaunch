@@ -183,6 +183,18 @@
 - [`budget.rs`](src-tauri/src/minecraft/download/budget.rs)：总预算 = **最大线程数 × 2**（上限 64）。不能直接用最大线程数——分片下载至少要 2 条连接才可能快于单流，文件一多每个文件只剩 1 条，批量安装反而退化。默认 8 线程 → 16 条总预算：单文件下载拿满分片数（与之前一致），8 个文件并行时每个仍有 2 条，而此前是 8 × 4 = 32 条。
 - [`manager/core.rs`](src-tauri/src/minecraft/download/manager/core.rs)：构造下载会话时把折算后的总预算写入池子。想要更高吞吐就调大「最大线程数」，各文件会自动按份额加速。
 
+#### 库文件候选链：补上 Maven Central 与阿里云镜像
+
+此前一个库只有两条候选：版本 JSON 声明的地址，和 BMCLAPI 的同路径代理。Mojang 的 Maven 这些年下架了不少老构件
+（典型 `net.java.jinput` 的平台 jar 直接 404），两条都落空时安装就断在那里。
+
+- [`library_chain.rs`](src-tauri/src/minecraft/sources/library_chain.rs)、[`library_chain_test.rs`](src-tauri/src/minecraft/sources/library_chain_test.rs)（新）：把「一个构件该去哪些仓库找」抽成一条有序候选链——BMCLAPI `/maven/` → BMCLAPI `/libraries/` → Mojang Maven → 老构件原仓库 → **Maven Central** → **阿里云公共仓**。构件相对路径优先从 maven 坐标推导（带 classifier 也算得对），拿不到坐标才退回本地路径。
+- [`constants.rs`](src-tauri/src/minecraft/sources/constants.rs)：新增 `MAVEN_CENTRAL`、`ALIYUN_MAVEN_PUBLIC`、`MAVEN_SPONGE`。阿里云是 Central 的国内 1:1 镜像，不需要代理。
+- **老构件归位**：按 groupId 前缀猜原仓库——`org/ow2/`、`org/scala-lang/`、`org/jline/`、`jline/`、`net/java/dev/jna/`、`com/typesafe/` 走 Central；`net/fabricmc/`、`net/minecraftforge/`、`cpw/mods/`、`net/neoforged/`、`org/spongepowered/` 走各自仓库。
+- [`libraries/download.rs`](src-tauri/src/minecraft/version/libraries/download.rs)：候选按「用户自配镜像 → 声明来源 → 兜底链」组装并保序去重；顺带修掉一个老问题——声明地址是 `libraries.minecraft.net` 时，BMCLAPI 的 `/libraries/` 候选因为套在 `if 替换生效` 分支里而永远不生成。
+- [`http.rs`](src-tauri/src/minecraft/sources/http.rs)：`is_mirror_url` 认阿里云公共仓，因此「仅官方源」模式下不会走它。
+- [`multi.rs`](src-tauri/src/minecraft/download/chunk/multi.rs)：候选源多于连接额度时，排在后面的源一开始分不到 worker；前面的源全被判死后唤醒一条，避免「没人试过所以永远不试」。
+
 
 
 ## [0.3.13] - 2026-10-27

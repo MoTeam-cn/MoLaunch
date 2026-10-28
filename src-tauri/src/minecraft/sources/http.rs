@@ -14,9 +14,12 @@ pub fn should_skip_status(status: reqwest::StatusCode) -> bool {
 /// 判断 URL 是否为镜像源 URL
 ///
 /// 用于 `DownloadManager::reorder_urls` 按源模式重排候选 URL。
-/// 识别 BMCLAPI、mocdn.net、mcimirror.top 三类镜像域名。
+/// 识别 BMCLAPI、mocdn.net、mcimirror.top、阿里云公共仓四类镜像域名。
 pub fn is_mirror_url(url: &str) -> bool {
-    url.contains("bmclapi") || url.contains("mocdn") || url.contains("mcimirror")
+    url.contains("bmclapi")
+        || url.contains("mocdn")
+        || url.contains("mcimirror")
+        || url.contains("maven.aliyun.com")
 }
 
 /// 统一的带回退的 HTTP GET 请求

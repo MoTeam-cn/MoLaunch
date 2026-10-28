@@ -18,6 +18,15 @@ pub const MAVEN_FORGE: &str = "https://maven.minecraftforge.net";
 pub const MAVEN_NEOFORGE: &str = "https://maven.neoforged.net/releases";
 pub const MAVEN_FABRIC: &str = "https://maven.fabricmc.net";
 
+/// Maven Central：老构件（Mojang Maven 与 BMCLAPI 都已下架的）最后一站
+pub const MAVEN_CENTRAL: &str = "https://repo1.maven.org/maven2";
+
+/// 阿里云公共仓：Maven Central 的国内 1:1 镜像，无需代理即可访问
+pub const ALIYUN_MAVEN_PUBLIC: &str = "https://maven.aliyun.com/repository/public";
+
+/// Sponge 仓库：部分 Forge 系运行库（如 mixin）的原始出处
+pub const MAVEN_SPONGE: &str = "https://repo.spongepowered.org/maven";
+
 // ── Mod Loader 官方 ──
 pub const FORGE_VERSIONS_URL: &str = "https://files.minecraftforge.net/net/minecraftforge/forge";
 pub const NEOFORGE_API: &str =
