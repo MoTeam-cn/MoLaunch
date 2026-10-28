@@ -16,6 +16,7 @@ use crate::minecraft::download::rate_limiter::RateLimiter;
 use crate::minecraft::download::types::{
     ContentValidator, DownloadProgress, DownloadTask, GlobalProgress,
 };
+use crate::minecraft::sources::is_mirror_url;
 use crate::{log_debug, log_warn};
 
 const FNV_OFFSET: u64 = 0xcbf2_9ce4_8422_2325;
@@ -41,11 +42,15 @@ pub(super) async fn run_engine(
     // 进度记账：每轮跑完把「本文件当前可信字节」写进去，内部按差额增减，
     // 作废块重下时自动退回虚高的部分
     let credit = ProgressCredit::new(progress);
+    // 「主源」= 第一条非镜像 URL：隔离块的重下与校验失败后的定向重下都应该找它。
+    // 直接写死 0 会踩到「用户自配镜像排在第一位」的情况，那时 0 号其实是镜像。
+    let primary = urls.iter().position(|url| !is_mirror_url(url)).unwrap_or(0);
     let mut outcome = engine_once(
         client,
         urls,
         RetryScope::Full,
         key,
+        primary,
         task,
         file_size,
         chunk_count,
@@ -67,6 +72,7 @@ pub(super) async fn run_engine(
             urls,
             RetryScope::Full,
             key,
+            primary,
             task,
             file_size,
             chunk_count,
@@ -83,8 +89,9 @@ pub(super) async fn run_engine(
         outcome = engine_once(
             client,
             urls,
-            RetryScope::Suspects(0),
+            RetryScope::Suspects(primary),
             key,
+            primary,
             task,
             file_size,
             chunk_count,
@@ -105,8 +112,9 @@ pub(super) async fn run_engine(
         outcome = engine_once(
             client,
             urls,
-            RetryScope::Everything(0),
+            RetryScope::Everything(primary),
             key,
+            primary,
             task,
             file_size,
             chunk_count,
@@ -161,6 +169,7 @@ async fn engine_once(
     urls: &[String],
     scope: RetryScope,
     resume_key: u64,
+    official_index: usize,
     task: &DownloadTask,
     file_size: u64,
     chunk_count: usize,
@@ -172,7 +181,7 @@ async fn engine_once(
     chunk::download_multi(
         client,
         urls,
-        0,
+        official_index,
         scope,
         resume_key,
         &task.local_path,
