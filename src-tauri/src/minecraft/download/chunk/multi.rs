@@ -146,6 +146,13 @@ pub(crate) async fn download_multi(
     });
 
     let budget = budget.clamp(1, MAX_WORKERS_PER_FILE);
+    log_debug!(
+        "[Segment] 并行下载: {} (块长 {}, 源 {} 条, 连接额度 {})",
+        path,
+        table.seg_len(),
+        urls.len(),
+        budget
+    );
     let mut set: JoinSet<()> = JoinSet::new();
     for (index, count) in initial_workers(sources.len(), budget).iter().enumerate() {
         for _ in 0..*count {
@@ -252,8 +259,14 @@ pub(crate) async fn download_multi(
             None
         } else {
             Some(format!(
-                "并行下载未完成：{}/{} 字节（剩余块无法由可用源完成）",
-                downloaded, file_size
+                "并行下载未完成：{}/{} 字节（{}）",
+                downloaded,
+                file_size,
+                if table.has_claimable() {
+                    "仍有可领的块，但当前源都下不动"
+                } else {
+                    "剩余块已全部隔离，需要换源重试"
+                }
             ))
         },
     }
