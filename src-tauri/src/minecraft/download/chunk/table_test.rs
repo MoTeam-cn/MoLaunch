@@ -96,9 +96,12 @@ fn test_完成后再失败不影响已有进度() {
 #[test]
 fn test_invalidate_others_只作废非指定源的块() {
     let table = SegmentTable::new(3 * DEFAULT_SEG_LEN);
-    // 块 2 由源 0（官方）完成，块 1 由源 1（镜像）完成
+    // 块 2 由源 0（官方）完成，块 1 由源 1（镜像）完成；认领总是从表尾开始
+    let seg = table.claim(false).expect("应能认领");
+    assert_eq!(seg.index, 2);
     table.complete(2, 0);
-    table.claim(false);
+    let seg = table.claim(false).expect("应能认领");
+    assert_eq!(seg.index, 1);
     table.complete(1, 1);
     assert_eq!(table.done_count(), 2);
 
@@ -113,9 +116,13 @@ fn test_invalidate_others_只作废非指定源的块() {
 fn test_save_load_往返保留完成块与来源() {
     let path = temp_map("roundtrip.partmap");
     let table = SegmentTable::new(3 * DEFAULT_SEG_LEN);
+    let seg = table.claim(false).expect("应能认领");
+    assert_eq!(seg.index, 2);
     table.complete(2, 0);
-    table.claim(false);
+    let seg = table.claim(false).expect("应能认领");
+    assert_eq!(seg.index, 1);
     table.complete(1, 1);
+    assert_eq!(table.done_count(), 2);
     table.save(&path).expect("保存位图");
 
     let file_size = 3 * DEFAULT_SEG_LEN;
@@ -141,8 +148,11 @@ fn test_load_数据文件没写到的块不算完成() {
     let path = temp_map("short.partmap");
     let file_size = 2 * DEFAULT_SEG_LEN;
     let table = SegmentTable::new(file_size);
-    table.complete(1, 0);
-    table.complete(0, 0);
+    for _ in 0..2 {
+        let seg = table.claim(false).expect("应能认领");
+        table.complete(seg.index, 0);
+    }
+    assert_eq!(table.done_count(), 2);
     table.save(&path).expect("保存位图");
     // 数据文件只有半块长：两块都应被判为未完成
     let restored = SegmentTable::load(&path, file_size, DEFAULT_SEG_LEN / 2).expect("应能读回");
