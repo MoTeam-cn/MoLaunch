@@ -15,6 +15,9 @@ use super::super::types::{DownloadStatus, GlobalProgress};
 use super::download::download_chunk;
 use super::merge::merge_chunks;
 use super::probe::probe_file_size;
+use super::split::{
+    add_progress, assemble_split, spawn_chunk_task, try_split_straggler, ChunkHandle, SplitHalves,
+};
 
 /// 目标分片字节数：文件越大分片越多
 ///
@@ -24,6 +27,12 @@ const TARGET_SEGMENT_BYTES: u64 = 16 * 1024 * 1024;
 
 /// 分片数硬上限（在用户设置之外最多再翻一倍，且不超过这个值）
 const MAX_PLANNED_CHUNKS: usize = 12;
+
+/// 拆分提速需要的额外进度槽位（左右两半各一个）
+const SPLIT_SLOTS: usize = 2;
+
+/// 拆分提速的监督轮询间隔
+const SPLIT_POLL_INTERVAL: std::time::Duration = std::time::Duration::from_millis(200);
 
 /// 清理某个文件的所有分片临时文件
 ///
@@ -181,9 +190,13 @@ pub async fn download_chunked(
         format::bytes(chunk_size)
     );
 
-    // 分片进度追踪：每个 chunk 已下载字节数
-    let chunk_progress: Arc<Vec<StdMutex<u64>>> =
-        Arc::new((0..chunk_count).map(|_| StdMutex::new(0u64)).collect());
+    // 分片进度追踪：每个 chunk 已下载字节数；末尾两个槽位留给「拆分提速」的两半
+    // （采样器按全部槽位求和，所以拆出来的两半会自然计入整文件吞吐）
+    let chunk_progress: Arc<Vec<StdMutex<u64>>> = Arc::new(
+        (0..chunk_count + SPLIT_SLOTS)
+            .map(|_| StdMutex::new(0u64))
+            .collect(),
+    );
 
     // 慢速采样：每 0.5s 汇总全文件已下字节，按 5s 窗口判定聚合吞吐。
     // 只看单条连接会把「8 条各 100KiB/s」误判成低速，所以必须按整文件聚合。
@@ -223,61 +236,130 @@ pub async fn download_chunked(
     });
 
     let start_time = Instant::now();
-    let mut handles = Vec::with_capacity(chunk_count);
-
-    for (i, (start, end)) in ranges.into_iter().enumerate() {
-        let client = client.clone();
-        let url = url.to_string();
-        let part_path = format!("{}.part{}", local_path, i);
-        let limiter = rate_limiter.clone();
-        let prog = chunk_progress.clone();
-        let file_prog = file_progress.clone();
-        let pause = pause_flag.clone();
-        let cancel = cancel_flag.clone();
-        let slow_flag = slow_abort.clone();
-
-        let handle = tokio::spawn(async move {
-            let result = download_chunk(
-                &client,
-                &url,
-                &part_path,
-                start,
-                end,
-                limiter,
-                prog,
-                i,
-                file_prog,
-                pause,
-                cancel,
-                Some(slow_flag),
-            )
-            .await;
-            (i, result)
-        });
-
-        handles.push(handle);
+    let mut handles: Vec<ChunkHandle> = Vec::with_capacity(chunk_count + SPLIT_SLOTS);
+    for (index, &(start, end)) in ranges.iter().enumerate() {
+        handles.push(spawn_chunk_task(
+            client,
+            url,
+            &format!("{}.part{}", local_path, index),
+            index,
+            start,
+            end,
+            &rate_limiter,
+            &chunk_progress,
+            &file_progress,
+            &pause_flag,
+            &cancel_flag,
+            Some(slow_abort.clone()),
+        ));
     }
 
-    // 等待所有 chunk 完成
+    // 监督循环：定期让出并检查是否还有分片在跑。
+    // 用 is_finished 而不是 join_next —— 拆分提速会 abort 原任务，被 abort 的任务不会
+    // 返回结果，按完成计数会永久少一格，is_finished 没这个问题。
+    let mut split: Option<SplitHalves> = None;
+    loop {
+        if handles.iter().all(|handle| handle.is_finished()) {
+            break;
+        }
+        tokio::time::sleep(SPLIT_POLL_INTERVAL).await;
+        if split.is_none() && !allow_slow_abort && slow_abort.load(Ordering::Relaxed) {
+            split = try_split_straggler(
+                &mut handles,
+                local_path,
+                &ranges,
+                chunk_count,
+                client,
+                url,
+                &rate_limiter,
+                &chunk_progress,
+                &pause_flag,
+                &cancel_flag,
+            );
+        }
+    }
+
     let mut all_ok = true;
     let mut total_downloaded: u64 = 0;
     let mut last_error = String::new();
 
-    for handle in handles {
-        match handle.await {
+    // 先收「拆分提速」的两半：两半不计 file_progress（避免与原任务重复计数），
+    // 成功拼装后一次性补上；前缀字节原本就由被中止的原任务计过账了。
+    let mut split_ok = false;
+    if let Some(ref halves) = split {
+        let mut halves_bytes = 0_u64;
+        let mut halves_ok = true;
+        for offset in 0..SPLIT_SLOTS {
+            match handles[chunk_count + offset].await {
+                Ok((_, Ok(bytes))) => halves_bytes += bytes,
+                Ok((index, Err(e))) => {
+                    halves_ok = false;
+                    last_error = format!("chunk {} 拆分半段失败: {}", index, e);
+                }
+                Err(e) => {
+                    halves_ok = false;
+                    last_error = format!("chunk 拆分半段任务异常: {}", e);
+                }
+            }
+        }
+        let part_path = format!("{}.part{}", local_path, halves.index);
+        let prefix = std::fs::metadata(&part_path)
+            .map(|meta| meta.len())
+            .unwrap_or(0);
+        if halves_ok {
+            match assemble_split(&part_path, &halves.left_path, &halves.right_path) {
+                Ok(()) => {
+                    split_ok = true;
+                    total_downloaded += prefix + halves_bytes;
+                    if let Some(ref fp) = file_progress {
+                        add_progress(fp, halves_bytes);
+                    }
+                    log_debug!(
+                        "[Chunk] 拆分分片 {} 拼装完成: {}",
+                        halves.index,
+                        format::bytes(prefix + halves_bytes)
+                    );
+                }
+                Err(e) => {
+                    halves_ok = false;
+                    last_error = format!("拼装拆分分片失败: {}", e);
+                }
+            }
+        }
+        if !halves_ok {
+            // 前缀已由原任务计入 file_progress，这里一并记入 total_downloaded，
+            // 失败回滚时才不会漏账
+            total_downloaded += prefix;
+            log_warn!("[Chunk] {}", last_error);
+            all_ok = false;
+        }
+    }
+
+    for index in 0..chunk_count {
+        // 拆分成功的那个分片，原任务是被主动 abort 的，结果无意义
+        let aborted = split
+            .as_ref()
+            .map(|halves| halves.index == index)
+            .unwrap_or(false)
+            && split_ok;
+        match handles[index].await {
             Ok((idx, Ok(bytes))) => {
                 total_downloaded += bytes;
                 log_debug!("[Chunk] chunk {} 完成: {}", idx, format::bytes(bytes));
             }
             Ok((idx, Err(e))) => {
-                all_ok = false;
-                last_error = format!("chunk {} 失败: {}", idx, e);
-                log_warn!("[Chunk] {}", last_error);
+                if !aborted {
+                    all_ok = false;
+                    last_error = format!("chunk {} 失败: {}", idx, e);
+                    log_warn!("[Chunk] {}", last_error);
+                }
             }
             Err(e) => {
-                all_ok = false;
-                last_error = format!("chunk task panic: {}", e);
-                log_warn!("[Chunk] {}", last_error);
+                if !aborted {
+                    all_ok = false;
+                    last_error = format!("chunk task panic: {}", e);
+                    log_warn!("[Chunk] {}", last_error);
+                }
             }
         }
     }

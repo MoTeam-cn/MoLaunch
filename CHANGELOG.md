@@ -116,6 +116,14 @@
 - [`common.rs`](src-tauri/src/minecraft/community/common.rs)：新增 2s 对冲延迟常量。
 - [`curseforge/http.rs`](src-tauri/src/minecraft/community/curseforge/http.rs)、[`modrinth/http.rs`](src-tauri/src/minecraft/community/modrinth/http.rs)：官方线路领先 2s，超过就并发打镜像，先成功者胜出（慢的那条被取消）；官方与镜像的请求/解析合并为同一实现，404 互不重试的语义保持不变，镜像请求仍不带用户 API Key。
 
+#### 单源低速时拆分最难的分片并行提速
+
+只有唯一候选源时，慢速判定此前无事可做——换源没得换，判死又不该，只能干等最后那个卡住的分片。
+
+- [`split.rs`](src-tauri/src/minecraft/download/chunk/split.rs)、[`split_test.rs`](src-tauri/src/minecraft/download/chunk/split_test.rs)：新增拆分提速——单源场景下采样器判定低速后，挑「剩余字节最多且仍在跑」的分片，中止它并把剩余区间一分为二并行下载；左右两半完成后与已下前缀拼回原 `.part`，分片布局与合并逻辑完全不变（续传仍按原偏移）。剩余不足 8 MiB 不拆，避免多付一次往返。
+- [`api.rs`](src-tauri/src/minecraft/download/chunk/api.rs)：分片调度改为「监督循环 + is_finished 轮询」——被 abort 的任务不会返回结果，按完成计数会永久少一格；拆出来的两半各占一个预留进度槽位，成功拼装后一次性补进文件进度，避免与原任务重复计数。
+
+
 
 ## [0.3.13] - 2026-10-27
 

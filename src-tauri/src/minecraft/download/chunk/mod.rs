@@ -6,6 +6,7 @@ mod api;
 pub mod download;
 pub mod merge;
 pub mod probe;
+mod split;
 
 // 对外暴露探测能力：retry 需要「是否支持 Range + 声明大小」一起拿到，
 // 避免为了判断分片可行性多发一次请求
