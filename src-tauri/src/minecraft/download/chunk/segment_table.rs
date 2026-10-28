@@ -4,7 +4,7 @@
 
 use std::sync::atomic::{AtomicBool, Ordering};
 
-pub(crate) use super::multi::{download_multi, SegmentOutcome};
+pub(crate) use super::multi::download_multi;
 
 /// 开关（`download.segment_table`）
 static ENABLED: AtomicBool = AtomicBool::new(true);

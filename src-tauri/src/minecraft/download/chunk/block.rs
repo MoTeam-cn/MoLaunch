@@ -43,7 +43,7 @@ pub(crate) async fn download_block(
     segment: Segment,
     rate_limiter: &Option<Arc<Mutex<RateLimiter>>>,
     file_progress: &Option<Arc<StdMutex<GlobalProgress>>>,
-    source_bytes: &Arc<AtomicU64>,
+    source_bytes: &AtomicU64,
     pause_flag: &Option<Arc<AtomicBool>>,
     cancel_flag: &Option<Arc<AtomicBool>>,
 ) -> Result<u64, BlockError> {
@@ -61,7 +61,7 @@ pub(crate) async fn download_block(
         .send()
         .await
         .map_err(|e| BlockError::Failed(crate::http::request_error_msg(&e)))?;
-    mirror_gate::observe(&response);
+    mirror_gate::observe(url, &response);
     let status = response.status();
     if status == reqwest::StatusCode::OK && segment.start > 0 {
         return Err(BlockError::RangeUnsupported);
