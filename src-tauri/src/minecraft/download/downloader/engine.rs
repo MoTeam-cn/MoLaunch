@@ -8,6 +8,7 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex as StdMutex};
 use tokio::sync::Mutex;
 
+use super::credit::ProgressCredit;
 use super::verify;
 use crate::minecraft::download::chunk;
 use crate::minecraft::download::chunk::RetryScope;
@@ -37,9 +38,9 @@ pub(super) async fn run_engine(
     content_validator: &Option<ContentValidator>,
 ) -> Option<DownloadProgress> {
     let key = resume_key(task, urls, file_size);
-    // 本文件已计入全局进度的字节：每轮跑完按「当前可信字节」对齐，
-    // 作废块重下时把虚高的部分退回去，保证进度与实际落盘一致
-    let mut counted = 0_u64;
+    // 进度记账：每轮跑完把「本文件当前可信字节」写进去，内部按差额增减，
+    // 作废块重下时自动退回虚高的部分
+    let credit = ProgressCredit::new(progress);
     let mut outcome = engine_once(
         client,
         urls,
@@ -49,12 +50,12 @@ pub(super) async fn run_engine(
         file_size,
         chunk_count,
         rate_limiter,
-        progress,
+        Some(&credit),
         pause_flag,
         cancel_flag,
     )
     .await;
-    sync_progress(progress, &mut counted, outcome.downloaded);
+    credit.credit(outcome.downloaded);
     // 首轮未完成：位图里已有完成块，再跑一轮只补没完成的
     if !outcome.complete && !is_cancelled(cancel_flag) {
         log_warn!(
@@ -70,12 +71,12 @@ pub(super) async fn run_engine(
             file_size,
             chunk_count,
             rate_limiter,
-            progress,
+            Some(&credit),
             pause_flag,
             cancel_flag,
         )
         .await;
-        sync_progress(progress, &mut counted, outcome.downloaded);
+        credit.credit(outcome.downloaded);
     }
     let mut usable = verify_result(task, &outcome, trusted_size, content_validator);
     if !usable && outcome.complete && !is_cancelled(cancel_flag) {
@@ -88,12 +89,12 @@ pub(super) async fn run_engine(
             file_size,
             chunk_count,
             rate_limiter,
-            progress,
+            Some(&credit),
             pause_flag,
             cancel_flag,
         )
         .await;
-        sync_progress(progress, &mut counted, outcome.downloaded);
+        credit.credit(outcome.downloaded);
         usable = verify_result(task, &outcome, trusted_size, content_validator);
     }
     if !usable && outcome.complete && !is_cancelled(cancel_flag) {
@@ -110,12 +111,12 @@ pub(super) async fn run_engine(
             file_size,
             chunk_count,
             rate_limiter,
-            progress,
+            Some(&credit),
             pause_flag,
             cancel_flag,
         )
         .await;
-        sync_progress(progress, &mut counted, outcome.downloaded);
+        credit.credit(outcome.downloaded);
         usable = verify_result(task, &outcome, trusted_size, content_validator);
     }
     if usable {
@@ -139,7 +140,7 @@ pub(super) async fn run_engine(
             outcome.total,
             task.local_path
         );
-        rollback_progress(progress, counted);
+        credit.rollback();
         return None;
     }
     // 一点进度都没有，或数据已不可信：清干净交给单流兜底
@@ -149,7 +150,7 @@ pub(super) async fn run_engine(
     );
     let _ = std::fs::remove_file(&task.local_path);
     let _ = std::fs::remove_file(format!("{}.partmap", task.local_path));
-    rollback_progress(progress, counted);
+    credit.rollback();
     None
 }
 
@@ -164,7 +165,7 @@ async fn engine_once(
     file_size: u64,
     chunk_count: usize,
     rate_limiter: &Option<Arc<Mutex<RateLimiter>>>,
-    progress: &Option<Arc<StdMutex<GlobalProgress>>>,
+    credit: Option<&ProgressCredit<'_>>,
     pause_flag: &Option<Arc<AtomicBool>>,
     cancel_flag: &Option<Arc<AtomicBool>>,
 ) -> chunk::SegmentOutcome {
@@ -178,7 +179,7 @@ async fn engine_once(
         file_size,
         chunk_count.max(1),
         rate_limiter.clone(),
-        progress.clone(),
+        credit,
         pause_flag.clone(),
         cancel_flag.clone(),
     )
@@ -215,40 +216,6 @@ fn verify_result(
         }
     }
     true
-}
-
-/// 让全局进度与本文件「当前可信字节」对齐
-fn sync_progress(
-    progress: &Option<Arc<StdMutex<GlobalProgress>>>,
-    counted: &mut u64,
-    current: u64,
-) {
-    if current > *counted {
-        add_progress(progress, current - *counted);
-    } else if current < *counted {
-        rollback_progress(progress, *counted - current);
-    }
-    *counted = current;
-}
-
-fn add_progress(progress: &Option<Arc<StdMutex<GlobalProgress>>>, bytes: u64) {
-    if bytes == 0 {
-        return;
-    }
-    if let Some(ref p) = progress {
-        let mut p = p.lock().unwrap_or_else(|poisoned| poisoned.into_inner());
-        p.downloaded_bytes = p.downloaded_bytes.saturating_add(bytes);
-    }
-}
-
-fn rollback_progress(progress: &Option<Arc<StdMutex<GlobalProgress>>>, bytes: u64) {
-    if bytes == 0 {
-        return;
-    }
-    if let Some(ref p) = progress {
-        let mut p = p.lock().unwrap_or_else(|poisoned| poisoned.into_inner());
-        p.downloaded_bytes = p.downloaded_bytes.saturating_sub(bytes);
-    }
 }
 
 fn is_cancelled(flag: &Option<Arc<AtomicBool>>) -> bool {

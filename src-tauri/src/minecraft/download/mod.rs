@@ -6,6 +6,7 @@ pub mod assets;
 pub mod budget;
 pub mod chunk;
 pub mod config;
+pub mod credit;
 pub mod downloader;
 pub mod edge;
 pub mod fix;

@@ -2,7 +2,7 @@
 
 use std::io::{Seek, SeekFrom, Write};
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
-use std::sync::{Arc, Mutex as StdMutex};
+use std::sync::Arc;
 use std::time::Duration;
 
 use futures_util::StreamExt;
@@ -10,7 +10,6 @@ use tokio::sync::Mutex;
 
 use super::super::mirror_gate;
 use super::super::rate_limiter::RateLimiter;
-use super::super::types::GlobalProgress;
 use super::table::Segment;
 use crate::minecraft::utils::hash::{HashAlgorithm, IncrementalHash};
 
@@ -43,7 +42,6 @@ pub(crate) async fn download_block(
     path: &str,
     segment: Segment,
     rate_limiter: &Option<Arc<Mutex<RateLimiter>>>,
-    file_progress: &Option<Arc<StdMutex<GlobalProgress>>>,
     source_bytes: &AtomicU64,
     pause_flag: &Option<Arc<AtomicBool>>,
     cancel_flag: &Option<Arc<AtomicBool>>,
@@ -121,12 +119,6 @@ pub(crate) async fn download_block(
         .await?;
         hasher.update(&chunk);
         source_bytes.fetch_add(chunk_len, Ordering::Relaxed);
-        if let Some(progress) = file_progress {
-            let mut guard = progress
-                .lock()
-                .unwrap_or_else(|poisoned| poisoned.into_inner());
-            guard.downloaded_bytes = guard.downloaded_bytes.saturating_add(chunk_len);
-        }
     }
 
     if downloaded != expected {

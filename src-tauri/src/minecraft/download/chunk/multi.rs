@@ -5,7 +5,7 @@
 
 use std::path::Path;
 use std::sync::atomic::{AtomicBool, AtomicU64, AtomicUsize, Ordering};
-use std::sync::{Arc, Mutex as StdMutex};
+use std::sync::Arc;
 use std::time::Duration;
 
 use tokio::sync::Mutex;
@@ -14,10 +14,10 @@ use tokio::task::JoinSet;
 use crate::{log_debug, log_warn};
 
 use super::super::budget;
+use super::super::credit::ProgressCredit;
 use super::super::edge;
 use super::super::host_profile;
 use super::super::rate_limiter::RateLimiter;
-use super::super::types::GlobalProgress;
 use super::block::{download_block, BlockError};
 use super::schedule::{
     initial_workers, should_grow, should_retire, should_shrink, MAX_WORKERS_PER_FILE,
@@ -85,7 +85,6 @@ struct WorkerArgs {
     base_client: reqwest::Client,
     path: String,
     rate_limiter: Option<Arc<Mutex<RateLimiter>>>,
-    file_progress: Option<Arc<StdMutex<GlobalProgress>>>,
     pause_flag: Option<Arc<AtomicBool>>,
     cancel_flag: Option<Arc<AtomicBool>>,
 }
@@ -110,7 +109,7 @@ pub(crate) async fn download_multi(
     file_size: u64,
     budget: usize,
     rate_limiter: Option<Arc<Mutex<RateLimiter>>>,
-    file_progress: Option<Arc<StdMutex<GlobalProgress>>>,
+    credit: Option<&ProgressCredit<'_>>,
     pause_flag: Option<Arc<AtomicBool>>,
     cancel_flag: Option<Arc<AtomicBool>>,
 ) -> SegmentOutcome {
@@ -128,13 +127,21 @@ pub(crate) async fn download_multi(
     }
     let map_path = format!("{}.partmap", path);
     let data_len = std::fs::metadata(path).map(|meta| meta.len()).unwrap_or(0);
-    let table = match SegmentTable::load(
-        Path::new(&map_path),
-        file_size,
-        data_len,
-        resume_key,
-        Some(Path::new(path)),
-    ) {
+    let data_path = path.to_string();
+    let load_map_path = map_path.clone();
+    let restored = tokio::task::spawn_blocking(move || {
+        SegmentTable::load(
+            Path::new(&load_map_path),
+            file_size,
+            data_len,
+            resume_key,
+            Some(Path::new(&data_path)),
+        )
+    })
+    .await
+    .ok()
+    .flatten();
+    let table = match restored {
         Some(restored) => {
             log_debug!(
                 "[Segment] 复用已完成块: {} 块 / {} 字节",
@@ -185,7 +192,6 @@ pub(crate) async fn download_multi(
         base_client: client.clone(),
         path: path.to_string(),
         rate_limiter,
-        file_progress,
         pause_flag,
         cancel_flag,
     });
@@ -232,6 +238,9 @@ pub(crate) async fn download_multi(
             break;
         }
         save_map(&engine);
+        if let Some(credit) = credit {
+            credit.credit(table.done_bytes());
+        }
         let done = table.done_bytes();
         if done == last_done {
             idle_windows += 1;
@@ -313,7 +322,7 @@ pub(crate) async fn download_multi(
         // 收缩：明显低于均值的源减一条；worker 在下次认领前自行退出
         for index in usable.iter().copied() {
             let current = sources[index].target.load(Ordering::Relaxed);
-            if should_shrink(rates[index], avg, current) || total_target > share {
+            if current > 1 && (should_shrink(rates[index], avg, current) || total_target > share) {
                 // 明显慢，或本文件已超出当前份额（别的文件也需要额度）
                 sources[index].target.store(current - 1, Ordering::Relaxed);
                 log_debug!(
@@ -355,6 +364,9 @@ pub(crate) async fn download_multi(
 
     let downloaded = table.done_bytes();
     let complete = table.is_complete();
+    if let Some(credit) = credit {
+        credit.credit(downloaded);
+    }
     if complete {
         // 完成即清理位图，避免下次误复用
         let _ = std::fs::remove_file(&engine.map_path);
@@ -427,7 +439,6 @@ async fn run_worker(args: Arc<WorkerArgs>, source_index: usize) {
                 &args.path,
                 segment,
                 &args.rate_limiter,
-                &args.file_progress,
                 &slot.bytes,
                 &args.pause_flag,
                 &args.cancel_flag,

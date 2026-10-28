@@ -1,12 +1,20 @@
-//! 主机脾气记忆：同一主机学到的并发与吞吐，在文件之间传递
+//! 主机脾气记忆：同一主机学到的并发与吞吐，在文件之间、进程之间传递
 //!
 //! 单文件内的 AIMD 学到的结论（这台 CDN 给几条流最舒服）在下完那一刻就丢了，装 300 个模组
 //! 时每个文件都要重新摸一遍。这里把结论留下来，下一个文件直接从上次的结论起步；
 //! 起点偏高也没关系——引擎每 2 秒采样一次，方向不对两个窗口内就会自己收回来。
+//!
+//! 记忆会落盘（`cache/download/host_profiles.json`），重启后仍然有效；条目带时间戳，
+//! 超过 TTL 自动作废，条数上限 64，格式带版本号，读不懂就当成没有——不猜、不迁移。
 
 use std::collections::HashMap;
+use std::path::Path;
 use std::sync::{Mutex, OnceLock};
-use std::time::{Duration, Instant};
+use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
+
+use serde::{Deserialize, Serialize};
+
+use crate::{log_debug, log_warn};
 
 /// 记忆有效期：太久以前的经验不再可信（CDN 会扩容/调度）
 const TTL: Duration = Duration::from_secs(30 * 60);
@@ -18,6 +26,18 @@ const EMA_WEIGHT: f64 = 0.3;
 const MIN_TARGET: usize = 1;
 const MAX_TARGET: usize = 8;
 
+/// 落盘文件（相对缓存根目录）
+const STORE_PATH: &str = "download/host_profiles.json";
+
+/// 落盘格式版本
+const STORE_VERSION: u32 = 1;
+
+/// 落盘条目上限（超出按最近使用淘汰）
+const MAX_ENTRIES: usize = 64;
+
+/// 两次落盘的最小间隔，避免每个文件结束都写一次
+const SAVE_INTERVAL: Duration = Duration::from_secs(60);
+
 /// 一条主机的档案
 #[derive(Clone, Copy, Debug)]
 struct Profile {
@@ -26,9 +46,15 @@ struct Profile {
     learned_at: Instant,
 }
 
-fn profiles() -> &'static Mutex<HashMap<String, Profile>> {
-    static PROFILES: OnceLock<Mutex<HashMap<String, Profile>>> = OnceLock::new();
-    PROFILES.get_or_init(|| Mutex::new(HashMap::new()))
+/// 运行时状态
+struct State {
+    profiles: HashMap<String, Profile>,
+    last_save: Instant,
+}
+
+fn state() -> &'static Mutex<Option<State>> {
+    static STATE: OnceLock<Mutex<Option<State>>> = OnceLock::new();
+    STATE.get_or_init(|| Mutex::new(None))
 }
 
 /// 从 URL 取主机名（小写）；解析失败返回 None
@@ -68,7 +94,9 @@ fn ema(previous: u64, sample: u64) -> u64 {
 /// 上次学到的并发目标（TTL 内有效）
 pub(crate) fn suggest(url: &str) -> Option<usize> {
     let host = host_of(url)?;
-    let profiles = profiles().lock().unwrap_or_else(|p| p.into_inner());
+    let mut guard = state().lock().unwrap_or_else(|p| p.into_inner());
+    ensure_loaded(&mut *guard);
+    let profiles = &guard.as_ref()?.profiles;
     let profile = profiles.get(&host)?;
     if profile.learned_at.elapsed() > TTL {
         return None;
@@ -81,13 +109,174 @@ pub(crate) fn observe(url: &str, target: usize, throughput: u64) {
     let Some(host) = host_of(url) else {
         return;
     };
+    // 一个字节都没下成（比如整条源直接 404）不构成经验
+    if throughput == 0 {
+        return;
+    }
     let now = Instant::now();
-    let mut profiles = profiles().lock().unwrap_or_else(|p| p.into_inner());
-    let previous = profiles
+    let mut guard = state().lock().unwrap_or_else(|p| p.into_inner());
+    ensure_loaded(&mut *guard);
+    let Some(state) = guard.as_mut() else {
+        return;
+    };
+    let previous = state
+        .profiles
         .get(&host)
         .copied()
         .filter(|profile| profile.learned_at.elapsed() <= TTL);
-    profiles.insert(host, merge(previous, target, throughput, now));
+    state
+        .profiles
+        .insert(host, merge(previous, target, throughput, now));
+    let should_save = state.last_save.elapsed() >= SAVE_INTERVAL;
+    if should_save {
+        state.last_save = now;
+        prune(state);
+        let snapshot = snapshot(state);
+        drop(guard);
+        if let Some(path) = store_path() {
+            if let Err(e) = save_to(&path, &snapshot) {
+                log_debug!("[HostProfile] 落盘失败: {}", e);
+            }
+        }
+    }
+}
+
+/// 丢掉过期条目，并把条数压到上限以内（保留最近学到的）
+fn prune(state: &mut State) {
+    state
+        .profiles
+        .retain(|_, profile| profile.learned_at.elapsed() <= TTL);
+    if state.profiles.len() <= MAX_ENTRIES {
+        return;
+    }
+    let mut order: Vec<(String, Instant)> = state
+        .profiles
+        .iter()
+        .map(|(host, profile)| (host.clone(), profile.learned_at))
+        .collect();
+    order.sort_by(|left, right| right.1.cmp(&left.1));
+    let keep: Vec<String> = order
+        .into_iter()
+        .take(MAX_ENTRIES)
+        .map(|(h, _)| h)
+        .collect();
+    state.profiles.retain(|host, _| keep.contains(host));
+}
+
+/// 落盘用的快照（时间换成绝对时间戳，重启后才能算 TTL）
+fn snapshot(state: &State) -> Store {
+    let now = unix_millis();
+    let profiles = state
+        .profiles
+        .iter()
+        .filter_map(|(host, profile)| {
+            let elapsed = profile.learned_at.elapsed().as_millis() as u64;
+            Some((
+                host.clone(),
+                PersistedProfile {
+                    target: profile.target,
+                    throughput: profile.throughput,
+                    learned_epoch_ms: now.saturating_sub(elapsed),
+                },
+            ))
+        })
+        .collect();
+    Store {
+        version: STORE_VERSION,
+        profiles,
+    }
+}
+
+fn ensure_loaded(guard: &mut Option<State>) {
+    if guard.is_some() {
+        return;
+    }
+    let profiles = store_path()
+        .as_deref()
+        .and_then(|path| load_from(path).ok())
+        .map(|store| store.into_runtime())
+        .unwrap_or_default();
+    if !profiles.is_empty() {
+        log_debug!("[HostProfile] 读回 {} 条主机记忆", profiles.len());
+    }
+    *guard = Some(State {
+        profiles,
+        last_save: Instant::now(),
+    });
+}
+
+fn store_path() -> Option<std::path::PathBuf> {
+    Some(crate::storage::cache::Cache::instance().path(STORE_PATH))
+}
+
+fn unix_millis() -> u64 {
+    SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .map(|d| d.as_millis() as u64)
+        .unwrap_or(0)
+}
+
+/// 落盘格式
+#[derive(Debug, Default, Serialize, Deserialize)]
+struct Store {
+    version: u32,
+    profiles: HashMap<String, PersistedProfile>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+struct PersistedProfile {
+    target: usize,
+    throughput: u64,
+    /// 学到这条经验的绝对时间（毫秒时间戳），用来跨进程算 TTL
+    learned_epoch_ms: u64,
+}
+
+impl Store {
+    /// 转成运行时表示：丢掉版本不符、过期、明显异常的条目
+    fn into_runtime(self) -> HashMap<String, Profile> {
+        if self.version != STORE_VERSION {
+            log_warn!("[HostProfile] 记忆格式版本 {} 不认识，忽略", self.version);
+            return HashMap::new();
+        }
+        let now = unix_millis();
+        self.profiles
+            .into_iter()
+            .filter_map(|(host, stored)| {
+                if stored.learned_epoch_ms > now {
+                    return None;
+                }
+                let age = Duration::from_millis(now - stored.learned_epoch_ms);
+                if age > TTL || stored.target == 0 {
+                    return None;
+                }
+                Some((
+                    host,
+                    Profile {
+                        target: stored.target.clamp(MIN_TARGET, MAX_TARGET),
+                        throughput: stored.throughput,
+                        learned_at: Instant::now().checked_sub(age).unwrap_or_else(Instant::now),
+                    },
+                ))
+            })
+            .collect()
+    }
+}
+
+/// 读盘（测试用可指定路径）
+fn load_from(path: &Path) -> anyhow::Result<Store> {
+    let text = std::fs::read_to_string(path)?;
+    let store: Store = serde_json::from_str(&text)?;
+    Ok(store)
+}
+
+/// 写盘（测试用可指定路径）
+fn save_to(path: &Path, store: &Store) -> anyhow::Result<()> {
+    if let Some(parent) = path.parent() {
+        std::fs::create_dir_all(parent)?;
+    }
+    let text = serde_json::to_string(store)?;
+    std::fs::write(path, text)?;
+    Ok(())
 }
 
 #[cfg(test)]

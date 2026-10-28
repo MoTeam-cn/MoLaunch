@@ -1,8 +1,7 @@
 //! 引擎阶梯的纯逻辑测试（不下载、不联网）
 
-use super::{feed, resume_key, sync_progress, FNV_OFFSET};
-use crate::minecraft::download::types::{DownloadTask, GlobalProgress};
-use std::sync::{Arc, Mutex as StdMutex};
+use super::{feed, resume_key, FNV_OFFSET};
+use crate::minecraft::download::types::DownloadTask;
 
 fn task(id: &str, hash: Option<&str>) -> DownloadTask {
     DownloadTask {
@@ -70,42 +69,4 @@ fn test_feed_是确定性的FNV变体() {
     let mut other = FNV_OFFSET;
     feed(&mut other, b"abd");
     assert_ne!(first, other);
-}
-
-#[test]
-fn test_sync_progress_按当前可信字节对齐() {
-    let progress = Arc::new(StdMutex::new(GlobalProgress {
-        downloaded_bytes: 1000,
-        ..Default::default()
-    }));
-    let slot = Some(progress.clone());
-    let mut counted = 0_u64;
-    // 第一轮跑出 300 字节 -> 全局 1300
-    sync_progress(&slot, &mut counted, 300);
-    assert_eq!(
-        progress
-            .lock()
-            .unwrap_or_else(|p| p.into_inner())
-            .downloaded_bytes,
-        1300
-    );
-    // 作废重下使可信字节降到 120 -> 退回 180
-    sync_progress(&slot, &mut counted, 120);
-    assert_eq!(
-        progress
-            .lock()
-            .unwrap_or_else(|p| p.into_inner())
-            .downloaded_bytes,
-        1120
-    );
-    // 重下补齐到 300 -> 再加 180
-    sync_progress(&slot, &mut counted, 300);
-    assert_eq!(
-        progress
-            .lock()
-            .unwrap_or_else(|p| p.into_inner())
-            .downloaded_bytes,
-        1300
-    );
-    assert_eq!(counted, 300);
 }

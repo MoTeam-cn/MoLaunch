@@ -206,6 +206,23 @@
 - [`host_profile.rs`](src-tauri/src/minecraft/download/host_profile.rs)、[`host_profile_test.rs`](src-tauri/src/minecraft/download/host_profile_test.rs)（新）：**主机脾气记忆**——把每个主机学到的并发目标与吞吐（EMA）留下来，下一个文件直接从上次的结论起步，不必重新试错；记忆 30 分钟过期，并发取历史最大值（只是起点，方向不对引擎两个窗口内自己收回）。
 - [`retired.rs`](src-tauri/src/minecraft/sources/retired.rs)、[`retired_test.rs`](src-tauri/src/minecraft/sources/retired_test.rs)（新）：**退役镜像地址还原**——老 manifest 里的 `cdn-alt.modrinth.com`、`mod.tianpao.top` 按路径前缀换成官方地址（`/data/`→Modrinth、`/files/`→CF edge、`/media/`→CF media），查询串原样保留，对不上的原样返回不猜。
 
+#### 修复：进度重复累计、连接数震荡、恢复时阻塞执行器
+
+回归排查发现三处真问题，都在最近几轮引入。
+
+- **进度翻倍**：块级写盘每收到一段数据就加一次 `downloaded_bytes`，引擎每轮跑完又按「已完成字节」补一次，同一个 100 MB 文件会被记成 200 MB。新增 [`credit.rs`](src-tauri/src/minecraft/download/credit.rs) 统一记账——接口改成「设置本文件的累计贡献」，内部只按差额增减，谁调用、调用几次都幂等；[`block.rs`](src-tauri/src/minecraft/download/chunk/block.rs) 不再直接写全局进度，[`multi.rs`](src-tauri/src/minecraft/download/chunk/multi.rs) 每采样窗口上报一次，[`engine.rs`](src-tauri/src/minecraft/download/downloader/engine.rs) 每轮与最终失败时结算。顺带修掉「失败块的半截字节被计入却从不回退」。
+- **连接数震荡**：候选源多于额度时，唤醒未试过的源会把目标设为 1，而同轮的「超出份额」收缩又把它减到 0，worker 立刻退出、下一轮再唤醒——无限抖动。收缩现在要求当前连接数 > 1 才减。
+- **恢复时阻塞执行器**：位图自校验要读回已完成块算 SHA256，这在 async 上下文里是同步 IO；改为在 `spawn_blocking` 里读位图与校验，不再卡住 runtime 线程。
+- 主机记忆不再记录「零吞吐」的观测：整条源直接 404 不构成经验，否则会把 EMA 拖到 0。
+
+#### 重构：位图落盘拆出独立模块
+
+- [`table_map.rs`](src-tauri/src/minecraft/download/chunk/table_map.rs)（新）：序列化、自校验、本进程信任记录从 `table.rs` 拆出（`table.rs` 418 行 → 254 行），段表只管状态，落盘格式单独可读。
+
+#### 新增：主机记忆落盘
+
+- [`host_profile.rs`](src-tauri/src/minecraft/download/host_profile.rs)：记忆写入 `cache/download/host_profiles.json`，重启后仍有效；条目带绝对时间戳，超过 30 分钟自动作废，条数上限 64（按最近使用淘汰），格式带版本号，版本不认识就当没有——不猜、不迁移。落盘节流为 60 秒一次。
+
 
 
 ## [0.3.13] - 2026-10-27
