@@ -8,5 +8,5 @@ mod multi;
 pub mod probe;
 mod table;
 
-pub use multi::{download_multi, SegmentOutcome};
+pub(crate) use multi::{download_multi, SegmentOutcome};
 pub use probe::probe_file_size;
