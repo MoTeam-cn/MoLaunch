@@ -269,7 +269,7 @@ fn resume_key(task: &DownloadTask, urls: &[String], file_size: u64) -> u64 {
     );
     feed(&mut hash, &file_size.to_le_bytes());
     for url in urls {
-        feed(&mut hash, b'\0');
+        feed(&mut hash, &[0_u8]);
         feed(&mut hash, url.as_bytes());
     }
     hash
