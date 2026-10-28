@@ -77,8 +77,14 @@ pub async fn download_single(
     )
     .await;
 
-    if let Some(result) = result {
-        return result;
+    match result {
+        retry::AttemptOutcome::Done(progress) => return progress,
+        // 半成品还在盘上，下一次同一任务会直接续；这里如实报告而不是「全部源失败」
+        retry::AttemptOutcome::PartialKept => {
+            log_debug!("[Download] 未完成但已保留半成品: {}", task.local_path);
+            return verify::failed(task, "下载未完成，已保留半成品，下次将继续".to_string());
+        }
+        retry::AttemptOutcome::Failed => {}
     }
     if cancel_flag
         .as_ref()

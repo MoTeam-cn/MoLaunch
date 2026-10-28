@@ -14,12 +14,25 @@ use super::super::super::slow;
 use super::super::super::types::{
     ContentValidator, DownloadProgress, DownloadTask, GlobalProgress,
 };
-use super::engine;
+use super::engine::{self, EngineOutcome};
 use super::verify;
 use crate::minecraft::download::chunk;
 use crate::{log_debug, log_warn};
 
 const MAX_RETRIES: usize = 3;
+
+/// 一次下载尝试的结果
+///
+/// 与单纯的 `Option` 相比多了一个「半成品已保留」：此时既不能算成功，
+/// 也不能让上层再拿别的路径去覆盖那个文件。
+pub(super) enum AttemptOutcome {
+    /// 成功
+    Done(DownloadProgress),
+    /// 未完成，但半成品与位图已保留在盘上
+    PartialKept,
+    /// 所有路径都失败
+    Failed,
+}
 
 #[allow(clippy::too_many_arguments)]
 pub(super) async fn download_with_retries(
@@ -36,9 +49,9 @@ pub(super) async fn download_with_retries(
     pause_flag: Option<Arc<AtomicBool>>,
     cancel_flag: Option<Arc<AtomicBool>>,
     content_validator: Option<ContentValidator>,
-) -> Option<DownloadProgress> {
+) -> AttemptOutcome {
     if urls.is_empty() {
-        return None;
+        return AttemptOutcome::Failed;
     }
     let trusted_size = file_size;
 
@@ -49,7 +62,7 @@ pub(super) async fn download_with_retries(
     }
 
     if can_chunk && chunkable_size(size, chunk_count) && !is_cancelled(&cancel_flag) {
-        if let Some(done) = engine::run_engine(
+        match engine::run_engine(
             client,
             urls,
             task,
@@ -65,11 +78,15 @@ pub(super) async fn download_with_retries(
         )
         .await
         {
-            return Some(done);
+            EngineOutcome::Done(progress) => return AttemptOutcome::Done(progress),
+            // 半成品与位图留着，别让单流把它覆盖掉：
+            // 下一次同一任务进来会直接续，比重新下一遍划算
+            EngineOutcome::KeptPartial => return AttemptOutcome::PartialKept,
+            EngineOutcome::Fallback => {}
         }
     }
 
-    download_single_stream(
+    match download_single_stream(
         client,
         task,
         urls,
@@ -82,6 +99,10 @@ pub(super) async fn download_with_retries(
         content_validator,
     )
     .await
+    {
+        Some(progress) => AttemptOutcome::Done(progress),
+        None => AttemptOutcome::Failed,
+    }
 }
 
 /// 单流兜底：小文件、探测不到大小，或引擎彻底失败时使用

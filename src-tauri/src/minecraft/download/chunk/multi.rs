@@ -207,21 +207,22 @@ pub(crate) async fn download_multi(
         ceiling
     );
     let mut set: JoinSet<()> = JoinSet::new();
-    let mut initial = initial_workers(sources.len(), initial_budget);
-    // 主机记忆：记得这台 CDN 适合几条流，就从几条起步（不超过本轮份额）
-    for (index, count) in initial.iter_mut().enumerate() {
-        if let Some(remembered) = host_profile::suggest(&sources[index].url) {
-            *count = (*count).max(remembered.min(initial_budget));
+    // 只给活着的源分配 worker：定向重跑时保留下来的源不一定排在候选列表前几位，
+    // 按位置分配会让额度全落到被停用的源上，真正能用的那条一个 worker 也拿不到
+    let alive_indices: Vec<usize> = (0..sources.len())
+        .filter(|index| !sources[*index].dead.load(Ordering::Relaxed))
+        .collect();
+    let counts = initial_workers(alive_indices.len(), initial_budget);
+    for (index, count) in alive_indices.iter().zip(counts.iter()) {
+        let mut count = *count;
+        // 主机记忆：记得这台 CDN 适合几条流，就从几条起步（不超过本轮份额）
+        if let Some(remembered) = host_profile::suggest(&sources[*index].url) {
+            count = count.max(remembered.min(initial_budget));
         }
-    }
-    for (index, count) in initial.iter().enumerate() {
-        sources[index].target.store(*count, Ordering::Relaxed);
-        if sources[index].dead.load(Ordering::Relaxed) {
-            continue;
-        }
-        for _ in 0..*count {
-            sources[index].active.fetch_add(1, Ordering::Relaxed);
-            spawn_worker(&mut set, &args, index);
+        sources[*index].target.store(count, Ordering::Relaxed);
+        for _ in 0..count {
+            sources[*index].active.fetch_add(1, Ordering::Relaxed);
+            spawn_worker(&mut set, &args, *index);
         }
     }
 
@@ -283,6 +284,10 @@ pub(crate) async fn download_multi(
 
         // 判死：本轮零产出且有别的源可用（唯一活源永远保留）
         for index in alive.iter().copied() {
+            // 没分到 worker 的源不是「零产出」：它只是还没轮到，判死就再也不会被试用
+            if sources[index].active.load(Ordering::Relaxed) == 0 {
+                continue;
+            }
             if should_retire(rates[index], alive.len(), active_total) {
                 sources[index].dead.store(true, Ordering::Relaxed);
                 log_warn!("[Segment] 源本轮零产出，停用: {}", sources[index].url);
@@ -314,9 +319,9 @@ pub(crate) async fn download_multi(
         let avg = sum / usable.len().max(1) as u64;
         // 每轮重算份额：别的文件下完会让这里的额度变大，反之变小
         let share = budget::per_file_share(ceiling);
-        let total_target: usize = sources
+        let total_target: usize = usable
             .iter()
-            .map(|slot| slot.target.load(Ordering::Relaxed))
+            .map(|index| sources[*index].target.load(Ordering::Relaxed))
             .sum();
 
         // 收缩：明显低于均值的源减一条；worker 在下次认领前自行退出

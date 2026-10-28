@@ -19,6 +19,20 @@ use crate::minecraft::download::types::{
 use crate::minecraft::sources::is_mirror_url;
 use crate::{log_debug, log_warn};
 
+/// 引擎一次尝试的结果
+///
+/// 关键区别在「半成品要不要留」：单流兜底会用 `File::create` 从头写，
+/// 如果引擎刚把半成品与位图留在盘上，接着跑单流就等于把它们全丢了——
+/// 所以必须把「留着别动」和「已清干净可以兜底」分成两种结果。
+pub(super) enum EngineOutcome {
+    /// 成功
+    Done(DownloadProgress),
+    /// 有半成品与位图保留在盘上，不能再走单流（会覆盖掉）
+    KeptPartial,
+    /// 彻底失败且已清理，可以交给单流兜底
+    Fallback,
+}
+
 const FNV_OFFSET: u64 = 0xcbf2_9ce4_8422_2325;
 const FNV_PRIME: u64 = 0x0000_0100_0000_01b3;
 
@@ -37,7 +51,7 @@ pub(super) async fn run_engine(
     pause_flag: &Option<Arc<AtomicBool>>,
     cancel_flag: &Option<Arc<AtomicBool>>,
     content_validator: &Option<ContentValidator>,
-) -> Option<DownloadProgress> {
+) -> EngineOutcome {
     let key = resume_key(task, urls, file_size);
     // 进度记账：每轮跑完把「本文件当前可信字节」写进去，内部按差额增减，
     // 作废块重下时自动退回虚高的部分
@@ -133,15 +147,16 @@ pub(super) async fn run_engine(
                 .unwrap_or_else(|poisoned| poisoned.into_inner())
                 .insert(task.id.clone());
         }
-        return Some(verify::completed(
+        return EngineOutcome::Done(verify::completed(
             task,
             outcome.downloaded,
             outcome.total,
             0,
         ));
     }
-    // 有进度但没跑完（断网/反复超时）：保留半成品与位图，下次同一任务进来直接续
-    if outcome.resumable && !is_cancelled(cancel_flag) {
+    // 有进度但没跑完（断网、反复超时、用户取消）：保留半成品与位图，
+    // 下次同一任务进来直接续——取消不该把已经下好的几十兆一起扔掉
+    if outcome.resumable {
         log_warn!(
             "[Download] 保留半成品与位图（{}/{} 字节），下次继续: {}",
             outcome.downloaded,
@@ -149,7 +164,7 @@ pub(super) async fn run_engine(
             task.local_path
         );
         credit.rollback();
-        return None;
+        return EngineOutcome::KeptPartial;
     }
     // 一点进度都没有，或数据已不可信：清干净交给单流兜底
     log_debug!(
@@ -159,7 +174,7 @@ pub(super) async fn run_engine(
     let _ = std::fs::remove_file(&task.local_path);
     let _ = std::fs::remove_file(format!("{}.partmap", task.local_path));
     credit.rollback();
-    None
+    EngineOutcome::Fallback
 }
 
 /// 跑一轮段表引擎
