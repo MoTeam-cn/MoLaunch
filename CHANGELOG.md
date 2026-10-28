@@ -4,10 +4,11 @@
 
 ## [Unreleased]
 
+## [0.3.14-rc.1] - 2026-10-28
+
 ### 修复
 
 #### 暗色主题：浅色阶在深底上刺眼，`/NN` 透明度全部失效
-
 两件事同源：[`tailwind.config.js`](tailwind.config.js) 用的是 v3 的 `<alpha-value>` 占位符，项目却跑在 Tailwind v4.3.3 上——v4 把它当字面量，解析失败后一律给 `/ 1`。
 
 - [`theme-dark.scss`](src/assets/styles/theme-dark.scss)：原先只覆盖了 `bg-primary-50`、`bg-primary-100` 与 `bg-primary-50/60`。资源详情的版本卡片展开态用的是 `bg-primary-50/30`，没有规则命中，回退到 `:root` 的 `#eff2ff` 实心浅蓝，而同一卡片的文字已随变量转浅——浅底浅字，基本读不出来。现补齐主色浅底各档透明度变体，并补上 `border-primary-100/200/300`、`bg-primary-200`、`text-primary-400` 以及 `border-blue/red/amber/green/yellow/emerald-100~300`、`bg-blue-200`、`bg-red-200` 这些浅色阶的深色取值。
@@ -15,51 +16,7 @@
 - 14 个文件里 21 处 `bg-primary-50/30` 一类写法与不带 `/NN` 完全等价，一并去掉无效修饰符，视觉零变化。
 - 试过把色板搬到 `@theme inline` 让 `/NN` 真正生效：v4 对 `rgb(var(...))` 这种含变量的值推断不出颜色空间，产物仍是 `rgb(var(...))`，已放弃并回滚。
 
-### 新增
-
-#### 开发者页：受限 CurseForge 文件地址推导开关
-
-作者禁止第三方分发的 CurseForge 文件，官方 API 不返回下载地址，此前启动器**无条件**按 fileId 推导 CDN 地址。推导依赖 CurseForge 未公开的路径布局，属于「需要时才用」的能力，现改为开发者选项，默认关闭。
-
-- [`ExperimentalTab.vue`](src/views/settings/developer/ExperimentalTab.vue)：开发者页「实验性功能」下新增「下载实验开关」卡片，一个复选框即改即存，并说明开启/关闭后的具体行为。
-- [`models.rs`](src-tauri/src/state/config/models.rs)、[`defaults.rs`](src-tauri/src/state/config/defaults.rs)、[`load.rs`](src-tauri/src/config/load.rs)、[`save.rs`](src-tauri/src/config/save.rs)：新增 `download.cf_derive_url`（INI `[Download] cf_derive_url`），默认 `false`；旧配置缺该键时按默认值处理。
-- [`patch.rs`](src-tauri/src/commands/system/apply_config/types/patch.rs)、[`snapshot.rs`](src-tauri/src/commands/system/apply_config/types/snapshot.rs)、[`entry.rs`](src-tauri/src/commands/system/apply_config/types/entry.rs)、[`fields.rs`](src-tauri/src/commands/system/apply_config/apply/fields.rs)：配置补丁/快照字段 `cfDeriveUrl` 贯通，走既有的 `apply_config` / `get_config` 通道。
-- [`config.ts`](src/utils/api/config.ts)：前端 `ConfigSnapshot` / `ConfigPatch` 同步 `cfDeriveUrl`。
-- [`cf_policy.rs`](src-tauri/src/minecraft/community/cf_policy.rs)：新增进程级开关镜像。社区资源的版本转换层是同步纯函数，拿不到 `AppState` 的异步配置锁，故在启动加载配置（[`app.rs`](src-tauri/src/state/app.rs)）与保存配置（[`fields.rs`](src-tauri/src/commands/system/apply_config/apply/fields.rs)）时各写一次 `AtomicBool`，读取端零成本，开关改动立即生效、无需重启。
-- [`curseforge.rs`](src-tauri/src/commands/community/install/curseforge.rs)：整合包安装按开关决定是否推导。开关关闭时**先收集**受限文件、再一次性报错并列出文件名与 fileId，附上「开启开关」与「手动下载后放入 mods」两条出路——不再出现「安装完成但 mods 目录少文件」的静默残缺。
-
-#### 边缘节点优选（开发者开关，默认关闭）
-
-多边缘 CDN 的「最近节点」是 DNS 按解析器位置算出来的，不是按实际链路，经常给出绕路或拥塞的边缘。现在可以对同一域名解析出的多个 IP 各拉一小段真实文件测吞吐，挑最快的钉住使用。
-
-- [`edge.rs`](src-tauri/src/minecraft/download/edge.rs)、[`edge_test.rs`](src-tauri/src/minecraft/download/edge_test.rs)：新增优选模块——候选池来自系统解析结果（过滤内网、保留段、`198.18/15` 与 `100.64/10` 这类代理假地址），逐个用 `Range: bytes=0-4MiB` 采样测速，结果缓存 5 分钟；新节点要比当前快 **25% 以上**才切换（避免抖动横跳），连续 2 次传输失败直接作废重选；探测流量按每小时 64 MiB 记账，用完即停。只在 `cdn.modrinth.com` / `cdn.curseforge.com` / `edge.forgecdn.net` 等公开 CDN 域名生效，自家 CDN 与公共镜像不参与。
-- [`client.rs`](src-tauri/src/http/client.rs)、[`http.rs`](src-tauri/src/http.rs)：新增 `build_pinned_client`（把 host 钉到指定地址，SNI/Host/证书校验仍是原域名）与 `proxy_configured`；配置了代理或关闭了证书校验时整段跳过优选——这两种情况下换 IP 要么无意义、要么失去「TLS 失败即作废候选」这道防线。
-- [`retry.rs`](src-tauri/src/minecraft/download/downloader/retry.rs)：每条候选 URL 取客户端时查询优选结果，传输层失败上报健康度。
-- [`models.rs`](src-tauri/src/state/config/models.rs)、[`defaults.rs`](src-tauri/src/state/config/defaults.rs)、[`load.rs`](src-tauri/src/config/load.rs)、[`save.rs`](src-tauri/src/config/save.rs)、[`patch.rs`](src-tauri/src/commands/system/apply_config/types/patch.rs)、[`snapshot.rs`](src-tauri/src/commands/system/apply_config/types/snapshot.rs)、[`entry.rs`](src-tauri/src/commands/system/apply_config/types/entry.rs)、[`fields.rs`](src-tauri/src/commands/system/apply_config/apply/fields.rs)、[`app.rs`](src-tauri/src/state/app.rs)：新增 `download.edge_select`（INI `[Download] edge_select`），默认 `false`，启动与保存配置时同步到进程级标志。
-- [`ExperimentalTab.vue`](src/views/settings/developer/ExperimentalTab.vue)、[`config.ts`](src/utils/api/config.ts)：开发者页「下载实验开关」新增该选项。
-
-#### 段表引擎：按块多源并行下载（默认开启，可关）
-
-此前下载的调度单位是「源」：一次尝试里由一个 URL 独占整个文件，官方慢镜像快时无法同时利用。现在以**块**为单位调度，快慢由实测决定，坏的块立刻能被别的源接走。
-
-- [`table.rs`](src-tauri/src/minecraft/download/chunk/table.rs)、[`table_test.rs`](src-tauri/src/minecraft/download/chunk/table_test.rs)：段表——块划分只依赖（文件大小, 块长），与源无关，因此换源/重试/并行都共享同一张表；认领从表尾开始（尾块最难凑齐）、在飞块不会被重复派出、失败三次的块标为隔离只许官方源领。默认 2 MiB/块，块数超 65536 自动增大块长。10 例单测覆盖划分、认领顺序、失败释放、隔离与完成判定。
-- [`block.rs`](src-tauri/src/minecraft/download/chunk/block.rs)：单块下载（Range + 随机写目标文件偏移）；对非首块返回 200 视为「不支持 Range」并停用该源；块内不做续传（2 MiB 重下比对齐偏移更划算），带 20s 无数据超时与限速。
-- [`multi.rs`](src-tauri/src/minecraft/download/chunk/multi.rs)、[`multi_test.rs`](src-tauri/src/minecraft/download/chunk/multi_test.rs)：worker 池 + 源分配——初始单源拿满额度、多源先各一条；每 2s 采样各源 goodput，明显高于均值（1.2 倍）就加一条连接，本轮零产出且还有别的源则停用；唯一活源永不判死；连续 6 个窗口无进展才放弃。
-- [`retry.rs`](src-tauri/src/minecraft/download/downloader/retry.rs)：新引擎作为第一尝试，成功即返回；失败清掉半成品并退回原有逐源重试路径——**两个引擎并存**，出问题关开关即可回退。
-- [`segment_table.rs`](src-tauri/src/minecraft/download/chunk/segment_table.rs)：门面与开关 `download.segment_table`（INI 同键，默认 true）。
-
-#### 下载域名支持 DoH 解析（开发者开关，默认关闭）
-
-运营商 DNS 劫持/污染会让 CDN 域名解析到错误节点。现在可让下载域名走 DoH 解析，失败自动回落系统解析。
-
-- [`doh.rs`](src-tauri/src/http/doh.rs)、[`doh_test.rs`](src-tauri/src/http/doh_test.rs)：用各家的 DNS-JSON 接口（腾讯 → 阿里 → Cloudflare 依次回落），不实现 RFC 8484 的 wire format——解析报文要自己编解码、出错面大又不带来额外能力；只取 A/AAAA 记录并过滤 CNAME 与私有/TUN 假地址；连续 3 次失败熔断 5 分钟，避免每个文件都白等一次超时。7 例单测覆盖 JSON 解析、记录过滤、去重与熔断开合。
-- [`dns.rs`](src-tauri/src/http/dns.rs)：解析链固定为「DoH（开启时）→ 系统解析」；把内网/保留段/TUN 假地址的过滤抽成 `usable_address`，DoH、系统解析与边缘优选共用一份，避免三处各自实现留下缺口。
-- 开关 `download.doh`（INI 同键，默认 false）：国内 DoH 端点可用性不稳定，且域名会发给第三方解析商，不替用户默认决定。
-
-### 修复
-
 #### 受限 CurseForge 文件地址推导：路径布局与文件名编码都不对
-
 受限文件的 CDN 地址推导此前有两份各自独立的实现，且**两份都不对**。
 
 - [`convert.rs`](src-tauri/src/minecraft/community/curseforge/convert.rs)：社区资源版本转换里的推导把 fileId 按「末四位」切段并**完全丢掉了文件名**（`6767951` → `/files/676/7951`，正确应为 `/files/6767/951/<文件名>`），单 mod 安装拿到的是必然 404 的地址；且不看开关，关不掉。
@@ -68,146 +25,16 @@
 - [`helpers_test.rs`](src-tauri/src/commands/community/install/helpers_test.rs)：4 例单测钉住布局与编码（标准 URL、六位 fileId 的拆段、路径穿越被编码、开关语义）。
 
 #### 下载设置页直接指路社区资源配置
-
 - [`SettingsDownload.vue`](src/views/settings/SettingsDownload.vue)：「下载源」区块下方说明这里只管游戏本体、库文件与加载器安装包，并给出「你是来找 CurseForge 或 Modrinth 的下载配置的吗？点我前往」的链接，经 `?tab=advanced` 直达进阶设置里的社区资源区块。两个设置项名称相近，改错地方是常态，直接给一条路比改文案有效。
 
 #### CurseForge 缺 API Key 时不再阻断安装，按既定策略回退镜像
-
 前置检查在 reset_stages 之前就返回错误，把请求层早已实现的镜像回退路径完全挡掉——用户被告知去一个并不存在的「设置 → 社区资源」改配置，改对了地方也不生效。
 
 - [`shared.rs`](src-tauri/src/commands/community/install/modpack/shared.rs)：`validate_cf_api_key` 改为不拦截安装，仅在未配置可用 Key 时记录本次走镜像源。走官方还是镜像由请求层的 `get_cf_config` 决定，无 Key 时本就回退到 `mod.mcimirror.top`。
 - [`SettingsAdvanced.vue`](src/views/settings/SettingsAdvanced.vue)：开关说明原写「未配置 Key 时仍回退到镜像」，与后端行为矛盾，改为说明未配置时安装会失败以及替代路径。
 - [`SettingsDownload.vue`](src/views/settings/SettingsDownload.vue)、[`CommunityConfigCard.vue`](src/components/community/CommunityConfigCard.vue)：「下载」页的下载源与社区资源的来源策略互相指路，避免改错设置项。
 
-### 优化
-
-#### 镜像并发闸门与限流冷却
-
-公共镜像（OpenBMCLAPI / MCIM / 自建 mocdn）对高并发 Range 请求很敏感：默认 8 文件 × 4 分片最多 32 条并发打过去，很容易触发 429，随后整批回落到官方源反而更慢，而 429 此前只是「跳过该 URL」、没有退避。
-
-- [`mirror_gate.rs`](src-tauri/src/minecraft/download/mirror_gate.rs)、[`mirror_gate_test.rs`](src-tauri/src/minecraft/download/mirror_gate_test.rs)：新增镜像闸门模块——按**主机名**识别镜像域并分桶限流（OpenBMCLAPI / MCIM 每主机 4 条，自建 mocdn 8 条，一个慢镜像不会占掉另一个的额度）；收到 429/503 时按 `Retry-After` 或指数退避（2s→4s→8s→16s→30s 封顶）给该主机设冷却，2xx 立即清除。5 例单测覆盖退避序列、主机归并、镜像识别与冷却查询。
-- [`download.rs`](src-tauri/src/minecraft/download/chunk/download.rs)、[`stream.rs`](src-tauri/src/minecraft/download/downloader/stream.rs)：请求前申请槽位、响应后登记限流状态；许可持有到响应体读完，排队才真正生效。
-- [`retry.rs`](src-tauri/src/minecraft/download/downloader/retry.rs)：镜像处于冷却期时直接换下一个候选源，不再把 3 次重试浪费在必然被拒的镜像上；只有「已经是最后一个候选」才短暂等待（上限 5s）后照常尝试——冷却只是启发式，不能因此判定无源可用。
-
-#### 大文件分片数按文件大小自适应
-
-分片数此前恒等于用户设置（默认 4），大文件拿不到并行度上限；直接把默认值调高又会拖累小文件与低配网络。
-
-- [`api.rs`](src-tauri/src/minecraft/download/chunk/api.rs)：新增 `plan_chunk_count`——用户设置作为**下限**，按 16 MiB/片 推导，最多翻一倍且硬上限 12，小文件保持原值。规划只依赖（文件大小, 用户设置），同一文件换源重试得到相同分片布局，`.part` 续传因此仍可复用。
-- [`api_test.rs`](src-tauri/src/minecraft/download/chunk/api_test.rs)：5 例单测覆盖单流不放大、小文件保持、大文件最多翻倍、硬上限、结果稳定。
-
-#### 假活线路：低速换源与 Range 支持记忆
-
-连接「假活」（连得上、有数据但吞吐极低）时，此前只能等 15s 无数据才失败，一条烂线路能把整个整合包拖住；另外每个文件都要先发一次 Range 探测，批量下载白付一轮往返。
-
-- [`slow.rs`](src-tauri/src/minecraft/download/slow.rs)、[`slow_test.rs`](src-tauri/src/minecraft/download/slow_test.rs)：新增慢速判定——只有 5s 窗口内**整文件聚合**吞吐低于 256 KiB/s、且剩余数据 ≥1 MiB 才判慢（单看一条连接会把「8 条各 100KiB/s」误判成低速，收尾阶段也不判），5 例单测钉住阈值边界与探测器窗口。
-- [`stream.rs`](src-tauri/src/minecraft/download/downloader/stream.rs)、[`api.rs`](src-tauri/src/minecraft/download/chunk/api.rs)：单流用滑动窗口、分片用采样任务（RAII 守卫，任意返回路径都会中止，避免任务泄漏）汇总聚合吞吐；命中即中止当前源。
-- [`retry.rs`](src-tauri/src/minecraft/download/downloader/retry.rs)：**只在后面还有别的候选源时**才允许判慢换源——唯一候选宁可慢慢下完，也不能因为线路慢直接失败；分片判慢时不再回退到同一 URL 的单流。
-- [`probe.rs`](src-tauri/src/minecraft/download/chunk/probe.rs)：新增「已确认支持 Range」的主机缓存，同一次运行里同主机后续文件直接进分片、跳过探测；只做正向缓存，反向不缓存（服务端灰度或临时故障都会让「这次不支持」很快过期）。
-
-#### 下载走 HTTP/2 大窗口客户端
-
-下载此前复用全局客户端（HTTP/1.1，未开 `http2`），8 个并发文件就是 8 次 TCP + TLS 握手；同一 CDN 上的并发连接纯属重复建链。另外默认 64 KiB 的流窗口在长肥管道上要几十个 RTT 才爬满带宽。
-
-- [`Cargo.toml`](src-tauri/Cargo.toml)：`reqwest` 打开 `http2` feature。
-- [`client.rs`](src-tauri/src/http/client.rs)、[`http.rs`](src-tauri/src/http.rs)：新增下载专用客户端（`build_download_client` / `get_download_client`）——HTTP/2 自适应流控 + 单流初始窗口 1 MiB + 连接级窗口 64 MiB + 每 host 保留 8 条空闲连接；与 API/鉴权请求分开，互不挤占连接池策略。代理、TLS 信任源与「逐跳校验」重定向策略沿用原逻辑。
-- [`core.rs`](src-tauri/src/minecraft/download/manager/core.rs)：下载管理器改用下载专用客户端。
-
-#### 下载域名解析结果进程内缓存
-
-一次批量下载里同一个 CDN 域名会被解析上百次（每个分片、每次换源各一次），系统解析器每次都要走一遍缓存与上游。
-
-- [`dns.rs`](src-tauri/src/http/dns.rs)、[`dns_test.rs`](src-tauri/src/http/dns_test.rs)：新增带 60s TTL 的解析缓存并挂到下载客户端上；单次解析 6s 超时（卡住就快速失败交给换源，不让下载停在握手阶段），空结果不入缓存，时间顺序异常按已过期处理。TTL 取短不取长：缓存太久等于把客户端钉死在一个可能已经失效的边缘节点上。5 例单测覆盖新鲜度边界、时间倒退、覆盖写入与并发共享。
-
-#### 换源升档：第二条线路拿到更高分片并行度
-
-分片数只按文件大小规划一次，第一条线路若被限速，换到第二条线路仍是同样的并行度，等于把「这条线更快」的机会浪费掉。
-
-- [`api.rs`](src-tauri/src/minecraft/download/chunk/api.rs)：`plan_chunk_count` 增加升档系数，用户设置仍是下限、硬上限仍是 12；新增 `clear_part_files` 清理分片临时文件。
-- [`retry.rs`](src-tauri/src/minecraft/download/downloader/retry.rs)：判慢或失败换到下一条线路时并行度翻倍（封顶 2 倍）并清掉旧分片——布局变了旧 `.part` 的偏移就对不上新 Range 区间，不清会合并出坏文件。
-- [`api_test.rs`](src-tauri/src/minecraft/download/chunk/api_test.rs)、[`retry_test.rs`](src-tauri/src/minecraft/download/downloader/retry_test.rs)：补充升档、单流不被强改多流、档位异常按 1 处理、升档后布局稳定与升档封顶共 9 例。
-
-#### 元数据请求双线路对冲
-
-社区资源的元数据此前是「官方 10~20s 超时才回退镜像」，首屏白等；镜像本身通常几百毫秒就能出结果。
-
-- [`common.rs`](src-tauri/src/minecraft/community/common.rs)：新增 2s 对冲延迟常量。
-- [`curseforge/http.rs`](src-tauri/src/minecraft/community/curseforge/http.rs)、[`modrinth/http.rs`](src-tauri/src/minecraft/community/modrinth/http.rs)：官方线路领先 2s，超过就并发打镜像，先成功者胜出（慢的那条被取消）；官方与镜像的请求/解析合并为同一实现，404 互不重试的语义保持不变，镜像请求仍不带用户 API Key。
-
-#### 单源低速时拆分最难的分片并行提速
-
-只有唯一候选源时，慢速判定此前无事可做——换源没得换，判死又不该，只能干等最后那个卡住的分片。
-
-- [`split.rs`](src-tauri/src/minecraft/download/chunk/split.rs)、[`split_test.rs`](src-tauri/src/minecraft/download/chunk/split_test.rs)：新增拆分提速——单源场景下采样器判定低速后，挑「剩余字节最多且仍在跑」的分片，中止它并把剩余区间一分为二并行下载；左右两半完成后与已下前缀拼回原 `.part`，分片布局与合并逻辑完全不变（续传仍按原偏移）。剩余不足 8 MiB 不拆，避免多付一次往返。
-- [`api.rs`](src-tauri/src/minecraft/download/chunk/api.rs)：分片调度改为「监督循环 + is_finished 轮询」——被 abort 的任务不会返回结果，按完成计数会永久少一格；拆出来的两半各占一个预留进度槽位，成功拼装后一次性补进文件进度，避免与原任务重复计数。
-
-#### 段表引擎补齐：位图落盘、按来源定位可疑块、边缘优选接入
-
-上一版引擎有三处留白，这次补上。
-
-- [`table.rs`](src-tauri/src/minecraft/download/chunk/table.rs)：位图落盘（`.partmap`，每块 2 字节：状态 + 来源）。读回时校验文件大小与块长，并把「数据文件里还没写到的块」判为未完成——避免位图说有、文件其实是空洞的脏状态被当成已完成。
-- [`multi.rs`](src-tauri/src/minecraft/download/chunk/multi.rs)：每 2 秒与结束时落盘位图，完成即删除；**失败后复用已完成块重跑一轮**（只补未完成的块）；内容校验失败时**只重下非官方源下过的块**——元数据没有块级哈希，就以「块的来源」定位可疑块，比整份重下省得多。
-- [`retry.rs`](src-tauri/src/minecraft/download/downloader/retry.rs)：引擎首轮未完成就复用位图再跑一轮，内容校验失败再用「仅官方源」跑一轮，仍失败才清掉半成品与位图、退回逐源重试。
-- [`multi.rs`](src-tauri/src/minecraft/download/chunk/multi.rs)：每条源的每次取块都走一次边缘优选（`edge::client_for`），命中钉住 IP 的客户端就用它；块级传输失败上报该源的节点健康度——此前引擎完全绕过了边缘优选。
-- [`table_test.rs`](src-tauri/src/minecraft/download/chunk/table_test.rs)：补位图往返、来源作废、文件大小不匹配、数据文件偏短、位图损坏共 6 例。
-
-#### 下载引擎合并为一套：删掉旧分片实现
-
-此前下载层有两套实现并存（按块多源的段表引擎 + 逐源重试里的 `.part` 分片与单源拆分），
-谁生效取决于文件大小和开关，读代码与排查问题都要同时看两条路径。现在合并为一套。
-
-- 删除 `chunk/api.rs`、`api_test.rs`、`chunk/download.rs`、`chunk/merge.rs`、`chunk/split.rs`、`split_test.rs`（约 1500 行）：`.part{i}` 落盘 + 合并、单源左右拆分、换源并行度升档全部退役；
-- [`retry.rs`](src-tauri/src/minecraft/download/downloader/retry.rs)：变成「段表引擎优先、单流兜底」两层——大文件走引擎，小文件（< 1 MiB）与探测不到大小的文件直接单流，不再有第三、第四条路径；
-- [`probe.rs`](src-tauri/src/minecraft/download/chunk/probe.rs)：只保留文件大小探测，Range 支持判断由引擎在首个块上实测（非首块返回 200 即判定不支持）；
-- 移除开发开关 `download.segment_table` 及对应配置项、前端开关：引擎就是唯一实现，回退不再是「切另一套代码」；
-- [`multi.rs`](src-tauri/src/minecraft/download/chunk/multi.rs)：AIMD 补齐收缩——某条源吞吐跌到均值一半以下且不止一条连接时减一条（worker 在下次认领前自行退出，不打断进行中的块），单条连接永远保底，避免慢源被自己饿死；
-- [`multi_test.rs`](src-tauri/src/minecraft/download/chunk/multi_test.rs)：补 `should_shrink` 三例（明显低于均值才收缩、单连接保底、均值为零不动）。
-
-#### 下载引擎：坏块重下阶梯、半成品可续、进度按实际对齐
-
-上一版只在「校验失败」时做了一次按来源的重下，且失败就把半成品全删。这次把这条链补完整。
-
-- [`engine.rs`](src-tauri/src/minecraft/download/downloader/engine.rs)、[`engine_test.rs`](src-tauri/src/minecraft/download/downloader/engine_test.rs)（新）：引擎调用与校验从 `retry.rs` 抽出，形成三级重下阶梯——全部未完成 → 只重下**非官方源下过的块** → **全部作废只用官方源**；元数据没有块级哈希，这是能做到的最小重下量。
-- **半成品保留**：未跑完但有进度（断网、反复超时）不再删文件，位图与半成品留在磁盘上，同一任务下次进来直接续；只有「零进度」或「数据已不可信」才清干净交给单流兜底——单流会从头写，不能踩到半成品。
-- [`table.rs`](src-tauri/src/minecraft/download/chunk/table.rs)：位图文件头加**续传指纹**（任务 id、期望哈希、文件大小、来源集合的 FNV 摘要）。同名文件大小相同但内容换了（同名模组更新）时拒绝复用旧位图；格式升到 `MPSEG2`，旧位图自动判为无效。新增 `invalidate_all`。
-- **进度对齐**：每轮跑完把「本文件已计入全局进度的字节」与引擎的当前可信字节对齐，作废块重下会把虚高部分退回去——此前多轮重跑会重复累计。
-- [`schedule.rs`](src-tauri/src/minecraft/download/chunk/schedule.rs)、[`schedule_test.rs`](src-tauri/src/minecraft/download/chunk/schedule_test.rs)（新）：初始分配、扩容、收缩、判死抽成纯函数并补 10 例测试；[`multi.rs`](src-tauri/src/minecraft/download/chunk/multi.rs) 只留编排（起 worker、采样、落盘），`multi_test.rs` 随之退役。
-
-#### 连接额度改成跨文件共享的全局池
-
-此前每个文件独立封顶（最多 12 条连接），而文件并发又按「最大线程数」开：8 个文件同时下就是 32 条连接，
-既压垮本机带宽分配，也容易被 CDN 判定为异常流量。现在把「最大线程数」当作**全局连接总预算**，按活跃文件数分摊。
-
-- [`budget.rs`](src-tauri/src/minecraft/download/budget.rs)、[`budget_test.rs`](src-tauri/src/minecraft/download/budget_test.rs)（新）：总预算 + 活跃文件计数；份额 = `总预算 / 活跃文件数`，受单文件上限（用户设的分片数）约束，且**永远保底 1 条**——再拥挤也给每个文件留一条，否则它会永远排不上。活跃名额用 RAII 租约（`FileLease`）管理，失败、取消都不会漏归还。
-- [`multi.rs`](src-tauri/src/minecraft/download/chunk/multi.rs)：每轮采样后重算份额——别的文件下完额度会变大（自动加速），文件变多则收缩；本文件连接数超过当前份额时无条件减一条，不必等它变慢。
-- [`budget.rs`](src-tauri/src/minecraft/download/budget.rs)：总预算 = **最大线程数 × 2**（上限 64）。不能直接用最大线程数——分片下载至少要 2 条连接才可能快于单流，文件一多每个文件只剩 1 条，批量安装反而退化。默认 8 线程 → 16 条总预算：单文件下载拿满分片数（与之前一致），8 个文件并行时每个仍有 2 条，而此前是 8 × 4 = 32 条。
-- [`manager/core.rs`](src-tauri/src/minecraft/download/manager/core.rs)：构造下载会话时把折算后的总预算写入池子。想要更高吞吐就调大「最大线程数」，各文件会自动按份额加速。
-
-#### 库文件候选链：补上 Maven Central 与阿里云镜像
-
-此前一个库只有两条候选：版本 JSON 声明的地址，和 BMCLAPI 的同路径代理。Mojang 的 Maven 这些年下架了不少老构件
-（典型 `net.java.jinput` 的平台 jar 直接 404），两条都落空时安装就断在那里。
-
-- [`library_chain.rs`](src-tauri/src/minecraft/sources/library_chain.rs)、[`library_chain_test.rs`](src-tauri/src/minecraft/sources/library_chain_test.rs)（新）：把「一个构件该去哪些仓库找」抽成一条有序候选链——BMCLAPI `/maven/` → BMCLAPI `/libraries/` → Mojang Maven → 老构件原仓库 → **Maven Central** → **阿里云公共仓**。构件相对路径优先从 maven 坐标推导（带 classifier 也算得对），拿不到坐标才退回本地路径。
-- [`constants.rs`](src-tauri/src/minecraft/sources/constants.rs)：新增 `MAVEN_CENTRAL`、`ALIYUN_MAVEN_PUBLIC`、`MAVEN_SPONGE`。阿里云是 Central 的国内 1:1 镜像，不需要代理。
-- **老构件归位**：按 groupId 前缀猜原仓库——`org/ow2/`、`org/scala-lang/`、`org/jline/`、`jline/`、`net/java/dev/jna/`、`com/typesafe/` 走 Central；`net/fabricmc/`、`net/minecraftforge/`、`cpw/mods/`、`net/neoforged/`、`org/spongepowered/` 走各自仓库。
-- [`libraries/download.rs`](src-tauri/src/minecraft/version/libraries/download.rs)：候选按「用户自配镜像 → 声明来源 → 兜底链」组装并保序去重；顺带修掉一个老问题——声明地址是 `libraries.minecraft.net` 时，BMCLAPI 的 `/libraries/` 候选因为套在 `if 替换生效` 分支里而永远不生成。
-- [`http.rs`](src-tauri/src/minecraft/sources/http.rs)：`is_mirror_url` 认阿里云公共仓，因此「仅官方源」模式下不会走它。
-- [`multi.rs`](src-tauri/src/minecraft/download/chunk/multi.rs)：候选源多于连接额度时，排在后面的源一开始分不到 worker；前面的源全被判死后唤醒一条，避免「没人试过所以永远不试」。
-
-#### 校验与续传：流式哈希、验证证明、位图自校验、主机记忆、退役地址还原
-
-这轮把「校验读盘」和「跨文件经验」两块补齐，顺手修掉两个真问题。
-
-- [`hash.rs`](src-tauri/src/minecraft/utils/hash.rs)、[`hash_test.rs`](src-tauri/src/minecraft/utils/hash_test.rs)（新）：**流式**哈希（64 KiB 缓冲，2 GB 整合包也不顶内存），按期望值长度识别 md5/sha1/sha256/**sha512**；**验证证明缓存**记录「路径 + 大小 + 修改/创建时间」，验证过的文件元数据没变就不重算。
-- [`file_checker.rs`](src-tauri/src/minecraft/utils/file_checker.rs)：改用上述实现，并修掉一个真 bug——此前按「长度 64 当 sha256、其余当 sha1」猜算法，**128 字符的 sha512 会被当成 sha1 去比，永远不匹配**，导致反复重下；长度认不出时改为跳过哈希校验并告警，不再瞎猜。
-- [`table.rs`](src-tauri/src/minecraft/download/chunk/table.rs)：位图升到 `MPSEG3`，每块额外存**写入时算出的 SHA256**；恢复时逐块读回验证，「位图说完成、数据其实是空洞」的脏状态会被丢弃并告警。同一次尝试内的重跑信任刚写下的位图，不重复读盘。
-- [`block.rs`](src-tauri/src/minecraft/download/chunk/block.rs)、[`multi.rs`](src-tauri/src/minecraft/download/chunk/multi.rs)：边写边算块哈希，完成后随块一起记入位图。
-- [`host_profile.rs`](src-tauri/src/minecraft/download/host_profile.rs)、[`host_profile_test.rs`](src-tauri/src/minecraft/download/host_profile_test.rs)（新）：**主机脾气记忆**——把每个主机学到的并发目标与吞吐（EMA）留下来，下一个文件直接从上次的结论起步，不必重新试错；记忆 30 分钟过期，并发取历史最大值（只是起点，方向不对引擎两个窗口内自己收回）。
-- [`retired.rs`](src-tauri/src/minecraft/sources/retired.rs)、[`retired_test.rs`](src-tauri/src/minecraft/sources/retired_test.rs)（新）：**退役镜像地址还原**——老 manifest 里的 `cdn-alt.modrinth.com`、`mod.tianpao.top` 按路径前缀换成官方地址（`/data/`→Modrinth、`/files/`→CF edge、`/media/`→CF media），查询串原样保留，对不上的原样返回不猜。
-
-#### 修复：进度重复累计、连接数震荡、恢复时阻塞执行器
-
+#### 进度重复累计、连接数震荡、恢复时阻塞执行器
 回归排查发现三处真问题，都在最近几轮引入。
 
 - **进度翻倍**：块级写盘每收到一段数据就加一次 `downloaded_bytes`，引擎每轮跑完又按「已完成字节」补一次，同一个 100 MB 文件会被记成 200 MB。新增 [`credit.rs`](src-tauri/src/minecraft/download/credit.rs) 统一记账——接口改成「设置本文件的累计贡献」，内部只按差额增减，谁调用、调用几次都幂等；[`block.rs`](src-tauri/src/minecraft/download/chunk/block.rs) 不再直接写全局进度，[`multi.rs`](src-tauri/src/minecraft/download/chunk/multi.rs) 每采样窗口上报一次，[`engine.rs`](src-tauri/src/minecraft/download/downloader/engine.rs) 每轮与最终失败时结算。顺带修掉「失败块的半截字节被计入却从不回退」。
@@ -219,38 +46,191 @@
 - **从没分到连接的源会被判死**：额度不足时排在后面的候选源一个 worker 也拿不到，首轮采样零产出就被标成「停用」，之后永不再试。现在判定前要求该源本轮确实有 worker 在跑；初始额度也只分配给活着的源（定向重跑时保留的源不一定排在前面）。
 - 用户取消下载时不再删除半成品与位图：已经下好的几十兆没有理由一起扔掉，下次继续即可。
 
-#### 重构：位图落盘拆出独立模块
+#### 慢速源被误判为「无进展」
+- 并行下载的「无进展」判定原本看「有没有块下完」。块长 2 MiB，一个 100 KB/s 的源下完一块要 20 秒以上，而判定阈值只有十来个采样窗口——**结果慢但在动的源会被直接终止**，最后退化成「并行未完成，保留半成品」。改为看**字节有没有在流动**：只要有数据落盘就不算无进展。
 
-- [`table_map.rs`](src-tauri/src/minecraft/download/chunk/table_map.rs)（新）：序列化、自校验、本进程信任记录从 `table.rs` 拆出（`table.rs` 418 行 → 254 行），段表只管状态，落盘格式单独可读。
 
-#### 新增：主机记忆落盘
+### 新增
 
+#### 开发者页：受限 CurseForge 文件地址推导开关
+作者禁止第三方分发的 CurseForge 文件，官方 API 不返回下载地址，此前启动器**无条件**按 fileId 推导 CDN 地址。推导依赖 CurseForge 未公开的路径布局，属于「需要时才用」的能力，现改为开发者选项，默认关闭。
+
+- [`ExperimentalTab.vue`](src/views/settings/developer/ExperimentalTab.vue)：开发者页「实验性功能」下新增「下载实验开关」卡片，一个复选框即改即存，并说明开启/关闭后的具体行为。
+- [`models.rs`](src-tauri/src/state/config/models.rs)、[`defaults.rs`](src-tauri/src/state/config/defaults.rs)、[`load.rs`](src-tauri/src/config/load.rs)、[`save.rs`](src-tauri/src/config/save.rs)：新增 `download.cf_derive_url`（INI `[Download] cf_derive_url`），默认 `false`；旧配置缺该键时按默认值处理。
+- [`patch.rs`](src-tauri/src/commands/system/apply_config/types/patch.rs)、[`snapshot.rs`](src-tauri/src/commands/system/apply_config/types/snapshot.rs)、[`entry.rs`](src-tauri/src/commands/system/apply_config/types/entry.rs)、[`fields.rs`](src-tauri/src/commands/system/apply_config/apply/fields.rs)：配置补丁/快照字段 `cfDeriveUrl` 贯通，走既有的 `apply_config` / `get_config` 通道。
+- [`config.ts`](src/utils/api/config.ts)：前端 `ConfigSnapshot` / `ConfigPatch` 同步 `cfDeriveUrl`。
+- [`cf_policy.rs`](src-tauri/src/minecraft/community/cf_policy.rs)：新增进程级开关镜像。社区资源的版本转换层是同步纯函数，拿不到 `AppState` 的异步配置锁，故在启动加载配置（[`app.rs`](src-tauri/src/state/app.rs)）与保存配置（[`fields.rs`](src-tauri/src/commands/system/apply_config/apply/fields.rs)）时各写一次 `AtomicBool`，读取端零成本，开关改动立即生效、无需重启。
+- [`curseforge.rs`](src-tauri/src/commands/community/install/curseforge.rs)：整合包安装按开关决定是否推导。开关关闭时**先收集**受限文件、再一次性报错并列出文件名与 fileId，附上「开启开关」与「手动下载后放入 mods」两条出路——不再出现「安装完成但 mods 目录少文件」的静默残缺。
+
+#### 边缘节点优选（开发者开关，默认关闭）
+多边缘 CDN 的「最近节点」是 DNS 按解析器位置算出来的，不是按实际链路，经常给出绕路或拥塞的边缘。现在可以对同一域名解析出的多个 IP 各拉一小段真实文件测吞吐，挑最快的钉住使用。
+
+- [`edge.rs`](src-tauri/src/minecraft/download/edge.rs)、[`edge_test.rs`](src-tauri/src/minecraft/download/edge_test.rs)：新增优选模块——候选池来自系统解析结果（过滤内网、保留段、`198.18/15` 与 `100.64/10` 这类代理假地址），逐个用 `Range: bytes=0-4MiB` 采样测速，结果缓存 5 分钟；新节点要比当前快 **25% 以上**才切换（避免抖动横跳），连续 2 次传输失败直接作废重选；探测流量按每小时 64 MiB 记账，用完即停。只在 `cdn.modrinth.com` / `cdn.curseforge.com` / `edge.forgecdn.net` 等公开 CDN 域名生效，自家 CDN 与公共镜像不参与。
+- [`client.rs`](src-tauri/src/http/client.rs)、[`http.rs`](src-tauri/src/http.rs)：新增 `build_pinned_client`（把 host 钉到指定地址，SNI/Host/证书校验仍是原域名）与 `proxy_configured`；配置了代理或关闭了证书校验时整段跳过优选——这两种情况下换 IP 要么无意义、要么失去「TLS 失败即作废候选」这道防线。
+- [`retry.rs`](src-tauri/src/minecraft/download/downloader/retry.rs)：每条候选 URL 取客户端时查询优选结果，传输层失败上报健康度。
+- [`models.rs`](src-tauri/src/state/config/models.rs)、[`defaults.rs`](src-tauri/src/state/config/defaults.rs)、[`load.rs`](src-tauri/src/config/load.rs)、[`save.rs`](src-tauri/src/config/save.rs)、[`patch.rs`](src-tauri/src/commands/system/apply_config/types/patch.rs)、[`snapshot.rs`](src-tauri/src/commands/system/apply_config/types/snapshot.rs)、[`entry.rs`](src-tauri/src/commands/system/apply_config/types/entry.rs)、[`fields.rs`](src-tauri/src/commands/system/apply_config/apply/fields.rs)、[`app.rs`](src-tauri/src/state/app.rs)：新增 `download.edge_select`（INI `[Download] edge_select`），默认 `false`，启动与保存配置时同步到进程级标志。
+- [`ExperimentalTab.vue`](src/views/settings/developer/ExperimentalTab.vue)、[`config.ts`](src/utils/api/config.ts)：开发者页「下载实验开关」新增该选项。
+
+#### 段表引擎：按块多源并行下载（默认开启，可关）
+此前下载的调度单位是「源」：一次尝试里由一个 URL 独占整个文件，官方慢镜像快时无法同时利用。现在以**块**为单位调度，快慢由实测决定，坏的块立刻能被别的源接走。
+
+- [`table.rs`](src-tauri/src/minecraft/download/chunk/table.rs)、[`table_test.rs`](src-tauri/src/minecraft/download/chunk/table_test.rs)：段表——块划分只依赖（文件大小, 块长），与源无关，因此换源/重试/并行都共享同一张表；认领从表尾开始（尾块最难凑齐）、在飞块不会被重复派出、失败三次的块标为隔离只许官方源领。默认 2 MiB/块，块数超 65536 自动增大块长。10 例单测覆盖划分、认领顺序、失败释放、隔离与完成判定。
+- [`block.rs`](src-tauri/src/minecraft/download/chunk/block.rs)：单块下载（Range + 随机写目标文件偏移）；对非首块返回 200 视为「不支持 Range」并停用该源；块内不做续传（2 MiB 重下比对齐偏移更划算），带 20s 无数据超时与限速。
+- [`multi.rs`](src-tauri/src/minecraft/download/chunk/multi.rs)、[`multi_test.rs`](src-tauri/src/minecraft/download/chunk/multi_test.rs)：worker 池 + 源分配——初始单源拿满额度、多源先各一条；每 2s 采样各源 goodput，明显高于均值（1.2 倍）就加一条连接，本轮零产出且还有别的源则停用；唯一活源永不判死；连续 6 个窗口无进展才放弃。
+- [`retry.rs`](src-tauri/src/minecraft/download/downloader/retry.rs)：新引擎作为第一尝试，成功即返回；失败清掉半成品并退回原有逐源重试路径——**两个引擎并存**，出问题关开关即可回退。
+- [`segment_table.rs`](src-tauri/src/minecraft/download/chunk/segment_table.rs)：门面与开关 `download.segment_table`（INI 同键，默认 true）。
+
+#### 下载域名支持 DoH 解析（开发者开关，默认关闭）
+运营商 DNS 劫持/污染会让 CDN 域名解析到错误节点。现在可让下载域名走 DoH 解析，失败自动回落系统解析。
+
+- [`doh.rs`](src-tauri/src/http/doh.rs)、[`doh_test.rs`](src-tauri/src/http/doh_test.rs)：用各家的 DNS-JSON 接口（腾讯 → 阿里 → Cloudflare 依次回落），不实现 RFC 8484 的 wire format——解析报文要自己编解码、出错面大又不带来额外能力；只取 A/AAAA 记录并过滤 CNAME 与私有/TUN 假地址；连续 3 次失败熔断 5 分钟，避免每个文件都白等一次超时。7 例单测覆盖 JSON 解析、记录过滤、去重与熔断开合。
+- [`dns.rs`](src-tauri/src/http/dns.rs)：解析链固定为「DoH（开启时）→ 系统解析」；把内网/保留段/TUN 假地址的过滤抽成 `usable_address`，DoH、系统解析与边缘优选共用一份，避免三处各自实现留下缺口。
+- 开关 `download.doh`（INI 同键，默认 false）：国内 DoH 端点可用性不稳定，且域名会发给第三方解析商，不替用户默认决定。
+
+#### 主机记忆落盘
 - [`host_profile.rs`](src-tauri/src/minecraft/download/host_profile.rs)：记忆写入 `cache/download/host_profiles.json`，重启后仍有效；条目带绝对时间戳，超过 30 分钟自动作废，条数上限 64（按最近使用淘汰），格式带版本号，版本不认识就当没有——不猜、不迁移。落盘节流为 60 秒一次。
 
-#### 变更：外部厂商 frpc 下载接入统一下载栈
 
+### 优化
+
+#### 镜像并发闸门与限流冷却
+公共镜像（OpenBMCLAPI / MCIM / 自建 mocdn）对高并发 Range 请求很敏感：默认 8 文件 × 4 分片最多 32 条并发打过去，很容易触发 429，随后整批回落到官方源反而更慢，而 429 此前只是「跳过该 URL」、没有退避。
+
+- [`mirror_gate.rs`](src-tauri/src/minecraft/download/mirror_gate.rs)、[`mirror_gate_test.rs`](src-tauri/src/minecraft/download/mirror_gate_test.rs)：新增镜像闸门模块——按**主机名**识别镜像域并分桶限流（OpenBMCLAPI / MCIM 每主机 4 条，自建 mocdn 8 条，一个慢镜像不会占掉另一个的额度）；收到 429/503 时按 `Retry-After` 或指数退避（2s→4s→8s→16s→30s 封顶）给该主机设冷却，2xx 立即清除。5 例单测覆盖退避序列、主机归并、镜像识别与冷却查询。
+- [`download.rs`](src-tauri/src/minecraft/download/chunk/download.rs)、[`stream.rs`](src-tauri/src/minecraft/download/downloader/stream.rs)：请求前申请槽位、响应后登记限流状态；许可持有到响应体读完，排队才真正生效。
+- [`retry.rs`](src-tauri/src/minecraft/download/downloader/retry.rs)：镜像处于冷却期时直接换下一个候选源，不再把 3 次重试浪费在必然被拒的镜像上；只有「已经是最后一个候选」才短暂等待（上限 5s）后照常尝试——冷却只是启发式，不能因此判定无源可用。
+
+#### 大文件分片数按文件大小自适应
+分片数此前恒等于用户设置（默认 4），大文件拿不到并行度上限；直接把默认值调高又会拖累小文件与低配网络。
+
+- [`api.rs`](src-tauri/src/minecraft/download/chunk/api.rs)：新增 `plan_chunk_count`——用户设置作为**下限**，按 16 MiB/片 推导，最多翻一倍且硬上限 12，小文件保持原值。规划只依赖（文件大小, 用户设置），同一文件换源重试得到相同分片布局，`.part` 续传因此仍可复用。
+- [`api_test.rs`](src-tauri/src/minecraft/download/chunk/api_test.rs)：5 例单测覆盖单流不放大、小文件保持、大文件最多翻倍、硬上限、结果稳定。
+
+#### 假活线路：低速换源与 Range 支持记忆
+连接「假活」（连得上、有数据但吞吐极低）时，此前只能等 15s 无数据才失败，一条烂线路能把整个整合包拖住；另外每个文件都要先发一次 Range 探测，批量下载白付一轮往返。
+
+- [`slow.rs`](src-tauri/src/minecraft/download/slow.rs)、[`slow_test.rs`](src-tauri/src/minecraft/download/slow_test.rs)：新增慢速判定——只有 5s 窗口内**整文件聚合**吞吐低于 256 KiB/s、且剩余数据 ≥1 MiB 才判慢（单看一条连接会把「8 条各 100KiB/s」误判成低速，收尾阶段也不判），5 例单测钉住阈值边界与探测器窗口。
+- [`stream.rs`](src-tauri/src/minecraft/download/downloader/stream.rs)、[`api.rs`](src-tauri/src/minecraft/download/chunk/api.rs)：单流用滑动窗口、分片用采样任务（RAII 守卫，任意返回路径都会中止，避免任务泄漏）汇总聚合吞吐；命中即中止当前源。
+- [`retry.rs`](src-tauri/src/minecraft/download/downloader/retry.rs)：**只在后面还有别的候选源时**才允许判慢换源——唯一候选宁可慢慢下完，也不能因为线路慢直接失败；分片判慢时不再回退到同一 URL 的单流。
+- [`probe.rs`](src-tauri/src/minecraft/download/chunk/probe.rs)：新增「已确认支持 Range」的主机缓存，同一次运行里同主机后续文件直接进分片、跳过探测；只做正向缓存，反向不缓存（服务端灰度或临时故障都会让「这次不支持」很快过期）。
+
+#### 下载走 HTTP/2 大窗口客户端
+下载此前复用全局客户端（HTTP/1.1，未开 `http2`），8 个并发文件就是 8 次 TCP + TLS 握手；同一 CDN 上的并发连接纯属重复建链。另外默认 64 KiB 的流窗口在长肥管道上要几十个 RTT 才爬满带宽。
+
+- [`Cargo.toml`](src-tauri/Cargo.toml)：`reqwest` 打开 `http2` feature。
+- [`client.rs`](src-tauri/src/http/client.rs)、[`http.rs`](src-tauri/src/http.rs)：新增下载专用客户端（`build_download_client` / `get_download_client`）——HTTP/2 自适应流控 + 单流初始窗口 1 MiB + 连接级窗口 64 MiB + 每 host 保留 8 条空闲连接；与 API/鉴权请求分开，互不挤占连接池策略。代理、TLS 信任源与「逐跳校验」重定向策略沿用原逻辑。
+- [`core.rs`](src-tauri/src/minecraft/download/manager/core.rs)：下载管理器改用下载专用客户端。
+
+#### 下载域名解析结果进程内缓存
+一次批量下载里同一个 CDN 域名会被解析上百次（每个分片、每次换源各一次），系统解析器每次都要走一遍缓存与上游。
+
+- [`dns.rs`](src-tauri/src/http/dns.rs)、[`dns_test.rs`](src-tauri/src/http/dns_test.rs)：新增带 60s TTL 的解析缓存并挂到下载客户端上；单次解析 6s 超时（卡住就快速失败交给换源，不让下载停在握手阶段），空结果不入缓存，时间顺序异常按已过期处理。TTL 取短不取长：缓存太久等于把客户端钉死在一个可能已经失效的边缘节点上。5 例单测覆盖新鲜度边界、时间倒退、覆盖写入与并发共享。
+
+#### 换源升档：第二条线路拿到更高分片并行度
+分片数只按文件大小规划一次，第一条线路若被限速，换到第二条线路仍是同样的并行度，等于把「这条线更快」的机会浪费掉。
+
+- [`api.rs`](src-tauri/src/minecraft/download/chunk/api.rs)：`plan_chunk_count` 增加升档系数，用户设置仍是下限、硬上限仍是 12；新增 `clear_part_files` 清理分片临时文件。
+- [`retry.rs`](src-tauri/src/minecraft/download/downloader/retry.rs)：判慢或失败换到下一条线路时并行度翻倍（封顶 2 倍）并清掉旧分片——布局变了旧 `.part` 的偏移就对不上新 Range 区间，不清会合并出坏文件。
+- [`api_test.rs`](src-tauri/src/minecraft/download/chunk/api_test.rs)、[`retry_test.rs`](src-tauri/src/minecraft/download/downloader/retry_test.rs)：补充升档、单流不被强改多流、档位异常按 1 处理、升档后布局稳定与升档封顶共 9 例。
+
+#### 元数据请求双线路对冲
+社区资源的元数据此前是「官方 10~20s 超时才回退镜像」，首屏白等；镜像本身通常几百毫秒就能出结果。
+
+- [`common.rs`](src-tauri/src/minecraft/community/common.rs)：新增 2s 对冲延迟常量。
+- [`curseforge/http.rs`](src-tauri/src/minecraft/community/curseforge/http.rs)、[`modrinth/http.rs`](src-tauri/src/minecraft/community/modrinth/http.rs)：官方线路领先 2s，超过就并发打镜像，先成功者胜出（慢的那条被取消）；官方与镜像的请求/解析合并为同一实现，404 互不重试的语义保持不变，镜像请求仍不带用户 API Key。
+
+#### 单源低速时拆分最难的分片并行提速
+只有唯一候选源时，慢速判定此前无事可做——换源没得换，判死又不该，只能干等最后那个卡住的分片。
+
+- [`split.rs`](src-tauri/src/minecraft/download/chunk/split.rs)、[`split_test.rs`](src-tauri/src/minecraft/download/chunk/split_test.rs)：新增拆分提速——单源场景下采样器判定低速后，挑「剩余字节最多且仍在跑」的分片，中止它并把剩余区间一分为二并行下载；左右两半完成后与已下前缀拼回原 `.part`，分片布局与合并逻辑完全不变（续传仍按原偏移）。剩余不足 8 MiB 不拆，避免多付一次往返。
+- [`api.rs`](src-tauri/src/minecraft/download/chunk/api.rs)：分片调度改为「监督循环 + is_finished 轮询」——被 abort 的任务不会返回结果，按完成计数会永久少一格；拆出来的两半各占一个预留进度槽位，成功拼装后一次性补进文件进度，避免与原任务重复计数。
+
+#### 段表引擎补齐：位图落盘、按来源定位可疑块、边缘优选接入
+上一版引擎有三处留白，这次补上。
+
+- [`table.rs`](src-tauri/src/minecraft/download/chunk/table.rs)：位图落盘（`.partmap`，每块 2 字节：状态 + 来源）。读回时校验文件大小与块长，并把「数据文件里还没写到的块」判为未完成——避免位图说有、文件其实是空洞的脏状态被当成已完成。
+- [`multi.rs`](src-tauri/src/minecraft/download/chunk/multi.rs)：每 2 秒与结束时落盘位图，完成即删除；**失败后复用已完成块重跑一轮**（只补未完成的块）；内容校验失败时**只重下非官方源下过的块**——元数据没有块级哈希，就以「块的来源」定位可疑块，比整份重下省得多。
+- [`retry.rs`](src-tauri/src/minecraft/download/downloader/retry.rs)：引擎首轮未完成就复用位图再跑一轮，内容校验失败再用「仅官方源」跑一轮，仍失败才清掉半成品与位图、退回逐源重试。
+- [`multi.rs`](src-tauri/src/minecraft/download/chunk/multi.rs)：每条源的每次取块都走一次边缘优选（`edge::client_for`），命中钉住 IP 的客户端就用它；块级传输失败上报该源的节点健康度——此前引擎完全绕过了边缘优选。
+- [`table_test.rs`](src-tauri/src/minecraft/download/chunk/table_test.rs)：补位图往返、来源作废、文件大小不匹配、数据文件偏短、位图损坏共 6 例。
+
+#### 下载引擎合并为一套：删掉旧分片实现
+此前下载层有两套实现并存（按块多源的段表引擎 + 逐源重试里的 `.part` 分片与单源拆分），
+谁生效取决于文件大小和开关，读代码与排查问题都要同时看两条路径。现在合并为一套。
+
+- 删除 `chunk/api.rs`、`api_test.rs`、`chunk/download.rs`、`chunk/merge.rs`、`chunk/split.rs`、`split_test.rs`（约 1500 行）：`.part{i}` 落盘 + 合并、单源左右拆分、换源并行度升档全部退役；
+- [`retry.rs`](src-tauri/src/minecraft/download/downloader/retry.rs)：变成「段表引擎优先、单流兜底」两层——大文件走引擎，小文件（< 1 MiB）与探测不到大小的文件直接单流，不再有第三、第四条路径；
+- [`probe.rs`](src-tauri/src/minecraft/download/chunk/probe.rs)：只保留文件大小探测，Range 支持判断由引擎在首个块上实测（非首块返回 200 即判定不支持）；
+- 移除开发开关 `download.segment_table` 及对应配置项、前端开关：引擎就是唯一实现，回退不再是「切另一套代码」；
+- [`multi.rs`](src-tauri/src/minecraft/download/chunk/multi.rs)：AIMD 补齐收缩——某条源吞吐跌到均值一半以下且不止一条连接时减一条（worker 在下次认领前自行退出，不打断进行中的块），单条连接永远保底，避免慢源被自己饿死；
+- [`multi_test.rs`](src-tauri/src/minecraft/download/chunk/multi_test.rs)：补 `should_shrink` 三例（明显低于均值才收缩、单连接保底、均值为零不动）。
+
+#### 下载引擎：坏块重下阶梯、半成品可续、进度按实际对齐
+上一版只在「校验失败」时做了一次按来源的重下，且失败就把半成品全删。这次把这条链补完整。
+
+- [`engine.rs`](src-tauri/src/minecraft/download/downloader/engine.rs)、[`engine_test.rs`](src-tauri/src/minecraft/download/downloader/engine_test.rs)（新）：引擎调用与校验从 `retry.rs` 抽出，形成三级重下阶梯——全部未完成 → 只重下**非官方源下过的块** → **全部作废只用官方源**；元数据没有块级哈希，这是能做到的最小重下量。
+- **半成品保留**：未跑完但有进度（断网、反复超时）不再删文件，位图与半成品留在磁盘上，同一任务下次进来直接续；只有「零进度」或「数据已不可信」才清干净交给单流兜底——单流会从头写，不能踩到半成品。
+- [`table.rs`](src-tauri/src/minecraft/download/chunk/table.rs)：位图文件头加**续传指纹**（任务 id、期望哈希、文件大小、来源集合的 FNV 摘要）。同名文件大小相同但内容换了（同名模组更新）时拒绝复用旧位图；格式升到 `MPSEG2`，旧位图自动判为无效。新增 `invalidate_all`。
+- **进度对齐**：每轮跑完把「本文件已计入全局进度的字节」与引擎的当前可信字节对齐，作废块重下会把虚高部分退回去——此前多轮重跑会重复累计。
+- [`schedule.rs`](src-tauri/src/minecraft/download/chunk/schedule.rs)、[`schedule_test.rs`](src-tauri/src/minecraft/download/chunk/schedule_test.rs)（新）：初始分配、扩容、收缩、判死抽成纯函数并补 10 例测试；[`multi.rs`](src-tauri/src/minecraft/download/chunk/multi.rs) 只留编排（起 worker、采样、落盘），`multi_test.rs` 随之退役。
+
+#### 连接额度改成跨文件共享的全局池
+此前每个文件独立封顶（最多 12 条连接），而文件并发又按「最大线程数」开：8 个文件同时下就是 32 条连接，
+既压垮本机带宽分配，也容易被 CDN 判定为异常流量。现在把「最大线程数」当作**全局连接总预算**，按活跃文件数分摊。
+
+- [`budget.rs`](src-tauri/src/minecraft/download/budget.rs)、[`budget_test.rs`](src-tauri/src/minecraft/download/budget_test.rs)（新）：总预算 + 活跃文件计数；份额 = `总预算 / 活跃文件数`，受单文件上限（用户设的分片数）约束，且**永远保底 1 条**——再拥挤也给每个文件留一条，否则它会永远排不上。活跃名额用 RAII 租约（`FileLease`）管理，失败、取消都不会漏归还。
+- [`multi.rs`](src-tauri/src/minecraft/download/chunk/multi.rs)：每轮采样后重算份额——别的文件下完额度会变大（自动加速），文件变多则收缩；本文件连接数超过当前份额时无条件减一条，不必等它变慢。
+- [`budget.rs`](src-tauri/src/minecraft/download/budget.rs)：总预算 = **最大线程数 × 2**（上限 64）。不能直接用最大线程数——分片下载至少要 2 条连接才可能快于单流，文件一多每个文件只剩 1 条，批量安装反而退化。默认 8 线程 → 16 条总预算：单文件下载拿满分片数（与之前一致），8 个文件并行时每个仍有 2 条，而此前是 8 × 4 = 32 条。
+- [`manager/core.rs`](src-tauri/src/minecraft/download/manager/core.rs)：构造下载会话时把折算后的总预算写入池子。想要更高吞吐就调大「最大线程数」，各文件会自动按份额加速。
+
+#### 库文件候选链：补上 Maven Central 与阿里云镜像
+此前一个库只有两条候选：版本 JSON 声明的地址，和 BMCLAPI 的同路径代理。Mojang 的 Maven 这些年下架了不少老构件
+（典型 `net.java.jinput` 的平台 jar 直接 404），两条都落空时安装就断在那里。
+
+- [`library_chain.rs`](src-tauri/src/minecraft/sources/library_chain.rs)、[`library_chain_test.rs`](src-tauri/src/minecraft/sources/library_chain_test.rs)（新）：把「一个构件该去哪些仓库找」抽成一条有序候选链——BMCLAPI `/maven/` → BMCLAPI `/libraries/` → Mojang Maven → 老构件原仓库 → **Maven Central** → **阿里云公共仓**。构件相对路径优先从 maven 坐标推导（带 classifier 也算得对），拿不到坐标才退回本地路径。
+- [`constants.rs`](src-tauri/src/minecraft/sources/constants.rs)：新增 `MAVEN_CENTRAL`、`ALIYUN_MAVEN_PUBLIC`、`MAVEN_SPONGE`。阿里云是 Central 的国内 1:1 镜像，不需要代理。
+- **老构件归位**：按 groupId 前缀猜原仓库——`org/ow2/`、`org/scala-lang/`、`org/jline/`、`jline/`、`net/java/dev/jna/`、`com/typesafe/` 走 Central；`net/fabricmc/`、`net/minecraftforge/`、`cpw/mods/`、`net/neoforged/`、`org/spongepowered/` 走各自仓库。
+- [`libraries/download.rs`](src-tauri/src/minecraft/version/libraries/download.rs)：候选按「用户自配镜像 → 声明来源 → 兜底链」组装并保序去重；顺带修掉一个老问题——声明地址是 `libraries.minecraft.net` 时，BMCLAPI 的 `/libraries/` 候选因为套在 `if 替换生效` 分支里而永远不生成。
+- [`http.rs`](src-tauri/src/minecraft/sources/http.rs)：`is_mirror_url` 认阿里云公共仓，因此「仅官方源」模式下不会走它。
+- [`multi.rs`](src-tauri/src/minecraft/download/chunk/multi.rs)：候选源多于连接额度时，排在后面的源一开始分不到 worker；前面的源全被判死后唤醒一条，避免「没人试过所以永远不试」。
+
+#### 校验与续传：流式哈希、验证证明、位图自校验、主机记忆、退役地址还原
+这轮把「校验读盘」和「跨文件经验」两块补齐，顺手修掉两个真问题。
+
+- [`hash.rs`](src-tauri/src/minecraft/utils/hash.rs)、[`hash_test.rs`](src-tauri/src/minecraft/utils/hash_test.rs)（新）：**流式**哈希（64 KiB 缓冲，2 GB 整合包也不顶内存），按期望值长度识别 md5/sha1/sha256/**sha512**；**验证证明缓存**记录「路径 + 大小 + 修改/创建时间」，验证过的文件元数据没变就不重算。
+- [`file_checker.rs`](src-tauri/src/minecraft/utils/file_checker.rs)：改用上述实现，并修掉一个真 bug——此前按「长度 64 当 sha256、其余当 sha1」猜算法，**128 字符的 sha512 会被当成 sha1 去比，永远不匹配**，导致反复重下；长度认不出时改为跳过哈希校验并告警，不再瞎猜。
+- [`table.rs`](src-tauri/src/minecraft/download/chunk/table.rs)：位图升到 `MPSEG3`，每块额外存**写入时算出的 SHA256**；恢复时逐块读回验证，「位图说完成、数据其实是空洞」的脏状态会被丢弃并告警。同一次尝试内的重跑信任刚写下的位图，不重复读盘。
+- [`block.rs`](src-tauri/src/minecraft/download/chunk/block.rs)、[`multi.rs`](src-tauri/src/minecraft/download/chunk/multi.rs)：边写边算块哈希，完成后随块一起记入位图。
+- [`host_profile.rs`](src-tauri/src/minecraft/download/host_profile.rs)、[`host_profile_test.rs`](src-tauri/src/minecraft/download/host_profile_test.rs)（新）：**主机脾气记忆**——把每个主机学到的并发目标与吞吐（EMA）留下来，下一个文件直接从上次的结论起步，不必重新试错；记忆 30 分钟过期，并发取历史最大值（只是起点，方向不对引擎两个窗口内自己收回）。
+- [`retired.rs`](src-tauri/src/minecraft/sources/retired.rs)、[`retired_test.rs`](src-tauri/src/minecraft/sources/retired_test.rs)（新）：**退役镜像地址还原**——老 manifest 里的 `cdn-alt.modrinth.com`、`mod.tianpao.top` 按路径前缀换成官方地址（`/data/`→Modrinth、`/files/`→CF edge、`/media/`→CF media），查询串原样保留，对不上的原样返回不猜。
+
+
+### 变更
+
+#### 外部厂商 frpc 下载接入统一下载栈
 - 外部厂商（`distribution=url`）的 frpc 二进制此前是自己发请求、整包读进内存再落盘，享受不到分片、重试阶梯与限速。现在改走 [`DownloadManager`](src-tauri/src/minecraft/download/manager/core.rs)：分片并行、多源重试、全局限速、SHA256 校验、大小探测全部复用同一套。
 - 安全边界没有一起交出去：`commands/frp/binary/external.rs` 仍负责 HTTPS 校验、域名白名单与**逐跳**重定向校验，重定向在进下载栈之前就走完；下载用的 `client` 换成不跟随 3xx 的那个，下载阶段再出现跳转一律视为失败，避免「服务器临时把你转到白名单外」。同时关掉镜像替换（`preserve_order` + 官方模式），厂商声明的地址不会被换成任何镜像。
 - 新增 `validate_target_path`：manifest 是云端下发的，`target_path` 里出现 `..`、绝对路径、盘符或反斜杠一律拒绝，防止借厂商配置往目录外写文件（`external_test.rs` 覆盖）。
 
-#### 修复：慢速源被误判为「无进展」
-
-- 并行下载的「无进展」判定原本看「有没有块下完」。块长 2 MiB，一个 100 KB/s 的源下完一块要 20 秒以上，而判定阈值只有十来个采样窗口——**结果慢但在动的源会被直接终止**，最后退化成「并行未完成，保留半成品」。改为看**字节有没有在流动**：只要有数据落盘就不算无进展。
-
-#### 加固：两处越界与不可信输入
-
-- [`retired.rs`](src-tauri/src/minecraft/sources/retired.rs)：路径按字节下标裁剪改用 `get()`，越界或落在多字节字符中间时原样返回，不再可能 panic。
-- [`host_profile.rs`](src-tauri/src/minecraft/download/host_profile.rs)：读回记忆前先看文件大小，超过 1 MB 直接当没有——正常只有几十 KB，突然变大说明文件被写坏，没理由把内存交给它。
-- [`external.rs`](src-tauri/src/commands/frp/binary/external.rs) 的域名白名单通配符没有点边界：`*.example.com` 会匹配 `evilexample.com`，攻击者注册一个后缀相同的域名即可混进白名单（同样影响复用它做服务器地址白名单的沙箱校验）。改为按 `strip_suffix` + 点边界判断。
-
-#### 变更：两处安全策略按「可用性优先」定案
-
+#### 两处安全策略按「可用性优先」定案
 评审提出的两个决策点，结论都是**维持现状**，并补测试把行为锁死，避免被后来的人当漏洞顺手改掉。
 
 - **哈希长度认不出时跳过哈希、只校验大小**（[`file_checker.rs`](src-tauri/src/minecraft/utils/file_checker.rs)）。元数据里哈希写坏的老版本不少，fail-closed 会让这些版本反复重下、永远装不完；代价是这类文件只能靠大小与后续内容校验兜底。函数内已注明这是取舍而非漏写的分支，[`file_checker_test.rs`](src-tauri/src/minecraft/utils/file_checker_test.rs) 用 4 个用例锁定：大小不符失败、哈希不符失败、**长度认不出放行**、无大小无哈希不放行。
 - **没有 sha1 的库仍保留镜像候选**（[`download.rs`](src-tauri/src/minecraft/version/libraries/download.rs)）。顺序上声明来源与官方永远在前，镜像只做兜底；砍掉镜像会让老版本直接下不来。哈希可用时由 `FileChecker` 逐字节校验，镜像给的文件对不上会失败重下。[`download_test.rs`](src-tauri/src/minecraft/version/libraries/download_test.rs) 锁定三条：声明来源排首位、无哈希仍有镜像与 Central 兜底、用户自配镜像优先且候选不重复。
 
 
+### 加固
+
+#### 两处越界与不可信输入
+- [`retired.rs`](src-tauri/src/minecraft/sources/retired.rs)：路径按字节下标裁剪改用 `get()`，越界或落在多字节字符中间时原样返回，不再可能 panic。
+- [`host_profile.rs`](src-tauri/src/minecraft/download/host_profile.rs)：读回记忆前先看文件大小，超过 1 MB 直接当没有——正常只有几十 KB，突然变大说明文件被写坏，没理由把内存交给它。
+- [`external.rs`](src-tauri/src/commands/frp/binary/external.rs) 的域名白名单通配符没有点边界：`*.example.com` 会匹配 `evilexample.com`，攻击者注册一个后缀相同的域名即可混进白名单（同样影响复用它做服务器地址白名单的沙箱校验）。改为按 `strip_suffix` + 点边界判断。
+
+
+### 重构
+
+#### 位图落盘拆出独立模块
+- [`table_map.rs`](src-tauri/src/minecraft/download/chunk/table_map.rs)（新）：序列化、自校验、本进程信任记录从 `table.rs` 拆出（`table.rs` 418 行 → 254 行），段表只管状态，落盘格式单独可读。
 
 ## [0.3.13] - 2026-10-27
 
