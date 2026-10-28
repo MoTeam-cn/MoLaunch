@@ -14,7 +14,7 @@ use tokio::task::JoinSet;
 
 use crate::{log_debug, log_warn};
 
-use super::super::super::edge;
+use super::super::edge;
 use super::super::rate_limiter::RateLimiter;
 use super::super::types::GlobalProgress;
 use super::block::{download_block, BlockError};
