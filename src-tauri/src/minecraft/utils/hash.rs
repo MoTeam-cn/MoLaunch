@@ -94,7 +94,6 @@ pub struct IncrementalHash {
 impl IncrementalHash {
     pub fn new(algorithm: HashAlgorithm) -> Self {
         use sha1::Digest as _;
-        use sha2::Digest as _;
         let mut this = Self {
             algorithm,
             md5: None,
@@ -113,7 +112,6 @@ impl IncrementalHash {
 
     pub fn update(&mut self, bytes: &[u8]) {
         use sha1::Digest as _;
-        use sha2::Digest as _;
         match self.algorithm {
             HashAlgorithm::Md5 => {
                 if let Some(context) = self.md5.as_mut() {
@@ -140,7 +138,6 @@ impl IncrementalHash {
 
     fn finish_bytes(self) -> Vec<u8> {
         use sha1::Digest as _;
-        use sha2::Digest as _;
         match self.algorithm {
             HashAlgorithm::Md5 => self
                 .md5

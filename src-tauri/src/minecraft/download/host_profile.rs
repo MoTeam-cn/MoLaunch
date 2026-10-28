@@ -90,11 +90,6 @@ pub(crate) fn observe(url: &str, target: usize, throughput: u64) {
     profiles.insert(host, merge(previous, target, throughput, now));
 }
 
-/// 清空记忆（测试用）
-pub(crate) fn reset() {
-    profiles().lock().unwrap_or_else(|p| p.into_inner()).clear();
-}
-
 #[cfg(test)]
 #[path = "host_profile_test.rs"]
 mod host_profile_test;
