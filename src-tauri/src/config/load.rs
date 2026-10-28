@@ -91,6 +91,14 @@ pub fn load_config() -> Result<Option<AppConfig>, String> {
     if let Some(edge) = config.get("Download", "edge_select") {
         app_config.download.edge_select = edge == "true" || edge == "1";
     }
+    // DoH 解析（开发者选项，缺省关闭）
+    if let Some(doh) = config.get("Download", "doh") {
+        app_config.download.doh = doh == "true" || doh == "1";
+    }
+    // 段表引擎（缺省开启，关闭即回到旧实现）
+    if let Some(table) = config.get("Download", "segment_table") {
+        app_config.download.segment_table = table == "true" || table == "1";
+    }
 
     // Mirror
     app_config.download.mirror_url = config.get("Mirror", "url");

@@ -13,6 +13,11 @@ pub struct ProxyConfig {
     pub ip_version: String,
 }
 
+/// serde 默认 true（旧配置缺键时按启用处理）
+fn default_true() -> bool {
+    true
+}
+
 /// 下载配置
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct DownloadConfig {
@@ -33,6 +38,19 @@ pub struct DownloadConfig {
     /// 因此默认关闭，只在「开发者 → 实验性功能」显式开启后生效。
     #[serde(default)]
     pub cf_derive_url: bool,
+    /// 是否启用 DoH 解析（开发者选项，默认关闭）
+    ///
+    /// 开启后下载域名优先走 DNS-JSON 接口解析（腾讯 → 阿里 → Cloudflare 依次回落），
+    /// 全部失败仍回落系统解析。默认关闭：国内 DoH 端点可用性不稳定，且域名会发给
+    /// 第三方解析商，属于隐私边界，不替用户默认决定。
+    #[serde(default)]
+    pub doh: bool,
+    /// 是否启用「段表 + 跨源并行」下载引擎（默认开启）
+    ///
+    /// 关闭后退回逐源重试 + 分片下载的旧实现。保留该开关是为了在新引擎出现问题时
+    /// 能一键回到旧路径，不必降级版本。
+    #[serde(default = "default_true")]
+    pub segment_table: bool,
     /// 是否对公开 CDN 做边缘节点优选（实验，默认关闭）
     ///
     /// 开启后对 `cdn.modrinth.com` 这类多边缘域名解析出的多个 IP 各拉一小段

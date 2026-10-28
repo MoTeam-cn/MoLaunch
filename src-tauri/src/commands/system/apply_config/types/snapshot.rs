@@ -36,6 +36,12 @@ pub struct DownloadSnapshot {
     /// 边缘节点优选（实验）
     #[serde(rename = "edgeSelect")]
     pub edge_select: bool,
+    /// DoH 解析（开发者选项）
+    #[serde(rename = "doh")]
+    pub doh: bool,
+    /// 段表引擎
+    #[serde(rename = "segmentTable")]
+    pub segment_table: bool,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]

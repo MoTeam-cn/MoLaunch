@@ -56,6 +56,69 @@ pub(super) async fn download_with_retries(
         let _ = std::fs::remove_file(&task.local_path);
         rollback_progress(&progress, downloaded);
     };
+
+    // 段表引擎：把「逐源重试」升级为「按块多源并行」——官方与镜像同时出力，
+    // 快的源自动多吃块，某条源断了它手上的块立刻能被别的源抢走。
+    // 成功后直接返回；失败则清掉半成品并退回下面的逐源重试（可一键关开关回退）。
+    if chunk::segment_table::enabled()
+        && can_chunk
+        && file_size > 0
+        && chunkable_size(file_size, chunk_count)
+        && !urls.is_empty()
+    {
+        let outcome = chunk::segment_table::download_multi(
+            client,
+            urls,
+            0,
+            &task.local_path,
+            file_size,
+            chunk_count.max(1),
+            rate_limiter.clone(),
+            progress.clone(),
+            pause_flag.clone(),
+            cancel_flag.clone(),
+        )
+        .await;
+        let mut usable = outcome.complete;
+        if usable {
+            let expected = if trusted_size > 0 {
+                trusted_size
+            } else {
+                outcome.total
+            };
+            if let Some(err) = verify::check_chunk(task, expected) {
+                log_warn!("[Segment] 大小校验失败：{} - {}", task.local_path, err);
+                let _ = std::fs::remove_file(&task.local_path);
+                rollback_progress(&progress, outcome.downloaded);
+                usable = false;
+            } else if let Some(v) = &content_validator {
+                if let Err(err) = v(Path::new(&task.local_path)) {
+                    invalid_content(err, outcome.downloaded);
+                    usable = false;
+                }
+            }
+        } else {
+            log_debug!(
+                "[Segment] 并行下载未完成，退回逐源重试: {:?}",
+                outcome.error
+            );
+            let _ = std::fs::remove_file(&task.local_path);
+            rollback_progress(&progress, outcome.downloaded);
+        }
+        if usable {
+            if let Some(ref ids) = chunked_task_ids {
+                ids.lock()
+                    .unwrap_or_else(|poisoned| poisoned.into_inner())
+                    .insert(task.id.clone());
+            }
+            return Some(verify::completed(
+                task,
+                outcome.downloaded,
+                outcome.total,
+                0,
+            ));
+        }
+    }
     'url_loop: for (url_index, url) in urls.iter().enumerate() {
         // 镜像刚被限流时，冷却期内直接换下一个候选；没有别的候选才短暂等待
         if let Some(remaining) = mirror_gate::cooldown_remaining(url) {

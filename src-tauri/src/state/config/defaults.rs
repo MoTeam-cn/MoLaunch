@@ -71,6 +71,8 @@ impl Default for AppConfig {
                 mirror_mode: 0,
                 cf_derive_url: false,
                 edge_select: false,
+                doh: false,
+                segment_table: true,
             },
             memory: MemoryConfig {
                 mode: "auto".to_string(),

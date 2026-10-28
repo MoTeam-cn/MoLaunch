@@ -387,49 +387,9 @@ fn should_switch(best: u64, current: Option<u64>) -> bool {
     }
 }
 
-/// 候选地址是否可用（排除内网、保留段与代理伪造的假地址）
+/// 候选地址是否可用（过滤逻辑与解析层共用一份实现）
 fn usable_candidate(ip: IpAddr) -> bool {
-    match ip {
-        IpAddr::V4(v4) => {
-            if v4.is_loopback()
-                || v4.is_private()
-                || v4.is_link_local()
-                || v4.is_multicast()
-                || v4.is_broadcast()
-                || v4.is_unspecified()
-            {
-                return false;
-            }
-            let octets = v4.octets();
-            // 198.18.0.0/15：TUN/代理常用的假地址段，测速结果全是本机回环
-            if octets[0] == 198 && (octets[1] == 18 || octets[1] == 19) {
-                return false;
-            }
-            // 100.64.0.0/10：运营商级 NAT
-            if octets[0] == 100 && (64..=127).contains(&octets[1]) {
-                return false;
-            }
-            true
-        }
-        IpAddr::V6(v6) => {
-            if v6.is_loopback() || v6.is_multicast() || v6.is_unspecified() {
-                return false;
-            }
-            if let Some(mapped) = v6.to_ipv4_mapped() {
-                return usable_candidate(IpAddr::V4(mapped));
-            }
-            let segments = v6.segments();
-            // fc00::/7 唯一本地地址
-            if (segments[0] & 0xfe00) == 0xfc00 {
-                return false;
-            }
-            // fe80::/10 链路本地地址
-            if (segments[0] & 0xffc0) == 0xfe80 {
-                return false;
-            }
-            true
-        }
-    }
+    crate::http::dns::usable_address(ip)
 }
 
 #[cfg(test)]

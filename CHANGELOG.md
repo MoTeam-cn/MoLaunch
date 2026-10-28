@@ -38,6 +38,24 @@
 - [`models.rs`](src-tauri/src/state/config/models.rs)、[`defaults.rs`](src-tauri/src/state/config/defaults.rs)、[`load.rs`](src-tauri/src/config/load.rs)、[`save.rs`](src-tauri/src/config/save.rs)、[`patch.rs`](src-tauri/src/commands/system/apply_config/types/patch.rs)、[`snapshot.rs`](src-tauri/src/commands/system/apply_config/types/snapshot.rs)、[`entry.rs`](src-tauri/src/commands/system/apply_config/types/entry.rs)、[`fields.rs`](src-tauri/src/commands/system/apply_config/apply/fields.rs)、[`app.rs`](src-tauri/src/state/app.rs)：新增 `download.edge_select`（INI `[Download] edge_select`），默认 `false`，启动与保存配置时同步到进程级标志。
 - [`ExperimentalTab.vue`](src/views/settings/developer/ExperimentalTab.vue)、[`config.ts`](src/utils/api/config.ts)：开发者页「下载实验开关」新增该选项。
 
+#### 段表引擎：按块多源并行下载（默认开启，可关）
+
+此前下载的调度单位是「源」：一次尝试里由一个 URL 独占整个文件，官方慢镜像快时无法同时利用。现在以**块**为单位调度，快慢由实测决定，坏的块立刻能被别的源接走。
+
+- [`table.rs`](src-tauri/src/minecraft/download/chunk/table.rs)、[`table_test.rs`](src-tauri/src/minecraft/download/chunk/table_test.rs)：段表——块划分只依赖（文件大小, 块长），与源无关，因此换源/重试/并行都共享同一张表；认领从表尾开始（尾块最难凑齐）、在飞块不会被重复派出、失败三次的块标为隔离只许官方源领。默认 2 MiB/块，块数超 65536 自动增大块长。10 例单测覆盖划分、认领顺序、失败释放、隔离与完成判定。
+- [`block.rs`](src-tauri/src/minecraft/download/chunk/block.rs)：单块下载（Range + 随机写目标文件偏移）；对非首块返回 200 视为「不支持 Range」并停用该源；块内不做续传（2 MiB 重下比对齐偏移更划算），带 20s 无数据超时与限速。
+- [`multi.rs`](src-tauri/src/minecraft/download/chunk/multi.rs)、[`multi_test.rs`](src-tauri/src/minecraft/download/chunk/multi_test.rs)：worker 池 + 源分配——初始单源拿满额度、多源先各一条；每 2s 采样各源 goodput，明显高于均值（1.2 倍）就加一条连接，本轮零产出且还有别的源则停用；唯一活源永不判死；连续 6 个窗口无进展才放弃。
+- [`retry.rs`](src-tauri/src/minecraft/download/downloader/retry.rs)：新引擎作为第一尝试，成功即返回；失败清掉半成品并退回原有逐源重试路径——**两个引擎并存**，出问题关开关即可回退。
+- [`segment_table.rs`](src-tauri/src/minecraft/download/chunk/segment_table.rs)：门面与开关 `download.segment_table`（INI 同键，默认 true）。
+
+#### 下载域名支持 DoH 解析（开发者开关，默认关闭）
+
+运营商 DNS 劫持/污染会让 CDN 域名解析到错误节点。现在可让下载域名走 DoH 解析，失败自动回落系统解析。
+
+- [`doh.rs`](src-tauri/src/http/doh.rs)、[`doh_test.rs`](src-tauri/src/http/doh_test.rs)：用各家的 DNS-JSON 接口（腾讯 → 阿里 → Cloudflare 依次回落），不实现 RFC 8484 的 wire format——解析报文要自己编解码、出错面大又不带来额外能力；只取 A/AAAA 记录并过滤 CNAME 与私有/TUN 假地址；连续 3 次失败熔断 5 分钟，避免每个文件都白等一次超时。7 例单测覆盖 JSON 解析、记录过滤、去重与熔断开合。
+- [`dns.rs`](src-tauri/src/http/dns.rs)：解析链固定为「DoH（开启时）→ 系统解析」；把内网/保留段/TUN 假地址的过滤抽成 `usable_address`，DoH、系统解析与边缘优选共用一份，避免三处各自实现留下缺口。
+- 开关 `download.doh`（INI 同键，默认 false）：国内 DoH 端点可用性不稳定，且域名会发给第三方解析商，不替用户默认决定。
+
 ### 修复
 
 #### 受限 CurseForge 文件地址推导：路径布局与文件名编码都不对

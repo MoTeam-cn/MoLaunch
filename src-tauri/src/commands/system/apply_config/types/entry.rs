@@ -71,6 +71,8 @@ pub fn build_snapshot(
             chunk_count: config.download.chunk_count,
             cf_derive_url: config.download.cf_derive_url,
             edge_select: config.download.edge_select,
+            doh: config.download.doh,
+            segment_table: config.download.segment_table,
         },
         memory: MemorySnapshot {
             mode: config.memory.mode.clone(),

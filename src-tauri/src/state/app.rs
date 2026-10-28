@@ -129,6 +129,10 @@ impl AppState {
         crate::minecraft::community::cf_policy::set_enabled(config.download.cf_derive_url);
         // 边缘节点优选同理：下载路径上多处同步取客户端，配置锁不该被跨 await 持有
         crate::minecraft::download::edge::set_enabled(config.download.edge_select);
+        crate::http::doh::set_enabled(config.download.doh);
+        crate::minecraft::download::chunk::segment_table::set_enabled(
+            config.download.segment_table,
+        );
 
         // 尝试加载 SDK lite
         let sdk = match crate::sdk::SdkInstance::load() {

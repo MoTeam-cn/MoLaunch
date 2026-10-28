@@ -34,6 +34,12 @@ pub struct DownloadPatch {
     /// 边缘节点优选（实验，默认关闭）
     #[serde(rename = "edgeSelect")]
     pub edge_select: Option<bool>,
+    /// DoH 解析（开发者选项，默认关闭）
+    #[serde(rename = "doh")]
+    pub doh: Option<bool>,
+    /// 段表引擎（默认开启）
+    #[serde(rename = "segmentTable")]
+    pub segment_table: Option<bool>,
     /// 双层 Option：外层 Some 表示"要更新此字段"，内层 None 表示"清空"
     #[serde(rename = "mirrorUrl")]
     pub mirror_url: Option<Option<String>>,

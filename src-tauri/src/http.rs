@@ -1,7 +1,8 @@
 //! HTTP 客户端模块：统一管理 reqwest 客户端构建，支持代理、IP 协议版本偏好与 TLS 信任源。
 
 mod client;
-mod dns;
+pub(crate) mod dns;
+pub(crate) mod doh;
 mod tls;
 
 pub use client::{

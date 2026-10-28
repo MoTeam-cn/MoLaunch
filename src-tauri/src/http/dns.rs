@@ -4,11 +4,13 @@
 //! 这里在进程内做短 TTL 缓存，把重复解析压成一次。
 
 use std::collections::HashMap;
-use std::net::SocketAddr;
+use std::net::{IpAddr, SocketAddr};
 use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
 
 use reqwest::dns::{Addrs, Name, Resolve, Resolving};
+
+use crate::log_debug;
 
 /// 解析结果缓存时长
 ///
@@ -86,6 +88,102 @@ fn is_fresh(at: Instant, now: Instant) -> bool {
     }
 }
 
+/// 解析地址：开了 DoH 就先走 DoH，失败一律回落系统解析
+async fn resolve_addrs(
+    host: &str,
+) -> Result<Vec<SocketAddr>, Box<dyn std::error::Error + Send + Sync>> {
+    if super::doh::enabled() {
+        match super::doh::resolve(host).await {
+            Ok(addrs) if !addrs.is_empty() => {
+                return Ok(addrs
+                    .into_iter()
+                    .map(|ip| SocketAddr::new(ip, 443))
+                    .collect());
+            }
+            Ok(_) => {}
+            Err(e) => log_debug!("[DNS] DoH 未取到结果，回落系统解析: {} ({})", host, e),
+        }
+    }
+    lookup_system(host).await
+}
+
+/// 系统解析（含私有/保留地址过滤与超时）
+async fn lookup_system(
+    host: &str,
+) -> Result<Vec<SocketAddr>, Box<dyn std::error::Error + Send + Sync>> {
+    let looked_up =
+        tokio::time::timeout(LOOKUP_TIMEOUT, tokio::net::lookup_host((host, 443))).await;
+    let mut addrs: Vec<SocketAddr> = Vec::new();
+    match looked_up {
+        Ok(Ok(iter)) => {
+            for addr in iter {
+                if usable_address(addr.ip()) && !addrs.contains(&addr) {
+                    addrs.push(addr);
+                }
+            }
+        }
+        Ok(Err(e)) => {
+            let boxed: Box<dyn std::error::Error + Send + Sync> = Box::new(e);
+            return Err(boxed);
+        }
+        Err(_) => {
+            return Err(format!("DNS 解析超时（{}s）: {}", LOOKUP_TIMEOUT.as_secs(), host).into());
+        }
+    }
+    // 空结果不进缓存：下一次应当重新问一次，而不是拿到一个空集合
+    if addrs.is_empty() {
+        return Err(format!("DNS 解析无结果: {}", host).into());
+    }
+    Ok(addrs)
+}
+
+/// 地址是否可用（排除内网、保留段与代理伪造的假地址）
+///
+/// DoH、系统解析与边缘优选共用这一份判断，避免三处各自实现出现缺口。
+pub(crate) fn usable_address(ip: IpAddr) -> bool {
+    match ip {
+        IpAddr::V4(v4) => {
+            if v4.is_loopback()
+                || v4.is_private()
+                || v4.is_link_local()
+                || v4.is_multicast()
+                || v4.is_broadcast()
+                || v4.is_unspecified()
+            {
+                return false;
+            }
+            let octets = v4.octets();
+            // 198.18.0.0/15：TUN/代理常用的假地址段，测速结果全是本机回环
+            if octets[0] == 198 && (octets[1] == 18 || octets[1] == 19) {
+                return false;
+            }
+            // 100.64.0.0/10：运营商级 NAT
+            if octets[0] == 100 && (64..=127).contains(&octets[1]) {
+                return false;
+            }
+            true
+        }
+        IpAddr::V6(v6) => {
+            if v6.is_loopback() || v6.is_multicast() || v6.is_unspecified() {
+                return false;
+            }
+            if let Some(mapped) = v6.to_ipv4_mapped() {
+                return usable_address(IpAddr::V4(mapped));
+            }
+            let segments = v6.segments();
+            // fc00::/7 唯一本地地址
+            if (segments[0] & 0xfe00) == 0xfc00 {
+                return false;
+            }
+            // fe80::/10 链路本地地址
+            if (segments[0] & 0xffc0) == 0xfe80 {
+                return false;
+            }
+            true
+        }
+    }
+}
+
 impl Resolve for CacheResolver {
     fn resolve(&self, name: Name) -> Resolving {
         let host = name.as_str().to_string();
@@ -97,24 +195,7 @@ impl Resolve for CacheResolver {
                 let boxed: Addrs = Box::new(addrs.into_iter());
                 return Ok(boxed);
             }
-            let looked_up = tokio::time::timeout(
-                LOOKUP_TIMEOUT,
-                tokio::net::lookup_host((host.as_str(), 443)),
-            )
-            .await;
-            let addrs: Vec<SocketAddr> = match looked_up {
-                Ok(Ok(iter)) => iter.collect(),
-                Ok(Err(e)) => return Err(Box::new(e) as Box<dyn std::error::Error + Send + Sync>),
-                Err(_) => {
-                    return Err(
-                        format!("DNS 解析超时（{}s）: {}", LOOKUP_TIMEOUT.as_secs(), host).into(),
-                    )
-                }
-            };
-            // 空结果不进缓存：下一次应当重新问一次，而不是拿到一个空集合
-            if addrs.is_empty() {
-                return Err(format!("DNS 解析无结果: {}", host).into());
-            }
+            let addrs = resolve_addrs(&host).await?;
             write_cache(&cache, &host, &addrs, now);
             let boxed: Addrs = Box::new(addrs.into_iter());
             Ok(boxed)
