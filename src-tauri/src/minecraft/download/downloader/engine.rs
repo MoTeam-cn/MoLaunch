@@ -8,10 +8,10 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex as StdMutex};
 use tokio::sync::Mutex;
 
-use super::credit::ProgressCredit;
 use super::verify;
 use crate::minecraft::download::chunk;
 use crate::minecraft::download::chunk::RetryScope;
+use crate::minecraft::download::credit::ProgressCredit;
 use crate::minecraft::download::rate_limiter::RateLimiter;
 use crate::minecraft::download::types::{
     ContentValidator, DownloadProgress, DownloadTask, GlobalProgress,

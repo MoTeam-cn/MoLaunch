@@ -242,6 +242,7 @@ impl SegmentTable {
     }
 }
 
+#[path = "table_map.rs"]
 mod table_map;
 
 #[cfg(test)]
