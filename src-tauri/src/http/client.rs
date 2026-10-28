@@ -15,6 +15,50 @@ pub struct ClientBuildParams<'a> {
     pub redirect: Option<reqwest::redirect::Policy>,
     pub user_agent: Option<&'a str>,
     pub no_timeout: bool,
+    /// 是否应用下载专用调优（HTTP/2 大窗口、连接池）
+    pub h2_tuned: bool,
+    /// 是否挂载带缓存的 DNS 解析器（仅下载客户端）
+    pub cache_dns: bool,
+}
+
+/// HTTP/2 单流初始窗口（1 MiB）
+///
+/// 默认 64 KiB 在千兆链路上要几十个 RTT 才能爬满带宽；大文件下载的单连接
+/// 吞吐几乎完全取决于这个窗口。
+const DOWNLOAD_STREAM_WINDOW: u32 = 1024 * 1024;
+
+/// HTTP/2 连接级初始窗口（64 MiB）：多条并发流共享，避免互相抢窗口
+const DOWNLOAD_CONN_WINDOW: u32 = 64 * 1024 * 1024;
+
+/// 每个 host 保留的空闲连接数：换源/重试时复用连接，省掉重复握手
+const DOWNLOAD_POOL_IDLE: usize = 8;
+
+/// 构建下载专用 HTTP 客户端：无整体超时 + HTTP/2 调优 + DNS 缓存。
+///
+/// 与全局客户端分开，是为了让下载路径的调优（大窗口、连接池、DNS 缓存）
+/// 不影响 API/鉴权这类小请求的连接策略。
+pub fn build_download_client(
+    proxy_mode: &str,
+    proxy_type: &str,
+    proxy_url: &str,
+    ip_version: &str,
+    trust_mode: &str,
+    ignore_tls: bool,
+) -> reqwest::Client {
+    build_client_inner(ClientBuildParams {
+        proxy_mode,
+        proxy_type,
+        proxy_url,
+        ip_version,
+        timeout: Duration::from_secs(0),
+        trust_mode,
+        ignore_tls,
+        redirect: None,
+        user_agent: None,
+        no_timeout: true,
+        h2_tuned: true,
+        cache_dns: true,
+    })
 }
 
 /// 构建流式专用 HTTP 客户端（无客户端级整体超时）。
@@ -37,6 +81,8 @@ pub fn build_stream_client(
         redirect: None,
         user_agent: None,
         no_timeout: true,
+        h2_tuned: false,
+        cache_dns: false,
     })
 }
 
@@ -61,6 +107,8 @@ pub fn build_client(
         redirect: None,
         user_agent: None,
         no_timeout: false,
+        h2_tuned: false,
+        cache_dns: false,
     })
 }
 
@@ -83,6 +131,8 @@ pub fn build_client_with_redirect(
         redirect: Some(redirect),
         user_agent: None,
         no_timeout: false,
+        h2_tuned: false,
+        cache_dns: false,
     })
 }
 
@@ -106,6 +156,8 @@ pub fn build_no_redirect_client(
         redirect: Some(reqwest::redirect::Policy::none()),
         user_agent: None,
         no_timeout: false,
+        h2_tuned: false,
+        cache_dns: false,
     })
 }
 
@@ -125,6 +177,8 @@ pub fn build_client_with_user_agent(user_agent: &str, timeout_ms: Option<u64>) -
         redirect: None,
         user_agent: Some(user_agent),
         no_timeout: false,
+        h2_tuned: false,
+        cache_dns: false,
     })
 }
 
@@ -172,6 +226,12 @@ fn build_client_inner(params: ClientBuildParams<'_>) -> reqwest::Client {
     if let Some(addr) = resolve_local_address(params.ip_version) {
         builder = builder.local_address(addr);
     }
+    if params.h2_tuned {
+        builder = apply_download_tuning(builder);
+    }
+    if params.cache_dns {
+        builder = builder.dns_resolver(std::sync::Arc::new(super::dns::CacheResolver::new()));
+    }
     // 通用客户端不绑定 base_url，无法低成本获知目标 host，保守禁用 IgnoreTls
     builder = tls::configure(builder, params.trust_mode, None);
     builder = configure_proxy(
@@ -181,6 +241,15 @@ fn build_client_inner(params: ClientBuildParams<'_>) -> reqwest::Client {
         params.proxy_url,
     );
     builder.build().expect("Failed to build HTTP client")
+}
+
+/// 下载专用传输层调优
+fn apply_download_tuning(builder: reqwest::ClientBuilder) -> reqwest::ClientBuilder {
+    builder
+        .http2_adaptive_window(true)
+        .http2_initial_stream_window_size(DOWNLOAD_STREAM_WINDOW)
+        .http2_initial_connection_window_size(DOWNLOAD_CONN_WINDOW)
+        .pool_max_idle_per_host(DOWNLOAD_POOL_IDLE)
 }
 
 fn configure_proxy(

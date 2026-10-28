@@ -1,10 +1,11 @@
 //! HTTP 客户端模块：统一管理 reqwest 客户端构建，支持代理、IP 协议版本偏好与 TLS 信任源。
 
 mod client;
+mod dns;
 mod tls;
 
 pub use client::{
-    build_client, build_client_with_redirect, build_client_with_user_agent,
+    build_client, build_client_with_redirect, build_client_with_user_agent, build_download_client,
     build_no_redirect_client, build_stream_client, ClientBuildParams,
 };
 pub use tls::ignore_tls_allowed;
@@ -18,6 +19,9 @@ static HTTP_CLIENT: RwLock<Option<reqwest::Client>> = RwLock::new(None);
 
 /// 全局无重定向 HTTP 客户端（可热重建，与主客户端同配置，仅禁用自动重定向）。
 static NO_REDIRECT_CLIENT: RwLock<Option<reqwest::Client>> = RwLock::new(None);
+
+/// 全局下载专用 HTTP 客户端（可热重建）：HTTP/2 调优 + DNS 缓存。
+static DOWNLOAD_CLIENT: RwLock<Option<reqwest::Client>> = RwLock::new(None);
 
 /// 编译时生成的 User-Agent 字符串（缓存）。
 static USER_AGENT: OnceLock<String> = OnceLock::new();
@@ -49,12 +53,35 @@ pub fn init_client(
     let no_redirect = build_no_redirect_client(
         proxy_mode, proxy_type, proxy_url, ip_version, trust_mode, ignore_tls,
     );
+    let download = build_download_client(
+        proxy_mode, proxy_type, proxy_url, ip_version, trust_mode, ignore_tls,
+    );
     let mut guard = HTTP_CLIENT.write().expect("HTTP_CLIENT poisoned");
     *guard = Some(client);
     let mut guard = NO_REDIRECT_CLIENT
         .write()
         .expect("NO_REDIRECT_CLIENT poisoned");
     *guard = Some(no_redirect);
+    let mut guard = DOWNLOAD_CLIENT
+        .write()
+        .unwrap_or_else(|poisoned| poisoned.into_inner());
+    *guard = Some(download);
+}
+
+/// 获取下载专用 HTTP 客户端。
+///
+/// 下载/分片/整包拉取都走它：HTTP/2 大窗口 + 连接池 + DNS 缓存，且与 API 请求
+/// 分开，互不挤占。未初始化时回落到全局客户端。
+pub fn get_download_client() -> reqwest::Client {
+    {
+        let guard = DOWNLOAD_CLIENT
+            .read()
+            .unwrap_or_else(|poisoned| poisoned.into_inner());
+        if let Some(ref client) = *guard {
+            return client.clone();
+        }
+    }
+    get_client()
 }
 
 /// 获取全局 HTTP 客户端。

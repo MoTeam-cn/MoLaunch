@@ -47,7 +47,7 @@ log = "0.4"
 env_logger = "0.10"
 thiserror = "1.0"
 libloading = "0.8"
-reqwest = { version = "0.12", default-features = false, features = ["json", "stream", "multipart", "gzip", "rustls-tls"] }
+reqwest = { version = "0.12", default-features = false, features = ["json", "stream", "multipart", "gzip", "rustls-tls", "http2"] }
 # 加载操作系统信任的根证书（TLS 信任源 system 模式）
 # 注：v0.8.x 对应 rustls 0.23（与 reqwest 0.12 rustls-tls feature 匹配）
 rustls-native-certs = "0.8"

@@ -45,7 +45,7 @@ impl DownloadManager {
         speed_limit: u64,
         source_mode: DownloadSourceMode,
     ) -> Self {
-        let client = crate::http::get_client();
+        let client = crate::http::get_download_client();
 
         Self {
             client,
