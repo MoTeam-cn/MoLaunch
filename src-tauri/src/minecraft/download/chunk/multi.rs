@@ -2,7 +2,9 @@
 //!
 //! 与「逐源重试」的区别在调度单位：这里以块为单位，哪个源快就让它多吃块，
 //! 某条源断了它手上的块立刻能被别的源抢走，不需要把整个文件重下。
+//! 位图落盘（`.partmap`）后，失败重试可复用已完成块，也能按「块的来源」定位可疑块。
 
+use std::path::Path;
 use std::sync::atomic::{AtomicBool, AtomicU64, AtomicUsize, Ordering};
 use std::sync::{Arc, Mutex as StdMutex};
 use std::time::Duration;
@@ -12,6 +14,7 @@ use tokio::task::JoinSet;
 
 use crate::{log_debug, log_warn};
 
+use super::super::super::edge;
 use super::super::rate_limiter::RateLimiter;
 use super::super::types::GlobalProgress;
 use super::block::{download_block, BlockError};
@@ -83,11 +86,13 @@ struct Engine {
     table: Arc<SegmentTable>,
     sources: Vec<Arc<SourceSlot>>,
     stop: AtomicBool,
+    map_path: String,
 }
 
 struct WorkerArgs {
     engine: Arc<Engine>,
-    client: reqwest::Client,
+    /// 基础客户端；每条源每次取块时再按边缘优选换用「钉住 IP」的客户端
+    base_client: reqwest::Client,
     path: String,
     rate_limiter: Option<Arc<Mutex<RateLimiter>>>,
     file_progress: Option<Arc<StdMutex<GlobalProgress>>>,
@@ -103,11 +108,14 @@ fn cancel_requested(flag: &Option<Arc<AtomicBool>>) -> bool {
 /// 多源并行下载同一文件
 ///
 /// `official_index` 指定的那条源可以领被隔离的块；其余源只领干净块。
+/// `only_source` 为 Some 时只保留那一条源，并把其它源下过的块标回待领
+/// ——内容校验失败时用它「只重下可疑块」而不是整份重下。
 #[allow(clippy::too_many_arguments)]
 pub(crate) async fn download_multi(
     client: &reqwest::Client,
     urls: &[String],
     official_index: usize,
+    only_source: Option<usize>,
     path: &str,
     file_size: u64,
     budget: usize,
@@ -116,15 +124,46 @@ pub(crate) async fn download_multi(
     pause_flag: Option<Arc<AtomicBool>>,
     cancel_flag: Option<Arc<AtomicBool>>,
 ) -> SegmentOutcome {
-    let table = Arc::new(SegmentTable::new(file_size));
+    if urls.is_empty() || file_size == 0 {
+        return SegmentOutcome {
+            downloaded: 0,
+            total: file_size,
+            complete: false,
+            error: Some("缺少可用源或文件大小未知".to_string()),
+        };
+    }
+    let map_path = format!("{}.partmap", path);
+    let data_len = std::fs::metadata(path).map(|meta| meta.len()).unwrap_or(0);
+    let table = match SegmentTable::load(Path::new(&map_path), file_size, data_len) {
+        Some(restored) => {
+            log_debug!(
+                "[Segment] 复用已完成块: {} 块 / 共 {} 字节",
+                restored.done_count(),
+                restored.done_bytes()
+            );
+            Arc::new(restored)
+        }
+        None => Arc::new(SegmentTable::new(file_size)),
+    };
+    if let Some(keep) = only_source {
+        let invalidated = table.invalidate_others(keep);
+        if invalidated > 0 {
+            log_warn!(
+                "[Segment] 内容校验失败，作废 {} 块并只用源 #{} 重下",
+                invalidated,
+                keep
+            );
+        }
+    }
     let sources: Vec<Arc<SourceSlot>> = urls
         .iter()
         .enumerate()
         .map(|(index, url)| {
+            let keep = only_source.map_or(true, |keep| keep == index);
             Arc::new(SourceSlot {
                 url: url.clone(),
-                official: index == official_index || urls.len() == 1,
-                dead: AtomicBool::new(false),
+                official: index == official_index || urls.len() == 1 || only_source == Some(index),
+                dead: AtomicBool::new(!keep),
                 active: AtomicUsize::new(0),
                 bytes: AtomicU64::new(0),
             })
@@ -134,10 +173,11 @@ pub(crate) async fn download_multi(
         table: table.clone(),
         sources: sources.clone(),
         stop: AtomicBool::new(false),
+        map_path: map_path.clone(),
     });
     let args = Arc::new(WorkerArgs {
         engine: engine.clone(),
-        client: client.clone(),
+        base_client: client.clone(),
         path: path.to_string(),
         rate_limiter,
         file_progress,
@@ -155,13 +195,16 @@ pub(crate) async fn download_multi(
     );
     let mut set: JoinSet<()> = JoinSet::new();
     for (index, count) in initial_workers(sources.len(), budget).iter().enumerate() {
+        if sources[index].dead.load(Ordering::Relaxed) {
+            continue;
+        }
         for _ in 0..*count {
             sources[index].active.fetch_add(1, Ordering::Relaxed);
             spawn_worker(&mut set, &args, index);
         }
     }
 
-    // 监督循环：采样 → 判死 → 扩容。worker 自己负责认领与重试，这里只管「给谁更多连接」
+    // 监督循环：采样 → 判死 → 扩容；顺手把位图落盘（几 KB，代价可忽略）
     let mut last_done = 0_u64;
     let mut idle_windows = 0_usize;
     loop {
@@ -172,6 +215,9 @@ pub(crate) async fn download_multi(
         }
         if table.is_complete() {
             break;
+        }
+        if let Err(e) = table.save(Path::new(&engine.map_path)) {
+            log_debug!("[Segment] 位图落盘失败: {}", e);
         }
         let done = table.done_bytes();
         if done == last_done {
@@ -251,6 +297,15 @@ pub(crate) async fn download_multi(
 
     let downloaded = table.done_bytes();
     let complete = table.is_complete();
+    if complete {
+        // 完成即清理位图，避免下次误复用
+        let _ = std::fs::remove_file(&engine.map_path);
+    } else {
+        // 失败也要落盘：下一轮（或下次启动）可以只补没完成的块
+        if let Err(e) = table.save(Path::new(&engine.map_path)) {
+            log_debug!("[Segment] 位图落盘失败: {}", e);
+        }
+    }
     SegmentOutcome {
         downloaded,
         total: file_size,
@@ -292,10 +347,12 @@ async fn run_worker(args: Arc<WorkerArgs>, source_index: usize) {
             tokio::time::sleep(Duration::from_millis(50)).await;
             continue;
         };
+        // 每条源各自做边缘优选：同一条源拿到钉住 IP 的客户端，探测在后台完成
+        let client = edge::client_for(&slot.url, &args.base_client);
         let outcome = tokio::time::timeout(
             BLOCK_TIMEOUT,
             download_block(
-                &args.client,
+                &client,
                 &slot.url,
                 &args.path,
                 segment,
@@ -308,7 +365,7 @@ async fn run_worker(args: Arc<WorkerArgs>, source_index: usize) {
         )
         .await;
         match outcome {
-            Ok(Ok(_)) => engine.table.complete(segment.index),
+            Ok(Ok(_)) => engine.table.complete(segment.index, source_index),
             Ok(Err(BlockError::RangeUnsupported)) => {
                 log_debug!("[Segment] 源不支持 Range，停用: {}", slot.url);
                 slot.dead.store(true, Ordering::Relaxed);
@@ -321,10 +378,13 @@ async fn run_worker(args: Arc<WorkerArgs>, source_index: usize) {
             }
             Ok(Err(e)) => {
                 engine.table.fail(segment.index);
+                // 传输层失败计入该源的边缘节点健康度
+                edge::note_failure(&slot.url);
                 log_debug!("[Segment] 块 {} 失败: {} ({})", segment.index, e, slot.url);
             }
             Err(_) => {
                 engine.table.fail(segment.index);
+                edge::note_failure(&slot.url);
                 log_warn!("[Segment] 块 {} 超时: {}", segment.index, slot.url);
             }
         }

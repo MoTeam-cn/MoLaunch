@@ -59,51 +59,76 @@ pub(super) async fn download_with_retries(
 
     // 段表引擎：把「逐源重试」升级为「按块多源并行」——官方与镜像同时出力，
     // 快的源自动多吃块，某条源断了它手上的块立刻能被别的源抢走。
-    // 成功后直接返回；失败则清掉半成品并退回下面的逐源重试（可一键关开关回退）。
+    // 位图落盘，失败可复用已完成块；内容校验失败时只重下「非官方源下过的块」。
+    // 一切都失败才清掉半成品并退回下面的逐源重试（可一键关开关回退）。
     if chunk::segment_table::enabled()
         && can_chunk
         && file_size > 0
         && chunkable_size(file_size, chunk_count)
         && !urls.is_empty()
     {
-        let outcome = chunk::segment_table::download_multi(
+        let mut outcome = run_segment_engine(
             client,
             urls,
-            0,
-            &task.local_path,
+            None,
+            task,
             file_size,
-            chunk_count.max(1),
-            rate_limiter.clone(),
-            progress.clone(),
-            pause_flag.clone(),
-            cancel_flag.clone(),
+            chunk_count,
+            &rate_limiter,
+            &progress,
+            &pause_flag,
+            &cancel_flag,
         )
         .await;
-        let mut usable = outcome.complete;
-        if usable {
-            let expected = if trusted_size > 0 {
-                trusted_size
-            } else {
-                outcome.total
-            };
-            if let Some(err) = verify::check_chunk(task, expected) {
-                log_warn!("[Segment] 大小校验失败：{} - {}", task.local_path, err);
-                let _ = std::fs::remove_file(&task.local_path);
-                rollback_progress(&progress, outcome.downloaded);
-                usable = false;
-            } else if let Some(v) = &content_validator {
-                if let Err(err) = v(Path::new(&task.local_path)) {
-                    invalid_content(err, outcome.downloaded);
-                    usable = false;
-                }
-            }
-        } else {
-            log_debug!(
-                "[Segment] 并行下载未完成，退回逐源重试: {:?}",
+        // 首轮未完成：位图里已有完成块，再跑一轮只补没完成的
+        if !outcome.complete && !is_cancelled(&cancel_flag) {
+            log_warn!(
+                "[Segment] 首轮未完成，复用已完成块重试: {:?}",
                 outcome.error
             );
-            let _ = std::fs::remove_file(&task.local_path);
-            rollback_progress(&progress, outcome.downloaded);
+            outcome = run_segment_engine(
+                client,
+                urls,
+                None,
+                task,
+                file_size,
+                chunk_count,
+                &rate_limiter,
+                &progress,
+                &pause_flag,
+                &cancel_flag,
+            )
+            .await;
+        }
+        let mut usable = outcome.complete && segment_size_ok(task, &outcome, trusted_size);
+        if usable {
+            if let Some(v) = &content_validator {
+                if let Err(err) = v(Path::new(&task.local_path)) {
+                    // 元数据里没有块级哈希，只能按「块的来源」定位：
+                    // 保留官方源下的块，把镜像下的块标回待领后只用官方源重下
+                    log_warn!("[Segment] 内容校验失败，仅重下非官方源的块: {}", err);
+                    outcome = run_segment_engine(
+                        client,
+                        urls,
+                        Some(0),
+                        task,
+                        file_size,
+                        chunk_count,
+                        &rate_limiter,
+                        &progress,
+                        &pause_flag,
+                        &cancel_flag,
+                    )
+                    .await;
+                    usable = outcome.complete && segment_size_ok(task, &outcome, trusted_size);
+                    if usable {
+                        if let Err(again) = v(Path::new(&task.local_path)) {
+                            log_warn!("[Segment] 官方源重下后仍校验失败: {}", again);
+                            usable = false;
+                        }
+                    }
+                }
+            }
         }
         if usable {
             if let Some(ref ids) = chunked_task_ids {
@@ -118,6 +143,14 @@ pub(super) async fn download_with_retries(
                 0,
             ));
         }
+        // 彻底失败：清掉半成品与位图，交给下面的逐源重试（它会从头下，不会踩到半成品）
+        log_debug!(
+            "[Segment] 并行下载未成功，退回逐源重试: {:?}",
+            outcome.error
+        );
+        let _ = std::fs::remove_file(&task.local_path);
+        let _ = std::fs::remove_file(format!("{}.partmap", task.local_path));
+        rollback_progress(&progress, outcome.downloaded);
     }
     'url_loop: for (url_index, url) in urls.iter().enumerate() {
         // 镜像刚被限流时，冷却期内直接换下一个候选；没有别的候选才短暂等待
@@ -360,6 +393,56 @@ const MIN_CHUNK_BYTES: u64 = 1024 * 1024;
 /// 换源升档：并行度翻倍，封顶 [`MAX_SEGMENT_BOOST`]
 fn bump_segment_boost(current: u32) -> u32 {
     current.saturating_mul(2).min(MAX_SEGMENT_BOOST)
+}
+
+/// 跑一轮段表引擎
+#[allow(clippy::too_many_arguments)]
+async fn run_segment_engine(
+    client: &reqwest::Client,
+    urls: &[String],
+    only_source: Option<usize>,
+    task: &DownloadTask,
+    file_size: u64,
+    chunk_count: usize,
+    rate_limiter: &Option<Arc<Mutex<RateLimiter>>>,
+    progress: &Option<Arc<StdMutex<GlobalProgress>>>,
+    pause_flag: &Option<Arc<AtomicBool>>,
+    cancel_flag: &Option<Arc<AtomicBool>>,
+) -> chunk::segment_table::SegmentOutcome {
+    chunk::segment_table::download_multi(
+        client,
+        urls,
+        0,
+        only_source,
+        &task.local_path,
+        file_size,
+        chunk_count.max(1),
+        rate_limiter.clone(),
+        progress.clone(),
+        pause_flag.clone(),
+        cancel_flag.clone(),
+    )
+    .await
+}
+
+/// 段表引擎的大小校验：探测值不可信，优先用任务给出的可信大小
+fn segment_size_ok(
+    task: &DownloadTask,
+    outcome: &chunk::segment_table::SegmentOutcome,
+    trusted_size: u64,
+) -> bool {
+    let expected = if trusted_size > 0 {
+        trusted_size
+    } else {
+        outcome.total
+    };
+    match verify::check_chunk(task, expected) {
+        None => true,
+        Some(err) => {
+            log_warn!("[Segment] 大小校验失败：{} - {}", task.local_path, err);
+            false
+        }
+    }
 }
 
 /// 是否值得分片下载

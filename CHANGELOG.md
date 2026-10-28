@@ -141,6 +141,16 @@
 - [`split.rs`](src-tauri/src/minecraft/download/chunk/split.rs)、[`split_test.rs`](src-tauri/src/minecraft/download/chunk/split_test.rs)：新增拆分提速——单源场景下采样器判定低速后，挑「剩余字节最多且仍在跑」的分片，中止它并把剩余区间一分为二并行下载；左右两半完成后与已下前缀拼回原 `.part`，分片布局与合并逻辑完全不变（续传仍按原偏移）。剩余不足 8 MiB 不拆，避免多付一次往返。
 - [`api.rs`](src-tauri/src/minecraft/download/chunk/api.rs)：分片调度改为「监督循环 + is_finished 轮询」——被 abort 的任务不会返回结果，按完成计数会永久少一格；拆出来的两半各占一个预留进度槽位，成功拼装后一次性补进文件进度，避免与原任务重复计数。
 
+#### 段表引擎补齐：位图落盘、按来源定位可疑块、边缘优选接入
+
+上一版引擎有三处留白，这次补上。
+
+- [`table.rs`](src-tauri/src/minecraft/download/chunk/table.rs)：位图落盘（`.partmap`，每块 2 字节：状态 + 来源）。读回时校验文件大小与块长，并把「数据文件里还没写到的块」判为未完成——避免位图说有、文件其实是空洞的脏状态被当成已完成。
+- [`multi.rs`](src-tauri/src/minecraft/download/chunk/multi.rs)：每 2 秒与结束时落盘位图，完成即删除；**失败后复用已完成块重跑一轮**（只补未完成的块）；内容校验失败时**只重下非官方源下过的块**——元数据没有块级哈希，就以「块的来源」定位可疑块，比整份重下省得多。
+- [`retry.rs`](src-tauri/src/minecraft/download/downloader/retry.rs)：引擎首轮未完成就复用位图再跑一轮，内容校验失败再用「仅官方源」跑一轮，仍失败才清掉半成品与位图、退回逐源重试。
+- [`multi.rs`](src-tauri/src/minecraft/download/chunk/multi.rs)：每条源的每次取块都走一次边缘优选（`edge::client_for`），命中钉住 IP 的客户端就用它；块级传输失败上报该源的节点健康度——此前引擎完全绕过了边缘优选。
+- [`table_test.rs`](src-tauri/src/minecraft/download/chunk/table_test.rs)：补位图往返、来源作废、文件大小不匹配、数据文件偏短、位图损坏共 6 例。
+
 
 
 ## [0.3.13] - 2026-10-27
