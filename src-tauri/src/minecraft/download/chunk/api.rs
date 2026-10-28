@@ -12,7 +12,6 @@ use crate::{log_debug, log_warn};
 use super::super::rate_limiter::RateLimiter;
 use super::super::slow;
 use super::super::types::{DownloadStatus, GlobalProgress};
-use super::download::download_chunk;
 use super::merge::merge_chunks;
 use super::probe::probe_file_size;
 use super::split::{
@@ -42,6 +41,10 @@ const SPLIT_POLL_INTERVAL: std::time::Duration = std::time::Duration::from_milli
 pub fn clear_part_files(local_path: &str) {
     for index in 0..=MAX_PLANNED_CHUNKS {
         let _ = std::fs::remove_file(format!("{}.part{}", local_path, index));
+        // 拆分提速的残留（两半与拼装中间文件）也要清，否则换源升档后会拼出坏文件
+        let _ = std::fs::remove_file(format!("{}.part{}.a", local_path, index));
+        let _ = std::fs::remove_file(format!("{}.part{}.b", local_path, index));
+        let _ = std::fs::remove_file(format!("{}.part{}.assembled", local_path, index));
     }
 }
 
@@ -286,11 +289,17 @@ pub async fn download_chunked(
     // 先收「拆分提速」的两半：两半不计 file_progress（避免与原任务重复计数），
     // 成功拼装后一次性补上；前缀字节原本就由被中止的原任务计过账了。
     let mut split_ok = false;
+    // 句柄 await 需要所有权：先把追加的两半取出来，剩下的正好是主分片
+    let split_handles: Vec<ChunkHandle> = if split.is_some() {
+        handles.drain(chunk_count..).collect()
+    } else {
+        Vec::new()
+    };
     if let Some(ref halves) = split {
         let mut halves_bytes = 0_u64;
         let mut halves_ok = true;
-        for offset in 0..SPLIT_SLOTS {
-            match handles[chunk_count + offset].await {
+        for handle in split_handles {
+            match handle.await {
                 Ok((_, Ok(bytes))) => halves_bytes += bytes,
                 Ok((index, Err(e))) => {
                     halves_ok = false;
@@ -335,14 +344,14 @@ pub async fn download_chunked(
         }
     }
 
-    for index in 0..chunk_count {
+    for (index, handle) in handles.drain(..).enumerate() {
         // 拆分成功的那个分片，原任务是被主动 abort 的，结果无意义
         let aborted = split
             .as_ref()
             .map(|halves| halves.index == index)
             .unwrap_or(false)
             && split_ok;
-        match handles[index].await {
+        match handle.await {
             Ok((idx, Ok(bytes))) => {
                 total_downloaded += bytes;
                 log_debug!("[Chunk] chunk {} 完成: {}", idx, format::bytes(bytes));
