@@ -17,7 +17,10 @@ pub(crate) const MAX_SEGS: u64 = 65536;
 pub(crate) const MAX_SEG_FAILURES: u8 = 3;
 
 /// 位图文件头（含版本，格式变更时直接判为无效而不是读出脏数据）
-const MAP_MAGIC: &[u8; 6] = b"MPSEG1";
+const MAP_MAGIC: &[u8; 6] = b"MPSEG2";
+
+/// 文件头长度：magic(6) + 文件大小(8) + 块长(8) + 块数(8) + 续传指纹(8)
+const MAP_HEADER_LEN: usize = 38;
 
 /// 来源未知（未完成或未记录）
 const SOURCE_UNKNOWN: u8 = u8::MAX;
@@ -184,6 +187,23 @@ impl SegmentTable {
         invalidated
     }
 
+    /// 把所有已完成块标回待领（内容校验失败且无法从来源判断时，全部重下）
+    ///
+    /// 返回被作废的块数。文件的既有字节保留，重下时原地覆盖。
+    pub(crate) fn invalidate_all(&self) -> usize {
+        let mut segs = self.lock();
+        let mut invalidated = 0_usize;
+        for seg in segs.iter_mut() {
+            if seg.status == Status::Done {
+                seg.status = Status::Pending;
+                seg.source = SOURCE_UNKNOWN;
+                seg.failures = 0;
+                invalidated += 1;
+            }
+        }
+        invalidated
+    }
+
     /// 已完成的字节数
     pub(crate) fn done_bytes(&self) -> u64 {
         let segs = self.lock();
@@ -220,13 +240,17 @@ impl SegmentTable {
     }
 
     /// 落盘位图（每块 2 字节：状态 + 来源）
-    pub(crate) fn save(&self, path: &Path) -> std::io::Result<()> {
+    ///
+    /// `resume_key` 是「同一次下载」的指纹（任务、来源、期望哈希的摘要）：
+    /// 文件大小相同但内容换了的场景（同名模组更新）靠它拒绝复用旧位图。
+    pub(crate) fn save(&self, path: &Path, resume_key: u64) -> std::io::Result<()> {
         let segs = self.lock();
-        let mut bytes = Vec::with_capacity(30 + segs.len() * 2);
+        let mut bytes = Vec::with_capacity(MAP_HEADER_LEN + segs.len() * 2);
         bytes.extend_from_slice(MAP_MAGIC);
         bytes.extend_from_slice(&self.file_size.to_le_bytes());
         bytes.extend_from_slice(&self.seg_len.to_le_bytes());
         bytes.extend_from_slice(&(segs.len() as u64).to_le_bytes());
+        bytes.extend_from_slice(&resume_key.to_le_bytes());
         for seg in segs.iter() {
             bytes.push(u8::from(seg.status == Status::Done));
             bytes.push(seg.source);
@@ -239,9 +263,14 @@ impl SegmentTable {
     ///
     /// `data_len` 是数据文件当前长度：位图里有但文件里没写到的块一律作废，
     /// 避免「位图说有、文件其实是空洞」这种脏状态被当成已完成。
-    pub(crate) fn load(path: &Path, file_size: u64, data_len: u64) -> Option<Self> {
+    pub(crate) fn load(
+        path: &Path,
+        file_size: u64,
+        data_len: u64,
+        resume_key: u64,
+    ) -> Option<Self> {
         let raw = std::fs::read(path).ok()?;
-        if raw.len() < 30 || &raw[0..6] != MAP_MAGIC {
+        if raw.len() < MAP_HEADER_LEN || &raw[0..6] != MAP_MAGIC {
             return None;
         }
         let mut offset = 6;
@@ -253,7 +282,11 @@ impl SegmentTable {
         let stored_size = take_u64()?;
         let stored_seg_len = take_u64()?;
         let stored_count = take_u64()?;
-        if stored_size != file_size || stored_seg_len != seg_len_for(file_size) {
+        let stored_key = take_u64()?;
+        if stored_size != file_size
+            || stored_seg_len != seg_len_for(file_size)
+            || stored_key != resume_key
+        {
             return None;
         }
         let table = Self::new(file_size);
@@ -261,13 +294,13 @@ impl SegmentTable {
         if stored_count != expected_count {
             return None;
         }
-        if raw.len() < 30 + (stored_count as usize) * 2 {
+        if raw.len() < MAP_HEADER_LEN + (stored_count as usize) * 2 {
             return None;
         }
         {
             let mut segs = table.lock();
             for (index, seg) in segs.iter_mut().enumerate() {
-                let base = 30 + index * 2;
+                let base = MAP_HEADER_LEN + index * 2;
                 let done = raw[base] == 1;
                 let source = raw[base + 1];
                 if !done {

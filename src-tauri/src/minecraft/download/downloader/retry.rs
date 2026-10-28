@@ -14,6 +14,7 @@ use super::super::super::slow;
 use super::super::super::types::{
     ContentValidator, DownloadProgress, DownloadTask, GlobalProgress,
 };
+use super::engine;
 use super::verify;
 use crate::minecraft::download::chunk;
 use crate::{log_debug, log_warn};
@@ -48,7 +49,7 @@ pub(super) async fn download_with_retries(
     }
 
     if can_chunk && chunkable_size(size, chunk_count) && !is_cancelled(&cancel_flag) {
-        if let Some(done) = run_engine(
+        if let Some(done) = engine::run_engine(
             client,
             urls,
             task,
@@ -81,109 +82,6 @@ pub(super) async fn download_with_retries(
         content_validator,
     )
     .await
-}
-
-/// 跑段表引擎并校验：失败会清理半成品与位图、回滚进度，返回 None 交给单流兜底
-#[allow(clippy::too_many_arguments)]
-async fn run_engine(
-    client: &reqwest::Client,
-    urls: &[String],
-    task: &DownloadTask,
-    file_size: u64,
-    chunk_count: usize,
-    trusted_size: u64,
-    rate_limiter: &Option<Arc<Mutex<RateLimiter>>>,
-    progress: &Option<Arc<StdMutex<GlobalProgress>>>,
-    chunked_task_ids: &Option<Arc<StdMutex<std::collections::HashSet<String>>>>,
-    pause_flag: &Option<Arc<AtomicBool>>,
-    cancel_flag: &Option<Arc<AtomicBool>>,
-    content_validator: &Option<ContentValidator>,
-) -> Option<DownloadProgress> {
-    let mut outcome = engine_once(
-        client,
-        urls,
-        None,
-        task,
-        file_size,
-        chunk_count,
-        rate_limiter,
-        progress,
-        pause_flag,
-        cancel_flag,
-    )
-    .await;
-    // 首轮未完成：位图里已有完成块，再跑一轮只补没完成的
-    if !outcome.complete && !is_cancelled(cancel_flag) {
-        log_warn!(
-            "[Download] 并行下载首轮未完成，复用已完成块重试: {:?}",
-            outcome.error
-        );
-        outcome = engine_once(
-            client,
-            urls,
-            None,
-            task,
-            file_size,
-            chunk_count,
-            rate_limiter,
-            progress,
-            pause_flag,
-            cancel_flag,
-        )
-        .await;
-    }
-    let mut usable = outcome.complete && size_ok(task, &outcome, trusted_size);
-    if usable {
-        if let Some(validator) = content_validator {
-            if let Err(err) = validator(Path::new(&task.local_path)) {
-                // 元数据没有块级哈希，只能按「块的来源」定位：保留官方源下的块，
-                // 把其它源下过的块标回待领后只用官方源重下
-                log_warn!("[Download] 内容校验失败，仅重下非官方源的块: {}", err);
-                outcome = engine_once(
-                    client,
-                    urls,
-                    Some(0),
-                    task,
-                    file_size,
-                    chunk_count,
-                    rate_limiter,
-                    progress,
-                    pause_flag,
-                    cancel_flag,
-                )
-                .await;
-                usable = outcome.complete && size_ok(task, &outcome, trusted_size);
-                if usable {
-                    if let Err(again) = validator(Path::new(&task.local_path)) {
-                        log_warn!("[Download] 官方源重下后仍校验失败: {}", again);
-                        usable = false;
-                    }
-                }
-            }
-        }
-    }
-    if usable {
-        if let Some(ref ids) = chunked_task_ids {
-            ids.lock()
-                .unwrap_or_else(|poisoned| poisoned.into_inner())
-                .insert(task.id.clone());
-        }
-        return Some(verify::completed(
-            task,
-            outcome.downloaded,
-            outcome.total,
-            0,
-        ));
-    }
-    // 彻底失败：清掉半成品与位图（单流会从头写，不能踩到半成品），回滚进度
-    log_debug!(
-        "[Download] 并行下载未成功，改用单流兜底: {:?}",
-        outcome.error
-    );
-    let _ = std::fs::remove_file(&task.local_path);
-    let _ = std::fs::remove_file(format!("{}.partmap", task.local_path));
-    rollback_progress(progress, outcome.downloaded);
-    None
 }
 
 /// 单流兜底：小文件、探测不到大小，或引擎彻底失败时使用
@@ -267,6 +165,8 @@ async fn download_single_stream(
                             break;
                         }
                     }
+                    // 单流接手后位图已失效，顺手清掉避免下次误复用
+                    let _ = std::fs::remove_file(format!("{}.partmap", task.local_path));
                     return Some(verify::completed(task, downloaded, total, speed));
                 }
                 Err(e) => {
@@ -292,52 +192,6 @@ async fn download_single_stream(
         }
     }
     None
-}
-
-/// 跑一轮段表引擎
-#[allow(clippy::too_many_arguments)]
-async fn engine_once(
-    client: &reqwest::Client,
-    urls: &[String],
-    only_source: Option<usize>,
-    task: &DownloadTask,
-    file_size: u64,
-    chunk_count: usize,
-    rate_limiter: &Option<Arc<Mutex<RateLimiter>>>,
-    progress: &Option<Arc<StdMutex<GlobalProgress>>>,
-    pause_flag: &Option<Arc<AtomicBool>>,
-    cancel_flag: &Option<Arc<AtomicBool>>,
-) -> chunk::SegmentOutcome {
-    chunk::download_multi(
-        client,
-        urls,
-        0,
-        only_source,
-        &task.local_path,
-        file_size,
-        chunk_count.max(1),
-        rate_limiter.clone(),
-        progress.clone(),
-        pause_flag.clone(),
-        cancel_flag.clone(),
-    )
-    .await
-}
-
-/// 段表引擎的大小校验：探测值不可信，优先用任务给出的可信大小
-fn size_ok(task: &DownloadTask, outcome: &chunk::SegmentOutcome, trusted_size: u64) -> bool {
-    let expected = if trusted_size > 0 {
-        trusted_size
-    } else {
-        outcome.total
-    };
-    match verify::check_chunk(task, expected) {
-        None => true,
-        Some(err) => {
-            log_warn!("[Download] 大小校验失败：{} - {}", task.local_path, err);
-            false
-        }
-    }
 }
 
 fn request_timeout(source_mode: DownloadSourceMode, url: &str) -> Duration {

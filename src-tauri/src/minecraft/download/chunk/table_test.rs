@@ -3,6 +3,9 @@
 use super::{seg_len_for, segments_for, SegmentTable, DEFAULT_SEG_LEN, MAX_SEGS, MAX_SEG_FAILURES};
 use std::path::PathBuf;
 
+/// 测试用的续传指纹
+const KEY: u64 = 0x5EED_1234_ABCD_0001;
+
 fn temp_map(name: &str) -> PathBuf {
     let dir = std::env::temp_dir().join(format!("molaunch-segmap-{}", std::process::id()));
     std::fs::create_dir_all(&dir).expect("创建临时目录");
@@ -123,10 +126,10 @@ fn test_save_load_往返保留完成块与来源() {
     assert_eq!(seg.index, 1);
     table.complete(1, 1);
     assert_eq!(table.done_count(), 2);
-    table.save(&path).expect("保存位图");
+    table.save(&path, KEY).expect("保存位图");
 
     let file_size = 3 * DEFAULT_SEG_LEN;
-    let restored = SegmentTable::load(&path, file_size, file_size).expect("应能读回");
+    let restored = SegmentTable::load(&path, file_size, file_size, KEY).expect("应能读回");
     assert_eq!(restored.done_count(), 2);
     assert_eq!(restored.done_bytes(), 2 * DEFAULT_SEG_LEN);
     // 只保留官方源 -> 镜像那块的来源信息仍在，作废时能定位
@@ -138,8 +141,8 @@ fn test_save_load_往返保留完成块与来源() {
 fn test_load_文件大小不匹配则拒绝() {
     let path = temp_map("mismatch.partmap");
     let table = SegmentTable::new(2 * DEFAULT_SEG_LEN);
-    table.save(&path).expect("保存位图");
-    assert!(SegmentTable::load(&path, 4 * DEFAULT_SEG_LEN, u64::MAX).is_none());
+    table.save(&path, KEY).expect("保存位图");
+    assert!(SegmentTable::load(&path, 4 * DEFAULT_SEG_LEN, u64::MAX, KEY).is_none());
     let _ = std::fs::remove_file(&path);
 }
 
@@ -153,9 +156,10 @@ fn test_load_数据文件没写到的块不算完成() {
         table.complete(seg.index, 0);
     }
     assert_eq!(table.done_count(), 2);
-    table.save(&path).expect("保存位图");
+    table.save(&path, KEY).expect("保存位图");
     // 数据文件只有半块长：两块都应被判为未完成
-    let restored = SegmentTable::load(&path, file_size, DEFAULT_SEG_LEN / 2).expect("应能读回");
+    let restored =
+        SegmentTable::load(&path, file_size, DEFAULT_SEG_LEN / 2, KEY).expect("应能读回");
     assert_eq!(restored.done_count(), 0);
     let _ = std::fs::remove_file(&path);
 }
@@ -164,6 +168,31 @@ fn test_load_数据文件没写到的块不算完成() {
 fn test_load_损坏的位图返回None() {
     let path = temp_map("broken.partmap");
     std::fs::write(&path, b"broken").expect("写入脏数据");
-    assert!(SegmentTable::load(&path, DEFAULT_SEG_LEN, u64::MAX).is_none());
+    assert!(SegmentTable::load(&path, DEFAULT_SEG_LEN, u64::MAX, KEY).is_none());
+    let _ = std::fs::remove_file(&path);
+}
+
+#[test]
+fn test_invalidate_all_全部作废() {
+    let table = SegmentTable::new(2 * DEFAULT_SEG_LEN);
+    for _ in 0..2 {
+        let seg = table.claim(false).expect("应能认领");
+        table.complete(seg.index, 1);
+    }
+    assert!(table.is_complete());
+    assert_eq!(table.invalidate_all(), 2);
+    assert_eq!(table.done_bytes(), 0);
+    assert!(table.has_claimable());
+}
+
+#[test]
+fn test_load_续传指纹不匹配则拒绝() {
+    let path = temp_map("key.partmap");
+    let table = SegmentTable::new(2 * DEFAULT_SEG_LEN);
+    let seg = table.claim(false).expect("应能认领");
+    table.complete(seg.index, 0);
+    table.save(&path, KEY).expect("保存位图");
+    // 同名文件但内容换了（同名模组更新）-> 指纹不同，不复用
+    assert!(SegmentTable::load(&path, 2 * DEFAULT_SEG_LEN, u64::MAX, KEY + 1).is_none());
     let _ = std::fs::remove_file(&path);
 }

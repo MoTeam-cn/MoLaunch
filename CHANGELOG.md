@@ -163,6 +163,16 @@
 - [`multi.rs`](src-tauri/src/minecraft/download/chunk/multi.rs)：AIMD 补齐收缩——某条源吞吐跌到均值一半以下且不止一条连接时减一条（worker 在下次认领前自行退出，不打断进行中的块），单条连接永远保底，避免慢源被自己饿死；
 - [`multi_test.rs`](src-tauri/src/minecraft/download/chunk/multi_test.rs)：补 `should_shrink` 三例（明显低于均值才收缩、单连接保底、均值为零不动）。
 
+#### 下载引擎：坏块重下阶梯、半成品可续、进度按实际对齐
+
+上一版只在「校验失败」时做了一次按来源的重下，且失败就把半成品全删。这次把这条链补完整。
+
+- [`engine.rs`](src-tauri/src/minecraft/download/downloader/engine.rs)、[`engine_test.rs`](src-tauri/src/minecraft/download/downloader/engine_test.rs)（新）：引擎调用与校验从 `retry.rs` 抽出，形成三级重下阶梯——全部未完成 → 只重下**非官方源下过的块** → **全部作废只用官方源**；元数据没有块级哈希，这是能做到的最小重下量。
+- **半成品保留**：未跑完但有进度（断网、反复超时）不再删文件，位图与半成品留在磁盘上，同一任务下次进来直接续；只有「零进度」或「数据已不可信」才清干净交给单流兜底——单流会从头写，不能踩到半成品。
+- [`table.rs`](src-tauri/src/minecraft/download/chunk/table.rs)：位图文件头加**续传指纹**（任务 id、期望哈希、文件大小、来源集合的 FNV 摘要）。同名文件大小相同但内容换了（同名模组更新）时拒绝复用旧位图；格式升到 `MPSEG2`，旧位图自动判为无效。新增 `invalidate_all`。
+- **进度对齐**：每轮跑完把「本文件已计入全局进度的字节」与引擎的当前可信字节对齐，作废块重下会把虚高部分退回去——此前多轮重跑会重复累计。
+- [`schedule.rs`](src-tauri/src/minecraft/download/chunk/schedule.rs)、[`schedule_test.rs`](src-tauri/src/minecraft/download/chunk/schedule_test.rs)（新）：初始分配、扩容、收缩、判死抽成纯函数并补 10 例测试；[`multi.rs`](src-tauri/src/minecraft/download/chunk/multi.rs) 只留编排（起 worker、采样、落盘），`multi_test.rs` 随之退役。
+
 
 
 ## [0.3.13] - 2026-10-27

@@ -11,6 +11,8 @@ use super::super::rate_limiter::RateLimiter;
 use super::super::types::{ContentValidator, DownloadProgress, DownloadTask, GlobalProgress};
 use crate::log_debug;
 
+#[path = "engine.rs"]
+mod engine;
 #[path = "retry.rs"]
 mod retry;
 #[path = "verify.rs"]

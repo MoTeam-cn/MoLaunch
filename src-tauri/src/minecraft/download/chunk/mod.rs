@@ -6,7 +6,8 @@
 mod block;
 mod multi;
 pub mod probe;
+mod schedule;
 mod table;
 
-pub(crate) use multi::{download_multi, SegmentOutcome};
+pub(crate) use multi::{download_multi, RetryScope, SegmentOutcome};
 pub use probe::probe_file_size;
