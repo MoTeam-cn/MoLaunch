@@ -6,6 +6,13 @@
 
 ### 修复
 
+#### 同一份 Java runtime 被并发安装会互相覆盖
+两个安装任务同时写 `runtime/{component}/` 时，各自以为在装同一份 Java，实际每人写了一半：两边都把对方的文件当成「已存在但大小不对」重写，最后的目录混着两个批次的内容，校验器找不出规律，只能一起失败。
+
+[`pipeline.rs`](src-tauri/src/minecraft/java/download/pipeline.rs)：匹配到 component 之后排队拿一把按 component 分的锁，整个下载+验证都在锁内。按 component 分是为了装 Java 8 不必等装 Java 21。
+- 锁用 `tokio::sync::Mutex` + `lock_owned`：安装是 async 流程，标准库锁会在 `await` 处造成跨线程问题。
+- [`pipeline_test.rs`](src-tauri/src/minecraft/java/download/pipeline_test.rs)（新）：2 个用例——同一 component 的 4 个并发任务串行（峰值为 1）、不同 component 之间不排队。
+
 #### 装到一半的 runtime 会被当成可用 Java
 下载中断或进程中途被杀，会留下一个**能执行但模块不全**的 `java.exe`。Java 扫描的 Step 5 递归扫 `runtime/` 目录，会把它收进候选列表；用户选中后在启动游戏时才崩，而崩溃信息跟「Java 没装完」毫无关系。
 

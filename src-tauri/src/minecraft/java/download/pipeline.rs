@@ -2,9 +2,12 @@
 //!
 //! fetching → matching → manifest → downloading → verifying
 
+use std::collections::HashMap;
 use std::path::PathBuf;
-use std::sync::Arc;
+use std::sync::{Arc, Mutex as StdMutex, OnceLock};
 use tauri::AppHandle;
+
+use tokio::sync::{Mutex as AsyncMutex, OwnedMutexGuard};
 
 use crate::log_info;
 use crate::minecraft::download::config::DownloadManagerConfig;
@@ -18,6 +21,29 @@ use super::files;
 use super::progress;
 use super::r#match;
 use super::verify;
+
+/// 每个 component 一把安装锁
+///
+/// 同一份 runtime 被两个安装任务同时写会互相覆盖对方刚写好的文件：
+/// 两边都以为自己在装同一份 Java，实际每人只写了一半，最后谁都验证不过。
+/// 锁按 component 分——装 Java 8 不必等装 Java 21。
+fn install_locks() -> &'static StdMutex<HashMap<String, Arc<AsyncMutex<()>>>> {
+    static LOCKS: OnceLock<StdMutex<HashMap<String, Arc<AsyncMutex<()>>>>> = OnceLock::new();
+    LOCKS.get_or_init(|| StdMutex::new(HashMap::new()))
+}
+
+/// 排队拿这个 component 的安装锁（前一个装完才轮到）
+async fn lock_install(component: &str) -> OwnedMutexGuard<()> {
+    let lock = {
+        let mut map = install_locks()
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner());
+        map.entry(component.to_string())
+            .or_insert_with(|| Arc::new(AsyncMutex::new(())))
+            .clone()
+    };
+    lock.lock_owned().await
+}
 
 /// 下载 Java Runtime
 ///
@@ -49,6 +75,9 @@ pub async fn download_java_runtime(
         component,
         entry.version.name
     );
+
+    // 同一 component 的安装串行化：并发写同一份 runtime 只会互相覆盖
+    let _install_guard = lock_install(&component).await;
 
     // 阶段 3：拉取 manifest
     progress::emit(app, "manifest", 0, 1, 0, 0, "正在获取文件清单...");
@@ -172,3 +201,7 @@ pub async fn download_java_runtime(
 
     Ok(java_exe)
 }
+
+#[cfg(test)]
+#[path = "pipeline_test.rs"]
+mod pipeline_test;
