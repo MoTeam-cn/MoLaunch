@@ -6,6 +6,13 @@
 
 ### 修复
 
+#### 重装整合包失败时会删掉用户改过的配置
+失败清理的判据是「版本目录下有没有 `saves/` 或 `versions/` 子目录」——而这两个恰恰是整合包实例通常没有的（存档要玩过才有，嵌套版本只有部分整合包才有）。于是对**已存在**的实例重装整合包、一旦失败，整个 `versions/<实例名>` 会被递归删掉，连用户改过的 `config/`、`options.txt`、资源包一起。
+
+- [`helpers.rs`](src-tauri/src/commands/community/install/helpers.rs)：判据换成「安装开始前目录是否已存在」，新增 `dir_existed` 参数。本次新建 → 整目录删掉回到安装前状态；本来就有 → 只记一条日志并保留。
+- [`local.rs`](src-tauri/src/commands/community/install/modpack/local.rs)、[`online.rs`](src-tauri/src/commands/community/install/modpack/online.rs)：在 `create_dir_all` **之前**取样 `instance_dir.exists()`——放在后面取永远是 true，判据就失效了。
+- [`helpers_test.rs`](src-tauri/src/commands/community/install/helpers_test.rs)：2 个用例，覆盖已有实例保留用户文件、本次新建整目录删除。
+
 #### 导入实例时会跟随目录链接，导致体积膨胀甚至递归
 导入走的是复制模式，而复制用 `path.is_dir()` 判类型——它会**跟随**重解析点。别的启动器常用 junction 把 `libraries`、`assets` 甚至整个数据目录链到别处：跟随过去就是整份复制（体积成倍膨胀），链回祖先目录时还会无限递归。
 

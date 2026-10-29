@@ -88,6 +88,8 @@ pub async fn install_local_modpack(
     // 解析游戏目录、创建 instance_dir
     let game_dir = crate::state::resolve_game_dir_from_state(state).await;
     let instance_dir = game_dir.join("versions").join(&req.instance_name);
+    // 安装开始前取样：这是判断「本次新建」还是「已有实例」的唯一可靠依据
+    let dir_existed = instance_dir.exists();
     std::fs::create_dir_all(&instance_dir).map_err(|e| format!("创建整合包目录失败: {}", e))?;
 
     let instance_dir_ref = &instance_dir;
@@ -200,7 +202,7 @@ pub async fn install_local_modpack(
     if let Err(e) = result {
         let mut ds = state.download_state.lock().unwrap();
         ds.mark_failed(0);
-        super::super::helpers::cleanup_version_dir_on_failure(&instance_dir);
+        super::super::helpers::cleanup_version_dir_on_failure(&instance_dir, dir_existed);
         if let Some(tmp) = &_temp_cleanup {
             let _ = std::fs::remove_file(tmp);
             let _ = std::fs::remove_dir(tmp.parent().unwrap_or(std::path::Path::new(".")));

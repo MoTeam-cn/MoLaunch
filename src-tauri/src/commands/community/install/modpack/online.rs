@@ -45,6 +45,8 @@ pub async fn install_modpack(
     // 解析游戏目录、创建 instance_dir（提到 async block 外，便于错误时清理版本目录）
     let game_dir = crate::state::resolve_game_dir_from_state(state).await;
     let instance_dir = game_dir.join("versions").join(&req.instance_name);
+    // 安装开始前取样：这是判断「本次新建」还是「已有实例」的唯一可靠依据
+    let dir_existed = instance_dir.exists();
     std::fs::create_dir_all(&instance_dir).map_err(|e| format!("创建整合包目录失败: {}", e))?;
 
     // zip 下载目标（提到 async block 外，便于安装成功后删除）
@@ -206,7 +208,7 @@ pub async fn install_modpack(
         Err(e) => {
             let mut ds = state.download_state.lock().unwrap();
             ds.mark_failed(0);
-            super::super::helpers::cleanup_version_dir_on_failure(&instance_dir);
+            super::super::helpers::cleanup_version_dir_on_failure(&instance_dir, dir_existed);
             return Err(e);
         }
         Ok(mut ok) => {

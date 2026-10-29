@@ -4,8 +4,8 @@
 //! 两者都是路径穿越 sink，必须各自有独立的校验（扩展名校验不承担路径安全）。
 
 use super::{
-    construct_cf_edge_url, resolve_cf_download_url, validate_instance_name,
-    validate_modpack_extension,
+    cleanup_version_dir_on_failure, construct_cf_edge_url, resolve_cf_download_url,
+    validate_instance_name, validate_modpack_extension,
 };
 
 /// 路径分隔符与相对路径段必须被拒绝（否则可逃出 versions/ 目录）
@@ -111,5 +111,36 @@ fn test_resolve_cf_download_url_开关语义() {
     assert_eq!(
         resolve_cf_download_url(None, 1_234_005, "x.jar", false),
         None
+    );
+}
+
+#[test]
+fn test_cleanup_version_dir_on_failure_已有实例时保留不删() {
+    let dir = std::env::temp_dir().join(format!("molaunch-cleanup-{}-keep", std::process::id()));
+    let _ = std::fs::remove_dir_all(&dir);
+    std::fs::create_dir_all(dir.join("config")).expect("建实例目录");
+    std::fs::write(dir.join("config").join("user.ini"), b"user").expect("写用户文件");
+
+    cleanup_version_dir_on_failure(&dir, true);
+
+    assert!(
+        dir.join("config").join("user.ini").exists(),
+        "安装前就存在的实例目录里，用户改过的配置不能被删"
+    );
+    let _ = std::fs::remove_dir_all(&dir);
+}
+
+#[test]
+fn test_cleanup_version_dir_on_failure_本次新建时整目录删除() {
+    let dir = std::env::temp_dir().join(format!("molaunch-cleanup-{}-gone", std::process::id()));
+    let _ = std::fs::remove_dir_all(&dir);
+    std::fs::create_dir_all(dir.join("mods")).expect("建实例目录");
+    std::fs::write(dir.join("mods").join("half.jar"), b"half").expect("写半成品");
+
+    cleanup_version_dir_on_failure(&dir, false);
+
+    assert!(
+        !dir.exists(),
+        "本次新建的目录安装失败后应整删，避免污染版本列表"
     );
 }

@@ -244,17 +244,19 @@ pub(super) fn validate_modpack_extension(file_path: &str) -> Result<(), String> 
 
 /// 整合包安装失败/取消后清理版本目录
 ///
-/// 保护逻辑：若版本目录下已存在 `saves/` 或 `versions/` 子目录，
-/// 说明用户已独立启动过该版本，保留目录避免误删存档。
-/// 否则删除整个版本目录，避免残留半安装文件污染版本列表。
+/// `dir_existed` 是**安装开始前**目录是否已存在，这是这里唯一可靠的判据：
+/// - 本次新建：整目录删掉，回到安装前的状态；
+/// - 本来就有：说明是在重装或更新一个已有实例，目录里可能有用户改过的
+///   `config/`、`options.txt`、资源包等，整删就是删用户数据，因此保留。
+///
+/// 早先的判据是「有没有 `saves/` 或 `versions/` 子目录」，但这两个恰恰是
+/// 整合包实例通常没有的（存档要玩过才有），于是判据在常见情况下恒为「没有」。
 ///
 /// 删除失败仅记录警告，不传播错误（清理失败不应阻塞错误传播）。
-pub(super) fn cleanup_version_dir_on_failure(instance_dir: &std::path::Path) {
-    let has_saves = instance_dir.join("saves").exists();
-    let has_versions = instance_dir.join("versions").exists();
-    if has_saves || has_versions {
+pub(super) fn cleanup_version_dir_on_failure(instance_dir: &std::path::Path, dir_existed: bool) {
+    if dir_existed {
         crate::log_warn!(
-            "[Community] 版本目录已含 saves/versions 子目录，保留不清理: {}",
+            "[Community] 版本目录安装失败但原本就存在，保留不清理: {}",
             instance_dir.display()
         );
         return;
