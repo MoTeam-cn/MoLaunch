@@ -5,6 +5,7 @@
 
 use crate::{log_info, log_warn};
 
+use super::instance_files;
 use super::version_naming::find_loader_version_dir;
 
 /// 安装后处理：合并 JSON + 删除原版 + 重命名版本目录
@@ -32,11 +33,15 @@ pub(crate) fn merge_and_rename_version(
     };
 
     // 如果用户自定义了名称，需要重命名版本目录和修改 JSON
-    if instance != final_version_id {
+    let final_id = if instance != final_version_id {
         rename_version_dir(game_dir, &final_version_id, instance)
     } else {
         final_version_id
-    }
+    };
+
+    // 装好之后记一份文件事实表，并把「安装之外发生的改动」报出来
+    instance_files::record(game_dir, &final_id);
+    final_id
 }
 
 /// 合并加载器版本的 JSON（删除 inheritsFrom，合并原版 JSON）

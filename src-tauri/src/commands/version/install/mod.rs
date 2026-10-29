@@ -7,6 +7,7 @@ mod fabric;
 mod fabric_api;
 pub mod flow;
 mod forge;
+mod instance_files;
 pub(crate) mod loader_helpers;
 mod neoforge;
 mod post_install;
