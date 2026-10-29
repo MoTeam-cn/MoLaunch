@@ -379,6 +379,10 @@ pub(crate) async fn download_multi(
         credit.credit(downloaded);
     }
     if complete {
+        // 数据先落盘再删账本：账本没了而数据还在页缓存时，掉电后文件会变成无法自证的半截
+        if let Err(e) = flush_data_file(path) {
+            log_warn!("[Segment] 数据落盘失败: {}", e);
+        }
         // 完成即清理位图，避免下次误复用
         let _ = std::fs::remove_file(&engine.map_path);
     } else {
@@ -405,6 +409,15 @@ pub(crate) async fn download_multi(
             ))
         },
     }
+}
+
+/// 把数据文件刷到稳定存储。
+///
+/// 必须用写句柄打开：Windows 的 FlushFileBuffers 要求句柄带写权限，
+/// 只读句柄的 sync_all 会直接失败——那样等于没刷。
+fn flush_data_file(path: &str) -> std::io::Result<()> {
+    let file = std::fs::OpenOptions::new().write(true).open(path)?;
+    file.sync_all()
 }
 
 fn save_map(engine: &Engine) {
@@ -483,3 +496,7 @@ async fn run_worker(args: Arc<WorkerArgs>, source_index: usize) {
     }
     slot.active.fetch_sub(1, Ordering::Relaxed);
 }
+
+#[cfg(test)]
+#[path = "multi_test.rs"]
+mod multi_test;
