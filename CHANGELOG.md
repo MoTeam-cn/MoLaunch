@@ -6,6 +6,14 @@
 
 ### 修复
 
+#### 主机记忆顺带记下「这台不支持 Range」
+遇到不支持 Range 的主机（非首块返回 200），每个块都要先发一次注定白费的请求才知道，一个文件几百块就是几百次。主机记忆里本来就有这台主机的档案，顺手把这条结论记上，下一块直接判负换源。
+
+- [`host_profile.rs`](src-tauri/src/minecraft/download/host_profile.rs)：档案加 `supports_range`（`None` = 没测过，当支持处理），新增 `range_unsupported` / `note_range_unsupported`。合并时**不覆盖**这个结论——并发与 Range 是两件事，学并发不该把 Range 的能力判断抹掉。
+- 落盘字段带 `#[serde(default)]`：旧记忆文件缺这个字段时按「没测过」读，不需要版本号迁移。顺带把「到点落盘」抽成 `due_snapshot`，两处共用同一套节流。
+- [`block.rs`](src-tauri/src/minecraft/download/chunk/block.rs)：非首块请求前先查这条记忆，命中就直接返回 `RangeUnsupported`，不再发请求；收到「非首块 200」时记下结论。
+- [`host_profile_test.rs`](src-tauri/src/minecraft/download/host_profile_test.rs)：3 个用例——未知主机当支持、记下后能读到且只影响该主机、合并时保留 Range 结论。
+
 #### 旧进度帧后到会让百分比回退
 Tauri 事件不保证有序：多个后端任务并发 emit、WebView 调度延迟，都可能让旧帧后到。百分比一旦回退，用户看到的就是「下着下着又退回去」。
 

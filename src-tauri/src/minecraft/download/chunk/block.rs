@@ -8,6 +8,7 @@ use std::time::Duration;
 use futures_util::StreamExt;
 use tokio::sync::Mutex;
 
+use super::super::host_profile;
 use super::super::mirror_gate;
 use super::super::rate_limiter::RateLimiter;
 use super::super::throttle;
@@ -48,6 +49,11 @@ pub(crate) async fn download_block(
     cancel_flag: &Option<Arc<AtomicBool>>,
 ) -> Result<([u8; 32], u64), BlockError> {
     let expected = segment.len();
+    // 这台主机先前已明确不支持 Range：这次请求注定白费，直接判负让调度换源
+    if segment.start > 0 && host_profile::range_unsupported(url) {
+        return Err(BlockError::RangeUnsupported);
+    }
+
     // 镜像闸门：许可持有到响应体读完，公共镜像的高并发 Range 才有节制
     let _permit = mirror_gate::acquire(url).await;
     let response = client
@@ -67,6 +73,8 @@ pub(crate) async fn download_block(
     }
     let status = response.status();
     if status == reqwest::StatusCode::OK && segment.start > 0 {
+        // 记下来：同一主机后面的块不必再白试一遍
+        host_profile::note_range_unsupported(url);
         return Err(BlockError::RangeUnsupported);
     }
     if !status.is_success() {

@@ -48,6 +48,8 @@ struct Profile {
     target: usize,
     throughput: u64,
     learned_at: Instant,
+    /// 这台主机是否支持 Range；None 表示没测过（当支持处理）
+    supports_range: Option<bool>,
 }
 
 /// 运行时状态
@@ -77,11 +79,14 @@ fn merge(previous: Option<Profile>, target: usize, throughput: u64, now: Instant
             target: previous.target.max(target).clamp(MIN_TARGET, MAX_TARGET),
             throughput: ema(previous.throughput, throughput),
             learned_at: now,
+            // Range 能力与并发无关，学并发不能把这条结论抹掉
+            supports_range: previous.supports_range,
         },
         None => Profile {
             target,
             throughput,
             learned_at: now,
+            supports_range: None,
         },
     }
 }
@@ -108,6 +113,71 @@ pub(crate) fn suggest(url: &str) -> Option<usize> {
     Some(profile.target.clamp(MIN_TARGET, MAX_TARGET))
 }
 
+/// 这台主机是否已被记为不支持 Range
+///
+/// 未知一律当「支持」：这条记忆只用来省掉注定白费的请求，不该拦下可能成功的。
+pub(crate) fn range_unsupported(url: &str) -> bool {
+    let Some(host) = host_of(url) else {
+        return false;
+    };
+    let mut guard = state().lock().unwrap_or_else(|p| p.into_inner());
+    ensure_loaded(&mut guard);
+    guard
+        .as_ref()
+        .and_then(|state| state.profiles.get(&host))
+        .filter(|profile| profile.learned_at.elapsed() <= TTL)
+        .map(|profile| profile.supports_range == Some(false))
+        .unwrap_or(false)
+}
+
+/// 记下「这台主机不支持 Range」
+///
+/// 只改这一个结论：学到的并发与吞吐是另一件事，不能被覆盖掉。
+pub(crate) fn note_range_unsupported(url: &str) {
+    let Some(host) = host_of(url) else {
+        return;
+    };
+    let now = Instant::now();
+    let mut guard = state().lock().unwrap_or_else(|p| p.into_inner());
+    ensure_loaded(&mut guard);
+    let Some(state) = guard.as_mut() else {
+        return;
+    };
+    let previous = state
+        .profiles
+        .get(&host)
+        .copied()
+        .filter(|profile| profile.learned_at.elapsed() <= TTL);
+    let mut profile = previous.unwrap_or(Profile {
+        target: MIN_TARGET,
+        throughput: 0,
+        learned_at: now,
+        supports_range: None,
+    });
+    profile.supports_range = Some(false);
+    // 刷新时间：这条结论比一条并发的经验更重要，别让它先过期
+    profile.learned_at = now;
+    state.profiles.insert(host, profile);
+    if let Some(snapshot) = due_snapshot(state, now) {
+        drop(guard);
+        if let Some(path) = store_path() {
+            if let Err(e) = save_to(&path, &snapshot) {
+                log_debug!("[HostProfile] 落盘失败: {}", e);
+            }
+        }
+    }
+}
+
+/// 到点就落盘：返回要写的快照，未到间隔返回 None
+fn due_snapshot(state: &mut State, now: Instant) -> Option<Store> {
+    if state.last_save.elapsed() < SAVE_INTERVAL {
+        return None;
+    }
+    state.last_save = now;
+    prune(state);
+    Some(snapshot(state))
+}
+
 /// 记录一次观测（引擎结束时按每条源调用）
 pub(crate) fn observe(url: &str, target: usize, throughput: u64) {
     let Some(host) = host_of(url) else {
@@ -131,11 +201,7 @@ pub(crate) fn observe(url: &str, target: usize, throughput: u64) {
     state
         .profiles
         .insert(host, merge(previous, target, throughput, now));
-    let should_save = state.last_save.elapsed() >= SAVE_INTERVAL;
-    if should_save {
-        state.last_save = now;
-        prune(state);
-        let snapshot = snapshot(state);
+    if let Some(snapshot) = due_snapshot(state, now) {
         drop(guard);
         if let Some(path) = store_path() {
             if let Err(e) = save_to(&path, &snapshot) {
@@ -180,6 +246,7 @@ fn snapshot(state: &State) -> Store {
                 PersistedProfile {
                     target: profile.target,
                     throughput: profile.throughput,
+                    supports_range: profile.supports_range,
                     learned_epoch_ms: now.saturating_sub(elapsed),
                 },
             )
@@ -231,6 +298,9 @@ struct Store {
 struct PersistedProfile {
     target: usize,
     throughput: u64,
+    /// 旧文件里没有这个字段：缺省即「没测过」，不猜
+    #[serde(default)]
+    supports_range: Option<bool>,
     /// 学到这条经验的绝对时间（毫秒时间戳），用来跨进程算 TTL
     learned_epoch_ms: u64,
 }
@@ -258,6 +328,7 @@ impl Store {
                     Profile {
                         target: stored.target.clamp(MIN_TARGET, MAX_TARGET),
                         throughput: stored.throughput,
+                        supports_range: stored.supports_range,
                         learned_at: Instant::now().checked_sub(age).unwrap_or_else(Instant::now),
                     },
                 ))

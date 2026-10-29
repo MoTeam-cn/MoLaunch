@@ -1,11 +1,11 @@
 //! 主机记忆测试：主机识别、EMA、目标合并、落盘往返与清理
 
 use super::{
-    ema, host_of, load_from, merge, observe, save_to, suggest, PersistedProfile, Store,
-    STORE_VERSION, TTL,
+    ema, host_of, load_from, merge, note_range_unsupported, observe, range_unsupported, save_to,
+    suggest, PersistedProfile, Store, STORE_VERSION, TTL,
 };
 use std::path::PathBuf;
-use std::time::{Duration, SystemTime, UNIX_EPOCH};
+use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 
 fn temp_path(name: &str) -> PathBuf {
     let dir = std::env::temp_dir().join(format!("molaunch-hostprofile-{}", std::process::id()));
@@ -78,6 +78,7 @@ fn test_store_往返保留并发与吞吐() {
         PersistedProfile {
             target: 4,
             throughput: 1_234_567,
+            supports_range: None,
             learned_epoch_ms: now_millis(),
         },
     );
@@ -103,6 +104,7 @@ fn test_store_版本不符则整体忽略() {
         PersistedProfile {
             target: 4,
             throughput: 1,
+            supports_range: None,
             learned_epoch_ms: now_millis(),
         },
     );
@@ -126,6 +128,7 @@ fn test_store_过期条目被丢弃() {
         PersistedProfile {
             target: 6,
             throughput: 1,
+            supports_range: None,
             learned_epoch_ms: stale,
         },
     );
@@ -134,6 +137,7 @@ fn test_store_过期条目被丢弃() {
         PersistedProfile {
             target: 2,
             throughput: 1,
+            supports_range: None,
             learned_epoch_ms: now_millis(),
         },
     );
@@ -163,4 +167,33 @@ fn test_store_过大文件被拒() {
     std::fs::write(&path, &filler).expect("写大文件");
     assert!(load_from(&path).is_err(), "超限的记忆文件应当被拒绝");
     let _ = std::fs::remove_file(&path);
+}
+
+#[test]
+fn test_range_unsupported_未知主机当支持() {
+    assert!(
+        !range_unsupported("https://range-unknown.example.com/a.jar"),
+        "没记过的host当支持处理，这条记忆只用来省白费的请求"
+    );
+}
+
+#[test]
+fn test_note_range_unsupported_记下之后能读到() {
+    let url = "https://range-broken.example.com/a.jar";
+    note_range_unsupported(url);
+    assert!(range_unsupported(url), "记过之后必须能读到");
+    assert!(
+        !range_unsupported("https://range-broken-other.example.com/a.jar"),
+        "只影响这一台主机"
+    );
+}
+
+#[test]
+fn test_merge_学并发不会抹掉Range结论() {
+    let now = Instant::now();
+    let mut profile = merge(None, 2, 100, now);
+    profile.supports_range = Some(false);
+    let merged = merge(Some(profile), 4, 200, now);
+    assert_eq!(merged.supports_range, Some(false), "并发与 Range 是两件事");
+    assert_eq!(merged.target, 4);
 }
