@@ -11,7 +11,7 @@ import { useVersionStore } from '@/stores/version'
 import { toastSuccess } from '@/utils/toast'
 import { isDownloading, getDownloadProgress } from '@/utils/api/system'
 import type { RawDownloadProgress } from '@/types/download'
-import { toProgressSnapshot } from '@/utils/downloadProgress'
+import { shouldAcceptSnapshot, toProgressSnapshot } from '@/utils/downloadProgress'
 import { safeCall } from '@/utils/async'
 
 /** 防止 initDownloadStream 被多次调用注册重复 listener */
@@ -40,7 +40,13 @@ function handleProgress(progress: RawDownloadProgress) {
     return
   }
 
-  versionStore.updateProgress(toProgressSnapshot(progress))
+  const snapshot = toProgressSnapshot(progress)
+  // 旧帧后到会让百分比回退，先过一遍单调性判断
+  if (shouldAcceptSnapshot(versionStore.downloadProgress ?? null, snapshot)) {
+    versionStore.updateProgress(snapshot)
+  } else if (import.meta.env.DEV) {
+    console.debug('[Download] 丢弃回退的进度帧:', snapshot.percentage)
+  }
 
   if (progress.is_complete) {
     if (import.meta.env.DEV) {

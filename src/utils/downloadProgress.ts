@@ -117,3 +117,28 @@ export function resolveDisplayPercentage(input: DisplayPercentageInput): number 
   if (input.globalBytesTotal > 0) return clamp(input.weighted)
   return Math.min(99.9, clamp(input.stage))
 }
+
+/** 单调容差：后端百分比有取整与权重抖动，允许 1 个百分点内的回落 */
+const MONOTONIC_TOLERANCE = 1
+
+/**
+ * 这一帧进度快照该不该接收
+ *
+ * 事件流不保证有序：多个后端任务并发 emit、WebView 调度都可能让旧帧后到。
+ * 百分比一旦回退，用户看到的就是「下着下着又退回去」。三条不变量：
+ * 1. 阶段变了就接收——同一阶段内的比较才有意义；
+ * 2. 同一阶段内，总体百分比与阶段百分比都不许回退（1 个百分点内算抖动）；
+ * 3. 进度归零视为新任务开始（重下/重试），必须接收，否则界面会卡在旧数值。
+ */
+export function shouldAcceptSnapshot(
+  prev: DownloadProgress | null,
+  next: DownloadProgress,
+): boolean {
+  if (!prev) return true
+  if (next.percentage === 0 && prev.percentage > 0) return true
+  if (prev.current_stage_index !== next.current_stage_index) return true
+  if (prev.stages.length !== next.stages.length) return true
+  if (next.percentage + MONOTONIC_TOLERANCE < prev.percentage) return false
+  if (next.stage_percentage + MONOTONIC_TOLERANCE < prev.stage_percentage) return false
+  return true
+}

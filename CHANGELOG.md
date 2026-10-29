@@ -6,6 +6,13 @@
 
 ### 修复
 
+#### 旧进度帧后到会让百分比回退
+Tauri 事件不保证有序：多个后端任务并发 emit、WebView 调度延迟，都可能让旧帧后到。百分比一旦回退，用户看到的就是「下着下着又退回去」。
+
+- [`downloadProgress.ts`](src/utils/downloadProgress.ts)：新增 `shouldAcceptSnapshot`，三条不变量——阶段变了必收（跨阶段比较没意义）、同一阶段内总体与阶段百分比都不许回退（1 个百分点内的抖动算正常）、进度归零必收（重下/重试，否则界面卡在旧值）。
+- [`useDownloadStream.ts`](src/composables/useDownloadStream.ts)：更新 store 前先过这道判断，丢弃时只打 debug 日志。
+- [`download-progress.test.ts`](src/utils/__tests__/download-progress.test.ts)：补 7 个用例覆盖上述分支。
+
 #### 被限流后并发只缩不扩
 公共镜像返回 429/503 时，镜像闸门知道要给自己设冷却，但「本次下载整体该退一档」这件事没人接收——分块路径把闸门的返回值(`Option<Duration>`)直接丢掉了。于是限流只体现在「这条镜像被冷落一会儿」，同时其余连接还在按基线往上扩，越限越挤。
 
