@@ -93,8 +93,9 @@ pub(crate) fn plan_window(
         .max_by_key(|(_, rate, _)| *rate)
         .and_then(|(index, rate, _)| {
             let by_rate = should_grow(*rate, avg, total_target, share);
-            let by_probe =
-                window % PROBE_INTERVAL_WINDOWS == 0 && total_target < share && *rate > 0;
+            let by_probe = window.is_multiple_of(PROBE_INTERVAL_WINDOWS)
+                && total_target < share
+                && *rate > 0;
             if by_rate || by_probe {
                 Some(*index)
             } else {
