@@ -19,7 +19,8 @@ fn temp_file(tag: &str) -> (std::path::PathBuf, Arc<Mutex<std::fs::File>>) {
 #[tokio::test]
 async fn test_write_at_按绝对偏移写入() {
     let (path, file) = temp_file("offset");
-    write_at(&file, 4, b"world".to_vec())
+    // 两段不重叠：0..5 与 5..10
+    write_at(&file, 5, b"world".to_vec())
         .await
         .expect("写第二段");
     write_at(&file, 0, b"hello".to_vec())
