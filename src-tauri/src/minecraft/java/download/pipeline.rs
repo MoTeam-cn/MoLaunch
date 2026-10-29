@@ -148,7 +148,11 @@ pub async fn download_java_runtime(
         0,
         &format!("验证 Java: {}", java_exe.display()),
     );
-    verify::verify_downloaded_java(&java_exe);
+    if let Err(e) = verify::verify_downloaded_java(&java_exe) {
+        // 验证都过不了就不是「装好了」，按安装失败处理
+        files::cleanup_failed_install(&runtime_dir, dir_existed);
+        return Err(e);
+    }
 
     // 完成
     progress::emit(

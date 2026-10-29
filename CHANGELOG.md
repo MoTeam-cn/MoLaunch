@@ -6,6 +6,13 @@
 
 ### 修复
 
+#### Java 下完没跑起来也算成功
+`verify_downloaded_java` 只在失败时打一行 `info` 日志，然后照常返回——调用方于是把这份跑不起来的 Java 写进配置，用户直到启动游戏才看到一个看不懂的崩溃。
+
+[`verify.rs`](src-tauri/src/minecraft/java/download/verify.rs)：改为返回 `Result<(), String>`，失败时 `log_warn!` 并带上可执行路径与原因。
+[`pipeline.rs`](src-tauri/src/minecraft/java/download/pipeline.rs)：验证失败按安装失败处理（清理本次新建的目录）并向上返回错误，不再把坏路径交出去。
+[`verify_test.rs`](src-tauri/src/minecraft/java/download/verify_test.rs)（新）：1 个用例——路径不存在必须返回 `Err` 且信息非空。
+
 #### Java 安装失败会删掉共用的 runtime 目录
 `{APPDATA}/.minecraft/runtime/{component}/` 是**官方启动器也在用**的公共目录。原先下载失败就 `remove_dir_all` 整个目录——用户只要用官方启动器装过同一版本 Java，我们的下载失败就会把它一起删掉，而这两件事毫无关系。
 
