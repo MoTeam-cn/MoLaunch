@@ -167,6 +167,14 @@ Tauri 事件不保证有序：多个后端任务并发 emit、WebView 调度延�
 - 同一处缺陷连带修好另外三条早就跳不过去的深链：[`Online.vue`](src/views/Online.vue) 的「去设置联机」与「教程」按钮、[`useEasyTierInstall.ts`](src/composables/useEasyTierInstall.ts) 的安装引导。
 - 「教程」的二级深链 `?subtab=tutorial` 由 `SubTabBar` 内置的持久化恢复，一级分类能切换后它才真正生效。
 
+### 变更
+
+#### 遥测默认开启
+`read_state()` 读不到 `state.json`（首次启动、文件被删、解析失败）时，一律按 `enabled: true` 处理。等于「读不到设置」就替用户做了同意的决定——这既不合规，也不是用户以为自己做的选择。
+
+- [`store.rs`](src-tauri/src/telemetry/store.rs)：缺省改为「未同意」（`PersistedState::default()`）。已存在且明确开启过的设置不受影响，遥测由用户在设置里自己打开。
+- [`store_test.rs`](src-tauri/src/telemetry/store_test.rs)（新）：1 个用例守住默认值——默认未同意。
+
 ## [0.3.14-rc.1] - 2026-10-28
 
 ### 修复
@@ -370,11 +378,6 @@ Tauri 事件不保证有序：多个后端任务并发 emit、WebView 调度延�
 
 ### 变更
 
-#### 遥测默认开启
-`read_state()` 读不到 `state.json`（首次启动、文件被删、解析失败）时，一律按 `enabled: true` 处理。等于「读不到设置」就替用户做了同意的决定——这既不合规，也不是用户以为自己做的选择。
-
-- [`store.rs`](src-tauri/src/telemetry/store.rs)：缺省改为「未同意」（`PersistedState::default()`）。已存在且明确开启过的设置不受影响，遥测由用户在设置里自己打开。
-- [`store_test.rs`](src-tauri/src/telemetry/store_test.rs)（新）：1 个用例守住默认值——默认未同意。
 
 #### 外部厂商 frpc 下载接入统一下载栈
 - 外部厂商（`distribution=url`）的 frpc 二进制此前是自己发请求、整包读进内存再落盘，享受不到分片、重试阶梯与限速。现在改走 [`DownloadManager`](src-tauri/src/minecraft/download/manager/core.rs)：分片并行、多源重试、全局限速、SHA256 校验、大小探测全部复用同一套。
