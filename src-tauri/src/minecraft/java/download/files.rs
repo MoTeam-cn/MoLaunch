@@ -132,6 +132,9 @@ pub fn validate_path_traversal(
 /// 没有半点关系。所以只有本次新建的目录才能删。
 pub fn cleanup_failed_install(runtime_dir: &Path, dir_existed: bool) {
     if dir_existed {
+        // 保留目录，但要把「安装中」标记摘掉：目录里的文件都过了 SHA1，
+        // 混着旧文件通常仍然能用，而挂着标记会让扫描器永久忽略它
+        clear_install_marker(runtime_dir);
         log_warn!(
             "[JavaDownload] 安装失败但 runtime 目录原本就存在，保留不清理: {}",
             runtime_dir.display()
@@ -158,3 +161,42 @@ pub fn cleanup_failed_install(runtime_dir: &Path, dir_existed: bool) {
 #[cfg(test)]
 #[path = "files_test.rs"]
 mod files_test;
+
+/// 安装中标记文件名（放在 runtime 目录根部）
+pub const INSTALL_MARKER: &str = ".molaunch-installing";
+
+/// 标记「这个 runtime 正在安装」
+///
+/// 装到一半的 `java.exe` 往往已经能执行，但模块不全。扫描器把它当成可用 Java
+/// 收进来，用户一选就在启动时崩——所以安装期间与「进程中途被杀」之后，
+/// 目录里都要留着这个标记，让扫描跳过。
+pub fn mark_install_started(runtime_dir: &Path) {
+    if let Err(e) = std::fs::create_dir_all(runtime_dir) {
+        log_warn!(
+            "[JavaDownload] 创建 runtime 目录失败: {} ({})",
+            runtime_dir.display(),
+            e
+        );
+        return;
+    }
+    if let Err(e) = std::fs::write(
+        runtime_dir.join(INSTALL_MARKER),
+        std::process::id().to_string(),
+    ) {
+        log_warn!(
+            "[JavaDownload] 写安装标记失败: {} ({})",
+            runtime_dir.display(),
+            e
+        );
+    }
+}
+
+/// 摘掉安装中标记（下载与验证都通过才算装好）
+pub fn clear_install_marker(runtime_dir: &Path) {
+    let _ = std::fs::remove_file(runtime_dir.join(INSTALL_MARKER));
+}
+
+/// 没有安装中标记才算装好
+pub fn is_install_complete(runtime_dir: &Path) -> bool {
+    !runtime_dir.join(INSTALL_MARKER).exists()
+}

@@ -62,6 +62,8 @@ pub async fn download_java_runtime(
     let runtime_dir = files::get_runtime_dir(&component)?;
     // 安装开始前取样：这个目录与官方启动器共用，只有本次新建的才允许在失败时整删
     let dir_existed = runtime_dir.exists();
+    // 装到一半的 java.exe 能跑但缺模块：挂上标记，让 Java 扫描跳过它
+    files::mark_install_started(&runtime_dir);
     progress::emit(
         app,
         "downloading",
@@ -153,6 +155,9 @@ pub async fn download_java_runtime(
         files::cleanup_failed_install(&runtime_dir, dir_existed);
         return Err(e);
     }
+
+    // 下载与验证都过了，这个 runtime 才算装好
+    files::clear_install_marker(&runtime_dir);
 
     // 完成
     progress::emit(

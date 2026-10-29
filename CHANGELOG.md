@@ -6,6 +6,14 @@
 
 ### 修复
 
+#### 装到一半的 runtime 会被当成可用 Java
+下载中断或进程中途被杀，会留下一个**能执行但模块不全**的 `java.exe`。Java 扫描的 Step 5 递归扫 `runtime/` 目录，会把它收进候选列表；用户选中后在启动游戏时才崩，而崩溃信息跟「Java 没装完」毫无关系。
+
+[`files.rs`](src-tauri/src/minecraft/java/download/files.rs)：新增安装标记三件套 `mark_install_started` / `clear_install_marker` / `is_install_complete`。标记写在 `runtime/{component}/.molaunch-installing`，进程中途被杀也会留下，正好覆盖「装到一半就没了」的情况。
+[`pipeline.rs`](src-tauri/src/minecraft/java/download/pipeline.rs)：开始下载前挂标记，下载与验证都通过才摘。
+[`platform.rs`](src-tauri/src/minecraft/java/search/platform.rs)：Step 5 改为逐个 component 子目录扫描，带标记的跳过并记 debug。
+[`files_test.rs`](src-tauri/src/minecraft/java/download/files_test.rs)：补 3 个用例——安装期间视为未装完、目录不存在时会建出来、保留目录时摘掉标记。
+
 #### Java 下完没跑起来也算成功
 `verify_downloaded_java` 只在失败时打一行 `info` 日志，然后照常返回——调用方于是把这份跑不起来的 Java 写进配置，用户直到启动游戏才看到一个看不懂的崩溃。
 

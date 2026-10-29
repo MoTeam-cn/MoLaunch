@@ -16,6 +16,7 @@ mod verify;
 mod match_test;
 
 pub use constants::JAVA_DOWNLOAD_PROGRESS_EVENT;
+pub(crate) use files::is_install_complete;
 pub use pipeline::download_java_runtime;
 pub use progress::JavaDownloadProgress;
 pub use types::RuntimeManifest;

@@ -151,7 +151,29 @@ pub(super) fn collect_java_candidates(extra_paths: &[PathBuf]) -> Vec<PathBuf> {
             "[Java] Step 5: Searching runtime directory: {}",
             runtime_dir.display()
         );
-        search_folder_recursive(&runtime_dir, &mut collector, true);
+        // 逐个 component 子目录扫：正在安装（或上次装到一半进程就没了）的目录跳过
+        let mut skipped = 0_usize;
+        for entry in std::fs::read_dir(&runtime_dir)
+            .into_iter()
+            .flatten()
+            .flatten()
+        {
+            let path = entry.path();
+            if !path.is_dir() {
+                continue;
+            }
+            if !crate::minecraft::java::download::is_install_complete(&path) {
+                skipped += 1;
+                continue;
+            }
+            search_folder_recursive(&path, &mut collector, true);
+        }
+        if skipped > 0 {
+            crate::log_debug!(
+                "[Java] Step 5: 跳过 {} 个未完成安装的 runtime 目录",
+                skipped
+            );
+        }
     }
 
     // Step 6: 调用方追加的额外搜索路径（如游戏目录）
