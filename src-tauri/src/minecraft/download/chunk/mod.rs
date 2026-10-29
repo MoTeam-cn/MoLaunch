@@ -4,6 +4,7 @@
 //! 单一引擎：小文件与探测不到大小的文件由下载层直接走单流，不再有第二套分片实现。
 
 mod block;
+mod map_io;
 mod multi;
 pub mod probe;
 mod schedule;

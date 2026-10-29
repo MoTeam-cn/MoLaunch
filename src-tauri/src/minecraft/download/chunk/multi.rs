@@ -20,9 +20,8 @@ use super::super::host_profile;
 use super::super::rate_limiter::RateLimiter;
 use super::super::throttle;
 use super::block::{download_block, BlockError};
-use super::schedule::{
-    initial_workers, should_grow, should_retire, should_shrink, MAX_WORKERS_PER_FILE,
-};
+use super::map_io;
+use super::schedule::{initial_workers, plan_window, should_retire, MAX_WORKERS_PER_FILE};
 use super::table::SegmentTable;
 
 /// 采样与调度间隔
@@ -239,6 +238,8 @@ pub(crate) async fn download_multi(
     let mut last_moved = 0_u64;
     let mut idle_windows = 0_usize;
     let mut throttle_watch = throttle::ThrottleWatch::new();
+    // 窗口序号：探针扩容按窗口计数决定要不要试加一条
+    let mut window_index = 0_u64;
     loop {
         tokio::time::sleep(SAMPLE_INTERVAL).await;
         if cancel_requested(&args.cancel_flag) {
@@ -248,7 +249,7 @@ pub(crate) async fn download_multi(
         if table.is_complete() {
             break;
         }
-        save_map(&engine);
+        map_io::save_map(&engine.table, &engine.map_path, engine.resume_key);
         if let Some(credit) = credit {
             credit.credit(table.done_bytes());
         }
@@ -335,21 +336,24 @@ pub(crate) async fn download_multi(
         let avg = sum / usable.len().max(1) as u64;
         // 每轮重算份额：别的文件下完会让这里的额度变大，反之变小
         let share = budget::per_file_share(ceiling);
-        let total_target: usize = usable
-            .iter()
-            .map(|index| sources[*index].target.load(Ordering::Relaxed))
-            .sum();
 
-        // 本窗口被限流过：整体退一档，且这一窗口不扩容
+        // 决策全在 schedule::plan_window 里（纯函数，可单测），这里只负责执行
         let throttled = throttle_watch.tripped();
+        let items: Vec<(usize, u64, usize)> = usable
+            .iter()
+            .map(|index| {
+                (
+                    *index,
+                    rates[*index],
+                    sources[*index].target.load(Ordering::Relaxed),
+                )
+            })
+            .collect();
+        let plan = plan_window(&items, avg, share, throttled, window_index);
 
-        // 收缩：明显低于均值的源减一条；worker 在下次认领前自行退出
-        for index in usable.iter().copied() {
+        for index in plan.shrink {
             let current = sources[index].target.load(Ordering::Relaxed);
-            if current > 1
-                && (throttled || should_shrink(rates[index], avg, current) || total_target > share)
-            {
-                // 明显慢，或本文件已超出当前份额（别的文件也需要额度）
+            if current > 1 {
                 sources[index].target.store(current - 1, Ordering::Relaxed);
                 log_debug!(
                     "[Segment] 收缩: {} (-1 连接, {} B/s, 均值 {} B/s)",
@@ -359,22 +363,19 @@ pub(crate) async fn download_multi(
                 );
             }
         }
-
-        // 扩容：给本轮最快且明显高于均值的源加一条连接
-        if let Some(best) = usable.iter().copied().max_by_key(|index| rates[*index]) {
+        if let Some(best) = plan.grow {
             let current = sources[best].target.load(Ordering::Relaxed);
-            if !throttled && should_grow(rates[best], avg, total_target, share) {
-                sources[best].target.store(current + 1, Ordering::Relaxed);
-                sources[best].active.fetch_add(1, Ordering::Relaxed);
-                spawn_worker(&mut set, &args, best);
-                log_debug!(
-                    "[Segment] 扩容: {} (+1 连接, {} B/s, 均值 {} B/s)",
-                    sources[best].url,
-                    rates[best],
-                    avg
-                );
-            }
+            sources[best].target.store(current + 1, Ordering::Relaxed);
+            sources[best].active.fetch_add(1, Ordering::Relaxed);
+            spawn_worker(&mut set, &args, best);
+            log_debug!(
+                "[Segment] 扩容: {} (+1 连接, {} B/s, 均值 {} B/s)",
+                sources[best].url,
+                rates[best],
+                avg
+            );
         }
+        window_index += 1;
     }
 
     engine.stop.store(true, Ordering::Relaxed);
@@ -395,14 +396,14 @@ pub(crate) async fn download_multi(
     }
     if complete {
         // 数据先落盘再删账本：账本没了而数据还在页缓存时，掉电后文件会变成无法自证的半截
-        if let Err(e) = flush_data_file(path) {
+        if let Err(e) = map_io::flush_data_file(path) {
             log_warn!("[Segment] 数据落盘失败: {}", e);
         }
         // 完成即清理位图，避免下次误复用
         let _ = std::fs::remove_file(&engine.map_path);
     } else {
         // 未完成也落盘：下一轮（或下次启动）只补没完成的块
-        save_map(&engine);
+        map_io::save_map(&engine.table, &engine.map_path, engine.resume_key);
     }
     SegmentOutcome {
         downloaded,
@@ -423,25 +424,6 @@ pub(crate) async fn download_multi(
                 }
             ))
         },
-    }
-}
-
-/// 把数据文件刷到稳定存储。
-///
-/// 必须用写句柄打开：Windows 的 FlushFileBuffers 要求句柄带写权限，
-/// 只读句柄的 sync_all 会直接失败——那样等于没刷。
-fn flush_data_file(path: &str) -> std::io::Result<()> {
-    let file = std::fs::OpenOptions::new().write(true).open(path)?;
-    file.sync_all()
-}
-
-fn save_map(engine: &Engine) {
-    let Some(key) = engine.resume_key else {
-        // 不允许续传的下载不留位图：下次也不会加载它
-        return;
-    };
-    if let Err(e) = engine.table.save(Path::new(&engine.map_path), key) {
-        log_debug!("[Segment] 位图落盘失败: {}", e);
     }
 }
 
@@ -512,7 +494,3 @@ async fn run_worker(args: Arc<WorkerArgs>, source_index: usize) {
     }
     slot.active.fetch_sub(1, Ordering::Relaxed);
 }
-
-#[cfg(test)]
-#[path = "multi_test.rs"]
-mod multi_test;

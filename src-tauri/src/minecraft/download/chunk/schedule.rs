@@ -51,6 +51,59 @@ pub(crate) fn should_retire(rate: u64, alive: usize, active_total: usize) -> boo
     rate == 0 && alive > 1 && active_total > 1
 }
 
+/// 一个采样窗口的并发调整计划（纯决策，不碰 IO）
+pub(crate) struct WindowPlan {
+    /// 要各减一条连接的源（sources 下标）
+    pub(crate) shrink: Vec<usize>,
+    /// 要加一条连接的源
+    pub(crate) grow: Option<usize>,
+}
+
+/// 探针扩容的间隔（窗口数）
+///
+/// 所有源速度都差不多时，「明显快于均值」永远选不出赢家，于是闲置额度一直没人用。
+/// 每隔几个窗口按速率挑一条试加一条连接：加对了下一窗口继续，加错了下一窗口被收缩收回。
+const PROBE_INTERVAL_WINDOWS: u64 = 5;
+
+/// 算出这个窗口的调整计划
+///
+/// `items` 是 (sources 下标, 本窗口速率, 当前目标连接数) 三元组，只包含还活着的源。
+/// `throttled` 表示上一窗口又被限流过：这时只许退、不许进。
+pub(crate) fn plan_window(
+    items: &[(usize, u64, usize)],
+    avg: u64,
+    share: usize,
+    throttled: bool,
+    window: u64,
+) -> WindowPlan {
+    let total_target: usize = items.iter().map(|(_, _, target)| *target).sum();
+    let mut shrink = Vec::new();
+    for (index, rate, current) in items {
+        if *current > 1
+            && (throttled || should_shrink(*rate, avg, *current) || total_target > share)
+        {
+            shrink.push(*index);
+        }
+    }
+    if throttled {
+        return WindowPlan { shrink, grow: None };
+    }
+    let grow = items
+        .iter()
+        .max_by_key(|(_, rate, _)| *rate)
+        .and_then(|(index, rate, _)| {
+            let by_rate = should_grow(*rate, avg, total_target, share);
+            let by_probe =
+                window % PROBE_INTERVAL_WINDOWS == 0 && total_target < share && *rate > 0;
+            if by_rate || by_probe {
+                Some(*index)
+            } else {
+                None
+            }
+        });
+    WindowPlan { shrink, grow }
+}
+
 #[cfg(test)]
 #[path = "schedule_test.rs"]
 mod schedule_test;

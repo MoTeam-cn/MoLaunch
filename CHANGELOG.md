@@ -6,6 +6,14 @@
 
 ### 修复
 
+#### 所有源一样快时，空闲额度永远用不上
+扩容条件是「某条源比均值快 1.2 倍」。当几条源速度都一样时，这个条件永远不成立——即使本文件的份额还没用完、还有额度空着，也没人会用。表现是多源下载稳定在很低的速度上，看起来像是「源都慢」，其实是调度自己不肯加。
+
+- [`schedule.rs`](src-tauri/src/minecraft/download/chunk/schedule.rs)：新增 `plan_window`（纯函数，输入每源速率与目标连接数，输出这一窗口该收缩谁、该给谁加一条），并加**探针扩容**——每 5 个窗口在仍有空闲额度时按速率挑一条试加一条连接，加错了下个窗口就被收缩收回。
+- [`multi.rs`](src-tauri/src/minecraft/download/chunk/multi.rs)：监督循环只负责执行计划，收缩/扩容的判断全部移出。
+- [`schedule_test.rs`](src-tauri/src/minecraft/download/chunk/schedule_test.rs)：补 5 个用例——限流时只缩不扩、明显最快者扩容、全同速只在探针窗口加、没有空闲额度不探针、单连接保底不被收缩。
+- 顺带把位图落盘与数据刷盘拆到 [`map_io.rs`](src-tauri/src/minecraft/download/chunk/map_io.rs)（含 [`map_io_test.rs`](src-tauri/src/minecraft/download/chunk/map_io_test.rs)），`multi.rs` 从 519 行回到 497 行，回到行数红线以内。
+
 #### 分块下载的写盘卡住了整个异步运行时
 块下载在 async 任务里直接 `write_all`：这是同步系统调用，写的时候整个 reactor 停摆。一个文件几百块、每块写完都要走一遍，同一时刻别的连接收到的数据也只能排队等——并行连接数是够了，真正落盘的吞吐却被自己卡死。
 
