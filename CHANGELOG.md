@@ -6,6 +6,12 @@
 
 ### 修复
 
+#### 用户环境里的 JVM 注入变量会顶掉实例参数
+`_JAVA_OPTIONS` / `JAVA_TOOL_OPTIONS` / `JDK_JAVA_OPTIONS` 由 JVM 自己读取，且优先级高于命令行参数。用户机器上被别的启动器或优化工具写过之后，实例拼好的 `-Xmx` 会被直接覆盖——症状是「内存设置不生效」或「莫名 OutOfMemory」，而日志里只多出无关的一句 `Picked up _JAVA_OPTIONS`，从启动器侧完全看不出是自己被顶了。
+
+- [`process_spawn.rs`](src-tauri/src/minecraft/launch/pipeline/process_spawn.rs)：拉起游戏进程前把这三个变量从子进程环境里摘掉。
+- `cmd.env("appdata", ...)` 那条隔离保持不动——它是另一个方向的隔离（把 APPDATA 指到游戏目录），与本条无关。
+
 #### 切换下载源就把续传位图作废了
 续传指纹里塞进了整份候选 URL 列表，而列表会随下载源模式（官方 / 镜像 / 智能）重排——用户切一次模式，或候选集变化，指纹就变了，已下好的块全部作废，表现为「断了以后还是从头下」。
 

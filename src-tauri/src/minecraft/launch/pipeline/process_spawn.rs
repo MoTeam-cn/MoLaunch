@@ -44,6 +44,13 @@ impl LaunchPipeline {
         #[cfg(target_os = "windows")]
         cmd.env("appdata", &args.game_dir);
 
+        // 这三个变量由 JVM 自己读取，且优先级高于命令行：用户被别的启动器或
+        // 优化工具写过之后，会把实例拼好的 -Xmx 之类直接顶掉。日志里只剩一句
+        // "Picked up _JAVA_OPTIONS"，从启动器侧完全看不出是自己被覆盖了。
+        for key in ["_JAVA_OPTIONS", "JAVA_TOOL_OPTIONS", "JDK_JAVA_OPTIONS"] {
+            cmd.env_remove(key);
+        }
+
         cmd.stdout(std::process::Stdio::piped());
         cmd.stderr(std::process::Stdio::piped());
 
