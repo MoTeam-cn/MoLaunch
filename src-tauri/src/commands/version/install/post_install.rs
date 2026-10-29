@@ -39,9 +39,19 @@ pub(crate) fn merge_and_rename_version(
         final_version_id
     };
 
-    // 装好之后记一份文件事实表，并把「安装之外发生的改动」报出来
+    // 装好之后记一份文件事实表，并顺带看看有没有安装残留
     instance_files::record(game_dir, &final_id);
+    report_orphans(game_dir);
     final_id
+}
+
+/// 看一眼 versions 下有没有安装残留——用户不会主动去翻这些目录
+fn report_orphans(game_dir: &std::path::Path) {
+    let versions_dir = crate::minecraft::version::orphans::versions_dir_of(game_dir);
+    let orphans = crate::minecraft::version::orphans::scan_version_orphans(&versions_dir);
+    if let Some(summary) = crate::minecraft::version::orphans::summarize(&orphans) {
+        crate::log_warn!("[Install] {}（不自动删除，需要时可手动清理）", summary);
+    }
 }
 
 /// 合并加载器版本的 JSON（删除 inheritsFrom，合并原版 JSON）

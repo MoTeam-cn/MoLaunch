@@ -6,6 +6,14 @@
 
 ### 修复
 
+#### 安装中断留下的版本目录没人清理
+`versions/` 下每个正常版本目录里都有一个同名 JSON。安装中断、或者用户直接在资源管理器里删过东西之后，会剩下没有 JSON 的目录：启动器不认它，界面上也看不到它，但它照样占着几百 MB。磁盘为什么一直在涨，从界面上找不到任何线索。
+
+- [`orphans.rs`](src-tauri/src/minecraft/version/orphans.rs)（新）：扫描 `versions/` 下没有同名 JSON 的目录，报出目录名、递归占用大小、以及判定理由。
+- **只报告、不删除**：删目录不可逆，判断失误就把能玩的版本删了。先让问题可见，删除交给用户确认。
+- [`post_install.rs`](src-tauri/src/commands/version/install/post_install.rs)：安装收尾时跑一次扫描，有残留就 `log_warn!` 一句；没有残留则什么都不说。
+- [`orphans_test.rs`](src-tauri/src/minecraft/version/orphans_test.rs)（新）：4 个用例——只报没有 JSON 的目录、目录不存在时返回空而不是 panic、递归求和、空清单不语。
+
 #### 分不清「安装带来的文件」和「用户自己的文件」
 版本目录装好之后，我们就不再记得里面本该有什么。于是下次更新只有两条路：覆盖（吃掉用户的改动）或跳过（装不上新版本），而无论选哪条都说不出理由。
 
