@@ -181,7 +181,7 @@ async fn write_with_limit(
     file: &Arc<StdMutex<std::fs::File>>,
     base_offset: u64,
     chunk: &[u8],
-    rate_limiter: Option<&Arc<Mutex<RateLimiter>>>,
+    rate_limiter: &Option<Arc<Mutex<RateLimiter>>>,
     downloaded: &mut u64,
     cancel_flag: &Option<Arc<AtomicBool>>,
 ) -> Result<(), BlockError> {
