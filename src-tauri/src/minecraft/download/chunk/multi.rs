@@ -205,7 +205,9 @@ pub(crate) async fn download_multi(
     });
 
     let ceiling = budget.clamp(1, MAX_WORKERS_PER_FILE);
-    let initial_budget = budget::per_file_share(ceiling);
+    // 目标文件所在盘的脾气：机械盘随机写抢磁头，不该按固态盘的并发跑
+    let disk_cap = budget::disk_connection_cap(Path::new(path));
+    let initial_budget = budget::per_file_share(ceiling).min(disk_cap);
     log_debug!(
         "[Segment] 并行下载: {} (块长 {}, 源 {} 条, 连接额度 {}/{})",
         path,
@@ -335,7 +337,7 @@ pub(crate) async fn download_multi(
         let sum: u64 = usable.iter().map(|index| rates[*index]).sum();
         let avg = sum / usable.len().max(1) as u64;
         // 每轮重算份额：别的文件下完会让这里的额度变大，反之变小
-        let share = budget::per_file_share(ceiling);
+        let share = budget::per_file_share(ceiling).min(disk_cap);
 
         // 决策全在 schedule::plan_window 里（纯函数，可单测），这里只负责执行
         let throttled = throttle_watch.tripped();

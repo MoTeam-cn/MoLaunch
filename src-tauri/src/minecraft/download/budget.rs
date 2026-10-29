@@ -4,7 +4,10 @@
 //! 被 CDN 判定为异常。这里把「最大线程数」当作**全局连接总预算**，按活跃文件数分摊，
 //! 文件下完就把额度让给还在下的文件——不需要任何中心调度器，各文件每轮自己算一次即可。
 
+use std::path::Path;
 use std::sync::atomic::{AtomicUsize, Ordering};
+
+use sysinfo::{DiskKind, Disks};
 
 /// 未设置时的总预算（与配置默认的最大线程数一致）
 const DEFAULT_TOTAL: usize = 8;
@@ -74,6 +77,60 @@ pub(crate) fn per_file_share(ceiling: usize) -> usize {
 pub(crate) fn per_file_share_of(total: usize, active: usize, ceiling: usize) -> usize {
     let active = active.max(1);
     (total / active).clamp(1, ceiling.max(1))
+}
+
+/// 磁盘类型（只关心对并发有影响的那一维）
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(crate) enum DiskCap {
+    Solid,
+    Rotational,
+    Unknown,
+}
+
+/// 固态盘/未知盘的单文件连接上限
+const SOLID_CONNECTIONS: usize = 8;
+
+/// 机械盘：随机写要抢磁头，多条连接并行写只会互相拖慢
+///
+/// 不降到 1——绝大多数宽带的速率远低于一块机械盘的顺序写能力，只留一条连接
+/// 会白白浪费带宽，反而更慢。
+const ROTATIONAL_CONNECTIONS: usize = 2;
+
+/// 磁盘类型对应的单文件并发
+pub(crate) fn connections_for(kind: DiskCap) -> usize {
+    match kind {
+        DiskCap::Solid | DiskCap::Unknown => SOLID_CONNECTIONS,
+        DiskCap::Rotational => ROTATIONAL_CONNECTIONS,
+    }
+}
+
+/// 目标文件所在磁盘允许的单文件并发
+///
+/// 解析不出挂载点就按未知处理：宁可保守地用默认值，也不要凭空猜一个更小的上限。
+pub(crate) fn disk_connection_cap(path: &Path) -> usize {
+    connections_for(detect_disk_cap(path))
+}
+
+/// 找到包含该路径的挂载点（取最长的那个前缀）
+fn detect_disk_cap(path: &Path) -> DiskCap {
+    let disks = Disks::new_with_refreshed_list();
+    let mut best: Option<(usize, DiskCap)> = None;
+    for disk in disks.iter() {
+        let mount = disk.mount_point();
+        if !path.starts_with(mount) {
+            continue;
+        }
+        let depth = mount.as_os_str().len();
+        if best.is_none_or(|(best_depth, _)| depth > best_depth) {
+            let kind = match disk.kind() {
+                DiskKind::SSD => DiskCap::Solid,
+                DiskKind::HDD => DiskCap::Rotational,
+                DiskKind::Unknown(_) => DiskCap::Unknown,
+            };
+            best = Some((depth, kind));
+        }
+    }
+    best.map(|(_, kind)| kind).unwrap_or(DiskCap::Unknown)
 }
 
 #[cfg(test)]

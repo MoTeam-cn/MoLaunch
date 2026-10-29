@@ -1,6 +1,8 @@
 //! 连接额度分摊的纯函数测试
 
-use super::{per_file_share_of, set_total, total, total_for_tasks, FileLease};
+use super::{
+    connections_for, per_file_share_of, set_total, total, total_for_tasks, DiskCap, FileLease,
+};
 
 #[test]
 fn test_per_file_share_按活跃文件数均分() {
@@ -52,4 +54,27 @@ fn test_total_for_tasks_按每任务两条折算() {
     assert_eq!(total_for_tasks(1), 2);
     assert_eq!(total_for_tasks(100), 64, "收敛到上限");
     assert_eq!(total_for_tasks(0), 1, "零线程也留一条");
+}
+
+#[test]
+fn test_connections_for_机械盘压到两条() {
+    assert_eq!(
+        connections_for(DiskCap::Rotational),
+        2,
+        "机械盘随机写抢磁头"
+    );
+    assert!(
+        connections_for(DiskCap::Rotational) > 1,
+        "但也不能降到 1：单连接会浪费带宽"
+    );
+}
+
+#[test]
+fn test_connections_for_固态与未知都按默认() {
+    assert_eq!(connections_for(DiskCap::Solid), 8);
+    assert_eq!(
+        connections_for(DiskCap::Unknown),
+        8,
+        "认不出就别自作聪明压低"
+    );
 }
