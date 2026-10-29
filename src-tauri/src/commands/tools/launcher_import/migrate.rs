@@ -145,7 +145,8 @@ fn copy_import(
     }
 
     // 游戏数据
-    copy_tree(data_dir, target_dir, source_name)?;
+    let mut visited = std::collections::HashSet::new();
+    copy_tree(data_dir, target_dir, source_name, &mut visited)?;
     Ok(())
 }
 
@@ -302,7 +303,23 @@ fn loader_to_version_type(loader: Option<&str>) -> VersionType {
 }
 
 /// 递归复制目录（跳过启动器元数据与源版本元数据文件，已存在且相同则跳过）
-fn copy_tree(src: &Path, dst: &Path, source_name: &str) -> Result<(), String> {
+///
+/// 目录里的**重解析点**（junction / 符号链接）不跟随。源实例常把 libraries、assets
+/// 甚至整个数据目录链到别处：跟随会把链接指向的内容整份复制过来（体积成倍膨胀），
+/// 链到祖先目录时还会无限递归。这里改为在目标位置重建同样的链接。
+fn copy_tree(
+    src: &Path,
+    dst: &Path,
+    source_name: &str,
+    visited: &mut std::collections::HashSet<PathBuf>,
+) -> Result<(), String> {
+    // 兜底防环：即使某个文件系统把目录环暴露成普通目录，也不会无限递归
+    if let Ok(real) = std::fs::canonicalize(src) {
+        if !visited.insert(real) {
+            log_info!("[LauncherImport] 目录成环，跳过: {}", src.display());
+            return Ok(());
+        }
+    }
     let entries =
         std::fs::read_dir(src).map_err(|e| format!("读取目录失败 {}: {}", src.display(), e))?;
     for entry in entries {
@@ -320,17 +337,45 @@ fn copy_tree(src: &Path, dst: &Path, source_name: &str) -> Result<(), String> {
             continue;
         }
 
-        if path.is_dir() {
+        // 判类型必须用不解析链接的 file_type()：path.is_dir() 会跟随重解析点
+        let file_type = entry
+            .file_type()
+            .map_err(|e| format!("读取目录项类型失败 {}: {}", path.display(), e))?;
+        if file_type.is_symlink() {
+            relink(&path, &target)?;
+            continue;
+        }
+        if file_type.is_dir() {
             if !target.exists() {
                 std::fs::create_dir_all(&target)
                     .map_err(|e| format!("创建目录失败 {}: {}", target.display(), e))?;
             }
-            copy_tree(&path, &target, source_name)?;
+            copy_tree(&path, &target, source_name, visited)?;
         } else {
             copy_file_if_needed(&path, &target)?;
         }
     }
     Ok(())
+}
+
+/// 在目标位置重建链接，而不是把链接指向的内容复制过来
+fn relink(src: &Path, dst: &Path) -> Result<(), String> {
+    if dst.exists() {
+        return Ok(());
+    }
+    let resolved = std::fs::canonicalize(src)
+        .map_err(|e| format!("解析链接目标失败 {}: {}", src.display(), e))?;
+    let is_dir = std::fs::metadata(&resolved)
+        .map(|meta| meta.is_dir())
+        .unwrap_or(false);
+    if is_dir {
+        create_dir_link(&resolved, dst)
+    } else {
+        // 文件链接多半指向共享的 jar：直接复制内容，避免为此要求 Windows 建链接权限
+        std::fs::copy(src, dst)
+            .map(|_| ())
+            .map_err(|e| format!("复制链接指向的文件失败 {}: {}", src.display(), e))
+    }
 }
 
 /// 复制单个文件（目标存在且 size+mtime 相同则跳过）
@@ -348,3 +393,7 @@ fn copy_file_if_needed(src: &Path, dst: &Path) -> Result<(), String> {
         .map_err(|e| format!("复制文件失败 {} -> {}: {}", src.display(), dst.display(), e))?;
     Ok(())
 }
+
+#[cfg(test)]
+#[path = "migrate_test.rs"]
+mod migrate_test;

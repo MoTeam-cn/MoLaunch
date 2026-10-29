@@ -6,6 +6,13 @@
 
 ### 修复
 
+#### 导入实例时会跟随目录链接，导致体积膨胀甚至递归
+导入走的是复制模式，而复制用 `path.is_dir()` 判类型——它会**跟随**重解析点。别的启动器常用 junction 把 `libraries`、`assets` 甚至整个数据目录链到别处：跟随过去就是整份复制（体积成倍膨胀），链回祖先目录时还会无限递归。
+
+- [`migrate.rs`](src-tauri/src/commands/tools/launcher_import/migrate.rs)：判类型改用不解析链接的 `file_type()`；遇到重解析点不再递归，改为在目标位置用已有的 `create_dir_link`（junction 优先、符号链接兜底）重建同样的链接；文件链接直接复制内容，不为此索要建链接权限。
+- 另加一份「真实路径」集合兜底防环：即使某个文件系统把目录环暴露成普通目录，也只会跳过而不会无限递归。
+- [`migrate_test.rs`](src-tauri/src/commands/tools/launcher_import/migrate_test.rs)（新）：3 个用例——普通目录复制且跳过启动器元数据、重解析点被重建为链接、目录成环时正常返回。
+
 #### 用户环境里的 JVM 注入变量会顶掉实例参数
 `_JAVA_OPTIONS` / `JAVA_TOOL_OPTIONS` / `JDK_JAVA_OPTIONS` 由 JVM 自己读取，且优先级高于命令行参数。用户机器上被别的启动器或优化工具写过之后，实例拼好的 `-Xmx` 会被直接覆盖——症状是「内存设置不生效」或「莫名 OutOfMemory」，而日志里只多出无关的一句 `Picked up _JAVA_OPTIONS`，从启动器侧完全看不出是自己被顶了。
 
