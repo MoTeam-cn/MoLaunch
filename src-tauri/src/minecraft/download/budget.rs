@@ -7,7 +7,7 @@
 use std::path::Path;
 use std::sync::atomic::{AtomicUsize, Ordering};
 
-use sysinfo::{DiskKind, Disks};
+use sysinfo::{DiskExt, DiskKind, System, SystemExt};
 
 /// 未设置时的总预算（与配置默认的最大线程数一致）
 const DEFAULT_TOTAL: usize = 8;
@@ -113,9 +113,10 @@ pub(crate) fn disk_connection_cap(path: &Path) -> usize {
 
 /// 找到包含该路径的挂载点（取最长的那个前缀）
 fn detect_disk_cap(path: &Path) -> DiskCap {
-    let disks = Disks::new_with_refreshed_list();
+    let mut system = System::new();
+    system.refresh_disks_list();
     let mut best: Option<(usize, DiskCap)> = None;
-    for disk in disks.iter() {
+    for disk in system.disks() {
         let mount = disk.mount_point();
         if !path.starts_with(mount) {
             continue;
