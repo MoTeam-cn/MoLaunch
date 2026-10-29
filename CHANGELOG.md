@@ -175,6 +175,17 @@ Tauri 事件不保证有序：多个后端任务并发 emit、WebView 调度延�
 - [`store.rs`](src-tauri/src/telemetry/store.rs)：缺省改为「未同意」（`PersistedState::default()`）。已存在且明确开启过的设置不受影响，遥测由用户在设置里自己打开。
 - [`store_test.rs`](src-tauri/src/telemetry/store_test.rs)（新）：1 个用例守住默认值——默认未同意。
 
+### 优化
+
+#### Java 搜索每次都全盘重扫
+找 Java 走的是全盘扫描：遍历所有盘符、用户目录、启动器目录，按关键词匹配。这一步在全盘 SSD 上也要几秒，机械盘或文件多的时候能到十几秒。而它每次切到 Java 页、每次启动都要跑一遍——候选路径几乎不变，重扫纯属浪费。
+
+- [`candidate_cache.rs`](src-tauri/src/minecraft/java/search/candidate_cache.rs)（新）：把扫到的候选路径缓存到 `cache/java/candidate_cache.json`。命中要求三条同时成立——额外搜索路径指纹一致、未过期（30 分钟）、缓存里的可执行文件都还在。用户卸载了某个 Java 就会因「死路径」立即作废重扫。
+- **空结果不写缓存**：「一个 Java 都没找到」多半是环境问题（权限、临时盘未挂载），把它记住半小时只会让人以为搜索坏了。
+- [`platform.rs`](src-tauri/src/minecraft/java/search/platform.rs)：进入 `collect_java_candidates` 先查缓存，未命中才扫描，扫完写回。
+- [`candidate_cache_test.rs`](src-tauri/src/minecraft/java/search/candidate_cache_test.rs)（新）：4 个用例——路径指纹与顺序无关、忽略重复与大小写、过期判定、有死路径即失效。
+
+
 ## [0.3.14-rc.1] - 2026-10-28
 
 ### 修复

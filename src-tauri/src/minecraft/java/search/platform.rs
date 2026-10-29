@@ -5,6 +5,7 @@
 use std::collections::HashSet;
 use std::path::{Path, PathBuf};
 
+use super::candidate_cache;
 use super::priority::is_deprioritized_path;
 
 /// 搜索关键词（共67个）
@@ -108,6 +109,12 @@ impl CandidateCollector {
 
 /// 执行全部搜索步骤，返回去重后的候选 Java 可执行文件路径列表
 pub(super) fn collect_java_candidates(extra_paths: &[PathBuf]) -> Vec<PathBuf> {
+    // 全盘扫描是最慢的一步，上次的候选还都在就直接用
+    if let Some(cached) = candidate_cache::load(extra_paths) {
+        crate::log_debug!("[Java] 候选缓存命中（{} 条），跳过扫描", cached.len());
+        return cached;
+    }
+
     let mut collector = CandidateCollector::new();
 
     // Step 1: 环境变量扫描
@@ -188,7 +195,9 @@ pub(super) fn collect_java_candidates(extra_paths: &[PathBuf]) -> Vec<PathBuf> {
         }
     }
 
-    collector.into_inner()
+    let candidates = collector.into_inner();
+    candidate_cache::save(extra_paths, &candidates);
+    candidates
 }
 
 /// Step 1: 从环境变量（PATH、JAVA_HOME）收集候选 Java
