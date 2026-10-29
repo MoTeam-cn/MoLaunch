@@ -46,14 +46,15 @@ impl TelemetryStore {
         self.dir.join("device_id")
     }
 
+    /// 读持久化状态
+    ///
+    /// 文件缺失或解析失败时一律视为「未同意」：遥测必须由用户自己打开。
+    /// 因为读不到设置就替他做决定，等于把默认值当成了同意。
     fn read_state(&self) -> PersistedState {
         std::fs::read_to_string(self.state_path())
             .ok()
             .and_then(|text| serde_json::from_str::<PersistedState>(&text).ok())
-            .unwrap_or(PersistedState {
-                enabled: true,
-                ..Default::default()
-            })
+            .unwrap_or_default()
     }
 
     fn write_state(&self, state: &PersistedState) {
@@ -167,3 +168,7 @@ impl TelemetryStore {
         self.read_queue().len()
     }
 }
+
+#[cfg(test)]
+#[path = "store_test.rs"]
+mod store_test;

@@ -370,6 +370,12 @@ Tauri 事件不保证有序：多个后端任务并发 emit、WebView 调度延�
 
 ### 变更
 
+#### 遥测默认开启
+`read_state()` 读不到 `state.json`（首次启动、文件被删、解析失败）时，一律按 `enabled: true` 处理。等于「读不到设置」就替用户做了同意的决定——这既不合规，也不是用户以为自己做的选择。
+
+- [`store.rs`](src-tauri/src/telemetry/store.rs)：缺省改为「未同意」（`PersistedState::default()`）。已存在且明确开启过的设置不受影响，遥测由用户在设置里自己打开。
+- [`store_test.rs`](src-tauri/src/telemetry/store_test.rs)（新）：1 个用例守住默认值——默认未同意。
+
 #### 外部厂商 frpc 下载接入统一下载栈
 - 外部厂商（`distribution=url`）的 frpc 二进制此前是自己发请求、整包读进内存再落盘，享受不到分片、重试阶梯与限速。现在改走 [`DownloadManager`](src-tauri/src/minecraft/download/manager/core.rs)：分片并行、多源重试、全局限速、SHA256 校验、大小探测全部复用同一套。
 - 安全边界没有一起交出去：`commands/frp/binary/external.rs` 仍负责 HTTPS 校验、域名白名单与**逐跳**重定向校验，重定向在进下载栈之前就走完；下载用的 `client` 换成不跟随 3xx 的那个，下载阶段再出现跳转一律视为失败，避免「服务器临时把你转到白名单外」。同时关掉镜像替换（`preserve_order` + 官方模式），厂商声明的地址不会被换成任何镜像。
