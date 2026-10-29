@@ -258,7 +258,11 @@ fn pick_best_version(
     // 过滤兼容版本
     let compatible: Vec<&ResourceVersion> = versions
         .iter()
-        .filter(|v| v.game_versions.iter().any(|gv| gv == game_version))
+        .filter(|v| {
+            v.game_versions
+                .iter()
+                .any(|gv| crate::minecraft::utils::version_range::matches_game(gv, game_version))
+        })
         .filter(|v| mod_loader == 0 || (v.mod_loaders & mod_loader) != 0)
         .collect();
 
