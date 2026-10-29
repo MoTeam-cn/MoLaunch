@@ -52,7 +52,7 @@ pub(super) async fn run_engine(
     cancel_flag: &Option<Arc<AtomicBool>>,
     content_validator: &Option<ContentValidator>,
 ) -> EngineOutcome {
-    let key = resume_key(task, urls, file_size);
+    let key = resume_key(task, file_size);
     // 进度记账：每轮跑完把「本文件当前可信字节」写进去，内部按差额增减，
     // 作废块重下时自动退回虚高的部分
     let credit = ProgressCredit::new(progress);
@@ -183,7 +183,7 @@ async fn engine_once(
     client: &reqwest::Client,
     urls: &[String],
     scope: RetryScope,
-    resume_key: u64,
+    resume_key: Option<u64>,
     official_index: usize,
     task: &DownloadTask,
     file_size: u64,
@@ -247,23 +247,25 @@ fn is_cancelled(flag: &Option<Arc<AtomicBool>>) -> bool {
         .is_some_and(|flag| flag.load(Ordering::Relaxed))
 }
 
-/// 续传指纹：同一任务、同一来源集合、同一期望内容才算「同一次下载」
+/// 续传指纹：同一任务、同一期望内容才算「同一次下载」
 ///
 /// 位图靠它拒绝复用过期的半成品：同名文件大小相同但内容换了的场景（同名模组更新），
-/// 只比较文件大小是分辨不出来的。
-fn resume_key(task: &DownloadTask, urls: &[String], file_size: u64) -> u64 {
+/// 只比较文件大小是分辨不出来的，所以期望哈希必须参与。
+///
+/// 候选源列表**不**参与：它只说明「从哪儿取」，不改变期望内容。用户切换下载源模式时
+/// 列表会被重排，把源算进指纹的话，切一次就把已下好的块全部作废了。
+///
+/// 没有期望哈希时返回 `None`：拼接出来的内容无从裁决，此时不允许续传。
+fn resume_key(task: &DownloadTask, file_size: u64) -> Option<u64> {
+    let expected = task.expected_hash.as_deref().unwrap_or("");
+    if expected.is_empty() {
+        return None;
+    }
     let mut hash = FNV_OFFSET;
     feed(&mut hash, task.id.as_bytes());
-    feed(
-        &mut hash,
-        task.expected_hash.as_deref().unwrap_or("").as_bytes(),
-    );
+    feed(&mut hash, expected.as_bytes());
     feed(&mut hash, &file_size.to_le_bytes());
-    for url in urls {
-        feed(&mut hash, &[0_u8]);
-        feed(&mut hash, url.as_bytes());
-    }
-    hash
+    Some(hash)
 }
 
 fn feed(hash: &mut u64, bytes: &[u8]) {

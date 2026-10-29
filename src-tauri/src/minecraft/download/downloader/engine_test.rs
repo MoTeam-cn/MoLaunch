@@ -13,47 +13,56 @@ fn task(id: &str, hash: Option<&str>) -> DownloadTask {
     }
 }
 
-fn urls(list: &[&str]) -> Vec<String> {
-    list.iter().map(|url| (*url).to_string()).collect()
-}
-
 #[test]
 fn test_resume_key_同输入稳定() {
-    let urls = urls(&["https://a/x.jar", "https://b/x.jar"]);
-    let a = task("t1", Some("sha1:abc"));
-    let b = task("t1", Some("sha1:abc"));
     assert_eq!(
-        resume_key(&a, &urls, 1024),
-        resume_key(&b, &urls, 1024),
-        "同任务同来源必须得到同一指纹"
+        resume_key(&task("t1", Some("sha1:abc")), 1024),
+        resume_key(&task("t1", Some("sha1:abc")), 1024),
+        "同任务同期望内容必须得到同一指纹"
     );
 }
 
 #[test]
-fn test_resume_key_任务变更则不同() {
-    let urls = urls(&["https://a/x.jar"]);
+fn test_resume_key_任务或期望内容变更则不同() {
     assert_ne!(
-        resume_key(&task("t1", Some("sha1:abc")), &urls, 1024),
-        resume_key(&task("t2", Some("sha1:abc")), &urls, 1024)
+        resume_key(&task("t1", Some("sha1:abc")), 1024),
+        resume_key(&task("t2", Some("sha1:abc")), 1024),
+        "不同任务不能共用一次下载"
     );
     // 同名文件内容更新（哈希变了但大小相同）必须换指纹
     assert_ne!(
-        resume_key(&task("t1", Some("sha1:abc")), &urls, 1024),
-        resume_key(&task("t1", Some("sha1:def")), &urls, 1024)
+        resume_key(&task("t1", Some("sha1:abc")), 1024),
+        resume_key(&task("t1", Some("sha1:def")), 1024)
     );
     assert_ne!(
-        resume_key(&task("t1", None), &urls, 1024),
-        resume_key(&task("t1", None), &urls, 2048)
+        resume_key(&task("t1", Some("sha1:abc")), 1024),
+        resume_key(&task("t1", Some("sha1:abc")), 2048)
     );
 }
 
 #[test]
-fn test_resume_key_来源集合变更则不同() {
-    let one = urls(&["https://a/x.jar"]);
-    let two = urls(&["https://a/x.jar", "https://b/x.jar"]);
-    assert_ne!(
-        resume_key(&task("t1", None), &one, 1024),
-        resume_key(&task("t1", None), &two, 1024)
+fn test_resume_key_无期望哈希时不允许续传() {
+    assert!(
+        resume_key(&task("t1", None), 1024).is_none(),
+        "没有期望哈希，拼出来的内容无从裁决，必须整份重下"
+    );
+    assert!(
+        resume_key(&task("t1", Some("")), 1024).is_none(),
+        "空哈希等同没有哈希"
+    );
+}
+
+#[test]
+fn test_resume_key_候选源不参与指纹() {
+    let mut swapped = task("t1", Some("sha1:abc"));
+    swapped.urls = vec![
+        "https://mirror.example.com/a.jar".to_string(),
+        "https://example.com/a.jar".to_string(),
+    ];
+    assert_eq!(
+        resume_key(&task("t1", Some("sha1:abc")), 1024),
+        resume_key(&swapped, 1024),
+        "换下载源不改变期望内容，不能作废已下好的块"
     );
 }
 

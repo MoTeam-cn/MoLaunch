@@ -76,7 +76,7 @@ struct Engine {
     sources: Vec<Arc<SourceSlot>>,
     stop: AtomicBool,
     map_path: String,
-    resume_key: u64,
+    resume_key: Option<u64>,
 }
 
 struct WorkerArgs {
@@ -97,14 +97,15 @@ fn cancel_requested(flag: &Option<Arc<AtomicBool>>) -> bool {
 /// 多源并行下载同一文件
 ///
 /// `official_index` 指定的源可以领被隔离的块；`scope` 控制重跑时作废哪些已完成块；
-/// `resume_key` 是「同一次下载」的指纹，防止同名但内容变了的文件复用旧位图。
+/// `resume_key` 是「同一次下载」的指纹，防止同名但内容变了的文件复用旧位图；
+/// 为 `None` 表示这次下载不允许续传（没有期望哈希，拼出来的内容无从裁决）。
 #[allow(clippy::too_many_arguments)]
 pub(crate) async fn download_multi(
     client: &reqwest::Client,
     urls: &[String],
     official_index: usize,
     scope: RetryScope,
-    resume_key: u64,
+    resume_key: Option<u64>,
     path: &str,
     file_size: u64,
     budget: usize,
@@ -129,18 +130,25 @@ pub(crate) async fn download_multi(
     let data_len = std::fs::metadata(path).map(|meta| meta.len()).unwrap_or(0);
     let data_path = path.to_string();
     let load_map_path = map_path.clone();
-    let restored = tokio::task::spawn_blocking(move || {
-        SegmentTable::load(
-            Path::new(&load_map_path),
-            file_size,
-            data_len,
-            resume_key,
-            Some(Path::new(&data_path)),
-        )
-    })
-    .await
-    .ok()
-    .flatten();
+    let restored = match resume_key {
+        Some(key) => tokio::task::spawn_blocking(move || {
+            SegmentTable::load(
+                Path::new(&load_map_path),
+                file_size,
+                data_len,
+                key,
+                Some(Path::new(&data_path)),
+            )
+        })
+        .await
+        .ok()
+        .flatten(),
+        None => {
+            // 没有期望哈希就不续传：旧位图留着也没人会信它，直接清掉
+            let _ = std::fs::remove_file(&load_map_path);
+            None
+        }
+    };
     let table = match restored {
         Some(restored) => {
             log_debug!(
@@ -421,10 +429,11 @@ fn flush_data_file(path: &str) -> std::io::Result<()> {
 }
 
 fn save_map(engine: &Engine) {
-    if let Err(e) = engine
-        .table
-        .save(Path::new(&engine.map_path), engine.resume_key)
-    {
+    let Some(key) = engine.resume_key else {
+        // 不允许续传的下载不留位图：下次也不会加载它
+        return;
+    };
+    if let Err(e) = engine.table.save(Path::new(&engine.map_path), key) {
         log_debug!("[Segment] 位图落盘失败: {}", e);
     }
 }
