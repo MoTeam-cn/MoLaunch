@@ -2,7 +2,7 @@
 
 use std::io::{Seek, SeekFrom, Write};
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
-use std::sync::Arc;
+use std::sync::{Arc, Mutex as StdMutex};
 use std::time::Duration;
 
 use futures_util::StreamExt;
@@ -81,15 +81,16 @@ pub(crate) async fn download_block(
         return Err(BlockError::Failed(format!("HTTP {}", status.as_u16())));
     }
 
-    let mut file = std::fs::OpenOptions::new()
-        .read(true)
-        .write(true)
-        .create(true)
-        .truncate(false)
-        .open(path)
-        .map_err(|e| BlockError::Failed(format!("打开目标文件失败: {}", e)))?;
-    file.seek(SeekFrom::Start(segment.start))
-        .map_err(|e| BlockError::Failed(format!("定位写入偏移失败: {}", e)))?;
+    // 句柄进 Arc<Mutex>：写盘要挪到阻塞线程池里做，句柄得能跨线程持有
+    let file = Arc::new(StdMutex::new(
+        std::fs::OpenOptions::new()
+            .read(true)
+            .write(true)
+            .create(true)
+            .truncate(false)
+            .open(path)
+            .map_err(|e| BlockError::Failed(format!("打开目标文件失败: {}", e)))?,
+    ));
 
     let mut downloaded = 0_u64;
     // 边写边算这块的 SHA256：位图靠它证明「这段字节确实落盘了」
@@ -122,7 +123,8 @@ pub(crate) async fn download_block(
             ));
         }
         write_with_limit(
-            &mut file,
+            &file,
+            segment.start,
             &chunk,
             rate_limiter,
             &mut downloaded,
@@ -151,17 +153,42 @@ fn cancel_requested(cancel_flag: &Option<Arc<AtomicBool>>) -> bool {
         .is_some_and(|flag| flag.load(Ordering::Relaxed))
 }
 
-/// 写入并按限速分批等待
+/// 把一段字节写到文件的指定偏移
+///
+/// 必须走 `spawn_blocking`：文件写入是同步系统调用，直接在 async 任务里写会把
+/// 整个 reactor 一起卡住——一个文件几百块，每块都卡一下，并行度就白给了。
+/// 用写句柄而不是只读句柄：只读句柄在 Windows 上连写都做不到。
+async fn write_at(
+    file: &Arc<StdMutex<std::fs::File>>,
+    offset: u64,
+    data: Vec<u8>,
+) -> Result<(), BlockError> {
+    let file = file.clone();
+    tokio::task::spawn_blocking(move || {
+        let mut guard = file.lock().unwrap_or_else(|poisoned| poisoned.into_inner());
+        guard
+            .seek(SeekFrom::Start(offset))
+            .map_err(|e| BlockError::Failed(format!("定位写入偏移失败: {}", e)))?;
+        guard
+            .write_all(&data)
+            .map_err(|e| BlockError::Failed(format!("写入失败: {}", e)))
+    })
+    .await
+    .map_err(|e| BlockError::Failed(format!("写盘任务异常: {}", e)))?
+}
+
 async fn write_with_limit(
-    file: &mut std::fs::File,
+    file: &Arc<StdMutex<std::fs::File>>,
+    base_offset: u64,
     chunk: &[u8],
-    rate_limiter: &Option<Arc<Mutex<RateLimiter>>>,
+    rate_limiter: Option<&Arc<Mutex<RateLimiter>>>,
     downloaded: &mut u64,
     cancel_flag: &Option<Arc<AtomicBool>>,
 ) -> Result<(), BlockError> {
+    // 块内已写的位置：绝对偏移 = 块起点 + 已写字节数 + 块内偏移
+    let block_start = base_offset + *downloaded;
     let Some(limiter) = rate_limiter else {
-        file.write_all(chunk)
-            .map_err(|e| BlockError::Failed(format!("写入失败: {}", e)))?;
+        write_at(file, block_start, chunk.to_vec()).await?;
         *downloaded += chunk.len() as u64;
         return Ok(());
     };
@@ -181,11 +208,19 @@ async fn write_with_limit(
             continue;
         }
         let end = (offset + granted as usize).min(chunk.len());
-        file.write_all(&chunk[offset..end])
-            .map_err(|e| BlockError::Failed(format!("写入失败: {}", e)))?;
+        write_at(
+            file,
+            block_start + offset as u64,
+            chunk[offset..end].to_vec(),
+        )
+        .await?;
         offset = end;
         remaining -= granted;
         *downloaded += granted;
     }
     Ok(())
 }
+
+#[cfg(test)]
+#[path = "block_test.rs"]
+mod block_test;

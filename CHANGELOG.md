@@ -6,6 +6,13 @@
 
 ### 修复
 
+#### 分块下载的写盘卡住了整个异步运行时
+块下载在 async 任务里直接 `write_all`：这是同步系统调用，写的时候整个 reactor 停摆。一个文件几百块、每块写完都要走一遍，同一时刻别的连接收到的数据也只能排队等——并行连接数是够了，真正落盘的吞吐却被自己卡死。
+
+- [`block.rs`](src-tauri/src/minecraft/download/chunk/block.rs)：写盘移进 `spawn_blocking`，句柄改成 `Arc<Mutex<File>>`。写入按**绝对偏移**定位（块起点 + 已写字节 + 块内偏移），不再依赖文件游标，因此不受调度顺序影响。
+- 限速分支同理：每次拿到额度只把这一小段交给阻塞线程池，`acquire` 与 `sleep` 仍旧在 async 侧。
+- [`block_test.rs`](src-tauri/src/minecraft/download/chunk/block_test.rs)（新）：2 个用例——乱序写两段能拼出正确内容、覆盖写落在正确位置。
+
 #### 同一份 Java runtime 被并发安装会互相覆盖
 两个安装任务同时写 `runtime/{component}/` 时，各自以为在装同一份 Java，实际每人写了一半：两边都把对方的文件当成「已存在但大小不对」重写，最后的目录混着两个批次的内容，校验器找不出规律，只能一起失败。
 
