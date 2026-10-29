@@ -6,6 +6,13 @@
 
 ### 修复
 
+#### Java 安装失败会删掉共用的 runtime 目录
+`{APPDATA}/.minecraft/runtime/{component}/` 是**官方启动器也在用**的公共目录。原先下载失败就 `remove_dir_all` 整个目录——用户只要用官方启动器装过同一版本 Java，我们的下载失败就会把它一起删掉，而这两件事毫无关系。
+
+[`files.rs`](src-tauri/src/minecraft/java/download/files.rs)：新增 `cleanup_failed_install`，判据是「安装前该目录是否已存在」——本次新建才整删，本来就有只记警告保留。
+[`pipeline.rs`](src-tauri/src/minecraft/java/download/pipeline.rs)：在取到 `runtime_dir` 后立刻取样 `dir_existed`，失败分支改走上面的清理。
+[`files_test.rs`](src-tauri/src/minecraft/java/download/files_test.rs)（新）：2 个用例，覆盖已有目录保留、本次新建整删。
+
 #### 主机记忆顺带记下「这台不支持 Range」
 遇到不支持 Range 的主机（非首块返回 200），每个块都要先发一次注定白费的请求才知道，一个文件几百块就是几百次。主机记忆里本来就有这台主机的档案，顺手把这条结论记上，下一块直接判负换源。
 

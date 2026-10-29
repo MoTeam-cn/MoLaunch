@@ -4,6 +4,8 @@ use std::path::{Path, PathBuf};
 
 use super::types::{RuntimeFile, RuntimeManifest};
 
+use crate::log_warn;
+
 /// 从 manifest 中过滤出需要下载的文件（有 downloads.raw 的）
 pub fn filter_downloadable_files(manifest: &RuntimeManifest) -> Vec<(String, RuntimeFile)> {
     manifest
@@ -121,3 +123,38 @@ pub fn validate_path_traversal(
     }
     Ok(())
 }
+
+/// 安装失败后清理本次新建的 runtime 目录
+///
+/// `dir_existed` 是**安装开始前**目录是否已存在。这个目录
+/// （`{APPDATA}/.minecraft/runtime/{component}`）与官方启动器共用：
+/// 整删会把别的启动器装好、正在用的 Java 一起毁掉，而这跟「我们这次装失败」
+/// 没有半点关系。所以只有本次新建的目录才能删。
+pub fn cleanup_failed_install(runtime_dir: &Path, dir_existed: bool) {
+    if dir_existed {
+        log_warn!(
+            "[JavaDownload] 安装失败但 runtime 目录原本就存在，保留不清理: {}",
+            runtime_dir.display()
+        );
+        return;
+    }
+    match std::fs::remove_dir_all(runtime_dir) {
+        Ok(()) => {
+            log_warn!(
+                "[JavaDownload] 安装失败，已清理本次新建的 runtime 目录: {}",
+                runtime_dir.display()
+            );
+        }
+        Err(e) => {
+            log_warn!(
+                "[JavaDownload] 清理 runtime 目录失败: {} ({})",
+                runtime_dir.display(),
+                e
+            );
+        }
+    }
+}
+
+#[cfg(test)]
+#[path = "files_test.rs"]
+mod files_test;

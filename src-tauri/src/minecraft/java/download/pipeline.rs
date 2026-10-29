@@ -60,6 +60,8 @@ pub async fn download_java_runtime(
 
     // 阶段 4：下载文件（复用通用 DownloadManager：文件级并发 + 分片 + SHA1 校验）
     let runtime_dir = files::get_runtime_dir(&component)?;
+    // 安装开始前取样：这个目录与官方启动器共用，只有本次新建的才允许在失败时整删
+    let dir_existed = runtime_dir.exists();
     progress::emit(
         app,
         "downloading",
@@ -116,7 +118,7 @@ pub async fn download_java_runtime(
         .download_batch(tasks, progress_callback)
         .await;
     if let Some(failed) = results.iter().find(|r| r.status == DownloadStatus::Failed) {
-        let _ = std::fs::remove_dir_all(&runtime_dir);
+        files::cleanup_failed_install(&runtime_dir, dir_existed);
         return Err(format!(
             "下载文件失败: {} - {}",
             failed.task_id,
