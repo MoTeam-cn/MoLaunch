@@ -6,6 +6,15 @@
 
 ### 修复
 
+#### 进程被杀之后，正在下载的任务彻底消失
+下载状态全在内存里。进程崩溃、被任务管理器结束、或者关机时任务还在跑——重启后界面干干净净，用户不知道「刚才下的那个整合包是没开始，还是下到一半没了」。这是最难排查的一类失败：没有任何痕迹。
+
+- [`job_store.rs`](src-tauri/src/minecraft/download/job_store.rs)（新）：下载台账，落盘到 `cache/download/active_jobs.json`。开始下载时登记、结束时注销（用 RAII `JobGuard`，避免在一条有多个提前返回的路径上漏注销）。带版本号、2 小时 TTL、512 条上限，读不懂就当成空的。
+- **只做「让中断可见」，不做自动续传**：重启后下载线程、HTTP 连接、位图锁全都没了，自动续跑要把整个会话状态重建出来，那是另一个工程。台账保证的是下次启动能说出「上次有 N 个任务没跑完」。
+- [`single.rs`](src-tauri/src/minecraft/download/downloader/single.rs)：任务开始下载时登记，作用域结束自动注销。
+- [`lib.rs`](src-tauri/src/lib.rs)：启动时读取残留台账，逐条 `log_warn!` 上报，然后清空——这些任务在当前进程里已经不存在，留着只会被反复报告。
+- [`job_store_test.rs`](src-tauri/src/minecraft/download/job_store_test.rs)（新）：4 个用例——有效期内保留、超时丢弃、时钟回拨不下溢、超出上限丢最旧。
+
 #### 下载失败时用户看不到原因
 后端早就通过 `error_code` 告诉前端「失败了、是哪种失败」，但前端收到非 0 只在调试构建里 `console.debug` 一句就 return——用户在界面上只看到下载停了，没有任何解释。
 

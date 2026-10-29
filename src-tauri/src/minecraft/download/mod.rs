@@ -13,6 +13,7 @@ pub mod error_code;
 pub mod fix;
 pub mod full_download;
 pub mod host_profile;
+pub mod job_store;
 pub mod manager;
 pub mod mirror_gate;
 pub mod rate_limiter;

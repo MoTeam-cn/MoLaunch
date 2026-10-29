@@ -7,6 +7,7 @@ use tokio::sync::Mutex;
 
 use super::super::super::sources::DownloadSourceMode;
 use super::super::super::utils::file_checker::FileChecker;
+use super::super::job_store;
 use super::super::rate_limiter::RateLimiter;
 use super::super::types::{ContentValidator, DownloadProgress, DownloadTask, GlobalProgress};
 use crate::log_debug;
@@ -63,6 +64,8 @@ pub async fn download_single(
         return verify::skipped(task);
     }
 
+    // 登记到台账：进程若中途被杀，下次启动还能看到这个任务没跑完
+    let _job = job_store::JobGuard::new(&task.id, &task.local_path);
     log_debug!(
         "[Download] 开始下载: {} (size={}, urls={:?})",
         task.local_path,

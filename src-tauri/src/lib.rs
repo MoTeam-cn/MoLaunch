@@ -200,6 +200,16 @@ pub fn run() {
             // setup 钩子在窗口/webview 创建后、前端加载前调用
             log_info!("[Startup] Tauri setup() hook entered — webview & window created");
 
+            // 上次进程留下的下载台账：下载线程随进程一起消失了，这些任务不会自己继续，
+            // 但得让人知道它们存在过——静默消失是最难排查的一种失败
+            for job in crate::minecraft::download::job_store::recover() {
+                crate::log_warn!(
+                    "[Startup] 上次未完成的下载任务: {} (id={})",
+                    job.label,
+                    job.id
+                );
+            }
+
             // 私有协议库的日志接入启动器日志系统
             install_protocol_log_sink();
 
