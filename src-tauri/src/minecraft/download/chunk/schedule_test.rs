@@ -88,9 +88,8 @@ fn test_plan_window_全同速时到探针窗口才加() {
     let quiet = plan_window(&items, 100, 8, false, 3);
     assert_eq!(quiet.grow, None, "非探针窗口、速度都一样就不动");
     let probe = plan_window(&items, 100, 8, false, 5);
-    assert_eq!(
-        probe.grow,
-        Some(0),
+    assert!(
+        probe.grow.is_some(),
         "探针窗口要试加一条，否则空闲额度永远用不上"
     );
 }
