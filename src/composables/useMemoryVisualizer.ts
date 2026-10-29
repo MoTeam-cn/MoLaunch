@@ -9,6 +9,7 @@ import { ref, computed, onUnmounted } from 'vue'
 import type { Ref, ComputedRef } from 'vue'
 import { listen, type UnlistenFn } from '@tauri-apps/api/event'
 import * as tauri from '@/utils/tauri'
+import { recommendMemory } from '@/utils/memory-recommend'
 
 /** 后端内存推送事件名（与 src-tauri/src/commands/system/memory_push.rs 约定一致） */
 const MEMORY_PUSH_EVENT = 'memory-info'
@@ -35,7 +36,7 @@ interface UseMemoryVisualizerReturn {
   usedPercent: ComputedRef<number>
   /** 游戏内存占比（%） */
   gamePercent: ComputedRef<number>
-  /** 按可用内存的 75% 自动分配游戏内存（上限 8GB，下限 512MB） */
+  /** 按总内存档位与可用内存自动分配游戏内存（规则见 utils/memory-recommend） */
   applyAutoMemory: () => void
   /** 订阅后端内存推送并监听 memory-info 事件（页面挂载时调用，幂等） */
   startMemoryPolling: () => void
@@ -118,10 +119,13 @@ export function useMemoryVisualizer(
 
   function applyAutoMemory() {
     if (!systemMemory.value) return
-    const availableMB = systemMemory.value.available / 1024 / 1024
-    const suggested = Math.min(Math.round(availableMB * 0.75), 8192)
-    maxMemoryRef.value = Math.max(suggested, 512)
-    minMemoryRef.value = Math.round(maxMemoryRef.value / 2)
+    // 档位与理由都在 recommendMemory 里，这里只负责把结果写回
+    const recommendation = recommendMemory({
+      totalMB: systemMemory.value.total / 1024 / 1024,
+      availableMB: systemMemory.value.available / 1024 / 1024,
+    })
+    maxMemoryRef.value = recommendation.maxMB
+    minMemoryRef.value = recommendation.minMB
   }
 
   return {
