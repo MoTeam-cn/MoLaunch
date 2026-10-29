@@ -9,6 +9,7 @@ pub mod config;
 pub mod credit;
 pub mod downloader;
 pub mod edge;
+pub mod error_code;
 pub mod fix;
 pub mod full_download;
 pub mod host_profile;

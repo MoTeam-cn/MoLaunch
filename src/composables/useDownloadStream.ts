@@ -8,10 +8,11 @@
 
 import { listen } from '@tauri-apps/api/event'
 import { useVersionStore } from '@/stores/version'
-import { toastSuccess } from '@/utils/toast'
+import { toastError, toastSuccess } from '@/utils/toast'
 import { isDownloading, getDownloadProgress } from '@/utils/api/system'
 import type { RawDownloadProgress } from '@/types/download'
 import { shouldAcceptSnapshot, toProgressSnapshot } from '@/utils/downloadProgress'
+import { describeDownloadError } from '@/utils/downloadErrorText'
 import { safeCall } from '@/utils/async'
 
 /** 防止 initDownloadStream 被多次调用注册重复 listener */
@@ -34,9 +35,9 @@ function handleProgress(progress: RawDownloadProgress) {
   // 错误码检查：仅忽略事件，不 finishDownload / toastError
   // 失败的 UI 提示由调用方的 catch 统一处理
   if (progress.error_code && progress.error_code !== 0) {
-    if (import.meta.env.DEV) {
-      console.debug('[Download] Failed with error_code=', progress.error_code, '（交给调用方 catch 处理）')
-    }
+    // 失败原因要告诉用户：只把状态改成失败、不给一句话，等于没说
+    const reason = describeDownloadError(progress.error_code)
+    toastError(reason ?? `下载失败（错误码 ${progress.error_code}）`)
     return
   }
 

@@ -6,6 +6,14 @@
 
 ### 修复
 
+#### 下载失败时用户看不到原因
+后端早就通过 `error_code` 告诉前端「失败了、是哪种失败」，但前端收到非 0 只在调试构建里 `console.debug` 一句就 return——用户在界面上只看到下载停了，没有任何解释。
+
+- [`error_code.rs`](src-tauri/src/minecraft/download/error_code.rs)（新）：把失败码集中定义（网络 / 校验 / 磁盘 / 取消 / 安装），0 表示没有错误。原先散落在各处的 `mark_failed(1)` 是魔法数字，既改不动也读不懂。
+- [`downloadErrorText.ts`](src/utils/downloadErrorText.ts)（新）：码表在前端的镜像，把码翻成一句人话；未知码返回 `null`，让调用方兜底而不是硬编一句错的。
+- [`useDownloadStream.ts`](src/composables/useDownloadStream.ts)：收到非 0 码时 `toastError` 提示原因，不再只写调试日志。
+- 测试：[`error_code_test.rs`](src-tauri/src/minecraft/download/error_code_test.rs) 守住「0 只能是 NONE、各码互不相同」；[`download-error-text.test.ts`](src/utils/__tests__/download-error-text.test.ts) 覆盖 0、已知码、未知码三种情况。
+
 #### 目标路径上会出现写了一半的文件
 下载直接往最终路径写。中途崩溃、断电、被杀进程，都会在目标路径上留下一个**大小不对的半截文件**：对整合包来说这可能是缺了一段 `.jar` 的模组，对版本 JSON 来说可能是缺了半个括号的文本。下游读它的人没法判断「这是坏的还是我没读完」。
 
