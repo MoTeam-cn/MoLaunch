@@ -5,7 +5,7 @@
 //! 否则更新只能二选一：覆盖（吃掉用户改动）或跳过（装不上新版本）。
 
 use std::path::{Path, PathBuf};
-use std::time::{SystemTime, UNIX_EPOCH};
+use std::time::UNIX_EPOCH;
 
 use serde::{Deserialize, Serialize};
 
