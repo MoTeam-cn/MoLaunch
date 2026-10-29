@@ -4,230 +4,332 @@
 
 ## [Unreleased]
 
+
+## [0.3.14-rc.2] - 2026-10-29
+
 ### 修复
 
 #### 版本声明带通配或区间时一律匹配不上
+
 选兼容模组版本的过滤器原来只做字符串相等：`gv == game_version`。平台与模组给出的声明并不总是干净的单个版本号，`1.20.x`、`>=1.20 <1.21` 这类写法一律被判为不兼容，于是明明能用的版本被跳过，用户看到的是「这个模组不支持当前版本」。
 
 - [`version_range.rs`](src-tauri/src/minecraft/utils/version_range.rs)（新）：`matches_game` 支持精确、段通配（`1.20.x`、`*`）、比较符（`>=`/`<=`/`>`/`<`/`=`），空格分隔视为同时满足。
+
 - 版本比较按**数字段**进行，不按字符串：`1.9 < 1.10` 必须成立，字符串比较会得出相反结论。预发布后缀（`1.20.1-pre1`）不参与比较——这里回答的是「能不能装」，不是精确排序。
+
 - 保守边界：**看不懂的声明不算匹配**（空串、空白）。宁可漏装一个模组，也不要装上一个声明了不兼容的模组——后者会在启动时炸，而原因离安装环节很远。
+
 - [`dependency_resolver.rs`](src-tauri/src/commands/version/mods/dependency_resolver.rs)：`pick_best_version` 的过滤改用该函数，向后兼容（精确相等仍然匹配）。
+
 - [`version_range_test.rs`](src-tauri/src/minecraft/utils/version_range_test.rs)（新）：6 个用例——数字段比较、忽略预发布后缀、精确相等、段通配、比较符区间、空声明不算匹配。
 
 #### 自动分配内存被 8GB 硬顶卡死
+
 「自动分配」原来是「可用内存的 75%，最多 8192 MB」。两个方向都不对：64GB 的机器照样被 8GB 卡住，200 模组的整合包根本不够；而 8GB 和 64GB 机器拿到同一个上限，档位形同虚设。下限 512 MB 也早已起不来现代版本。
 
 - [`memory-recommend.ts`](src/utils/memory-recommend.ts)（新）：推荐规则抽成纯函数——按**总内存**分档取基线（4GB 及以下 1024、8GB 2048、16GB 4096、32GB 6144、更大 12288），再按模组数量加成（每 50 个 +512，上限 +2048）。
+
 - 上限同时受三重约束：想要的值、当前可用内存的 70%、总内存减去 2048 系统预留；取最小，但不低于 1024 硬下限。
+
 - 返回值里带 `reason` 字符串，逐条说明取这个数的依据——用户看到 6144 时应该能知道为什么。
+
 - [`useMemoryVisualizer.ts`](src/composables/useMemoryVisualizer.ts)：`applyAutoMemory` 改为调用该函数，最小堆取推荐值的一半。
+
 - [`memory-recommend.test.ts`](src/utils/__tests__/memory-recommend.test.ts)（新）：6 个用例——档位随总内存增长、模组加成生效、加成有上限、尊重当前可用内存、内存紧张时按硬下限兜底且 min ≤ max、理由字符串包含关键依据。
 
 #### 安装中断留下的版本目录没人清理
+
 `versions/` 下每个正常版本目录里都有一个同名 JSON。安装中断、或者用户直接在资源管理器里删过东西之后，会剩下没有 JSON 的目录：启动器不认它，界面上也看不到它，但它照样占着几百 MB。磁盘为什么一直在涨，从界面上找不到任何线索。
 
 - [`orphans.rs`](src-tauri/src/minecraft/version/orphans.rs)（新）：扫描 `versions/` 下没有同名 JSON 的目录，报出目录名、递归占用大小、以及判定理由。
+
 - **只报告、不删除**：删目录不可逆，判断失误就把能玩的版本删了。先让问题可见，删除交给用户确认。
+
 - [`post_install.rs`](src-tauri/src/commands/version/install/post_install.rs)：安装收尾时跑一次扫描，有残留就 `log_warn!` 一句；没有残留则什么都不说。
+
 - [`orphans_test.rs`](src-tauri/src/minecraft/version/orphans_test.rs)（新）：4 个用例——只报没有 JSON 的目录、目录不存在时返回空而不是 panic、递归求和、空清单不语。
 
 #### 分不清「安装带来的文件」和「用户自己的文件」
+
 版本目录装好之后，我们就不再记得里面本该有什么。于是下次更新只有两条路：覆盖（吃掉用户的改动）或跳过（装不上新版本），而无论选哪条都说不出理由。
 
 - [`instance_files.rs`](src-tauri/src/commands/version/install/instance_files.rs)（新）：安装收尾时给版本目录拍一份快照（相对路径 + 大小 + 修改时间），落盘到 `{游戏目录}/.molaunch/instance_files/{版本}.json`。
+
 - `diff` 是纯函数：新增 / 删除 / 改写（同名但大小或时间变了）三类差异分开报，后续「更新时不覆盖被改过的文件」就有了判据。
+
 - **只记元数据不读内容**：算哈希要把几百 MB 读一遍，安装收尾不该付这个代价。
+
 - 首次记录之后，每次安装都会先比对旧快照，把「安装之外的文件」数量写进日志——用户装了额外模组、手改过 JSON 这类情况，从此有迹可循。
+
 - [`post_install.rs`](src-tauri/src/commands/version/install/post_install.rs)：版本目录改名定稿后调用 `record`，保证记的是最终路径。
+
 - [`instance_files_test.rs`](src-tauri/src/commands/version/install/instance_files_test.rs)（新）：4 个用例——识别新增删除改写、完全相同无差异、快照递归且分隔符统一、版本名非法字符替换。
 
 #### 更新失败时旧文件跟着一起没了
+
 `.part` 换成目标路径这一步是 rename 覆盖。更新场景下目标文件通常已经存在——覆盖一旦失败（另一个进程占着、磁盘刚好满、杀毒软件锁文件），结果是「新文件没落地」和「旧文件已丢失」同时发生。用户原本能玩的版本就此打不开。
 
 - [`single.rs`](src-tauri/src/minecraft/download/downloader/single.rs)：替换前若目标已存在，先复制一份 `.molaunch-bak`；替换成功即删除备份，替换失败则把备份换回去，并在错误信息里说明是否已恢复。
+
 - 备份失败**不阻断**更新：记一条 debug 日志继续走原流程——最坏情况就是退回修改前的行为，而不是因为备份不了就不让更新。
+
 - [`single_test.rs`](src-tauri/src/minecraft/download/downloader/single_test.rs)：新增 4 个用例——后缀固定、旧内容可完整恢复、目标不存在时不产生备份、提交后不留备份文件。
 
 #### 进程被杀之后，正在下载的任务彻底消失
+
 下载状态全在内存里。进程崩溃、被任务管理器结束、或者关机时任务还在跑——重启后界面干干净净，用户不知道「刚才下的那个整合包是没开始，还是下到一半没了」。这是最难排查的一类失败：没有任何痕迹。
 
 - [`job_store.rs`](src-tauri/src/minecraft/download/job_store.rs)（新）：下载台账，落盘到 `cache/download/active_jobs.json`。开始下载时登记、结束时注销（用 RAII `JobGuard`，避免在一条有多个提前返回的路径上漏注销）。带版本号、2 小时 TTL、512 条上限，读不懂就当成空的。
+
 - **只做「让中断可见」，不做自动续传**：重启后下载线程、HTTP 连接、位图锁全都没了，自动续跑要把整个会话状态重建出来，那是另一个工程。台账保证的是下次启动能说出「上次有 N 个任务没跑完」。
+
 - [`single.rs`](src-tauri/src/minecraft/download/downloader/single.rs)：任务开始下载时登记，作用域结束自动注销。
+
 - [`lib.rs`](src-tauri/src/lib.rs)：启动时读取残留台账，逐条 `log_warn!` 上报，然后清空——这些任务在当前进程里已经不存在，留着只会被反复报告。
+
 - [`job_store_test.rs`](src-tauri/src/minecraft/download/job_store_test.rs)（新）：4 个用例——有效期内保留、超时丢弃、时钟回拨不下溢、超出上限丢最旧。
 
 #### 下载失败时用户看不到原因
+
 后端早就通过 `error_code` 告诉前端「失败了、是哪种失败」，但前端收到非 0 只在调试构建里 `console.debug` 一句就 return——用户在界面上只看到下载停了，没有任何解释。
 
 - [`error_code.rs`](src-tauri/src/minecraft/download/error_code.rs)（新）：把失败码集中定义（网络 / 校验 / 磁盘 / 取消 / 安装），0 表示没有错误。原先散落在各处的 `mark_failed(1)` 是魔法数字，既改不动也读不懂。
+
 - [`downloadErrorText.ts`](src/utils/downloadErrorText.ts)（新）：码表在前端的镜像，把码翻成一句人话；未知码返回 `null`，让调用方兜底而不是硬编一句错的。
+
 - [`useDownloadStream.ts`](src/composables/useDownloadStream.ts)：收到非 0 码时 `toastError` 提示原因，不再只写调试日志。
+
 - 测试：[`error_code_test.rs`](src-tauri/src/minecraft/download/error_code_test.rs) 守住「0 只能是 NONE、各码互不相同」；[`download-error-text.test.ts`](src/utils/__tests__/download-error-text.test.ts) 覆盖 0、已知码、未知码三种情况。
 
 #### 目标路径上会出现写了一半的文件
+
 下载直接往最终路径写。中途崩溃、断电、被杀进程，都会在目标路径上留下一个**大小不对的半截文件**：对整合包来说这可能是缺了一段 `.jar` 的模组，对版本 JSON 来说可能是缺了半个括号的文本。下游读它的人没法判断「这是坏的还是我没读完」。
 
 - [`single.rs`](src-tauri/src/minecraft/download/downloader/single.rs)：下载链路统一改为写 `{目标}.part`，校验（大小 + 哈希 + 内容）全部通过后才 `.part` → 目标路径。目标路径在此之前**不存在**，因此任何中断都只留下 `.part` 和位图。
+
 - 替换前先 `sync_all` 再 `rename`：同目录 rename 是原子的，读者要么看到旧的完整文件、要么看到新的完整文件；先刷盘则是为了避免「名字已换、内容还在页缓存里」这种掉电后更隐蔽的坏法。
+
 - 续传不受影响：位图跟着 `.part` 走（`{目标}.part.partmap`），指纹只由任务 id、期望哈希与大小决定，与路径无关。
+
 - [`single_test.rs`](src-tauri/src/minecraft/download/downloader/single_test.rs)（新）：3 个用例——替换后内容完整且临时文件消失、覆盖已存在的目标文件、临时文件不存在时报错。
 
 #### 机械盘上按固态盘的并发并行写
+
 我们的分段并发是「越多越快」的假设下做的，但那假设只在固态盘上成立。机械盘的多路随机写在物理上要抢同一组磁头，连接开得越多反而越慢，还顺带把盘占满影响别的程序。
 
 - [`budget.rs`](src-tauri/src/minecraft/download/budget.rs)：新增 `disk_connection_cap`，按目标文件所在挂载点的类型给出单文件并发上限——固态/未知 8 条、机械 2 条。挂载点取最长前缀匹配，认不出就当未知。
+
 - 机械盘**不降到 1**：绝大多数宽带速率远低于一块机械盘的顺序写能力，只留一条连接会白白浪费带宽。宁可让它 2 条。
+
 - [`multi.rs`](src-tauri/src/minecraft/download/chunk/multi.rs)：初始并发与每轮份额都过一遍这个上限。
+
 - [`budget_test.rs`](src-tauri/src/minecraft/download/budget_test.rs)：2 个用例——机械盘压到 2 且不降到 1、固态与未知按默认 8。
 
 #### 所有源一样快时，空闲额度永远用不上
+
 扩容条件是「某条源比均值快 1.2 倍」。当几条源速度都一样时，这个条件永远不成立——即使本文件的份额还没用完、还有额度空着，也没人会用。表现是多源下载稳定在很低的速度上，看起来像是「源都慢」，其实是调度自己不肯加。
 
 - [`schedule.rs`](src-tauri/src/minecraft/download/chunk/schedule.rs)：新增 `plan_window`（纯函数，输入每源速率与目标连接数，输出这一窗口该收缩谁、该给谁加一条），并加**探针扩容**——每 5 个窗口在仍有空闲额度时按速率挑一条试加一条连接，加错了下个窗口就被收缩收回。
+
 - [`multi.rs`](src-tauri/src/minecraft/download/chunk/multi.rs)：监督循环只负责执行计划，收缩/扩容的判断全部移出。
+
 - [`schedule_test.rs`](src-tauri/src/minecraft/download/chunk/schedule_test.rs)：补 5 个用例——限流时只缩不扩、明显最快者扩容、全同速只在探针窗口加、没有空闲额度不探针、单连接保底不被收缩。
+
 - 顺带把位图落盘与数据刷盘拆到 [`map_io.rs`](src-tauri/src/minecraft/download/chunk/map_io.rs)（含 [`map_io_test.rs`](src-tauri/src/minecraft/download/chunk/map_io_test.rs)），`multi.rs` 从 519 行回到 497 行，回到行数红线以内。
 
 #### 分块下载的写盘卡住了整个异步运行时
+
 块下载在 async 任务里直接 `write_all`：这是同步系统调用，写的时候整个 reactor 停摆。一个文件几百块、每块写完都要走一遍，同一时刻别的连接收到的数据也只能排队等——并行连接数是够了，真正落盘的吞吐却被自己卡死。
 
 - [`block.rs`](src-tauri/src/minecraft/download/chunk/block.rs)：写盘移进 `spawn_blocking`，句柄改成 `Arc<Mutex<File>>`。写入按**绝对偏移**定位（块起点 + 已写字节 + 块内偏移），不再依赖文件游标，因此不受调度顺序影响。
+
 - 限速分支同理：每次拿到额度只把这一小段交给阻塞线程池，`acquire` 与 `sleep` 仍旧在 async 侧。
+
 - [`block_test.rs`](src-tauri/src/minecraft/download/chunk/block_test.rs)（新）：2 个用例——乱序写两段能拼出正确内容、覆盖写落在正确位置。
 
 #### 同一份 Java runtime 被并发安装会互相覆盖
+
 两个安装任务同时写 `runtime/{component}/` 时，各自以为在装同一份 Java，实际每人写了一半：两边都把对方的文件当成「已存在但大小不对」重写，最后的目录混着两个批次的内容，校验器找不出规律，只能一起失败。
 
 [`pipeline.rs`](src-tauri/src/minecraft/java/download/pipeline.rs)：匹配到 component 之后排队拿一把按 component 分的锁，整个下载+验证都在锁内。按 component 分是为了装 Java 8 不必等装 Java 21。
+
 - 锁用 `tokio::sync::Mutex` + `lock_owned`：安装是 async 流程，标准库锁会在 `await` 处造成跨线程问题。
+
 - [`pipeline_test.rs`](src-tauri/src/minecraft/java/download/pipeline_test.rs)（新）：2 个用例——同一 component 的 4 个并发任务串行（峰值为 1）、不同 component 之间不排队。
 
 #### 装到一半的 runtime 会被当成可用 Java
+
 下载中断或进程中途被杀，会留下一个**能执行但模块不全**的 `java.exe`。Java 扫描的 Step 5 递归扫 `runtime/` 目录，会把它收进候选列表；用户选中后在启动游戏时才崩，而崩溃信息跟「Java 没装完」毫无关系。
 
 [`files.rs`](src-tauri/src/minecraft/java/download/files.rs)：新增安装标记三件套 `mark_install_started` / `clear_install_marker` / `is_install_complete`。标记写在 `runtime/{component}/.molaunch-installing`，进程中途被杀也会留下，正好覆盖「装到一半就没了」的情况。
+
 [`pipeline.rs`](src-tauri/src/minecraft/java/download/pipeline.rs)：开始下载前挂标记，下载与验证都通过才摘。
+
 [`platform.rs`](src-tauri/src/minecraft/java/search/platform.rs)：Step 5 改为逐个 component 子目录扫描，带标记的跳过并记 debug。
+
 [`files_test.rs`](src-tauri/src/minecraft/java/download/files_test.rs)：补 3 个用例——安装期间视为未装完、目录不存在时会建出来、保留目录时摘掉标记。
 
 #### Java 下完没跑起来也算成功
+
 `verify_downloaded_java` 只在失败时打一行 `info` 日志，然后照常返回——调用方于是把这份跑不起来的 Java 写进配置，用户直到启动游戏才看到一个看不懂的崩溃。
 
 [`verify.rs`](src-tauri/src/minecraft/java/download/verify.rs)：改为返回 `Result<(), String>`，失败时 `log_warn!` 并带上可执行路径与原因。
+
 [`pipeline.rs`](src-tauri/src/minecraft/java/download/pipeline.rs)：验证失败按安装失败处理（清理本次新建的目录）并向上返回错误，不再把坏路径交出去。
+
 [`verify_test.rs`](src-tauri/src/minecraft/java/download/verify_test.rs)（新）：1 个用例——路径不存在必须返回 `Err` 且信息非空。
 
 #### Java 安装失败会删掉共用的 runtime 目录
+
 `{APPDATA}/.minecraft/runtime/{component}/` 是**官方启动器也在用**的公共目录。原先下载失败就 `remove_dir_all` 整个目录——用户只要用官方启动器装过同一版本 Java，我们的下载失败就会把它一起删掉，而这两件事毫无关系。
 
 [`files.rs`](src-tauri/src/minecraft/java/download/files.rs)：新增 `cleanup_failed_install`，判据是「安装前该目录是否已存在」——本次新建才整删，本来就有只记警告保留。
+
 [`pipeline.rs`](src-tauri/src/minecraft/java/download/pipeline.rs)：在取到 `runtime_dir` 后立刻取样 `dir_existed`，失败分支改走上面的清理。
+
 [`files_test.rs`](src-tauri/src/minecraft/java/download/files_test.rs)（新）：2 个用例，覆盖已有目录保留、本次新建整删。
 
 #### 主机记忆顺带记下「这台不支持 Range」
+
 遇到不支持 Range 的主机（非首块返回 200），每个块都要先发一次注定白费的请求才知道，一个文件几百块就是几百次。主机记忆里本来就有这台主机的档案，顺手把这条结论记上，下一块直接判负换源。
 
 - [`host_profile.rs`](src-tauri/src/minecraft/download/host_profile.rs)：档案加 `supports_range`（`None` = 没测过，当支持处理），新增 `range_unsupported` / `note_range_unsupported`。合并时**不覆盖**这个结论——并发与 Range 是两件事，学并发不该把 Range 的能力判断抹掉。
+
 - 落盘字段带 `#[serde(default)]`：旧记忆文件缺这个字段时按「没测过」读，不需要版本号迁移。顺带把「到点落盘」抽成 `due_snapshot`，两处共用同一套节流。
+
 - [`block.rs`](src-tauri/src/minecraft/download/chunk/block.rs)：非首块请求前先查这条记忆，命中就直接返回 `RangeUnsupported`，不再发请求；收到「非首块 200」时记下结论。
+
 - [`host_profile_test.rs`](src-tauri/src/minecraft/download/host_profile_test.rs)：3 个用例——未知主机当支持、记下后能读到且只影响该主机、合并时保留 Range 结论。
 
 #### 旧进度帧后到会让百分比回退
+
 Tauri 事件不保证有序：多个后端任务并发 emit、WebView 调度延迟，都可能让旧帧后到。百分比一旦回退，用户看到的就是「下着下着又退回去」。
 
 - [`downloadProgress.ts`](src/utils/downloadProgress.ts)：新增 `shouldAcceptSnapshot`，三条不变量——阶段变了必收（跨阶段比较没意义）、同一阶段内总体与阶段百分比都不许回退（1 个百分点内的抖动算正常）、进度归零必收（重下/重试，否则界面卡在旧值）。
+
 - [`useDownloadStream.ts`](src/composables/useDownloadStream.ts)：更新 store 前先过这道判断，丢弃时只打 debug 日志。
+
 - [`download-progress.test.ts`](src/utils/__tests__/download-progress.test.ts)：补 7 个用例覆盖上述分支。
 
 #### 被限流后并发只缩不扩
+
 公共镜像返回 429/503 时，镜像闸门知道要给自己设冷却，但「本次下载整体该退一档」这件事没人接收——分块路径把闸门的返回值(`Option<Duration>`)直接丢掉了。于是限流只体现在「这条镜像被冷落一会儿」，同时其余连接还在按基线往上扩，越限越挤。
 
 - [`throttle.rs`](src-tauri/src/minecraft/download/throttle.rs)（新）：把限流事件攒成一个**单调计数**，并提供 `ThrottleWatch`（每个下载任务持自己的基线，多个文件并发时不会互相把信号取走——「取走清零」式的全局单值会）。
+
 - [`block.rs`](src-tauri/src/minecraft/download/chunk/block.rs)：闸门回报被限流时记一次信号，不再丢弃返回值。
+
 - [`multi.rs`](src-tauri/src/minecraft/download/chunk/multi.rs)：监督循环每窗口取一次观察器；有新限流就整体退一档（每条 `target > 1` 的源减一条），且**这一窗口不扩容**。
+
 - 已知债务：`multi.rs` 现 519 行，已超「500 行需拆分」的线。建议把采样+窗口决策整段提取成 `schedule` 的纯函数，留到磁盘类型限流那一批一起做（批次 D 本来就要改这一段）。
 
 #### 重装整合包失败时会删掉用户改过的配置
+
 失败清理的判据是「版本目录下有没有 `saves/` 或 `versions/` 子目录」——而这两个恰恰是整合包实例通常没有的（存档要玩过才有，嵌套版本只有部分整合包才有）。于是对**已存在**的实例重装整合包、一旦失败，整个 `versions/<实例名>` 会被递归删掉，连用户改过的 `config/`、`options.txt`、资源包一起。
 
 - [`helpers.rs`](src-tauri/src/commands/community/install/helpers.rs)：判据换成「安装开始前目录是否已存在」，新增 `dir_existed` 参数。本次新建 → 整目录删掉回到安装前状态；本来就有 → 只记一条日志并保留。
+
 - [`local.rs`](src-tauri/src/commands/community/install/modpack/local.rs)、[`online.rs`](src-tauri/src/commands/community/install/modpack/online.rs)：在 `create_dir_all` **之前**取样 `instance_dir.exists()`——放在后面取永远是 true，判据就失效了。
+
 - [`helpers_test.rs`](src-tauri/src/commands/community/install/helpers_test.rs)：2 个用例，覆盖已有实例保留用户文件、本次新建整目录删除。
 
 #### 导入实例时会跟随目录链接，导致体积膨胀甚至递归
+
 导入走的是复制模式，而复制用 `path.is_dir()` 判类型——它会**跟随**重解析点。别的启动器常用 junction 把 `libraries`、`assets` 甚至整个数据目录链到别处：跟随过去就是整份复制（体积成倍膨胀），链回祖先目录时还会无限递归。
 
 - [`migrate.rs`](src-tauri/src/commands/tools/launcher_import/migrate.rs)：判类型改用不解析链接的 `file_type()`；遇到重解析点不再递归，改为在目标位置用已有的 `create_dir_link`（junction 优先、符号链接兜底）重建同样的链接；文件链接直接复制内容，不为此索要建链接权限。
+
 - 另加一份「真实路径」集合兜底防环：即使某个文件系统把目录环暴露成普通目录，也只会跳过而不会无限递归。
+
 - [`migrate_test.rs`](src-tauri/src/commands/tools/launcher_import/migrate_test.rs)（新）：3 个用例——普通目录复制且跳过启动器元数据、重解析点被重建为链接、目录成环时正常返回。
 
 #### 用户环境里的 JVM 注入变量会顶掉实例参数
+
 `_JAVA_OPTIONS` / `JAVA_TOOL_OPTIONS` / `JDK_JAVA_OPTIONS` 由 JVM 自己读取，且优先级高于命令行参数。用户机器上被别的启动器或优化工具写过之后，实例拼好的 `-Xmx` 会被直接覆盖——症状是「内存设置不生效」或「莫名 OutOfMemory」，而日志里只多出无关的一句 `Picked up _JAVA_OPTIONS`，从启动器侧完全看不出是自己被顶了。
 
 - [`process_spawn.rs`](src-tauri/src/minecraft/launch/pipeline/process_spawn.rs)：拉起游戏进程前把这三个变量从子进程环境里摘掉。
+
 - `cmd.env("appdata", ...)` 那条隔离保持不动——它是另一个方向的隔离（把 APPDATA 指到游戏目录），与本条无关。
 
 #### 切换下载源就把续传位图作废了
+
 续传指纹里塞进了整份候选 URL 列表，而列表会随下载源模式（官方 / 镜像 / 智能）重排——用户切一次模式，或候选集变化，指纹就变了，已下好的块全部作废，表现为「断了以后还是从头下」。
 
 - [`engine.rs`](src-tauri/src/minecraft/download/downloader/engine.rs)：指纹只保留「任务 id + 期望哈希 + 文件大小」。候选源只说明**从哪儿取**，不改变期望内容，不该参与。
+
 - 同一个改动补上前置条件：**没有期望哈希就不允许续传**（`resume_key` 返回 `None`）。两者必须一起成立——去掉源之后，若无哈希可判，指纹就只剩「任务 + 大小」，那就真分辨不出同名模组的新旧内容了。
+
 - [`multi.rs`](src-tauri/src/minecraft/download/chunk/multi.rs)：指纹为 `None` 时不加载位图、并清掉遗留的 `.partmap`，未完成也不落盘（下次同样不会信它）。
+
 - [`engine_test.rs`](src-tauri/src/minecraft/download/downloader/engine_test.rs)：用例改为覆盖同输入稳定、任务/期望内容变更、无哈希不续传、候选源不参与指纹。
 
 #### 下载完成后先落盘再删位图
+
 位图是「哪些块可信」的账本，账本的可信度上限是数据真的写到了稳定存储上。原先收到「全部块完成」就直接删位图，而那些块刚写完还在页缓存里——掉电后账本已经不存在、数据可能只落了一部分，文件会变成无法自证的半截。
 
 - [`multi.rs`](src-tauri/src/minecraft/download/chunk/multi.rs)：完成分支先 `sync_all` 再删位图，落盘失败只记警告、不影响下载结果（文件本身已经下完了）。
+
 - 落盘必须用**写句柄**打开：Windows 的 `FlushFileBuffers` 要求句柄带写权限，只读句柄的 `sync_all` 会直接失败——那样等于没刷，属于「看着修了其实没修」。
+
 - [`multi_test.rs`](src-tauri/src/minecraft/download/chunk/multi_test.rs)（新）：2 个用例，覆盖正常落盘后内容不变、以及文件不存在时必须报错而不是静默成功。
 
 #### 下载浮动按钮层级压过抽屉与弹窗
+
 素材：右下角那颗按钮的 `z-index` 是 `10001`，比抽屉（1000/1001）和所有弹窗（1200）都高，于是它会浮在安装确认弹窗上面，正好压住弹窗右下角的按钮。
 
 - [`DownloadPanel.vue`](src/components/common/DownloadPanel.vue)：层级降到 `900`，并在组件头写明这个刻度——浮动按钮在抽屉与弹窗**之下**，`Toast` 依旧在最上（10001）。
 
 #### 解析阶段进度看起来卡在 0%
+
 两处原因，分别修：
 
 - **百分比被权重稀释**：总体百分比按阶段权重折算，而「解析整合包」权重是 1（总权重 56），它的进度再怎么动也只能把总数推到 1-2%，观感就是纹丝不动。[`downloadProgress.ts`](src/utils/downloadProgress.ts) 新增 `resolveDisplayPercentage`：还没有任何字节时（解析 / 批量查询 / 复制配置）改显示**当前阶段自身**的进度，一旦开始有字节就回到总体值——那才是真正剩下的工作量；任何阶段都不会显示到 100%，最多 99.9。
+
 - **阶段内根本没有进度**：CF/MR 依赖列表要先批量查文件信息与 slug，两次往返期间一个字节都没下。[`loader_helpers.rs`](src-tauri/src/commands/version/install/loader_helpers.rs) 新增 `start_query_ticker`（0→10% @2%/s，用 `TickerGuard` 的 `Drop` 保证任何提前返回都会停），[`curseforge.rs`](src-tauri/src/commands/community/install/curseforge.rs) 与 [`modrinth.rs`](src-tauri/src/commands/community/install/modrinth.rs) 在查询期间启动、真实字节进来前显式停掉；只给 10% 是为了避免伪造值过高后「先到 50% 再退回 2%」的倒车。
 
 #### 进度快照构造去重
+
 - [`useDownloadStream.ts`](src/composables/useDownloadStream.ts) 与 [`useDownloadPageRestore.ts`](src/composables/useDownloadPageRestore.ts) 原本各写一份「Raw → 稳定结构 + 加权百分比」，合并为 `toProgressSnapshot`（`downloadProgress.ts`），顺带补上 `stage_percentage` 字段（[`types/download.ts`](src/types/download.ts)）。
+
 - [`download-progress.test.ts`](src/utils/__tests__/download-progress.test.ts)：9 个用例覆盖加权百分比、当前阶段百分比、索引越界回退、可选字段默认值、暂停标记，以及展示值的四种分支。
 
-### 修复
-
 #### 设置页「点我前往」点击没反应
+
 整条链路只有一半：按钮本身是好的，`router.push` 也确实执行了，但**设置页从来不读 URL 上的 `?tab=`**。
 
 - [`Settings.vue`](src/views/Settings.vue)：分类由左侧菜单的 `v-model` 驱动，页面挂载后不再看查询参数，于是「跳到 `/apps/settings?tab=advanced`」只改了地址栏，内容一动不动。新增 `route.query.tab` 监听（含挂载时立即生效），按分类 id 校验后切换。
+
 - [`settings-tab.ts`](src/utils/settings-tab.ts)（新）：把「查询参数 → 合法分类 id」抽成纯函数，重复参数、拼错、大小写不符一律忽略并保持当前分类，不让页面白屏。
+
 - [`settings-tab.test.ts`](src/utils/__tests__/settings-tab.test.ts)：5 个用例覆盖正常、未知、缺失、数组参数、前后空格、大小写。
+
 - 同一处缺陷连带修好另外三条早就跳不过去的深链：[`Online.vue`](src/views/Online.vue) 的「去设置联机」与「教程」按钮、[`useEasyTierInstall.ts`](src/composables/useEasyTierInstall.ts) 的安装引导。
+
 - 「教程」的二级深链 `?subtab=tutorial` 由 `SubTabBar` 内置的持久化恢复，一级分类能切换后它才真正生效。
 
 ### 变更
 
 #### 遥测默认开启
+
 `read_state()` 读不到 `state.json`（首次启动、文件被删、解析失败）时，一律按 `enabled: true` 处理。等于「读不到设置」就替用户做了同意的决定——这既不合规，也不是用户以为自己做的选择。
 
 - [`store.rs`](src-tauri/src/telemetry/store.rs)：缺省改为「未同意」（`PersistedState::default()`）。已存在且明确开启过的设置不受影响，遥测由用户在设置里自己打开。
+
 - [`store_test.rs`](src-tauri/src/telemetry/store_test.rs)（新）：1 个用例守住默认值——默认未同意。
 
 ### 优化
 
 #### Java 搜索每次都全盘重扫
+
 找 Java 走的是全盘扫描：遍历所有盘符、用户目录、启动器目录，按关键词匹配。这一步在全盘 SSD 上也要几秒，机械盘或文件多的时候能到十几秒。而它每次切到 Java 页、每次启动都要跑一遍——候选路径几乎不变，重扫纯属浪费。
 
 - [`candidate_cache.rs`](src-tauri/src/minecraft/java/search/candidate_cache.rs)（新）：把扫到的候选路径缓存到 `cache/java/candidate_cache.json`。命中要求三条同时成立——额外搜索路径指纹一致、未过期（30 分钟）、缓存里的可执行文件都还在。用户卸载了某个 Java 就会因「死路径」立即作废重扫。
-- **空结果不写缓存**：「一个 Java 都没找到」多半是环境问题（权限、临时盘未挂载），把它记住半小时只会让人以为搜索坏了。
-- [`platform.rs`](src-tauri/src/minecraft/java/search/platform.rs)：进入 `collect_java_candidates` 先查缓存，未命中才扫描，扫完写回。
-- [`candidate_cache_test.rs`](src-tauri/src/minecraft/java/search/candidate_cache_test.rs)（新）：4 个用例——路径指纹与顺序无关、忽略重复与大小写、过期判定、有死路径即失效。
 
+- **空结果不写缓存**：「一个 Java 都没找到」多半是环境问题（权限、临时盘未挂载），把它记住半小时只会让人以为搜索坏了。
+
+- [`platform.rs`](src-tauri/src/minecraft/java/search/platform.rs)：进入 `collect_java_candidates` 先查缓存，未命中才扫描，扫完写回。
+
+- [`candidate_cache_test.rs`](src-tauri/src/minecraft/java/search/candidate_cache_test.rs)（新）：4 个用例——路径指纹与顺序无关、忽略重复与大小写、过期判定、有死路径即失效。
 
 ## [0.3.14-rc.1] - 2026-10-28
 
@@ -13008,4 +13110,4 @@ oom_heartbeat\ 心跳上报时房主侧查询在线人数随请求体携带 \pla
 
 ---
 
-*本文档最后更新于 2026-10-26*
+*本文档最后更新于 2026-10-29*
