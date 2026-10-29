@@ -18,6 +18,7 @@ use super::super::credit::ProgressCredit;
 use super::super::edge;
 use super::super::host_profile;
 use super::super::rate_limiter::RateLimiter;
+use super::super::throttle;
 use super::block::{download_block, BlockError};
 use super::schedule::{
     initial_workers, should_grow, should_retire, should_shrink, MAX_WORKERS_PER_FILE,
@@ -237,6 +238,7 @@ pub(crate) async fn download_multi(
     // 监督循环：采样 → 判死 → 收缩/扩容；顺手把位图落盘（几 KB，代价可忽略）
     let mut last_moved = 0_u64;
     let mut idle_windows = 0_usize;
+    let mut throttle_watch = throttle::ThrottleWatch::new();
     loop {
         tokio::time::sleep(SAMPLE_INTERVAL).await;
         if cancel_requested(&args.cancel_flag) {
@@ -338,10 +340,15 @@ pub(crate) async fn download_multi(
             .map(|index| sources[*index].target.load(Ordering::Relaxed))
             .sum();
 
+        // 本窗口被限流过：整体退一档，且这一窗口不扩容
+        let throttled = throttle_watch.tripped();
+
         // 收缩：明显低于均值的源减一条；worker 在下次认领前自行退出
         for index in usable.iter().copied() {
             let current = sources[index].target.load(Ordering::Relaxed);
-            if current > 1 && (should_shrink(rates[index], avg, current) || total_target > share) {
+            if current > 1
+                && (throttled || should_shrink(rates[index], avg, current) || total_target > share)
+            {
                 // 明显慢，或本文件已超出当前份额（别的文件也需要额度）
                 sources[index].target.store(current - 1, Ordering::Relaxed);
                 log_debug!(
@@ -356,7 +363,7 @@ pub(crate) async fn download_multi(
         // 扩容：给本轮最快且明显高于均值的源加一条连接
         if let Some(best) = usable.iter().copied().max_by_key(|index| rates[*index]) {
             let current = sources[best].target.load(Ordering::Relaxed);
-            if should_grow(rates[best], avg, total_target, share) {
+            if !throttled && should_grow(rates[best], avg, total_target, share) {
                 sources[best].target.store(current + 1, Ordering::Relaxed);
                 sources[best].active.fetch_add(1, Ordering::Relaxed);
                 spawn_worker(&mut set, &args, best);

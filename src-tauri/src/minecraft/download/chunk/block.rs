@@ -10,6 +10,7 @@ use tokio::sync::Mutex;
 
 use super::super::mirror_gate;
 use super::super::rate_limiter::RateLimiter;
+use super::super::throttle;
 use super::table::Segment;
 use crate::minecraft::utils::hash::{HashAlgorithm, IncrementalHash};
 
@@ -60,7 +61,10 @@ pub(crate) async fn download_block(
         .send()
         .await
         .map_err(|e| BlockError::Failed(crate::http::request_error_msg(&e)))?;
-    mirror_gate::observe(url, &response);
+    if mirror_gate::observe(url, &response).is_some() {
+        // 被限流了：镜像冷却之外再给监督循环一个「该退一档」的信号
+        throttle::note_throttle();
+    }
     let status = response.status();
     if status == reqwest::StatusCode::OK && segment.start > 0 {
         return Err(BlockError::RangeUnsupported);
