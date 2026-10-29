@@ -30,6 +30,53 @@ fn promote_part(part: &str, final_path: &str) -> Result<(), String> {
         .map_err(|e| format!("替换目标文件失败 {} -> {}: {}", part, final_path, e))
 }
 
+/// 旧文件的备份后缀
+const BACKUP_SUFFIX: &str = ".molaunch-bak";
+
+fn backup_path(final_path: &str) -> String {
+    format!("{}{}", final_path, BACKUP_SUFFIX)
+}
+
+/// 目标已存在时先复制一份备份
+///
+/// 更新时目标文件往往已经存在。直接 rename 覆盖，意味着「新文件有问题」和
+/// 「旧文件没了」会同时发生——备份把这两件事解耦。
+fn stash_existing(final_path: &str) -> Option<String> {
+    if !std::path::Path::new(final_path).is_file() {
+        return None;
+    }
+    let backup = backup_path(final_path);
+    match std::fs::copy(final_path, &backup) {
+        Ok(_) => Some(backup),
+        Err(e) => {
+            // 备份失败不该阻止更新：记一笔继续，最坏情况就是退回原行为
+            log_debug!("[Download] 备份旧文件失败，继续替换: {}", e);
+            None
+        }
+    }
+}
+
+/// 替换成功后丢掉备份
+fn drop_backup(backup: Option<String>) {
+    if let Some(path) = backup {
+        let _ = std::fs::remove_file(&path);
+    }
+}
+
+/// 替换失败时把备份换回去，返回是否恢复成功
+fn restore_backup(backup: Option<String>, final_path: &str) -> bool {
+    let Some(backup) = backup else {
+        return false;
+    };
+    match std::fs::rename(&backup, final_path) {
+        Ok(()) => true,
+        Err(e) => {
+            log_debug!("[Download] 恢复旧文件失败，备份仍在 {}: {}", backup, e);
+            false
+        }
+    }
+}
+
 #[path = "engine.rs"]
 mod engine;
 #[path = "retry.rs"]
@@ -113,9 +160,17 @@ pub async fn download_single(
     match result {
         retry::AttemptOutcome::Done(progress) => {
             // 校验都过了才替换：这一步之前目标路径上什么都没有，出问题也不会留半截文件
+            let stash = stash_existing(&final_path);
             if let Err(e) = promote_part(&part_path, &final_path) {
-                return verify::failed(task, format!("落地替换失败：{}", e));
+                let recovered = restore_backup(stash, &final_path);
+                let hint = if recovered {
+                    "（已恢复替换前的文件）"
+                } else {
+                    ""
+                };
+                return verify::failed(task, format!("落地替换失败：{}{}", e, hint));
             }
+            drop_backup(stash);
             return progress;
         }
         // 半成品还在盘上，下一次同一任务会直接续；这里如实报告而不是「全部源失败」

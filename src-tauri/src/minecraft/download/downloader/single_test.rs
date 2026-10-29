@@ -1,6 +1,6 @@
 //! .part 原子替换单测
 
-use super::promote_part;
+use super::{backup_path, drop_backup, promote_part, restore_backup, stash_existing};
 
 fn temp_path(tag: &str) -> std::path::PathBuf {
     std::env::temp_dir().join(format!("molaunch-single-{}-{}", tag, std::process::id()))
@@ -51,4 +51,48 @@ fn test_promote_part_临时文件不存在时报错() {
         temp_path("missing").to_string_lossy().as_ref(),
     );
     assert!(result.is_err(), "没下完就谈不上替换，必须报错");
+}
+
+#[test]
+fn test_backup_path_加固定后缀() {
+    assert_eq!(backup_path("a/b.jar"), "a/b.jar.molaunch-bak");
+}
+
+#[test]
+fn test_stash_existing_保留旧内容且可恢复() {
+    let target = temp_path("stash");
+    std::fs::write(&target, b"old-version").expect("写旧文件");
+    let stash = stash_existing(target.to_string_lossy().as_ref()).expect("应生成备份");
+    assert!(
+        std::path::Path::new(&stash).exists(),
+        "备份文件必须真的存在"
+    );
+    std::fs::write(&target, b"new-version").expect("模拟替换后的新文件");
+    assert!(restore_backup(
+        Some(stash),
+        target.to_string_lossy().as_ref()
+    ));
+    assert_eq!(
+        std::fs::read(&target).expect("读回"),
+        b"old-version",
+        "恢复的必须是旧内容"
+    );
+    let _ = std::fs::remove_file(&target);
+}
+
+#[test]
+fn test_stash_existing_目标不存在时返回_none() {
+    let missing = temp_path("no-such-file");
+    let _ = std::fs::remove_file(&missing);
+    assert!(stash_existing(missing.to_string_lossy().as_ref()).is_none());
+}
+
+#[test]
+fn test_drop_backup_删掉备份文件() {
+    let target = temp_path("drop");
+    std::fs::write(&target, b"x").expect("写文件");
+    let stash = stash_existing(target.to_string_lossy().as_ref()).expect("应生成备份");
+    drop_backup(Some(stash.clone()));
+    assert!(!std::path::Path::new(&stash).exists(), "提交后不该留备份");
+    let _ = std::fs::remove_file(&target);
 }
