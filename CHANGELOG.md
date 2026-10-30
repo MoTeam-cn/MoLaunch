@@ -4,6 +4,18 @@
 
 ## [Unreleased]
 
+### 修复
+
+#### 安装加载器固定用 Java 8，新版 NeoForge 装出来是坏的
+注入器本身对 Java 要求不高，所以「优先 Java 8」看起来最保险。但注入器在安装过程中会调用 **processors**（AutoRenamingTool 等）去重写 jar，这些工具是按目标版本的 Java 编译的。用 Java 8 跑新版 NeoForge 的 processor，只会得到 UnsupportedClassVersionError，安装产物（`client-<版本>-<patch>-srg.jar`）根本不会生成——而注入器可能照样返回成功，我们随后就把版本目录复制好、报告安装完成。用户拿到的是一个能点启动、进游戏立刻报「Your NeoForge installation is corrupted」的实例。
+
+- [`installer.rs`](src-tauri/src/minecraft/java_selector/installer.rs)：不再固定优先 Java 8。新增 `required_java_major(mc_version)`——新版本号体系（如 26.x）与 1.21+、1.20.5+ 要 Java 21，1.18~1.20.4 要 Java 17，更早的才接受 Java 8。
+- `get_java_for_installer_with` 在达标候选里取**版本最接近**的那个，而不是最高的：够用就行，拿 Java 25 去装 1.12.2 反而会踩模块系统差异。
+- 同版本内优先 64 位、其次优先 **JDK**（processor 可能要用 javap 一类的工具），此前是 JRE 优先。
+- [`shared.rs`](src-tauri/src/minecraft/loaders/shared.rs)：`find_java_for_install` 增加 `mc_version` 参数，找不到达标 Java 时报出明确要求（「安装 26.3 需要 Java 21 或更高版本」），而不是笼统的「Java not found」。
+- [`forge/install.rs`](src-tauri/src/minecraft/loaders/forge/install.rs)、[`neoforge.rs`](src-tauri/src/minecraft/loaders/neoforge.rs)：传入版本号。
+- [`installer_test.rs`](src-tauri/src/minecraft/java_selector/installer_test.rs)（新）：6 个用例覆盖 26.x / 1.21 / 1.20.6 / 1.20.4 / 1.18 / 老版本以及解析失败。
+
 
 ## [0.3.14-rc.2] - 2026-10-29
 
@@ -13111,13 +13123,4 @@ oom_heartbeat\ 心跳上报时房主侧查询在线人数随请求体携带 \pla
 ---
 
 *本文档最后更新于 2026-10-29*
-#### 安装加载器固定用 Java 8，新版 NeoForge 装出来是坏的
-注入器本身对 Java 要求不高，所以「优先 Java 8」看起来最保险。但注入器在安装过程中会调用 **processors**（AutoRenamingTool 等）去重写 jar，这些工具是按目标版本的 Java 编译的。用 Java 8 跑新版 NeoForge 的 processor，只会得到 UnsupportedClassVersionError，安装产物（`client-<版本>-<patch>-srg.jar`）根本不会生成——而注入器可能照样返回成功，我们随后就把版本目录复制好、报告安装完成。用户拿到的是一个能点启动、进游戏立刻报「Your NeoForge installation is corrupted」的实例。
-
-- [`installer.rs`](src-tauri/src/minecraft/java_selector/installer.rs)：不再固定优先 Java 8。新增 `required_java_major(mc_version)`——新版本号体系（如 26.x）与 1.21+、1.20.5+ 要 Java 21，1.18~1.20.4 要 Java 17，更早的才接受 Java 8。
-- `get_java_for_installer_with` 在达标候选里取**版本最接近**的那个，而不是最高的：够用就行，拿 Java 25 去装 1.12.2 反而会踩模块系统差异。
-- 同版本内优先 64 位、其次优先 **JDK**（processor 可能要用 javap 一类的工具），此前是 JRE 优先。
-- [`shared.rs`](src-tauri/src/minecraft/loaders/shared.rs)：`find_java_for_install` 增加 `mc_version` 参数，找不到达标 Java 时报出明确要求（「安装 26.3 需要 Java 21 或更高版本」），而不是笼统的「Java not found」。
-- [`forge/install.rs`](src-tauri/src/minecraft/loaders/forge/install.rs)、[`neoforge.rs`](src-tauri/src/minecraft/loaders/neoforge.rs)：传入版本号。
-- [`installer_test.rs`](src-tauri/src/minecraft/java_selector/installer_test.rs)（新）：6 个用例覆盖 26.x / 1.21 / 1.20.6 / 1.20.4 / 1.18 / 老版本以及解析失败。
 
