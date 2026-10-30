@@ -1,6 +1,6 @@
 //! Shared utilities for loader installation
 
-use crate::{log_error, log_info, log_warn};
+use crate::{log_debug, log_error, log_info, log_warn};
 use std::path::{Path, PathBuf};
 
 use crate::minecraft::download::config::DownloadManagerConfig;
