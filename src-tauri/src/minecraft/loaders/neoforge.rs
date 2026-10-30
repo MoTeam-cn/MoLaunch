@@ -306,6 +306,16 @@ pub async fn install(
 
     shared::copy_generated_version_json(game_dir, mc_version, &version_id, "neoforge");
 
+    // 装完回头核对：注入器返回 0 不等于装好了，
+    // processor 失败可能不影响退出码，产物却没生成。
+    let installed_json = game_dir
+        .join("versions")
+        .join(&version_id)
+        .join(format!("{}.json", &version_id));
+    if let Err(reason) = super::artifact_check::check_install(game_dir, &installed_json) {
+        return Err(anyhow::anyhow!(reason));
+    }
+
     if let Some(ref cb) = progress_callback {
         cb(90.0);
     }

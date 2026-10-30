@@ -6,6 +6,15 @@
 
 ### 修复
 
+#### 注入器返回成功就当装好了，缺了 processor 产物也不报错
+注入器退出码为 0，只说明它的主流程走完了，不代表那些 processors 都成功了。它们生成的 `client-<版本>-<patch>-srg.jar` 这类文件任何下载源都拿不到，缺了它游戏能启动、但进世界前就会报安装损坏——离现场已经很远。安装结束必须回头核对一遍盘上的文件。
+
+- [`artifact_check.rs`](src-tauri/src/minecraft/loaders/artifact_check.rs)（新）：`required_library_files` 从版本 JSON 里取出所有应存在的库——有 `downloads.artifact.path` 就用它，没有就按 Maven 坐标推路径（processor 产物正是后者，它们的条目通常不带下载地址）；`natives` 走 classifier，不在这一步判。
+- `is_processor_artifact` 认 `:srg` / `:extra` / `:patched` / `:slim` 四类：这些只能由本地 processor 生成，缺失即致命。
+- `check_install` 把这两类分开处理：processor 产物缺失直接失败，并说明常见原因（Java 版本与游戏版本不匹配、临时目录无写权限）与下一步（确认 Java 21 后重试）；普通库缺失只记 warn，避免可选库把安装误判成失败。
+- [`neoforge.rs`](src-tauri/src/minecraft/loaders/neoforge.rs)、[`forge/install.rs`](src-tauri/src/minecraft/loaders/forge/install.rs)：复制完版本 JSON 后立即校验，失败就直接返回错误，不再往下报告安装完成。
+- [`artifact_check_test.rs`](src-tauri/src/minecraft/loaders/artifact_check_test.rs)（新）：5 个用例覆盖坐标推路径、声明的下载路径优先、跳过 natives、空文档不 panic、四类产物识别。
+
 #### 安装加载器固定用 Java 8，新版 NeoForge 装出来是坏的
 注入器本身对 Java 要求不高，所以「优先 Java 8」看起来最保险。但注入器在安装过程中会调用 **processors**（AutoRenamingTool 等）去重写 jar，这些工具是按目标版本的 Java 编译的。用 Java 8 跑新版 NeoForge 的 processor，只会得到 UnsupportedClassVersionError，安装产物（`client-<版本>-<patch>-srg.jar`）根本不会生成——而注入器可能照样返回成功，我们随后就把版本目录复制好、报告安装完成。用户拿到的是一个能点启动、进游戏立刻报「Your NeoForge installation is corrupted」的实例。
 
