@@ -47,6 +47,16 @@ pub fn find_java_for_install(_game_dir: &Path, mc_version: &str) -> anyhow::Resu
     ))
 }
 
+/// 安装前把 Java 检查做完
+///
+/// 这一步只是把「Java 不达标」提前暴露：加载器安装包动辄几十兆，
+/// 等下载完、跑到安装器那一步才报错，用户白等一场。
+pub fn preflight_install_java(mc_version: &str) -> anyhow::Result<()> {
+    let java_path = find_java_for_install(Path::new(""), mc_version)?;
+    log_info!("[Install] Java 预检通过，安装器将使用: {}", java_path);
+    Ok(())
+}
+
 /// Convert Maven coordinate to local file path
 pub fn maven_path_to_local(maven_path: &str, game_dir: &Path) -> PathBuf {
     crate::minecraft::utils::maven::maven_to_local_path(maven_path, game_dir)

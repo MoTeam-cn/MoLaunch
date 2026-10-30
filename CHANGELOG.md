@@ -6,6 +6,12 @@
 
 ### 修复
 
+#### 装加载器时 Java 不达标，等下载完才报错
+加载器安装包几十兆，Java 检查却排在下完安装包之后。用户等完下载、进度条走到一半，才看到「需要 Java 21」。
+
+- [`api.rs`](src-tauri/src/minecraft/loaders/api.rs)：`install_loader` 入口先做 Java 预检，只对 Forge / NeoForge 生效（只有它们要跑 processors，Fabric 与 OptiFine 不需要挑版本）。
+- [`shared.rs`](src-tauri/src/minecraft/loaders/shared.rs)：新增 `preflight_install_java`，把「找不到达标 Java」提前到下载之前暴露。
+
 #### 注入器返回成功就当装好了，缺了 processor 产物也不报错
 注入器退出码为 0，只说明它的主流程走完了，不代表那些 processors 都成功了。它们生成的 `client-<版本>-<patch>-srg.jar` 这类文件任何下载源都拿不到，缺了它游戏能启动、但进世界前就会报安装损坏——离现场已经很远。安装结束必须回头核对一遍盘上的文件。
 

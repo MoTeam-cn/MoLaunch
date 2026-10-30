@@ -60,6 +60,11 @@ pub async fn install_loader(
     progress_callback: Option<Arc<dyn Fn(f64) + Send + Sync>>,
     config: &DownloadManagerConfig,
 ) -> anyhow::Result<()> {
+    // 只有这两类要跑 processors，才挑 Java 版本；Fabric/OptiFine 不需要
+    if matches!(loader_type, LoaderType::Forge | LoaderType::NeoForge) {
+        super::shared::preflight_install_java(mc_version)?;
+    }
+
     match loader_type {
         LoaderType::Forge => {
             super::forge::install(
