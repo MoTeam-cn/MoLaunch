@@ -8,13 +8,23 @@ use crate::minecraft::download::manager::DownloadManager;
 use crate::minecraft::download::types::{DownloadStatus, DownloadTask};
 use crate::minecraft::sources;
 
-/// Find Java for installation (minimum Java 8u60)
-pub fn find_java_for_install(_game_dir: &Path) -> anyhow::Result<String> {
+/// 找一个能跑安装器（含 processors）的 Java
+///
+/// 最低版本由目标 MC 版本决定：新版 Forge/NeoForge 的 processors 是
+/// 按 Java 21 编译的，用 Java 8 跑只会让产物生成失败而安装器未必报错。
+pub fn find_java_for_install(_game_dir: &Path, mc_version: &str) -> anyhow::Result<String> {
+    let min_major = super::super::java_selector::required_java_major(mc_version);
     let java_list = super::super::java::search_java();
 
     if !java_list.is_empty() {
-        if let Some(java_path) = super::super::java_selector::get_java_for_installer(&java_list) {
-            log_info!("[Java] 使用自动检测的 Java: {}", java_path);
+        if let Some(java_path) =
+            super::super::java_selector::get_java_for_installer_with(&java_list, min_major)
+        {
+            log_info!(
+                "[Java] 使用自动检测的 Java 安装加载器: {}（要求 Java {}+）",
+                java_path,
+                min_major
+            );
             return Ok(java_path);
         }
     }
@@ -30,7 +40,10 @@ pub fn find_java_for_install(_game_dir: &Path) -> anyhow::Result<String> {
     }
 
     Err(anyhow::anyhow!(
-        "Java not found. Please install Java 8+ to install Forge/NeoForge."
+        "安装 {} 需要 Java {} 或更高版本，但没有找到合适的 Java。请先在「设置 → Java」中安装或选择一个 Java {} 后重试。",
+        mc_version,
+        min_major,
+        min_major
     ))
 }
 

@@ -124,7 +124,7 @@ async fn install_modern(
         cb(40.0);
     }
 
-    let java_path = shared::find_java_for_install(game_dir)?;
+    let java_path = shared::find_java_for_install(game_dir, mc_version)?;
 
     if let Some(ref cb) = progress_callback {
         cb(50.0);

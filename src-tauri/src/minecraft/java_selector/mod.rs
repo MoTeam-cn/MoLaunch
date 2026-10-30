@@ -14,7 +14,7 @@ mod tests;
 
 // 重新导出公共 API，保持 `crate::minecraft::java_selector::*` 路径稳定
 pub use compat::{check_java_compatible, describe_java_requirement};
-pub use installer::get_java_for_installer;
+pub use installer::{get_java_for_installer, get_java_for_installer_with, required_java_major};
 pub use rules::{
     check_loader_java_compat, get_java_version_range, get_mojang_java_requirement,
     get_recommended_java_version, get_required_java_version, java_too_new_warning,
