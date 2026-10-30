@@ -18,6 +18,9 @@ const PROCESSOR_TIMEOUT_SECS: u64 = 600;
 /// 报错时回看的日志行数
 const LOG_TAIL_LINES: usize = 10;
 
+/// 单个 processor 的尝试次数：偶发失败（磁盘抖动、临时占用）重试一次往往就过
+const PROCESSOR_ATTEMPTS: usize = 2;
+
 /// 一个待执行的 processor
 pub(crate) struct PlannedProcessor {
     /// 日志里显示的名字（jar 坐标）
@@ -225,6 +228,57 @@ fn log_tail(path: &Path) -> String {
     lines.join("\n")
 }
 
+/// 这一步是不是「联网下载 mojang 映射」
+///
+/// 它需要访问官方映射地址，失败不代表安装坏了——启动器在安装前已经用
+/// 自己的下载器把映射备好（支持多源重试）。所以这步失败只记警告。
+pub(crate) fn is_mojmaps_step(step: &PlannedProcessor) -> bool {
+    step.arguments
+        .iter()
+        .any(|argument| argument.contains("DOWNLOAD_MOJMAPS"))
+}
+
+/// 跑一个 processor，输出落到独立日志文件
+fn run_one(
+    java_path: &str,
+    step: &PlannedProcessor,
+    log_dir: &Path,
+    index: usize,
+    attempt: usize,
+) -> anyhow::Result<()> {
+    let main_class = read_main_class(&step.jar)?;
+    let mut classpath_entries = step.classpath.clone();
+    classpath_entries.push(step.jar.clone());
+    let classpath = std::env::join_paths(&classpath_entries)
+        .map_err(|e| anyhow::anyhow!("classpath 拼接失败: {}", e))?;
+
+    let log_path = log_dir.join(format!("processor-{}-{}.log", index, attempt));
+    let log_file = std::fs::File::create(&log_path)?;
+    let log_clone = log_file.try_clone()?;
+
+    let mut child = std::process::Command::new(java_path)
+        .arg("-cp")
+        .arg(&classpath)
+        .arg(&main_class)
+        .args(&step.arguments)
+        .stdin(Stdio::null())
+        .stdout(Stdio::from(log_file))
+        .stderr(Stdio::from(log_clone))
+        .spawn()?;
+    let status = wait_with_timeout(&mut child, Duration::from_secs(PROCESSOR_TIMEOUT_SECS))
+        .map_err(|e| anyhow::anyhow!("processor {} {}", step.label, e))?;
+    if !status.success() {
+        return Err(anyhow::anyhow!(
+            "processor {} 执行失败（退出码 {:?}），日志末尾：\n{}\n完整日志：{}",
+            step.label,
+            status.code(),
+            log_tail(&log_path),
+            log_path.display()
+        ));
+    }
+    Ok(())
+}
+
 /// 依次执行，产物齐的步骤跳过；返回实际执行的步数
 ///
 /// `on_progress` 收到「已完成步数 / 总步数」，让上层能把进度条往前推：
@@ -246,44 +300,42 @@ pub(crate) fn run_planned_processors(
             }
             continue;
         }
-        let main_class = read_main_class(&step.jar)?;
-        let mut classpath_entries = step.classpath.clone();
-        classpath_entries.push(step.jar.clone());
-        let classpath = std::env::join_paths(&classpath_entries)
-            .map_err(|e| anyhow::anyhow!("classpath 拼接失败: {}", e))?;
-
-        let log_path = log_dir.join(format!("processor-{}-{}.log", index, executed));
-        let log_file = std::fs::File::create(&log_path)?;
-        let log_clone = log_file.try_clone()?;
 
         crate::log_info!(
-            "[Processor] 执行第 {}/{} 步 {}（日志 {}）",
+            "[Processor] 执行第 {}/{} 步 {}",
             index + 1,
             total,
-            step.label,
-            log_path.display()
+            step.label
         );
-        let mut child = std::process::Command::new(java_path)
-            .arg("-cp")
-            .arg(&classpath)
-            .arg(&main_class)
-            .args(&step.arguments)
-            .stdin(Stdio::null())
-            .stdout(Stdio::from(log_file))
-            .stderr(Stdio::from(log_clone))
-            .spawn()?;
-        let status = wait_with_timeout(&mut child, Duration::from_secs(PROCESSOR_TIMEOUT_SECS))
-            .map_err(|e| anyhow::anyhow!("processor {} {}", step.label, e))?;
-        if !status.success() {
-            return Err(anyhow::anyhow!(
-                "processor {} 执行失败（退出码 {:?}），日志末尾：\n{}\n完整日志：{}",
-                step.label,
-                status.code(),
-                log_tail(&log_path),
-                log_path.display()
-            ));
+        let mut attempt = 1;
+        let outcome = loop {
+            match run_one(java_path, step, &log_dir, index, attempt) {
+                Ok(()) => break Ok(()),
+                Err(error) if attempt < PROCESSOR_ATTEMPTS => {
+                    crate::log_warn!(
+                        "[Processor] {} 第 {} 次失败，重试：{}",
+                        step.label,
+                        attempt,
+                        error
+                    );
+                    attempt += 1;
+                }
+                Err(error) => break Err(error),
+            }
+        };
+        match outcome {
+            Ok(()) => executed += 1,
+            Err(error) => {
+                if is_mojmaps_step(step) {
+                    crate::log_warn!(
+                        "[Processor] 映射下载步骤失败，跳过（映射已由启动器预下载）：{}",
+                        error
+                    );
+                } else {
+                    return Err(error);
+                }
+            }
         }
-        executed += 1;
         if let Some(callback) = on_progress {
             callback(index + 1, total);
         }

@@ -203,11 +203,43 @@ async fn install_modern(
             Err(e) => log_warn!("[Forge] 补全库失败，保留原始错误: {}", e),
         }
     }
+    // 执行器介入时把进度从 80% 推到 90%
+    let processor_progress = |done: usize, total: usize| {
+        if let Some(callback) = progress_callback.as_ref() {
+            if total > 0 {
+                callback(80.0 + (done as f64 / total as f64) * 10.0);
+            }
+        }
+    };
+
     if let Err(error) = install_result {
-        return Err(match first_error_message {
-            Some(first) => anyhow::anyhow!("{}；补全库重试前的错误：{}", error, first),
-            None => error,
-        });
+        let message = match first_error_message {
+            Some(first) => format!("{}；补全库重试前的错误：{}", error, first),
+            None => error.to_string(),
+        };
+        log_warn!(
+            "[Install] 注入器失败，改由启动器执行 processors: {}",
+            message
+        );
+        match super::super::processor_run::run_from_installer(
+            &java_path,
+            installer_path,
+            mc_version,
+            game_dir,
+            Some(&processor_progress),
+        ) {
+            Ok(ran) if ran > 0 => {
+                log_info!("[Install] 自行执行 {} 个 processor，继续后续校验", ran)
+            }
+            Ok(_) => return Err(anyhow::anyhow!(message)),
+            Err(runner_error) => {
+                return Err(anyhow::anyhow!(
+                    "{}；自行执行 processors 也失败：{}",
+                    message,
+                    runner_error
+                ))
+            }
+        }
     }
     if let Some(ref cb) = progress_callback {
         cb(80.0);
@@ -230,7 +262,7 @@ async fn install_modern(
             installer_path,
             mc_version,
             game_dir,
-            None::<&dyn Fn(usize, usize)>,
+            Some(&processor_progress),
         ) {
             Ok(0) => return Err(anyhow::anyhow!(reason)),
             Ok(ran) => log_info!("[Install] 自行执行 {} 个 processor，重新校验", ran),

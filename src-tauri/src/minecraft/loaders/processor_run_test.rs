@@ -2,7 +2,10 @@
 
 use serde_json::json;
 
-use super::{outputs_of, plan_client_processors};
+use super::{
+    is_mojmaps_step, outputs_of, plan_client_processors, read_main_class, PlannedProcessor,
+};
+use std::path::PathBuf;
 
 fn args(items: &[&str]) -> Vec<String> {
     items.iter().map(|item| item.to_string()).collect()
@@ -79,4 +82,40 @@ fn test_plan_client_processors_空profile返回空() {
 fn test_plan_client_processors_缺少jar字段时报错() {
     let profile = json!({ "processors": [{ "args": ["--task", "x"] }] });
     assert!(plan_client_processors(&profile, std::path::Path::new("C:/mc"), "26.3").is_err());
+}
+
+fn sample_processor(arguments: &[&str]) -> PlannedProcessor {
+    PlannedProcessor {
+        label: "net.neoforged:installertools:1.0".to_string(),
+        jar: PathBuf::from("C:/mc/x.jar"),
+        classpath: Vec::new(),
+        arguments: args(arguments),
+        outputs: Vec::new(),
+    }
+}
+
+#[test]
+fn test_is_mojmaps_step_认得下载映射那一步() {
+    assert!(is_mojmaps_step(&sample_processor(&[
+        "--task",
+        "DOWNLOAD_MOJMAPS"
+    ])));
+    assert!(!is_mojmaps_step(&sample_processor(&["--task", "MERGE"])));
+}
+
+#[test]
+fn test_read_main_class_文件不存在时返回错误() {
+    let result = read_main_class(std::path::Path::new("C:/definitely/not/here.jar"));
+    assert!(result.is_err(), "缺文件要报错，不能静默返回空主类");
+}
+
+#[test]
+fn test_read_main_class_不是_zip_时返回错误() {
+    let dir = std::env::temp_dir().join("molaunch-processor-test");
+    std::fs::create_dir_all(&dir).ok();
+    let path = dir.join("not-a-zip.jar");
+    std::fs::write(&path, b"just plain text, not a zip").ok();
+    let result = read_main_class(&path);
+    assert!(result.is_err());
+    std::fs::remove_file(&path).ok();
 }
