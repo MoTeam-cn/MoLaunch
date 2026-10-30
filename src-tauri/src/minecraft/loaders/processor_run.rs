@@ -236,7 +236,7 @@ pub(crate) fn run_planned_processors(
 ) -> anyhow::Result<usize> {
     let total = planned.len();
     let mut executed = 0;
-    let log_dir = crate::storage::cache::ensure_dir("processor_logs")?;
+    let log_dir = crate::utils::cache::ensure_dir("processor_logs")?;
 
     for (index, step) in planned.iter().enumerate() {
         if !step.outputs.is_empty() && step.outputs.iter().all(|path| path.is_file()) {
