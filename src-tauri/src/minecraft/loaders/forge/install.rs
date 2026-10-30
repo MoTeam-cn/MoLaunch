@@ -226,7 +226,7 @@ async fn install_modern(
         // 注入器没把产物生成齐：用自己的执行器补一次
         log_warn!("[Install] 产物不齐，改由启动器执行 processors: {}", reason);
         match super::super::processor_run::run_from_installer(
-            java_path,
+            &java_path,
             installer_path,
             mc_version,
             game_dir,
