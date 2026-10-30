@@ -6,13 +6,17 @@
 
 use std::path::{Path, PathBuf};
 use std::process::Stdio;
+use std::time::{Duration, Instant};
 
 use serde_json::Value;
 
 use super::processor_args::{resolve_arguments, ProcessorContext};
 
-/// processor 输出里回看的行数，用于报错
-const STDERR_TAIL_LINES: usize = 8;
+/// 单个 processor 的超时。改写整个 jar 也就几分钟，超过这个数基本是卡死了
+const PROCESSOR_TIMEOUT_SECS: u64 = 600;
+
+/// 报错时回看的日志行数
+const LOG_TAIL_LINES: usize = 10;
 
 /// 一个待执行的 processor
 pub(crate) struct PlannedProcessor {
@@ -28,18 +32,30 @@ pub(crate) struct PlannedProcessor {
     pub outputs: Vec<PathBuf>,
 }
 
-/// 从参数里挑出 `--output` / `--outputs` 声明的产物路径
+/// 从参数里挑出产物路径
+///
+/// `--output` 后面只跟一个；`--outputs` 后面可以跟一串，直到下一个选项为止。
+/// 早先只取紧跟的第一个，导致多输出步骤被误判成「产物齐了」而整步跳过。
 pub(crate) fn outputs_of(arguments: &[String]) -> Vec<PathBuf> {
     let mut outputs = Vec::new();
     let mut index = 0;
-    while index + 1 < arguments.len() {
-        let argument = arguments[index].as_str();
-        if argument == "--output" || argument == "--outputs" {
-            outputs.push(PathBuf::from(&arguments[index + 1]));
-            index += 2;
-            continue;
+    while index < arguments.len() {
+        match arguments[index].as_str() {
+            "--output" => {
+                if let Some(value) = arguments.get(index + 1) {
+                    outputs.push(PathBuf::from(value));
+                }
+                index += 2;
+            }
+            "--outputs" => {
+                index += 1;
+                while index < arguments.len() && !arguments[index].starts_with("--") {
+                    outputs.push(PathBuf::from(&arguments[index]));
+                    index += 1;
+                }
+            }
+            _ => index += 1,
         }
-        index += 1;
     }
     outputs
 }
@@ -49,11 +65,14 @@ fn coordinate_to_path(coordinate: &str, game_dir: &Path) -> PathBuf {
 }
 
 /// 按 install_profile 排出 client 侧要跑的 processor
+///
+/// 缺 processor jar 直接报错：那说明依赖基础就不完整，跳过只会让安装
+/// 「看起来成功」却少跑一步。
 pub(crate) fn plan_client_processors(
     profile: &Value,
     game_dir: &Path,
     version: &str,
-) -> Vec<PlannedProcessor> {
+) -> anyhow::Result<Vec<PlannedProcessor>> {
     let data = profile_data(profile);
     let minecraft_jar = game_dir
         .join("versions")
@@ -68,7 +87,7 @@ pub(crate) fn plan_client_processors(
         data: &data,
     };
     let Some(processors) = profile.get("processors").and_then(|value| value.as_array()) else {
-        return Vec::new();
+        return Ok(Vec::new());
     };
 
     let mut planned = Vec::new();
@@ -82,15 +101,17 @@ pub(crate) fn plan_client_processors(
             continue;
         }
         let Some(jar_coordinate) = processor.get("jar").and_then(|value| value.as_str()) else {
-            continue;
+            return Err(anyhow::anyhow!(
+                "install_profile 里有个 processor 没声明 jar，无法执行"
+            ));
         };
         let jar = coordinate_to_path(jar_coordinate, game_dir);
         if !jar.is_file() {
-            crate::log_warn!(
-                "[Processor] 缺少 processor jar: {}，跳过这一步",
+            return Err(anyhow::anyhow!(
+                "缺少 processor jar：{}（{}）。安装器需要的库没下全，请重试安装。",
+                jar_coordinate,
                 jar.display()
-            );
-            continue;
+            ));
         }
         let classpath: Vec<PathBuf> = processor
             .get("classpath")
@@ -123,7 +144,7 @@ pub(crate) fn plan_client_processors(
             outputs,
         });
     }
-    planned
+    Ok(planned)
 }
 
 /// install_profile 的 data 表，按 client 侧取值
@@ -174,15 +195,55 @@ fn read_main_class(jar_path: &Path) -> anyhow::Result<String> {
     ))
 }
 
+/// 等子进程结束，超时就杀掉
+fn wait_with_timeout(
+    child: &mut std::process::Child,
+    timeout: Duration,
+) -> anyhow::Result<std::process::ExitStatus> {
+    let started = Instant::now();
+    loop {
+        if let Some(status) = child.try_wait()? {
+            return Ok(status);
+        }
+        if started.elapsed() > timeout {
+            let _ = child.kill();
+            let _ = child.wait();
+            return Err(anyhow::anyhow!(
+                "超过 {} 秒仍未结束，已强制终止",
+                timeout.as_secs()
+            ));
+        }
+        std::thread::sleep(Duration::from_millis(200));
+    }
+}
+
+/// 读日志文件末尾若干行
+fn log_tail(path: &Path) -> String {
+    let content = std::fs::read_to_string(path).unwrap_or_default();
+    let mut lines: Vec<&str> = content.lines().rev().take(LOG_TAIL_LINES).collect();
+    lines.reverse();
+    lines.join("\n")
+}
+
 /// 依次执行，产物齐的步骤跳过；返回实际执行的步数
+///
+/// `on_progress` 收到「已完成步数 / 总步数」，让上层能把进度条往前推：
+/// 几分钟的重写过程不该让界面看起来像卡死了。
 pub(crate) fn run_planned_processors(
     java_path: &str,
     planned: &[PlannedProcessor],
+    on_progress: Option<&dyn Fn(usize, usize)>,
 ) -> anyhow::Result<usize> {
+    let total = planned.len();
     let mut executed = 0;
-    for step in planned {
+    let log_dir = crate::storage::cache::ensure_dir("processor_logs")?;
+
+    for (index, step) in planned.iter().enumerate() {
         if !step.outputs.is_empty() && step.outputs.iter().all(|path| path.is_file()) {
             crate::log_debug!("[Processor] {} 产物已在，跳过", step.label);
+            if let Some(callback) = on_progress {
+                callback(index + 1, total);
+            }
             continue;
         }
         let main_class = read_main_class(&step.jar)?;
@@ -191,32 +252,41 @@ pub(crate) fn run_planned_processors(
         let classpath = std::env::join_paths(&classpath_entries)
             .map_err(|e| anyhow::anyhow!("classpath 拼接失败: {}", e))?;
 
+        let log_path = log_dir.join(format!("processor-{}-{}.log", index, executed));
+        let log_file = std::fs::File::create(&log_path)?;
+        let log_clone = log_file.try_clone()?;
+
         crate::log_info!(
-            "[Processor] 执行 {} 个参数（{}）",
-            step.arguments.len(),
-            step.label
+            "[Processor] 执行第 {}/{} 步 {}（日志 {}）",
+            index + 1,
+            total,
+            step.label,
+            log_path.display()
         );
-        let output = std::process::Command::new(java_path)
+        let mut child = std::process::Command::new(java_path)
             .arg("-cp")
             .arg(&classpath)
             .arg(&main_class)
             .args(&step.arguments)
             .stdin(Stdio::null())
-            .stdout(Stdio::piped())
-            .stderr(Stdio::piped())
-            .output()?;
-        if !output.status.success() {
-            let stderr = String::from_utf8_lossy(&output.stderr);
-            let mut tail: Vec<&str> = stderr.lines().rev().take(STDERR_TAIL_LINES).collect();
-            tail.reverse();
+            .stdout(Stdio::from(log_file))
+            .stderr(Stdio::from(log_clone))
+            .spawn()?;
+        let status = wait_with_timeout(&mut child, Duration::from_secs(PROCESSOR_TIMEOUT_SECS))
+            .map_err(|e| anyhow::anyhow!("processor {} {}", step.label, e))?;
+        if !status.success() {
             return Err(anyhow::anyhow!(
-                "processor {} 执行失败（退出码 {:?}）：\n{}",
+                "processor {} 执行失败（退出码 {:?}），日志末尾：\n{}\n完整日志：{}",
                 step.label,
-                output.status.code(),
-                tail.join("\n")
+                status.code(),
+                log_tail(&log_path),
+                log_path.display()
             ));
         }
         executed += 1;
+        if let Some(callback) = on_progress {
+            callback(index + 1, total);
+        }
     }
     crate::log_info!("[Processor] 实际执行 {} 个 processor", executed);
     Ok(executed)
@@ -228,6 +298,7 @@ pub(crate) fn run_from_installer(
     installer_path: &Path,
     mc_version: &str,
     game_dir: &Path,
+    on_progress: Option<&dyn Fn(usize, usize)>,
 ) -> anyhow::Result<usize> {
     let file = std::fs::File::open(installer_path)?;
     let mut archive = zip::ZipArchive::new(file)?;
@@ -237,8 +308,8 @@ pub(crate) fn run_from_installer(
         std::io::Read::read_to_string(&mut entry, &mut content)?;
     }
     let profile: Value = serde_json::from_str(&content)?;
-    let planned = plan_client_processors(&profile, game_dir, mc_version);
-    run_planned_processors(java_path, &planned)
+    let planned = plan_client_processors(&profile, game_dir, mc_version)?;
+    run_planned_processors(java_path, &planned, on_progress)
 }
 
 #[cfg(test)]

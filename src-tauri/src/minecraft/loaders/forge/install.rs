@@ -230,6 +230,7 @@ async fn install_modern(
             installer_path,
             mc_version,
             game_dir,
+            None::<&dyn Fn(usize, usize)>,
         ) {
             Ok(0) => return Err(anyhow::anyhow!(reason)),
             Ok(ran) => log_info!("[Install] 自行执行 {} 个 processor，重新校验", ran),

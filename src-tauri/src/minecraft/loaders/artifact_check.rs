@@ -11,20 +11,31 @@ use serde_json::Value;
 
 use super::shared::maven_path_to_local;
 
-/// 是否是 processor 生成的产物（本地生成，下载源没有）
-pub(crate) fn is_processor_artifact(name: &str) -> bool {
-    let lower = name.to_ascii_lowercase();
-    lower.contains(":srg")
-        || lower.contains(":extra")
-        || lower.contains(":patched")
-        || lower.contains(":slim")
+/// 一个应当存在的库文件
+pub(crate) struct LibraryFile {
+    pub name: String,
+    pub path: PathBuf,
+    /// 只能由本地 processor 生成（没有下载地址）
+    pub generated: bool,
+}
+
+/// 这个条目的文件只能本地生成吗
+///
+/// 判据是**有没有下载地址**，不是猜名字。早先用 `:srg` 之类的后缀判断，
+/// 换个命名就漏判，缺文件从「致命」降级成「只记警告」。
+pub(crate) fn is_locally_generated(library: &Value) -> bool {
+    library
+        .get("downloads")
+        .and_then(|downloads| downloads.get("artifact"))
+        .and_then(|artifact| artifact.get("url"))
+        .and_then(|url| url.as_str())
+        .is_none()
 }
 
 /// 从 version JSON 里取出所有应当存在的库文件
 ///
-/// 有 `downloads.artifact.path` 就用它，没有就按 Maven 坐标推路径——
-/// processor 产物属于后者，它们的 JSON 条目通常不带下载地址。
-pub(crate) fn required_library_files(doc: &Value, game_dir: &Path) -> Vec<(String, PathBuf)> {
+/// 有 `downloads.artifact.path` 就用它，没有就按 Maven 坐标推路径。
+pub(crate) fn required_library_files(doc: &Value, game_dir: &Path) -> Vec<LibraryFile> {
     let mut files = Vec::new();
     let Some(libraries) = doc.get("libraries").and_then(|value| value.as_array()) else {
         return files;
@@ -46,7 +57,11 @@ pub(crate) fn required_library_files(doc: &Value, game_dir: &Path) -> Vec<(Strin
             Some(relative) => game_dir.join(relative),
             None => maven_path_to_local(name, game_dir),
         };
-        files.push((name.to_string(), path));
+        files.push(LibraryFile {
+            name: name.to_string(),
+            path,
+            generated: is_locally_generated(library),
+        });
     }
     files
 }
@@ -54,7 +69,7 @@ pub(crate) fn required_library_files(doc: &Value, game_dir: &Path) -> Vec<(Strin
 /// 校验一次安装的结果
 ///
 /// 返回「缺失但不算致命」的库名，供调用方记录。
-/// processor 产物缺失视为致命：那种缺口只会在启动时报出来，离安装现场太远。
+/// 本地生成的文件缺失视为致命：那种缺口只会在启动时报出来，离安装现场太远。
 pub(crate) fn check_install(game_dir: &Path, json_path: &Path) -> Result<Vec<String>, String> {
     let text = std::fs::read_to_string(json_path)
         .map_err(|e| format!("读不到版本 JSON（{}）：{}", json_path.display(), e))?;
@@ -63,14 +78,14 @@ pub(crate) fn check_install(game_dir: &Path, json_path: &Path) -> Result<Vec<Str
 
     let mut fatal: Vec<String> = Vec::new();
     let mut soft: Vec<String> = Vec::new();
-    for (name, path) in required_library_files(&doc, game_dir) {
-        if path.is_file() {
+    for file in required_library_files(&doc, game_dir) {
+        if file.path.is_file() {
             continue;
         }
-        if is_processor_artifact(&name) {
-            fatal.push(format!("{}（{}）", name, path.display()));
+        if file.generated {
+            fatal.push(format!("{}（{}）", file.name, file.path.display()));
         } else {
-            soft.push(name);
+            soft.push(file.name);
         }
     }
 
@@ -84,8 +99,8 @@ pub(crate) fn check_install(game_dir: &Path, json_path: &Path) -> Result<Vec<Str
 
     if !fatal.is_empty() {
         return Err(format!(
-            "安装不完整：缺少 {} 个由 processor 生成的文件（{}）。\
-             这类文件只能由安装器在本地生成，通常是安装器没能跑完 processors——\
+            "安装不完整：缺少 {} 个需要本地生成的文件（{}）。\
+             这类文件没有下载地址，只能由安装器在本地跑 processor 生成——\
              原因多见于 Java 版本与游戏版本不匹配、或临时目录没有写权限。\
              请确认已安装 Java 21 后重试。",
             fatal.len(),

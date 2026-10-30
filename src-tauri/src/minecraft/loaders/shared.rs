@@ -141,7 +141,7 @@ pub fn log_install_processors(
             .unwrap_or_default();
         let resolved = super::processor_args::resolve_arguments(&arguments, &context);
         planned += 1;
-        log_debug!("[Install] processor {} -> {}", jar, resolved.join(" "));
+        log_info!("[Install] processor {} -> {}", jar, resolved.join(" "));
         if resolved.iter().any(|argument| argument.is_empty()) {
             log_warn!(
                 "[Install] processor {} 有参数解析成空值，安装大概率会失败",
