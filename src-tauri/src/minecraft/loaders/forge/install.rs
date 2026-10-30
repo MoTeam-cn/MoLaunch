@@ -223,7 +223,28 @@ async fn install_modern(
         .join(&version_id)
         .join(format!("{}.json", version_id));
     if let Err(reason) = super::super::artifact_check::check_install(game_dir, &installed_json) {
-        return Err(anyhow::anyhow!(reason));
+        // 注入器没把产物生成齐：用自己的执行器补一次
+        log_warn!("[Install] 产物不齐，改由启动器执行 processors: {}", reason);
+        match super::super::processor_run::run_from_installer(
+            java_path,
+            installer_path,
+            mc_version,
+            game_dir,
+        ) {
+            Ok(0) => return Err(anyhow::anyhow!(reason)),
+            Ok(ran) => log_info!("[Install] 自行执行 {} 个 processor，重新校验", ran),
+            Err(error) => {
+                return Err(anyhow::anyhow!(
+                    "{}；自行执行 processors 也失败：{}",
+                    reason,
+                    error
+                ))
+            }
+        }
+        if let Err(reason) = super::super::artifact_check::check_install(game_dir, &installed_json)
+        {
+            return Err(anyhow::anyhow!(reason));
+        }
     }
 
     // Copy MC JAR to Forge version folder

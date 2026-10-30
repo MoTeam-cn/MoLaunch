@@ -21,5 +21,6 @@ mod artifact_check;
 #[cfg(test)]
 mod forge_installer_test;
 mod processor_args;
+mod processor_run;
 
 pub use types::{LoaderType, LoaderVersion};

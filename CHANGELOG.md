@@ -6,6 +6,15 @@
 
 ### 修复
 
+#### 注入器装不齐时，现在由启动器自己把 processors 跑完
+上一版只能在校验失败时报错退出，用户还得重装。现在会自己接手：读安装器里的 `install_profile.json`，按 client 侧顺序执行 processors，跑完重新校验。注入器仍是主路径，自己执行只在它没产出齐的情况下介入——成功的那批用户不受任何影响。
+
+- [`processor_run.rs`](src-tauri/src/minecraft/loaders/processor_run.rs)（新）：`plan_client_processors` 排执行计划（按 `sides` 过滤、jar 不在盘上就跳过该步而不是整体失败），`run_planned_processors` 逐步执行，`read_main_class` 从 processor jar 的 MANIFEST 读主类而不是写死。
+- **增量**：`outputs_of` 抓 `--output` / `--outputs` 声明的产物，全都存在就跳过该步。重装时不必把几分钟的重写流程再跑一遍。
+- 失败时报出退出码与 stderr 末尾 8 行：processor 的报错藏在标准错误里，光看「安装失败」没法定位。
+- [`neoforge.rs`](src-tauri/src/minecraft/loaders/neoforge.rs)、[`forge/install.rs`](src-tauri/src/minecraft/loaders/forge/install.rs)：产物校验失败时调用执行器补跑，补完再校验一次；执行器也失败时把两段原因一起抛出。
+- [`processor_run_test.rs`](src-tauri/src/minecraft/loaders/processor_run_test.rs)（新）：5 个用例覆盖输出声明解析、孤立尾部参数不越界、sides 过滤、空 profile。
+
 #### 安装前把 processor 清单落进日志
 前面那个参数解析模块得先接上真实用途。现在跑安装器之前会读一遍 `install_profile.json`，把 client 侧要执行的 processor 和它解析后的完整命令行写进日志。注入器失败时不再只有一句「请重装」，而是能对照清单看出是哪一步没产出。
 
