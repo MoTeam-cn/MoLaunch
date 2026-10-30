@@ -238,6 +238,10 @@ pub async fn install(
         cb(40.0);
     }
 
+    if let Err(error) = shared::log_install_processors(&installer_path, mc_version, game_dir) {
+        log_warn!("[Install] 读不到 processor 清单: {}", error);
+    }
+
     let java_path = shared::find_java_for_install(game_dir, mc_version)?;
 
     if let Some(ref cb) = progress_callback {

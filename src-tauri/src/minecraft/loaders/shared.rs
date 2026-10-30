@@ -57,6 +57,102 @@ pub fn preflight_install_java(mc_version: &str) -> anyhow::Result<()> {
     Ok(())
 }
 
+/// 读 install_profile.json，把 client 侧要跑的 processors 解析出来记进日志
+///
+/// 这一步不改磁盘，作用是把「安装器接下来该跑哪些 processor、参数长什么样」
+/// 落进日志。注入器失败时它只回一个非零或干脆静默，有了这份清单才能对照
+/// 是哪一步没产出。真正的执行要等处理器执行器接入。
+pub fn log_install_processors(
+    installer_path: &Path,
+    mc_version: &str,
+    game_dir: &Path,
+) -> anyhow::Result<usize> {
+    let file = std::fs::File::open(installer_path)?;
+    let mut archive = zip::ZipArchive::new(file)?;
+    let mut content = String::new();
+    {
+        let mut entry = archive.by_name("install_profile.json")?;
+        std::io::Read::read_to_string(&mut entry, &mut content)?;
+    }
+    let profile: serde_json::Value = serde_json::from_str(&content)?;
+
+    let mut data: std::collections::HashMap<String, String> = std::collections::HashMap::new();
+    if let Some(table) = profile.get("data").and_then(|value| value.as_object()) {
+        for (key, value) in table {
+            let picked = value
+                .as_object()
+                .and_then(|object| object.get("client"))
+                .and_then(|client| client.as_str())
+                .or_else(|| {
+                    value
+                        .as_array()
+                        .and_then(|array| array.first())
+                        .and_then(|first| first.as_str())
+                })
+                .or_else(|| value.as_str());
+            if let Some(picked) = picked {
+                data.insert(key.clone(), picked.to_string());
+            }
+        }
+    }
+
+    let processors = profile
+        .get("processors")
+        .and_then(|value| value.as_array())
+        .cloned()
+        .unwrap_or_default();
+
+    let minecraft_jar = game_dir
+        .join("versions")
+        .join(mc_version)
+        .join(format!("{}.jar", mc_version));
+    let context = super::processor_args::ProcessorContext {
+        game_dir,
+        minecraft_jar: &minecraft_jar,
+        installer: installer_path,
+        binpatch: None,
+        version: mc_version,
+        data: &data,
+    };
+
+    let mut planned = 0usize;
+    for processor in &processors {
+        let runs_on_client = processor
+            .get("sides")
+            .and_then(|value| value.as_array())
+            .map(|sides| sides.iter().any(|side| side.as_str() == Some("client")))
+            .unwrap_or(true);
+        if !runs_on_client {
+            continue;
+        }
+        let jar = processor
+            .get("jar")
+            .and_then(|value| value.as_str())
+            .unwrap_or("");
+        let arguments: Vec<String> = processor
+            .get("args")
+            .and_then(|value| value.as_array())
+            .map(|items| {
+                items
+                    .iter()
+                    .filter_map(|item| item.as_str().map(str::to_string))
+                    .collect()
+            })
+            .unwrap_or_default();
+        let resolved = super::processor_args::resolve_arguments(&arguments, &context);
+        planned += 1;
+        log_debug!("[Install] processor {} -> {}", jar, resolved.join(" "));
+        if resolved.iter().any(|argument| argument.is_empty()) {
+            log_warn!(
+                "[Install] processor {} 有参数解析成空值，安装大概率会失败",
+                jar
+            );
+        }
+    }
+    log_info!("[Install] 安装器声明了 {} 个 client 侧 processor", planned);
+    Ok(planned)
+}
+
 /// Convert Maven coordinate to local file path
 pub fn maven_path_to_local(maven_path: &str, game_dir: &Path) -> PathBuf {
     crate::minecraft::utils::maven::maven_to_local_path(maven_path, game_dir)

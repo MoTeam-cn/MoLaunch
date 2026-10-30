@@ -6,6 +6,13 @@
 
 ### 修复
 
+#### 安装前把 processor 清单落进日志
+前面那个参数解析模块得先接上真实用途。现在跑安装器之前会读一遍 `install_profile.json`，把 client 侧要执行的 processor 和它解析后的完整命令行写进日志。注入器失败时不再只有一句「请重装」，而是能对照清单看出是哪一步没产出。
+
+- [`shared.rs`](src-tauri/src/minecraft/loaders/shared.rs)：新增 `log_install_processors`，兼容 `data` 表的两种写法（对象取 `client` 键、数组取首项、纯字符串直接取）。
+- 参数解析出空值时记 warn：空参数几乎必然让 processor 失败，提前留痕比事后猜省事。
+- [`neoforge.rs`](src-tauri/src/minecraft/loaders/neoforge.rs)、[`forge/install.rs`](src-tauri/src/minecraft/loaders/forge/install.rs)：在启动注入器之前调用，读不到清单只告警、不阻断安装。
+
 #### 开始自己执行 processors：先把参数解析做对
 注入器的问题不是会不会出错，而是出错时不吭声。要摆脱它就得自己跑 processors，而第一步是把 `install_profile.json` 里那些参数解析对——里面混着 `{MINECRAFT_JAR}` 这类全局占位符和 `[MC_SRG]` 这类 data 表引用，解析错一个，processor 就静默失败，产物不再生成。
 
