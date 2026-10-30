@@ -4,77 +4,116 @@
 
 ## [Unreleased]
 
+
+## [0.3.14-rc.3] - 2026-10-30
+
 ### 修复
 
 #### 执行器剩余四处短板补齐
 
 - **Forge 路径没接进度**：只有 NeoForge 会把 80%~90% 推上去，Forge 那次停在原地看着像卡死。现在两条路径共用同一个进度闭包。
+
 - **注入器失败时 Forge 直接放弃**：NeoForge 会转交执行器，Forge 没有。现在两边一致。
+
 - **`DOWNLOAD_MOJMAPS` 无特判**：那一步要访问官方映射地址，网络不好就失败，而映射其实在安装前已由启动器预下载。现在这一步失败只记警告并跳过，不再拖垮整个安装。
+
 - **失败没有重试**：磁盘抖动、文件被临时占用都会让一次执行失败。现在每个 processor 最多尝试两次，第二次仍失败才报错。
+
 - 补了 `read_main_class` 的失败路径测试（jar 不存在、文件不是 zip）与 `is_mojmaps_step` 的识别测试：执行链路里最容易被静默吞掉的就是「主类读不出来」。
 
 #### 执行器自身的七个缺陷
+
 上一版刚落地就自查出一批问题，其中两个会直接造成事故。
 
 - **`--outputs` 只取了第一个文件**（最严重）：声明 `--outputs a.jar b.jar` 时，只要 `a.jar` 已在盘上，整步就被判定「产物齐了」跳过，`b.jar` 永远不会生成。更糟的是把这个行为写进了测试当作预期，等于给 bug 背书。现在会把所有非选项参数都收下，测试同步改为断言三个文件。
+
 - **执行器没有超时**：`command.output()` 会一直等，卡住的 processor 让安装永久停住，只能强杀。现在有 600 秒上限，超时 kill 并报错。
+
 - **缺 processor jar 被静默跳过**：跳过会让安装「看起来成功」却少跑一步。现在直接报错，指出缺哪个 jar。
+
 - **没有进度反馈**：八步跑几分钟，进度条停在原地看着像卡死。现在按「已完成步数 / 总步数」把 80%~90% 推上去。
+
 - **触发条件太窄**：原先只在「processor 产物缺失」时介入，注入器因为别的原因失败就完全用不上。现在注入器失败也会交给执行器。
+
 - **产物判定靠猜名字**：原先看 `:srg` / `:extra` / `:patched` / `:slim` 后缀，换个命名就漏判，缺文件从「致命」降级成「只记警告」。现在看**有没有下载地址**——没有下载地址的条目只能本地生成。
+
 - **清单日志级别太低**：说好「失败时能对照清单」，却写在 `log_debug` 里，默认级别根本看不到。已提到 info。
+
 - 执行器日志改为落文件（`cache/processor_logs/processor-*.log`），报错时附上末尾十行和完整路径：processor 的输出不进主日志，看不到就只能重跑一遍猜。
 
 #### 注入器装不齐时，现在由启动器自己把 processors 跑完
+
 上一版只能在校验失败时报错退出，用户还得重装。现在会自己接手：读安装器里的 `install_profile.json`，按 client 侧顺序执行 processors，跑完重新校验。注入器仍是主路径，自己执行只在它没产出齐的情况下介入——成功的那批用户不受任何影响。
 
 - [`processor_run.rs`](src-tauri/src/minecraft/loaders/processor_run.rs)（新）：`plan_client_processors` 排执行计划（按 `sides` 过滤、jar 不在盘上就跳过该步而不是整体失败），`run_planned_processors` 逐步执行，`read_main_class` 从 processor jar 的 MANIFEST 读主类而不是写死。
+
 - **增量**：`outputs_of` 抓 `--output` / `--outputs` 声明的产物，全都存在就跳过该步。重装时不必把几分钟的重写流程再跑一遍。
+
 - 失败时报出退出码与 stderr 末尾 8 行：processor 的报错藏在标准错误里，光看「安装失败」没法定位。
+
 - [`neoforge.rs`](src-tauri/src/minecraft/loaders/neoforge.rs)、[`forge/install.rs`](src-tauri/src/minecraft/loaders/forge/install.rs)：产物校验失败时调用执行器补跑，补完再校验一次；执行器也失败时把两段原因一起抛出。
+
 - [`processor_run_test.rs`](src-tauri/src/minecraft/loaders/processor_run_test.rs)（新）：5 个用例覆盖输出声明解析、孤立尾部参数不越界、sides 过滤、空 profile。
 
 #### 安装前把 processor 清单落进日志
+
 前面那个参数解析模块得先接上真实用途。现在跑安装器之前会读一遍 `install_profile.json`，把 client 侧要执行的 processor 和它解析后的完整命令行写进日志。注入器失败时不再只有一句「请重装」，而是能对照清单看出是哪一步没产出。
 
 - [`shared.rs`](src-tauri/src/minecraft/loaders/shared.rs)：新增 `log_install_processors`，兼容 `data` 表的两种写法（对象取 `client` 键、数组取首项、纯字符串直接取）。
+
 - 参数解析出空值时记 warn：空参数几乎必然让 processor 失败，提前留痕比事后猜省事。
+
 - [`neoforge.rs`](src-tauri/src/minecraft/loaders/neoforge.rs)、[`forge/install.rs`](src-tauri/src/minecraft/loaders/forge/install.rs)：在启动注入器之前调用，读不到清单只告警、不阻断安装。
 
 #### 开始自己执行 processors：先把参数解析做对
+
 注入器的问题不是会不会出错，而是出错时不吭声。要摆脱它就得自己跑 processors，而第一步是把 `install_profile.json` 里那些参数解析对——里面混着 `{MINECRAFT_JAR}` 这类全局占位符和 `[MC_SRG]` 这类 data 表引用，解析错一个，processor 就静默失败，产物不再生成。
 
 - [`processor_args.rs`](src-tauri/src/minecraft/loaders/processor_args.rs)（新）：`ProcessorContext` 收敛解析所需上下文（游戏目录、原版 jar、安装器、binpatches、版本号、data 表），`resolve_argument` 处理六类全局占位符与 `[键名]` 引用，`resolve_arguments` 处理整条命令行。
+
 - `normalize_data_value` 区分 data 表里的三种值：字面量（`'1.21.1'` 去引号）、绝对路径（原样）、Maven 坐标（转本地路径，否则 processor 找不到文件）。
+
 - 未知键解析成空串而不是报错：不同版本的 install_profile 键名会变，这里不该成为安装失败的原因。
+
 - [`processor_args_test.rs`](src-tauri/src/minecraft/loaders/processor_args_test.rs)（新）：8 个用例覆盖占位符、缺 binpatches、字面量、绝对路径、坐标转换、未知键、普通参数、整条命令行。
 
 #### 装加载器时 Java 不达标，等下载完才报错
+
 加载器安装包几十兆，Java 检查却排在下完安装包之后。用户等完下载、进度条走到一半，才看到「需要 Java 21」。
 
 - [`api.rs`](src-tauri/src/minecraft/loaders/api.rs)：`install_loader` 入口先做 Java 预检，只对 Forge / NeoForge 生效（只有它们要跑 processors，Fabric 与 OptiFine 不需要挑版本）。
+
 - [`shared.rs`](src-tauri/src/minecraft/loaders/shared.rs)：新增 `preflight_install_java`，把「找不到达标 Java」提前到下载之前暴露。
 
 #### 注入器返回成功就当装好了，缺了 processor 产物也不报错
+
 注入器退出码为 0，只说明它的主流程走完了，不代表那些 processors 都成功了。它们生成的 `client-<版本>-<patch>-srg.jar` 这类文件任何下载源都拿不到，缺了它游戏能启动、但进世界前就会报安装损坏——离现场已经很远。安装结束必须回头核对一遍盘上的文件。
 
 - [`artifact_check.rs`](src-tauri/src/minecraft/loaders/artifact_check.rs)（新）：`required_library_files` 从版本 JSON 里取出所有应存在的库——有 `downloads.artifact.path` 就用它，没有就按 Maven 坐标推路径（processor 产物正是后者，它们的条目通常不带下载地址）；`natives` 走 classifier，不在这一步判。
+
 - `is_processor_artifact` 认 `:srg` / `:extra` / `:patched` / `:slim` 四类：这些只能由本地 processor 生成，缺失即致命。
+
 - `check_install` 把这两类分开处理：processor 产物缺失直接失败，并说明常见原因（Java 版本与游戏版本不匹配、临时目录无写权限）与下一步（确认 Java 21 后重试）；普通库缺失只记 warn，避免可选库把安装误判成失败。
+
 - [`neoforge.rs`](src-tauri/src/minecraft/loaders/neoforge.rs)、[`forge/install.rs`](src-tauri/src/minecraft/loaders/forge/install.rs)：复制完版本 JSON 后立即校验，失败就直接返回错误，不再往下报告安装完成。
+
 - [`artifact_check_test.rs`](src-tauri/src/minecraft/loaders/artifact_check_test.rs)（新）：5 个用例覆盖坐标推路径、声明的下载路径优先、跳过 natives、空文档不 panic、四类产物识别。
 
 #### 安装加载器固定用 Java 8，新版 NeoForge 装出来是坏的
+
 注入器本身对 Java 要求不高，所以「优先 Java 8」看起来最保险。但注入器在安装过程中会调用 **processors**（AutoRenamingTool 等）去重写 jar，这些工具是按目标版本的 Java 编译的。用 Java 8 跑新版 NeoForge 的 processor，只会得到 UnsupportedClassVersionError，安装产物（`client-<版本>-<patch>-srg.jar`）根本不会生成——而注入器可能照样返回成功，我们随后就把版本目录复制好、报告安装完成。用户拿到的是一个能点启动、进游戏立刻报「Your NeoForge installation is corrupted」的实例。
 
 - [`installer.rs`](src-tauri/src/minecraft/java_selector/installer.rs)：不再固定优先 Java 8。新增 `required_java_major(mc_version)`——新版本号体系（如 26.x）与 1.21+、1.20.5+ 要 Java 21，1.18~1.20.4 要 Java 17，更早的才接受 Java 8。
-- `get_java_for_installer_with` 在达标候选里取**版本最接近**的那个，而不是最高的：够用就行，拿 Java 25 去装 1.12.2 反而会踩模块系统差异。
-- 同版本内优先 64 位、其次优先 **JDK**（processor 可能要用 javap 一类的工具），此前是 JRE 优先。
-- [`shared.rs`](src-tauri/src/minecraft/loaders/shared.rs)：`find_java_for_install` 增加 `mc_version` 参数，找不到达标 Java 时报出明确要求（「安装 26.3 需要 Java 21 或更高版本」），而不是笼统的「Java not found」。
-- [`forge/install.rs`](src-tauri/src/minecraft/loaders/forge/install.rs)、[`neoforge.rs`](src-tauri/src/minecraft/loaders/neoforge.rs)：传入版本号。
-- [`installer_test.rs`](src-tauri/src/minecraft/java_selector/installer_test.rs)（新）：6 个用例覆盖 26.x / 1.21 / 1.20.6 / 1.20.4 / 1.18 / 老版本以及解析失败。
 
+- `get_java_for_installer_with` 在达标候选里取**版本最接近**的那个，而不是最高的：够用就行，拿 Java 25 去装 1.12.2 反而会踩模块系统差异。
+
+- 同版本内优先 64 位、其次优先 **JDK**（processor 可能要用 javap 一类的工具），此前是 JRE 优先。
+
+- [`shared.rs`](src-tauri/src/minecraft/loaders/shared.rs)：`find_java_for_install` 增加 `mc_version` 参数，找不到达标 Java 时报出明确要求（「安装 26.3 需要 Java 21 或更高版本」），而不是笼统的「Java not found」。
+
+- [`forge/install.rs`](src-tauri/src/minecraft/loaders/forge/install.rs)、[`neoforge.rs`](src-tauri/src/minecraft/loaders/neoforge.rs)：传入版本号。
+
+- [`installer_test.rs`](src-tauri/src/minecraft/java_selector/installer_test.rs)（新）：6 个用例覆盖 26.x / 1.21 / 1.20.6 / 1.20.4 / 1.18 / 老版本以及解析失败。
 
 ## [0.3.14-rc.2] - 2026-10-29
 
@@ -13181,5 +13220,5 @@ oom_heartbeat\ 心跳上报时房主侧查询在线人数随请求体携带 \pla
 
 ---
 
-*本文档最后更新于 2026-10-29*
+*本文档最后更新于 2026-10-30*
 
