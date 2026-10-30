@@ -217,7 +217,7 @@ async fn install_modern(
     let installed_json = game_dir
         .join("versions")
         .join(&version_id)
-        .join(format!("{}.json", &version_id));
+        .join(format!("{}.json", version_id));
     if let Err(reason) = super::super::artifact_check::check_install(game_dir, &installed_json) {
         return Err(anyhow::anyhow!(reason));
     }
