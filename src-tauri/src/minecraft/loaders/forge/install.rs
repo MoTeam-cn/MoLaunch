@@ -124,7 +124,7 @@ async fn install_modern(
         cb(40.0);
     }
 
-    if let Err(error) = shared::log_install_processors(&installer_path, mc_version, game_dir) {
+    if let Err(error) = shared::log_install_processors(installer_path, mc_version, game_dir) {
         log_warn!("[Install] 读不到 processor 清单: {}", error);
     }
 
