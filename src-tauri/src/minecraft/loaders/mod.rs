@@ -20,5 +20,6 @@ pub use api::{
 mod artifact_check;
 #[cfg(test)]
 mod forge_installer_test;
+mod processor_args;
 
 pub use types::{LoaderType, LoaderVersion};

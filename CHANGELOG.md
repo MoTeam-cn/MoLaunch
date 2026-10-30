@@ -6,6 +6,14 @@
 
 ### 修复
 
+#### 开始自己执行 processors：先把参数解析做对
+注入器的问题不是会不会出错，而是出错时不吭声。要摆脱它就得自己跑 processors，而第一步是把 `install_profile.json` 里那些参数解析对——里面混着 `{MINECRAFT_JAR}` 这类全局占位符和 `[MC_SRG]` 这类 data 表引用，解析错一个，processor 就静默失败，产物不再生成。
+
+- [`processor_args.rs`](src-tauri/src/minecraft/loaders/processor_args.rs)（新）：`ProcessorContext` 收敛解析所需上下文（游戏目录、原版 jar、安装器、binpatches、版本号、data 表），`resolve_argument` 处理六类全局占位符与 `[键名]` 引用，`resolve_arguments` 处理整条命令行。
+- `normalize_data_value` 区分 data 表里的三种值：字面量（`'1.21.1'` 去引号）、绝对路径（原样）、Maven 坐标（转本地路径，否则 processor 找不到文件）。
+- 未知键解析成空串而不是报错：不同版本的 install_profile 键名会变，这里不该成为安装失败的原因。
+- [`processor_args_test.rs`](src-tauri/src/minecraft/loaders/processor_args_test.rs)（新）：8 个用例覆盖占位符、缺 binpatches、字面量、绝对路径、坐标转换、未知键、普通参数、整条命令行。
+
 #### 装加载器时 Java 不达标，等下载完才报错
 加载器安装包几十兆，Java 检查却排在下完安装包之后。用户等完下载、进度条走到一半，才看到「需要 Java 21」。
 
