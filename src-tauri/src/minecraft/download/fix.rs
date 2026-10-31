@@ -5,7 +5,7 @@ use std::path::Path;
 use super::super::version::json_merge;
 use super::manager::{DownloadManager, PanelLease};
 use super::stages::{download_assets, download_client_jar, download_libraries};
-use crate::log_debug;
+use crate::log_warn;
 
 /// 补全版本文件
 ///
