@@ -99,4 +99,5 @@ async fn sync_options(
             resourcepack_options::set_shader_pack(&game_dir, value)?;
         }
     }
+    Ok(())
 }

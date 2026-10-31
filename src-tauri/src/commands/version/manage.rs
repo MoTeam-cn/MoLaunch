@@ -5,7 +5,7 @@
 //! 由 `list_manager::dispatch` 反序列化参数后调用。
 
 use crate::state::AppState;
-use crate::{log_error, log_info};
+use crate::{log_error, log_info, log_warn};
 use tauri::Emitter;
 
 use super::sanitize_version_id;
