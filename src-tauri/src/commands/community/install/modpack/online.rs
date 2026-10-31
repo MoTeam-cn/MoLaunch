@@ -176,8 +176,8 @@ pub async fn install_modpack(
                     .unwrap_or(0),
             };
             if let Err(e) = meta.save(instance_dir_ref) {
-                crate::log_warn!(
-                    "[Community] 写入 modpack.meta.json 失败（不中断安装）: {}",
+                crate::log_error!(
+                    "[Community] 写入 modpack.meta.json 失败（安装继续，但来源与更新信息将丢失）: {}",
                     e
                 );
             } else {

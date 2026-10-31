@@ -28,6 +28,7 @@ import {
   isValidHomePanelMode,
 } from '@/utils/pluginInstaller'
 import { safeCall } from '@/utils/async'
+import { toastError } from '@/utils/toast'
 
 export interface PluginsInstallDeps {
   /** 已注册的插件清单（内置 + 外部） */
@@ -219,7 +220,8 @@ export function usePluginsInstallSlice(deps: PluginsInstallDeps) {
 
     state.enabled = enabled
 
-    // 调用钩子（失败仅记录，不阻塞）
+    // 钩子失败要把状态回滚：否则插件显示「已启用」但没有实际效果，
+    // 用户重启后看到的还是启用，问题被藏起来。
     try {
       if (enabled && manifest.hooks?.onEnable) {
         await manifest.hooks.onEnable()
@@ -228,8 +230,10 @@ export function usePluginsInstallSlice(deps: PluginsInstallDeps) {
       }
       state.lastError = null
     } catch (e) {
+      state.enabled = !enabled
       state.lastError = String(e)
-      console.error(`[Plugins] Plugin ${id} hook failed:`, e)
+      toastError(`插件 ${manifest.name || id} 启用失败：${e instanceof Error ? e.message : String(e)}`)
+      return
     }
 
     await persistToBackend()

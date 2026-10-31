@@ -6,6 +6,18 @@
 
 ### 修复
 
+#### 用户看得见的失败，不该只躺在控制台里
+- [`auto-backup.ts`](src/utils/auto-backup.ts)：开了自动备份但备份失败时，异常直接抛给上层被 `safeCall` 吞掉，界面上什么都没有——用户以为存档有兜底。现在失败会提示，并且不写「今天已备份」的标记，下次启动还能重试。
+- [`plugins-install.ts`](src/stores/plugins/plugins-install.ts)：插件钩子执行失败只记 `console.error`，随后照样持久化启用状态，插件显示「已启用」却没有任何效果。现在失败回滚启用状态并提示。
+- [`fix.rs`](src-tauri/src/minecraft/download/fix.rs)：下载主文件失败只记 `log_debug`，于是「修复」返回成功而主文件仍缺，下次启动继续崩。现在下载后会核对主文件是否真的存在，仍缺就报错。
+- [`online.rs`](src-tauri/src/commands/community/install/modpack/online.rs)：`modpack.meta.json` 写失败提升为错误级（安装本身继续，但来源与更新信息会丢失）。
+
+#### 暗色主题：浮层、画布与描边
+- [`Tooltip.vue`](src/components/common/Tooltip.vue)：浮层底色写死 `#1f2937`，与深色页面只差一档，边界全靠阴影撑。改用 `--surface-pop` / `--text-1` / `--shadow-pop`。
+- `SkinCanvas` / `SchematicCanvas`：棋盘格是 Tailwind 任意值里的字面量（编译期固定），变量管不到，深色下画布边缘发白。改引用 `--checker-a` / `--checker-b`。
+- [`SchematicScene.vue`](src/views/tools/storage/schematic/SchematicScene.vue)：3D 舞台用 `bg-slate-900`，与深色页面几乎同色，边界消失。改用 `--surface-sunken`。
+- `ColorSelect` / `RpPixelEditor`：黑 10% 描边在深底上等于没有边框，改用已变量化的 `border-gray-200`。
+
 #### 落盘失败不再只写一行 debug 日志
 写文件失败但流程照常继续，是这批问题的共同形态。按「失败后果」分开处理：用户主动操作的核心结果一律上抛，辅助数据至少留下 error 级痕迹。
 

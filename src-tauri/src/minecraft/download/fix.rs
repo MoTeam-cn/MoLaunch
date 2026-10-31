@@ -56,10 +56,20 @@ pub async fn fix_version_files(
     )
     .await
     {
-        log_debug!(
-            "[Fix] download_client_jar failed (may be expected for some versions): {}",
-            e
-        );
+        log_warn!("[Fix] 下载主文件失败，下面核对文件是否真的缺失: {}", e);
+    }
+
+    // 主文件缺失时「修复」等于没修，必须报错而不是默默返回成功
+    let jar_version = crate::minecraft::launch::classpath::find_original_version(game_dir, &json);
+    let main_jar = game_dir
+        .join("versions")
+        .join(&jar_version)
+        .join(format!("{}.jar", jar_version));
+    if !main_jar.exists() {
+        return Err(anyhow::anyhow!(
+            "修复后仍缺少游戏主文件：{}",
+            main_jar.display()
+        ));
     }
 
     // 取消检查

@@ -7,6 +7,7 @@
  */
 import { archiveBackup, archiveList } from '@/utils/api/tools/archive'
 import { getGameDir } from '@/utils/api/system'
+import { toastWarning } from '@/utils/toast'
 
 const SETTING_KEY = 'molaunch-auto-backup'
 const STATE_KEY = 'molaunch-auto-backup-state'
@@ -67,6 +68,7 @@ function writeState(state: Record<string, string>): void {
 /**
  * 执行启动前备份，返回备份的存档数量（未开启或今天已备份时返回 0）
  */
+
 export async function runAutoBackup(versionId: string): Promise<number> {
   if (!versionId) return 0
   if (!loadAutoBackupSetting().enabled) return 0
@@ -75,16 +77,24 @@ export async function runAutoBackup(versionId: string): Promise<number> {
   const today = todayKey()
   if (state[versionId] === today) return 0
 
-  const gameDir = await getGameDir()
-  const list = await archiveList(versionId)
-  const dir = `${gameDir}/molaunch-backups/${versionId}`
-  let count = 0
-  for (const world of list.items.slice(0, MAX_WORLDS)) {
-    await archiveBackup(world.name, `${dir}/${world.name}.zip`, false, versionId)
-    count += 1
-  }
+  // 备份失败必须让用户知道：开了自动备份却什么都没备，
+  // 用户会以为存档有兜底，真出事时才发现没有。
+  try {
+    const gameDir = await getGameDir()
+    const list = await archiveList(versionId)
+    const dir = `${gameDir}/molaunch-backups/${versionId}`
+    let count = 0
+    for (const world of list.items.slice(0, MAX_WORLDS)) {
+      await archiveBackup(world.name, `${dir}/${world.name}.zip`, false, versionId)
+      count += 1
+    }
 
-  state[versionId] = today
-  writeState(state)
-  return count
+    // 成功才记今天的标记，失败时下次启动还能重试
+    state[versionId] = today
+    writeState(state)
+    return count
+  } catch (e) {
+    toastWarning(`自动备份存档失败：${e instanceof Error ? e.message : String(e)}`)
+    return 0
+  }
 }
