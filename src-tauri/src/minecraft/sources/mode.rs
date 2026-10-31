@@ -1,6 +1,7 @@
 //! 下载源模式 + URL 构建函数
 
 use super::constants::BMCLAPI_BASE;
+use super::health;
 
 /// 下载源模式
 #[derive(Debug, Clone, Copy, PartialEq)]
@@ -50,8 +51,13 @@ pub fn build_urls(
             vec![official_url.to_string()]
         }
         DownloadSourceMode::Smart => {
-            // 官方优先，失败回退 BMCLAPI
-            vec![official_url.to_string(), bmclapi_url]
+            // 官方被判慢时先走镜像：否则每个文件都要先等一次超时，
+            // 官方不稳定时体感就是"每个文件都卡一下"
+            if health::official_is_slow() {
+                vec![bmclapi_url, official_url.to_string()]
+            } else {
+                vec![official_url.to_string(), bmclapi_url]
+            }
         }
     }
 }

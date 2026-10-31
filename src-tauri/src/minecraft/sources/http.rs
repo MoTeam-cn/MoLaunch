@@ -2,7 +2,13 @@
 
 use crate::minecraft::community::common::fmt_elapsed;
 use crate::{log_debug, log_info, log_warn};
-use std::time::Instant;
+use std::time::{Duration, Instant};
+
+/// 元数据请求的单次超时
+///
+/// 官方源不可用时不该让用户干等全局 30s 超时——5s 没响应就换镜像。
+/// 文件下载不走这里，那条链路由 DownloadManager 处理。
+const META_REQUEST_TIMEOUT_SECS: u64 = 5;
 
 /// 判断 HTTP 状态码是否应该直接跳过（不重试）
 /// - 403 Forbidden: 服务器拒绝，重试无意义
@@ -31,12 +37,45 @@ pub async fn fetch_with_fallback(urls: &[String]) -> anyhow::Result<String> {
 
     for url in urls {
         let start = Instant::now();
-        match client.get(url).send().await {
+        let mirror = is_mirror_url(url);
+        let sent = match tokio::time::timeout(
+            Duration::from_secs(META_REQUEST_TIMEOUT_SECS),
+            client.get(url).send(),
+        )
+        .await
+        {
+            Ok(result) => result,
+            Err(_) => {
+                // 官方超时就把整段时间切成镜像，避免下一个请求又干等一次
+                if mirror {
+                    log_warn!(
+                        "[Sources] {} 超过 {}s 未响应 ({})",
+                        url,
+                        META_REQUEST_TIMEOUT_SECS,
+                        fmt_elapsed(start)
+                    );
+                } else {
+                    super::health::mark_official_slow();
+                    log_warn!(
+                        "[Sources] {} 超过 {}s 未响应，改用镜像 ({})",
+                        url,
+                        META_REQUEST_TIMEOUT_SECS,
+                        fmt_elapsed(start)
+                    );
+                }
+                last_err = format!("{}: 超时", url);
+                continue;
+            }
+        };
+        match sent {
             Ok(resp) => {
                 let status = resp.status();
                 if status.is_success() {
                     match resp.text().await {
                         Ok(text) => {
+                            if !mirror {
+                                super::health::mark_official_ok();
+                            }
                             log_info!("[Sources] 请求成功: {} ({})", url, fmt_elapsed(start));
                             return Ok(text);
                         }

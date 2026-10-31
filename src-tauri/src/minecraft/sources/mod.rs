@@ -4,6 +4,7 @@
 
 mod cdn;
 mod constants;
+mod health;
 mod http;
 mod library_chain;
 mod mode;
@@ -22,6 +23,9 @@ pub use constants::{
     MAVEN_CENTRAL, MAVEN_FABRIC, MAVEN_FORGE, MAVEN_NEOFORGE, MAVEN_REPLACEMENTS, MAVEN_SPONGE,
     MOJANG_LAUNCHER, MOJANG_LAUNCHERMETA, MOJANG_LIBRARIES, MOJANG_PISTON_DATA, MOJANG_PISTON_META,
     MOJANG_REPLACEMENTS, MOJANG_RESOURCES, MR_CDN_DOMAINS, NEOFORGE_API, NEOFORGE_API_LEGACY,
+};
+pub use health::{
+    mark_official_ok, mark_official_slow, official_is_slow, official_slow_remaining_secs,
 };
 pub use http::{fetch_with_fallback, is_mirror_url, should_skip_status};
 pub use library_chain::{
