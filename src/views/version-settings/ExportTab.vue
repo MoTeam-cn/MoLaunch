@@ -194,7 +194,7 @@ const bottomHint = computed(() => {
         <!-- 进度条（仅导出中显示） -->
         <div
           v-if="exporting"
-          class="mb-2 h-1 w-full overflow-hidden rounded-full bg-black/10"
+          class="mb-2 h-1 w-full overflow-hidden rounded-full bg-gray-200"
         >
           <div
             class="h-full bg-primary-600 transition-all duration-300"

@@ -98,7 +98,7 @@ onUnmounted(stopFakeProgress)
         <!-- 伪进度移动的高光 -->
         <div
           v-if="fakePercent < 100"
-          class="absolute top-0 h-full w-1/3 bg-white/40 blur-xs"
+          class="absolute top-0 h-full w-1/3 bg-white/20 blur-xs"
           :style="{ left: fakePercent + '%' }"
         />
         <!-- 扫光层（sweep=true 时叠加；动画由 main.css 的 .progress-sweep 定义） -->

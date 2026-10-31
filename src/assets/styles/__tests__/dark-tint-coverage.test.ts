@@ -72,7 +72,6 @@ describe('彩色淡底与深字的深色覆盖', () => {
 
   it('should remap every tint used by source when 变体类名匹配不到逐类规则', () => {
     // 从源码实际用到的颜色推导，不写死清单：以后新增任何颜色都会自动被检查
-    const covered = coveredClasses()
     const usedColors = new Set<string>()
     for (const file of walk(path.join(SRC))) {
       const text = fs.readFileSync(file, 'utf8')
@@ -104,10 +103,20 @@ describe('彩色淡底与深字的深色覆盖', () => {
     )
     expect(missing, '这些彩色档位需要在 [data-theme=dark] 里重映射变量，否则 hover 变体会露出浅色').toEqual([])
 
-    const primaryMissing = ['50', '100', '200'].filter(
-      (shade) => !DARK.includes(`--color-primary-${shade}:`)
-    )
-    expect(primaryMissing, '品牌色的浅色档位同样要靠变量重映射').toEqual([])
+    // 品牌色不吃变量重映射：工具类编译成 rgb(var(--color-primary-rgb-N) / 1)，
+    // 而 --color-primary-* 由运行时内联写在 documentElement 上，选择器改不动它。
+    // 所以只能逐类写变体规则，这里校验的是真正生效的那些。
+    const primaryVariants = [
+      '.hover\\:bg-primary-50:hover',
+      '.hover\\:bg-primary-100:hover',
+      '.hover\\:bg-primary-200:hover',
+      '.hover\\:text-primary-500:hover',
+      '.hover\\:border-primary-200:hover',
+      '.btn-outline',
+      '.btn-text',
+    ]
+    const missingVariants = primaryVariants.filter((sel) => !DARK.includes(sel))
+    expect(missingVariants, '品牌色的变体只能逐类覆盖，缺了就退回浅蓝').toEqual([])
   })
 
   it('should not rely on translucent tint when 组件动态拼接颜色', () => {

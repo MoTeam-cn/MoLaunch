@@ -299,8 +299,8 @@ onBeforeUnmount(() => {
 .image-pixelated {
   image-rendering: pixelated;
   background-image:
-    linear-gradient(45deg, #f0f0f0 25%, transparent 25%, transparent 75%, #f0f0f0 75%),
-    linear-gradient(45deg, #f0f0f0 25%, transparent 25%, transparent 75%, #f0f0f0 75%);
+    linear-gradient(45deg, var(--checker-a) 25%, transparent 25%, transparent 75%, var(--checker-a) 75%),
+    linear-gradient(45deg, var(--checker-a) 25%, transparent 25%, transparent 75%, var(--checker-a) 75%);
   background-size:
     var(--grid-size) var(--grid-size),
     var(--grid-size) var(--grid-size);
@@ -309,12 +309,12 @@ onBeforeUnmount(() => {
     calc(var(--grid-size) / 2) calc(var(--grid-size) / 2);
 }
 .show-grid {
-  outline: 1px solid rgba(0, 0, 0, 0.08);
+  outline: 1px solid var(--grid-line);
   background-image:
-    linear-gradient(45deg, #f0f0f0 25%, transparent 25%, transparent 75%, #f0f0f0 75%),
-    linear-gradient(45deg, #f0f0f0 25%, transparent 25%, transparent 75%, #f0f0f0 75%),
-    repeating-linear-gradient(to right, rgba(0, 0, 0, 0.1) 0 1px, transparent 1px var(--grid-size)),
-    repeating-linear-gradient(to bottom, rgba(0, 0, 0, 0.1) 0 1px, transparent 1px var(--grid-size));
+    linear-gradient(45deg, var(--checker-a) 25%, transparent 25%, transparent 75%, var(--checker-a) 75%),
+    linear-gradient(45deg, var(--checker-a) 25%, transparent 25%, transparent 75%, var(--checker-a) 75%),
+    repeating-linear-gradient(to right, var(--grid-line) 0 1px, transparent 1px var(--grid-size)),
+    repeating-linear-gradient(to bottom, var(--grid-line) 0 1px, transparent 1px var(--grid-size));
   background-size:
     var(--grid-size) var(--grid-size),
     var(--grid-size) var(--grid-size),

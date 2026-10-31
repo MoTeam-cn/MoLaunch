@@ -133,10 +133,10 @@ onMounted(updateIndicator)
 }
 
 .sub-tab-bar.show-scrollbar::-webkit-scrollbar-thumb {
-  background: #d1d5db;
+  background: var(--scrollbar-thumb);
 }
 
 .sub-tab-bar.show-scrollbar::-webkit-scrollbar-thumb:hover {
-  background: #9ca3af;
+  background: var(--scrollbar-thumb-hover);
 }
 </style>

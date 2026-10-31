@@ -15,43 +15,43 @@ import type { LayoutSection } from './types'
  */
 const DESIGN_SYSTEM_CSS = `
 *{box-sizing:border-box;margin:0;padding:0}
-body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;font-size:13px;color:#1f2937;background:transparent;padding:12px}
+body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;font-size:13px;color:var(--color-gray-800,#1f2937);background:transparent;padding:12px}
 h1{font-size:18px;font-weight:600;margin-bottom:8px}
 h2{font-size:16px;font-weight:600;margin-bottom:6px}
 h3{font-size:14px;font-weight:600;margin-bottom:4px}
-p{font-size:12px;color:#6b7280;margin-bottom:4px}
+p{font-size:12px;color:var(--color-gray-500,#6b7280);margin-bottom:4px}
 /* 按钮 */
-.btn{display:inline-flex;align-items:center;gap:4px;padding:6px 12px;border:1px solid #d1d5db;border-radius:4px;background:#fff;color:#374151;font-size:12px;cursor:pointer;transition:background .15s}
-.btn:hover{background:#f3f4f6}
+.btn{display:inline-flex;align-items:center;gap:4px;padding:6px 12px;border:1px solid var(--border-subtle,#d1d5db);border-radius:4px;background:var(--surface-0,#fff);color:var(--color-gray-700,#374151);font-size:12px;cursor:pointer;transition:background .15s}
+.btn:hover{background:var(--surface-1,#f3f4f6)}
 .btn-primary{background:#6366f1;border-color:#6366f1;color:#fff}
 .btn-primary:hover{background:#4f46e5}
 .btn-sm{padding:4px 8px;font-size:11px}
 /* 卡片 */
-.card{border:1px solid #e5e7eb;border-radius:6px;padding:12px;background:#fff}
-.card-title{font-size:12px;font-weight:600;color:#6b7280;margin-bottom:8px}
+.card{border:1px solid var(--border-subtle,#e5e7eb);border-radius:6px;padding:12px;background:var(--surface-0,#fff)}
+.card-title{font-size:12px;font-weight:600;color:var(--color-gray-500,#6b7280);margin-bottom:8px}
 /* 统计卡片 */
 .stat{display:flex;flex-direction:column;gap:2px}
-.stat-label{font-size:11px;color:#9ca3af}
-.stat-value{font-size:20px;font-weight:700;color:#111827}
-.stat-suffix{font-size:12px;color:#6b7280}
+.stat-label{font-size:11px;color:var(--color-gray-400,#9ca3af)}
+.stat-value{font-size:20px;font-weight:700;color:var(--color-gray-900,#111827)}
+.stat-suffix{font-size:12px;color:var(--color-gray-500,#6b7280)}
 /* 网格 */
 .grid{display:grid;gap:12px}
 .grid-2{grid-template-columns:repeat(2,1fr)}
 .grid-3{grid-template-columns:repeat(3,1fr)}
 /* 进度条 */
-.progress-bar{height:8px;border-radius:4px;background:#e5e7eb;overflow:hidden}
+.progress-bar{height:8px;border-radius:4px;background:var(--surface-2,#e5e7eb);overflow:hidden}
 .progress-fill{height:100%;border-radius:4px;background:#6366f1;transition:width .3s}
 .progress-fill.green{background:#10b981}
 .progress-fill.yellow{background:#f59e0b}
 .progress-fill.red{background:#ef4444}
 /* 徽章 */
 .badge{display:inline-flex;align-items:center;padding:2px 6px;border-radius:3px;font-size:10px;font-weight:500}
-.badge-primary{background:#eef2ff;color:#4338ca}
-.badge-green{background:#ecfdf5;color:#047857}
-.badge-red{background:#fef2f2;color:#b91c1c}
-.badge-gray{background:#f3f4f6;color:#6b7280}
+.badge-primary{background:var(--color-indigo-50,#eef2ff);color:var(--color-indigo-700,#4338ca)}
+.badge-green{background:var(--color-emerald-50,#ecfdf5);color:var(--color-emerald-700,#047857)}
+.badge-red{background:var(--color-red-50,#fef2f2);color:var(--color-red-700,#b91c1c)}
+.badge-gray{background:var(--surface-1,#f3f4f6);color:var(--color-gray-500,#6b7280)}
 /* 文本工具类 */
-.text-muted{color:#9ca3af}
+.text-muted{color:var(--color-gray-400,#9ca3af)}
 .text-sm{font-size:11px}
 .text-lg{font-size:15px}
 .text-bold{font-weight:600}

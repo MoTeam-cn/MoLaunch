@@ -102,7 +102,7 @@ const svgMetadata = computed(() => {
             <text
               x="10"
               y="20"
-              fill="rgba(0, 0, 0, 0.06)"
+              fill="var(--watermark-fill)"
               font-size="11"
               font-family="monospace"
               font-weight="600"
@@ -110,14 +110,14 @@ const svgMetadata = computed(() => {
             <text
               x="10"
               y="40"
-              fill="rgba(0, 0, 0, 0.06)"
+              fill="var(--watermark-fill)"
               font-size="11"
               font-family="monospace"
             >{{ deviceLine }}</text>
             <text
               x="10"
               y="60"
-              fill="rgba(0, 0, 0, 0.06)"
+              fill="var(--watermark-fill)"
               font-size="9"
               font-family="monospace"
             >{{ hashLine }}</text>

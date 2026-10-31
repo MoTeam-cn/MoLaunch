@@ -54,7 +54,7 @@
   width: 16px;
   height: 16px;
   border-radius: 2px;
-  border: 1px solid rgba(0, 0, 0, 0.1);
+  border: 1px solid var(--border-subtle);
   flex-shrink: 0;
 }
 
@@ -86,7 +86,7 @@
   background-color: var(--surface-pop);
   border: 1px solid var(--border-subtle);
   border-radius: 4px;
-  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.1);
+  box-shadow: 0 4px 10px var(--border-subtle);
   padding: 12px;
   box-sizing: border-box;
 }
@@ -113,7 +113,7 @@
   position: relative;
   width: 100%;
   aspect-ratio: 1;
-  border: 1px solid rgba(0, 0, 0, 0.1);
+  border: 1px solid var(--border-subtle);
   border-radius: 2px;
   cursor: pointer;
   padding: 0;
@@ -150,7 +150,7 @@
   width: 28px;
   height: 28px;
   border-radius: 2px;
-  border: 1px solid rgba(0, 0, 0, 0.1);
+  border: 1px solid var(--border-subtle);
   flex-shrink: 0;
 }
 

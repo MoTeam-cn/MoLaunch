@@ -36,6 +36,16 @@
   --text-disabled: #5c646e;
   --toast-bg: rgb(28 32 39 / 0.95);
   --shadow-pop: 0 8px 24px rgb(0 0 0 / 0.55);
+
+  /* 自绘面：棋盘格、网格线、水印、滚动条、遮罩 */
+  --checker-a: #2a2f37;
+  --checker-b: #171a1f;
+  --grid-line: rgb(255 255 255 / 0.12);
+  --watermark-fill: rgb(255 255 255 / 0.08);
+  --scrollbar-thumb: #454c57;
+  --scrollbar-thumb-hover: #5f6772;
+  --skeleton-bg: #313843;
+  --bg-mask: rgb(0 0 0 / 0.62);
 }
 
 html[data-theme='dark'],
@@ -57,52 +67,49 @@ html[data-theme='dark'],
 [data-theme='dark'] {
   --color-amber-50: rgb(217 119 6 / 0.16);
   --color-amber-100: rgb(217 119 6 / 0.22);
-  --color-amber-200: rgb(217 119 6 / 0.28);
+  --color-amber-200: rgb(217 119 6 / 0.26);
   --color-blue-50: rgb(37 99 235 / 0.16);
   --color-blue-100: rgb(37 99 235 / 0.22);
-  --color-blue-200: rgb(37 99 235 / 0.28);
+  --color-blue-200: rgb(37 99 235 / 0.26);
   --color-cyan-50: rgb(8 145 178 / 0.16);
   --color-cyan-100: rgb(8 145 178 / 0.22);
-  --color-cyan-200: rgb(8 145 178 / 0.28);
+  --color-cyan-200: rgb(8 145 178 / 0.26);
   --color-emerald-50: rgb(5 150 105 / 0.16);
   --color-emerald-100: rgb(5 150 105 / 0.22);
-  --color-emerald-200: rgb(5 150 105 / 0.28);
+  --color-emerald-200: rgb(5 150 105 / 0.26);
   --color-green-50: rgb(22 163 74 / 0.16);
   --color-green-100: rgb(22 163 74 / 0.22);
-  --color-green-200: rgb(22 163 74 / 0.28);
+  --color-green-200: rgb(22 163 74 / 0.26);
   --color-indigo-50: rgb(79 70 229 / 0.16);
   --color-indigo-100: rgb(79 70 229 / 0.22);
-  --color-indigo-200: rgb(79 70 229 / 0.28);
+  --color-indigo-200: rgb(79 70 229 / 0.26);
   --color-lime-50: rgb(101 163 13 / 0.16);
   --color-lime-100: rgb(101 163 13 / 0.22);
-  --color-lime-200: rgb(101 163 13 / 0.28);
+  --color-lime-200: rgb(101 163 13 / 0.26);
   --color-orange-50: rgb(234 88 12 / 0.16);
   --color-orange-100: rgb(234 88 12 / 0.22);
-  --color-orange-200: rgb(234 88 12 / 0.28);
+  --color-orange-200: rgb(234 88 12 / 0.26);
   --color-rose-50: rgb(225 29 72 / 0.16);
   --color-rose-100: rgb(225 29 72 / 0.22);
-  --color-rose-200: rgb(225 29 72 / 0.28);
+  --color-rose-200: rgb(225 29 72 / 0.26);
   --color-pink-50: rgb(219 39 119 / 0.16);
   --color-pink-100: rgb(219 39 119 / 0.22);
-  --color-pink-200: rgb(219 39 119 / 0.28);
+  --color-pink-200: rgb(219 39 119 / 0.26);
   --color-purple-50: rgb(124 58 237 / 0.16);
   --color-purple-100: rgb(124 58 237 / 0.22);
-  --color-purple-200: rgb(124 58 237 / 0.28);
+  --color-purple-200: rgb(124 58 237 / 0.26);
   --color-red-50: rgb(220 38 38 / 0.16);
   --color-red-100: rgb(220 38 38 / 0.22);
-  --color-red-200: rgb(220 38 38 / 0.28);
+  --color-red-200: rgb(220 38 38 / 0.26);
   --color-sky-50: rgb(2 132 199 / 0.16);
   --color-sky-100: rgb(2 132 199 / 0.22);
-  --color-sky-200: rgb(2 132 199 / 0.28);
+  --color-sky-200: rgb(2 132 199 / 0.26);
   --color-teal-50: rgb(13 148 136 / 0.16);
   --color-teal-100: rgb(13 148 136 / 0.22);
-  --color-teal-200: rgb(13 148 136 / 0.28);
+  --color-teal-200: rgb(13 148 136 / 0.26);
   --color-yellow-50: rgb(202 138 4 / 0.16);
   --color-yellow-100: rgb(202 138 4 / 0.22);
-  --color-yellow-200: rgb(202 138 4 / 0.28);
-  --color-primary-50: rgb(var(--color-primary-rgb-500) / 0.18);
-  --color-primary-100: rgb(var(--color-primary-rgb-500) / 0.24);
-  --color-primary-200: rgb(var(--color-primary-rgb-500) / 0.30);
+  --color-yellow-200: rgb(202 138 4 / 0.26);
 }
 
 /* 页面底色 */
@@ -424,7 +431,7 @@ html[data-theme='dark'],
 [data-theme='dark'] .bg-purple-100,
 [data-theme='dark'] .bg-violet-50,
 [data-theme='dark'] .bg-violet-100 {
-  background-color: rgb(124 58 237 / 0.16);
+  background-color: rgb(124 58 237 / 0.22);
 }
 [data-theme='dark'] .bg-orange-50,
 [data-theme='dark'] .bg-orange-100 {
@@ -442,7 +449,7 @@ html[data-theme='dark'],
 [data-theme='dark'] .bg-pink-100,
 [data-theme='dark'] .bg-rose-50,
 [data-theme='dark'] .bg-rose-100 {
-  background-color: rgb(219 39 119 / 0.16);
+  background-color: rgb(219 39 119 / 0.22);
 }
 [data-theme='dark'] .bg-sky-50,
 [data-theme='dark'] .bg-sky-100 {
@@ -536,6 +543,60 @@ html[data-theme='dark'],
 }
 [data-theme='dark'] .text-teal-500 {
   color: #6ee0d6;
+}
+
+/* ------------------------------------------------------------
+   品牌色的变体类名
+   ------------------------------------------------------------
+   品牌色工具类编译成 rgb(var(--color-primary-rgb-50) / 1)，不吃 --color-primary-* 变量；
+   加上 --color-primary-* 由运行时内联写在 documentElement 上（优先级最高的内联样式），
+   任何 [data-theme] 选择器都改不动它。
+   所以 `hover:bg-primary-50` 这类变体只能逐条写，写成独立类名才匹配得上。
+   ------------------------------------------------------------ */
+[data-theme='dark'] .hover\:bg-primary-50:hover,
+[data-theme='dark'] .focus\:bg-primary-50:focus {
+  background-color: color-mix(in oklab, var(--color-primary-500) 18%, transparent);
+}
+[data-theme='dark'] .hover\:bg-primary-100:hover,
+[data-theme='dark'] .focus\:bg-primary-100:focus {
+  background-color: color-mix(in oklab, var(--color-primary-500) 22%, transparent);
+}
+[data-theme='dark'] .hover\:bg-primary-200:hover,
+[data-theme='dark'] .focus\:bg-primary-200:focus {
+  background-color: color-mix(in oklab, var(--color-primary-500) 26%, transparent);
+}
+[data-theme='dark'] .hover\:border-primary-200:hover,
+[data-theme='dark'] .hover\:border-primary-300:hover,
+[data-theme='dark'] .hover\:border-primary-400:hover,
+[data-theme='dark'] .hover\:border-primary-500:hover,
+[data-theme='dark'] .focus\:border-primary-500:focus {
+  border-color: color-mix(in oklab, var(--color-primary-500) 55%, transparent);
+}
+[data-theme='dark'] .hover\:text-primary-500:hover,
+[data-theme='dark'] .hover\:text-primary-600:hover,
+[data-theme='dark'] .hover\:text-primary-700:hover {
+  color: color-mix(in oklab, var(--color-primary-500) 62%, white);
+}
+
+/* 按钮与标签自有样式：这些规则直接写 color: var(--color-primary-500)，
+   不受 text-primary-* 工具类覆盖，深色下对比只有 3.4:1，需要单独提亮。 */
+[data-theme='dark'] .btn-outline,
+[data-theme='dark'] .btn-text {
+  color: color-mix(in oklab, var(--color-primary-500) 62%, white);
+}
+[data-theme='dark'] .tag-primary {
+  color: color-mix(in oklab, var(--color-primary-500) 66%, white);
+}
+
+/* 单色模型图标走 <img> 载入，currentColor 在独立 SVG 里解析成黑色，
+   深色主题下等于隐形；反相后仍是单色图标。 */
+[data-theme='dark'] .mono-model-icon {
+  filter: invert(1);
+}
+
+/* 进度条高光：/40 /20 档位不在白底覆盖清单里 */
+[data-theme='dark'] .bg-white\/20 {
+  background-color: rgb(255 255 255 / 0.12);
 }
 
 /* 对应的深色文字提亮（浅底上的 -600 在深色下对比不足） */

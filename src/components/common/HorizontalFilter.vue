@@ -184,9 +184,9 @@ defineExpose({ checkArrows })
   transition: background-color 0.25s ease;
 }
 .scroll-area:hover::-webkit-scrollbar-thumb {
-  background-color: rgba(156, 163, 175, 0.5);
+  background-color: var(--scrollbar-thumb);
 }
 .scroll-area:hover::-webkit-scrollbar-thumb:hover {
-  background-color: rgba(107, 114, 128, 0.7);
+  background-color: var(--scrollbar-thumb-hover);
 }
 </style>

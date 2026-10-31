@@ -22,6 +22,17 @@
     --color-primary-900: #0b2b75;
     --color-primary-950: #071a4d;
 
+  /* 画布/水印/滚动条等自绘面：这些颜色以前散落在各组件里写死，
+     深色主题够不到。集中成变量后由 theme-dark 覆盖。 */
+  --checker-a: #f0f0f0;
+  --checker-b: #ffffff;
+  --grid-line: rgba(0, 0, 0, 0.1);
+  --watermark-fill: rgba(0, 0, 0, 0.06);
+  --scrollbar-thumb: #d1d5db;
+  --scrollbar-thumb-hover: #9ca3af;
+  --skeleton-bg: #e9e6ec;
+  --bg-mask: rgba(0, 0, 0, 0.45);
+
     --color-primary-rgb-50:  239 242 255;
     --color-primary-rgb-100: 221 229 255;
     --color-primary-rgb-200: 188 208 255;

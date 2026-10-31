@@ -28,7 +28,7 @@ function cssVar(name: string, fallback: string): string {
 }
 
 /** 边标签配置（统一样式） */
-function edgeLabel(text: string, color = '#86909c'): object {
+function edgeLabel(text: string, color = cssVar('--text-3', '#86909c')): object {
   return { show: true, formatter: text, fontSize: 9, color, position: 'middle', offset: [0, -6] }
 }
 
@@ -51,8 +51,8 @@ export function buildTopologyOption(input: TopologyOptionInput): EChartsCoreOpti
   const friendColor = '#722ed1'
   const friendDark = '#531dab'
   const friendLight = '#f5e8ff'
-  const stunColor = '#86909c'
-  const textColor = '#4e5969'
+  const stunColor = cssVar('--text-3', '#86909c')
+  const textColor = cssVar('--text-2', '#4e5969')
 
   const categories = [
     { name: '本机', itemStyle: { color: primary } },
@@ -192,7 +192,7 @@ export function buildTopologyOption(input: TopologyOptionInput): EChartsCoreOpti
         medium: { color: '#f7ba1e', type: 'dashed' },
         low: { color: '#ff7d00', type: 'dashed' },
         none: { color: '#f53f3f', type: 'dashed' },
-        unknown: { color: '#86909c', type: 'dashed' },
+        unknown: { color: cssVar('--text-3', '#86909c'), type: 'dashed' },
       }
       const style = styleMap[verdict.level]
       links.push({
@@ -214,10 +214,10 @@ export function buildTopologyOption(input: TopologyOptionInput): EChartsCoreOpti
         }
         return ''
       },
-      backgroundColor: '#ffffff',
-      borderColor: '#e5e6eb',
+      backgroundColor: cssVar('--surface-pop', '#ffffff'),
+      borderColor: cssVar('--border-subtle', '#e5e6eb'),
       borderWidth: 1,
-      textStyle: { color: '#1d2129' },
+      textStyle: { color: cssVar('--text-1', '#1d2129') },
     },
     legend: {
       show: true,
@@ -229,10 +229,10 @@ export function buildTopologyOption(input: TopologyOptionInput): EChartsCoreOpti
       itemWidth: 10,
       itemHeight: 10,
       textStyle: { fontSize: 11, color: textColor },
-      backgroundColor: '#f2f3f5',
+      backgroundColor: cssVar('--surface-2', '#f2f3f5'),
       borderRadius: 20,
       padding: [3, 12],
-      borderColor: '#e5e6eb',
+      borderColor: cssVar('--border-subtle', '#e5e6eb'),
       borderWidth: 1,
     },
     series: [
@@ -263,7 +263,7 @@ export function buildTopologyOption(input: TopologyOptionInput): EChartsCoreOpti
         edgeLabel: {
           show: true,
           fontSize: 9,
-          color: '#86909c',
+          color: cssVar('--text-3', '#86909c'),
           position: 'middle',
           offset: [0, -6],
         },
@@ -274,7 +274,7 @@ export function buildTopologyOption(input: TopologyOptionInput): EChartsCoreOpti
           opacity: 0.7,
         },
         itemStyle: {
-          borderColor: '#e5e6eb',
+          borderColor: cssVar('--border-subtle', '#e5e6eb'),
           borderWidth: 1.5,
         },
         symbolSize: 44,

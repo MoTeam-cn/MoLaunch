@@ -67,7 +67,8 @@
         "visible": false,
         "maximizable": true,
         "minWidth": 1105,
-        "minHeight": 585
+        "minHeight": 585,
+        "backgroundColor": "#f0f5ff"
       }
     ],
     "security": {

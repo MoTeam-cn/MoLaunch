@@ -100,7 +100,7 @@ function markActive(mark: SliderMark): boolean {
 const trackStyle = computed(() => {
   const p = percent.value
   return {
-    background: `linear-gradient(to right, var(--color-primary-500) 0%, var(--color-primary-500) ${p}%, var(--color-skeleton-bg, #e9e6ec) ${p}%, var(--color-skeleton-bg, #e9e6ec) 100%)`,
+    background: `linear-gradient(to right, var(--color-primary-500) 0%, var(--color-primary-500) ${p}%, var(--skeleton-bg) ${p}%, var(--skeleton-bg) 100%)`,
   }
 })
 

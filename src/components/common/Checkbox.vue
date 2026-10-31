@@ -134,7 +134,7 @@ function onChange(e: Event) {
   opacity: 0;
 }
 .checkbox-target:focus-visible + .checkbox-icon-hover::before {
-  background-color: rgb(var(--color-primary-rgb-100) / 0.6);
+  background-color: color-mix(in oklab, var(--color-primary-500) 18%, transparent);
 }
 
 /* icon-hover 背景：28x28 圆形浅色背景，hover/focus 时显示 */
@@ -157,7 +157,7 @@ function onChange(e: Event) {
   transition: background-color 0.1s cubic-bezier(0, 0, 1, 1);
 }
 .checkbox:hover .checkbox-icon-hover::before {
-  background-color: rgb(var(--color-primary-rgb-100) / 0.6);
+  background-color: color-mix(in oklab, var(--color-primary-500) 18%, transparent);
 }
 .checkbox.checkbox-checked:hover .checkbox-icon-hover::before,
 .checkbox.checkbox-indeterminate:hover .checkbox-icon-hover::before,

@@ -27,7 +27,7 @@
 .drawer-mask {
   position: absolute;
   inset: 0;
-  background-color: rgba(0, 0, 0, 0.45);
+  background-color: var(--bg-mask);
 }
 
 /* 面板：绝对定位，按方向贴边，flex 列布局 */

@@ -6,6 +6,21 @@
 
 ### 修复
 
+#### 暗色主题：变量覆盖不到的地方一次清完
+子 agent 全量扫描后归纳出三类「变量管不到」的漏洞，逐类处理：
+
+- **品牌色变体**：品牌色工具类编译成 `rgb(var(--color-primary-rgb-50) / 1)`，不吃 `--color-primary-*` 变量，而 `--color-primary-*` 由运行时内联写在 `documentElement` 上，任何选择器都改不动。所以 `hover:bg-primary-50` 这类变体只能逐类写——补了 6 条，覆盖 27 处悬停白底（关于页依赖卡片、首页启动按钮、社区卡片等）。同时删掉上一版加的两条 primary 变量重映射：它们对应工具类无效，留着会让人以为已覆盖。
+- **自绘面与内联样式**：`Watermark` 的水印是黑色 6%，深色主题下等于没有水印（防水印功能静默失效）；`Slider` 引用了全仓库不存在的变量名，回退值是一条亮白轨道；`SubTabBar` / `HorizontalFilter` 的滚动条写死浅灰且特异性压过全局规则；`ColorPicker` 的黑色 10% 描边在深底消失；`Drawer` 遮罩在深底不产生分离。统一抽成 `--checker-a/b`、`--grid-line`、`--watermark-fill`、`--scrollbar-thumb*`、`--skeleton-bg`、`--bg-mask` 六个语义变量，浅色在 `tokens.scss`、深色在 `theme-dark.scss`。
+- **Shadow DOM 与 JS 绘制**：自定义布局的 html section 用 Shadow DOM，样式表全是字面量，选择器进不去——改走 CSS 变量（自定义属性可穿透 shadow 边界，深色自动生效）。在线拓扑图是 ECharts 画在透明背景上，tooltip 是固定白色浮层、标签是 `#4e5969`，深色下白浮层刺眼、标签几乎看不见——改为读 `--surface-pop` / `--text-1/2/3`。单色模型图标走 `<img>` 载入，`currentColor` 在独立 SVG 里解析成黑色，深色主题下整片隐形——加反相。
+- **Markdown 正文标题**：`markdown.scss` 未分层且排在工具类之后，优先级压过一切工具类，标题写死 `#1d2129`，深色下与背景 `#171a1f` 对比 1.05:1 等于隐形。影响 AI 聊天正文、更新日志、公告共 41 处。改走 `var(--text-1)`，顺带把引用块、表格线、分隔线换成语义 token。
+- **首帧闪白**：`index.html` 的 `dark:bg-gray-900` 从未生效——项目没开 media 变体，`dark:` 编译成 `prefers-color-scheme` 媒体查询，跟 `data-theme` 完全脱钩；而 `data-theme` 要等 Pinia 初始化才写入，首帧必然按浅色画一遍。改为在 `<head>` 里同步读偏好写入主题，并补 `theme-color` 与主窗口 `backgroundColor`（splash 窗口本来就有，主窗口漏了）。
+- 统一了彩色 -50/-100/-200 的透明度档位：此前「逐类硬编码」与「变量重映射」两条路给出不同 alpha（同一档位差 8%~37%），无前缀与带变体的写法观感不一致。
+
+#### 安装与版本管理：失败不再被静默吞掉
+- **缺主文件仍继续拼 classpath**：`build_classpath` 找不到游戏主 jar 时只记一条 info 就往下走，结果是「安装报告成功 → 启动闪退」链路的第一环。改为直接返回错误并提示去修复。
+- **合并失败却先删父目录**：`post_install` 先 `merge_loader_json` 再 `delete_original_dir`，而合并函数里四处静默 return，合并没成也照删——留下一个 `inheritsFrom` 指向已删目录、永远启动不了的版本。改为合并返回 `Result`，只有成功才删父目录，失败保留并记错误日志；写 JSON 失败也不再谎报「已合并」。
+- **重命名版本只改目录名**：jar / JSON / natives 三处改名失败都只记日志，最后照样返回成功。用户看到新名字，启动时按 id 找不到 jar 和资源。改为任一步失败就回滚目录名并返回错误。
+
 #### 浅档变量覆盖改为从源码推导，不再靠人工清单
 补齐 rose 与 slate 的浅档重映射后，把「哪些颜色需要覆盖」改成从源码实际用法推导：测试会扫描 `src/` 里出现的每个颜色类，要求它们的 -50/-100/-200 都能在 `theme-dark.scss` 里找到变量重映射。以后新增任何颜色不用再改测试，也不会再出现「改了这里漏了那里」。
 

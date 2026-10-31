@@ -5,8 +5,30 @@
     <link rel="icon" type="image/svg+xml" href="/src/assets/logo.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>MoLaunch</title>
+    <!-- 主题在 <head> 里同步落定：等 Pinia 初始化再写 data-theme 的话，
+         首帧会先按默认浅色画一遍，深色用户看到的就是一次白闪。
+         dark: 前缀在这里也用不了——项目没有开启 media 变体，它跟 data-theme 完全脱钩。 -->
+    <meta name="theme-color" content="#0f1115" media="(prefers-color-scheme: dark)" />
+    <meta name="theme-color" content="#f0f5ff" media="(prefers-color-scheme: light)" />
+    <script>
+      (function () {
+        var mode = 'system'
+        try {
+          var raw = localStorage.getItem('molaunch.ui')
+          if (raw) mode = JSON.parse(raw).appearance || 'system'
+        } catch (e) {
+          mode = 'system'
+        }
+        var dark =
+          mode === 'dark' ||
+          (mode !== 'light' &&
+            window.matchMedia('(prefers-color-scheme: dark)').matches)
+        document.documentElement.dataset.theme = dark ? 'dark' : 'light'
+        document.documentElement.dataset.appearanceMode = mode
+      })()
+    </script>
   </head>
-  <body class="bg-gray-50 dark:bg-gray-900">
+  <body>
     <div id="app"></div>
     <script type="module" src="/src/main.ts"></script>
   </body>
