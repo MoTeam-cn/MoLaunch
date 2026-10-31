@@ -22,7 +22,7 @@
   },
   "productName": "MoLaunch",
   "mainBinaryName": "MoLaunch",
-  "version": "0.3.14-rc.3",
+  "version": "0.3.14-rc.4",
   "identifier": "com.moteam.molaunch",
   "plugins": {
     "updater": {

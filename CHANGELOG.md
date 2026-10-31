@@ -4,77 +4,114 @@
 
 ## [Unreleased]
 
+
+## [0.3.14-rc.4] - 2026-10-31
+
 ### 修复
 
 #### 用户主动操作失败时会给出提示
+
 `safeCall` 本身支持错误回调，但写操作路径上大多没传，失败只在控制台留一行。全仓筛出 12 处写操作调用，补齐需要提示的 5 处：[`java.ts`](src/stores/java.ts) 保存 Java 路径、[`settings.ts`](src/stores/settings.ts) 保存主题色、[`launch.ts`](src/stores/launch.ts) 自动备份、[`TopNavLayout.vue`](src/components/layout/TopNavLayout.vue) 关窗前保存配置。读操作的降级路径保持安静——全部提示只会让用户习惯性点掉弹窗。
 
 #### 用户看得见的失败，不该只躺在控制台里
+
 - [`auto-backup.ts`](src/utils/auto-backup.ts)：开了自动备份但备份失败时，异常直接抛给上层被 `safeCall` 吞掉，界面上什么都没有——用户以为存档有兜底。现在失败会提示，并且不写「今天已备份」的标记，下次启动还能重试。
+
 - [`plugins-install.ts`](src/stores/plugins/plugins-install.ts)：插件钩子执行失败只记 `console.error`，随后照样持久化启用状态，插件显示「已启用」却没有任何效果。现在失败回滚启用状态并提示。
+
 - [`fix.rs`](src-tauri/src/minecraft/download/fix.rs)：下载主文件失败只记 `log_debug`，于是「修复」返回成功而主文件仍缺，下次启动继续崩。现在下载后会核对主文件是否真的存在，仍缺就报错。
+
 - [`online.rs`](src-tauri/src/commands/community/install/modpack/online.rs)：`modpack.meta.json` 写失败提升为错误级（安装本身继续，但来源与更新信息会丢失）。
 
 #### 暗色主题：浮层、画布与描边
+
 - [`Tooltip.vue`](src/components/common/Tooltip.vue)：浮层底色写死 `#1f2937`，与深色页面只差一档，边界全靠阴影撑。改用 `--surface-pop` / `--text-1` / `--shadow-pop`。
+
 - `SkinCanvas` / `SchematicCanvas`：棋盘格是 Tailwind 任意值里的字面量（编译期固定），变量管不到，深色下画布边缘发白。改引用 `--checker-a` / `--checker-b`。
+
 - [`SchematicScene.vue`](src/views/tools/storage/schematic/SchematicScene.vue)：3D 舞台用 `bg-slate-900`，与深色页面几乎同色，边界消失。改用 `--surface-sunken`。
+
 - `ColorSelect` / `RpPixelEditor`：黑 10% 描边在深底上等于没有边框，改用已变量化的 `border-gray-200`。
 
 #### 落盘失败不再只写一行 debug 日志
+
 写文件失败但流程照常继续，是这批问题的共同形态。按「失败后果」分开处理：用户主动操作的核心结果一律上抛，辅助数据至少留下 error 级痕迹。
 
 - [`map_io.rs`](src-tauri/src/minecraft/download/chunk/map_io.rs)：续传位图落盘失败原来是 `log_debug`，等于没有记录——下次打开从头下载，用户只觉得「怎么又卡住了」。改 error 并说明后果。
+
 - [`job_store.rs`](src-tauri/src/minecraft/download/job_store.rs)：任务台账写失败同样只记 debug，进程被杀后残留的 `.part` 文件没人认领也没人清理。改 error。
+
 - [`folder.rs`](src-tauri/src/commands/version/folder.rs)：添加游戏文件夹时保存配置失败只 warn，然后照样返回成功——界面提示「已添加」，重启后文件夹不见了。改为上抛错误。
+
 - [`setup_persist.rs`](src-tauri/src/commands/version/install/setup_persist.rs) / [`setup/load.rs`](src-tauri/src/minecraft/version/setup/load.rs)：`setup.ini` 保存失败会让加载器版本记不住、后续反复识别成 Unknown。前者提升为 error，后者的 `let _` 改为记录错误。
 
 #### 开屏与环境守卫页在深色主题下整屏发白
+
 - [`splash.html`](public/splash.html) / [`splash.js`](public/splash.js)：开屏是写死的浅色渐变，深色用户每次启动都先看到一屏白再跳到深色主界面。补深色渐变与文字色，并把脚本从 `<body>` 末尾移到 `<head>`——同步脚本会阻塞渲染，这样才能在首帧前落下 `data-theme`，放在末尾还是会先画一遍浅色。
+
 - [`checkTauriEnv.ts`](src/utils/checkTauriEnv.ts)：环境守卫页是纯静态内联 HTML，深色系统下整页白。样式改走类名并补 `prefers-color-scheme: dark` 分支（这一页拿不到应用内的主题偏好，跟随系统是唯一可靠选择）。
 
 #### processor 退出码 0 不算成功，资源包开关不再假装生效
+
 - **processor 只认退出码**：自跑 processor 时 `Ok(())` 就计入「已执行」，从不检查 `--outputs` 声明的产物有没有真的出现。参数解析成空串、写文件失败都会让 processor 以 0 退出然后什么都不做——这正是「注入器报 0 但产物没生成」的机制面。现在执行完逐个核对声明的产物，缺一个就报错（映射下载步骤除外，那一步失败仍只告警）。
+
 - **资源包/光影开关与 `options.txt` 脱钩**：`write_options_lines` 吞掉写失败，`sync_options` 里三处 `let _`，toggle 不管有没有写上照样返回成功，界面显示「已启用」而游戏里没加载。现在写失败会上抛，切换失败时回滚文件名保持一致；删除时文件已无可回滚，但会明确告知开关状态没同步。
+
 - 资源包引用格式取决于游戏版本（1.13+ 才带 `file/` 前缀），此前版本号取不到就退化成空串，写进 `options.txt` 的是一条游戏不认的引用。现在取不到版本直接报错，不猜。
 
 #### 暗色主题：变量覆盖不到的地方一次清完
+
 子 agent 全量扫描后归纳出三类「变量管不到」的漏洞，逐类处理：
 
 - **品牌色变体**：品牌色工具类编译成 `rgb(var(--color-primary-rgb-50) / 1)`，不吃 `--color-primary-*` 变量，而 `--color-primary-*` 由运行时内联写在 `documentElement` 上，任何选择器都改不动。所以 `hover:bg-primary-50` 这类变体只能逐类写——补了 6 条，覆盖 27 处悬停白底（关于页依赖卡片、首页启动按钮、社区卡片等）。同时删掉上一版加的两条 primary 变量重映射：它们对应工具类无效，留着会让人以为已覆盖。
+
 - **自绘面与内联样式**：`Watermark` 的水印是黑色 6%，深色主题下等于没有水印（防水印功能静默失效）；`Slider` 引用了全仓库不存在的变量名，回退值是一条亮白轨道；`SubTabBar` / `HorizontalFilter` 的滚动条写死浅灰且特异性压过全局规则；`ColorPicker` 的黑色 10% 描边在深底消失；`Drawer` 遮罩在深底不产生分离。统一抽成 `--checker-a/b`、`--grid-line`、`--watermark-fill`、`--scrollbar-thumb*`、`--skeleton-bg`、`--bg-mask` 六个语义变量，浅色在 `tokens.scss`、深色在 `theme-dark.scss`。
+
 - **Shadow DOM 与 JS 绘制**：自定义布局的 html section 用 Shadow DOM，样式表全是字面量，选择器进不去——改走 CSS 变量（自定义属性可穿透 shadow 边界，深色自动生效）。在线拓扑图是 ECharts 画在透明背景上，tooltip 是固定白色浮层、标签是 `#4e5969`，深色下白浮层刺眼、标签几乎看不见——改为读 `--surface-pop` / `--text-1/2/3`。单色模型图标走 `<img>` 载入，`currentColor` 在独立 SVG 里解析成黑色，深色主题下整片隐形——加反相。
+
 - **Markdown 正文标题**：`markdown.scss` 未分层且排在工具类之后，优先级压过一切工具类，标题写死 `#1d2129`，深色下与背景 `#171a1f` 对比 1.05:1 等于隐形。影响 AI 聊天正文、更新日志、公告共 41 处。改走 `var(--text-1)`，顺带把引用块、表格线、分隔线换成语义 token。
+
 - **首帧闪白**：`index.html` 的 `dark:bg-gray-900` 从未生效——项目没开 media 变体，`dark:` 编译成 `prefers-color-scheme` 媒体查询，跟 `data-theme` 完全脱钩；而 `data-theme` 要等 Pinia 初始化才写入，首帧必然按浅色画一遍。改为在 `<head>` 里同步读偏好写入主题，并补 `theme-color` 与主窗口 `backgroundColor`（splash 窗口本来就有，主窗口漏了）。
+
 - 统一了彩色 -50/-100/-200 的透明度档位：此前「逐类硬编码」与「变量重映射」两条路给出不同 alpha（同一档位差 8%~37%），无前缀与带变体的写法观感不一致。
 
 #### 安装与版本管理：失败不再被静默吞掉
+
 - **缺主文件仍继续拼 classpath**：`build_classpath` 找不到游戏主 jar 时只记一条 info 就往下走，结果是「安装报告成功 → 启动闪退」链路的第一环。改为直接返回错误并提示去修复。
+
 - **合并失败却先删父目录**：`post_install` 先 `merge_loader_json` 再 `delete_original_dir`，而合并函数里四处静默 return，合并没成也照删——留下一个 `inheritsFrom` 指向已删目录、永远启动不了的版本。改为合并返回 `Result`，只有成功才删父目录，失败保留并记错误日志；写 JSON 失败也不再谎报「已合并」。
+
 - **重命名版本只改目录名**：jar / JSON / natives 三处改名失败都只记日志，最后照样返回成功。用户看到新名字，启动时按 id 找不到 jar 和资源。改为任一步失败就回滚目录名并返回错误。
 
 #### 浅档变量覆盖改为从源码推导，不再靠人工清单
+
 补齐 rose 与 slate 的浅档重映射后，把「哪些颜色需要覆盖」改成从源码实际用法推导：测试会扫描 `src/` 里出现的每个颜色类，要求它们的 -50/-100/-200 都能在 `theme-dark.scss` 里找到变量重映射。以后新增任何颜色不用再改测试，也不会再出现「改了这里漏了那里」。
 
 #### 暗色主题下所有 hover 都会退回浅色底，根子在变体类名
+
 `hover:bg-orange-50` 编译出来的类名是 `.hover\:bg-orange-50:hover`，和 `.bg-orange-50` 是两个不同的类。`[data-theme='dark'] .bg-orange-50` 这条规则**匹配不到它**，于是悬停时退回 Tailwind 的原始浅色值——深色主题上一块白底，文字又是提亮过的，几乎读不出来。加载器面板、关于页的依赖卡片都是这个原因。
 
 上一版把 LoaderCard 的 `hover:bg-{color}-50/50` 改成 `hover:bg-{color}-50`，当时以为修好了，其实只是换了个同样匹配不到的变体类名——问题还在，只是在等下一次悬停。
 
 - 治本做法：把**浅色档位本身**重映射成深色值（`--color-orange-50: rgb(234 88 12 / 0.16)`），这样 `bg-`、`hover:bg-`、`focus:bg-`、`group-hover:bg-`、`bg-*/50` 全部自动跟着走，不必为每种变体手写规则。
+
 - [`theme-dark.scss`](src/assets/styles/theme-dark.scss)：14 种彩色的 -50/-100/-200 全部纳入变量重映射；品牌色用 `--color-primary-rgb-500` 参与计算，跟随用户自定义的主题色。中深档（300 以上）不重映射——彩色块在深底上依然合适，改浅反而失真。
+
 - 中性色早就是这么做的（文件开头重映射 `--color-gray-*`），彩色系此前是逐类硬编码，所以只有不带变体的写法能被覆盖。现在两者统一。
+
 - [`dark-tint-coverage.test.ts`](src/assets/styles/__tests__/dark-tint-coverage.test.ts)：补断言要求 14 种彩色的三个浅档与品牌色三档都必须有变量重映射，缺一个就失败。
 
 #### 暗色主题：彩色淡底与深字的覆盖是逐条手写的，漏了不少
+
 中性色由 Tailwind v4 变量在 `[data-theme='dark']` 里整体重映射，所以 `bg-gray-100` 这类不用管；彩色系不在重映射范围内，`bg-orange-50` 必须逐条给。查了一遍，漏的比想象中多。
 
 - 按「会不会出问题」分档清扫：底色与描边用 -200 及更浅会变成浅底压深底，文字用 -600 及更深会变成深字压深底。扫出源码正在用的这类档位，一次性补齐。
+
 - [`theme-dark.scss`](src/assets/styles/theme-dark.scss)：补橙/紫/绿/青四色的 `bg-*-200`（悬停态）、五色的 `border-*-300` 与橙紫的 `border-*-200`（强调块描边）、`text-red-600` / `text-amber-600` / `text-amber-800` / `text-green-800`（深字提亮）、以及加载器图标用的五色 `text-*-500`。
+
 - 顺手删掉昨天加的 `bg-gray-50` 覆盖：中性色走变量重映射，那条是冗余，留着会变成第二个来源。
+
 - [`dark-tint-coverage.test.ts`](src/assets/styles/__tests__/dark-tint-coverage.test.ts)（新）：把这次扫描固化成测试——遍历源码，凡是用了会出问题的彩色档位就必须能在 theme-dark.scss 里找到规则；另加一条「扫描结果不得为空」的断言，防止测试本身失效后仍然绿灯。
-
-
 
 ## [0.3.14-rc.3] - 2026-10-30
 
@@ -13291,5 +13328,5 @@ oom_heartbeat\ 心跳上报时房主侧查询在线人数随请求体携带 \pla
 
 ---
 
-*本文档最后更新于 2026-10-30*
+*本文档最后更新于 2026-10-31*
 
