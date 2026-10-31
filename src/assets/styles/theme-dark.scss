@@ -44,6 +44,64 @@ html[data-theme='dark'],
   color: var(--ui-text);
 }
 
+/* ------------------------------------------------------------
+   彩色浅色档位改由变量重映射
+   ------------------------------------------------------------
+   `hover:` / `focus:` / `group-hover:` 这些变体编译成独立类名
+   （`.hover\\:bg-orange-50:hover`），下面的逐类规则**匹配不到它们**。
+   于是悬停时会退回 Tailwind 的原始浅色值——在深色主题上就是一块白底，
+   文字同时被提亮，几乎读不出来。加载器面板和关于页的依赖卡片都栽在这。
+   把浅色档位本身重映射成深色值，所有变体（含 hover）自动跟着走。
+   中深档（300 以上）不重映射：彩色块在深底上依然合适，改浅反而失真。
+   ------------------------------------------------------------ */
+[data-theme='dark'] {
+  --color-amber-50: rgb(217 119 6 / 0.16);
+  --color-amber-100: rgb(217 119 6 / 0.22);
+  --color-amber-200: rgb(217 119 6 / 0.28);
+  --color-blue-50: rgb(37 99 235 / 0.16);
+  --color-blue-100: rgb(37 99 235 / 0.22);
+  --color-blue-200: rgb(37 99 235 / 0.28);
+  --color-cyan-50: rgb(8 145 178 / 0.16);
+  --color-cyan-100: rgb(8 145 178 / 0.22);
+  --color-cyan-200: rgb(8 145 178 / 0.28);
+  --color-emerald-50: rgb(5 150 105 / 0.16);
+  --color-emerald-100: rgb(5 150 105 / 0.22);
+  --color-emerald-200: rgb(5 150 105 / 0.28);
+  --color-green-50: rgb(22 163 74 / 0.16);
+  --color-green-100: rgb(22 163 74 / 0.22);
+  --color-green-200: rgb(22 163 74 / 0.28);
+  --color-indigo-50: rgb(79 70 229 / 0.16);
+  --color-indigo-100: rgb(79 70 229 / 0.22);
+  --color-indigo-200: rgb(79 70 229 / 0.28);
+  --color-lime-50: rgb(101 163 13 / 0.16);
+  --color-lime-100: rgb(101 163 13 / 0.22);
+  --color-lime-200: rgb(101 163 13 / 0.28);
+  --color-orange-50: rgb(234 88 12 / 0.16);
+  --color-orange-100: rgb(234 88 12 / 0.22);
+  --color-orange-200: rgb(234 88 12 / 0.28);
+  --color-pink-50: rgb(219 39 119 / 0.16);
+  --color-pink-100: rgb(219 39 119 / 0.22);
+  --color-pink-200: rgb(219 39 119 / 0.28);
+  --color-purple-50: rgb(124 58 237 / 0.16);
+  --color-purple-100: rgb(124 58 237 / 0.22);
+  --color-purple-200: rgb(124 58 237 / 0.28);
+  --color-red-50: rgb(220 38 38 / 0.16);
+  --color-red-100: rgb(220 38 38 / 0.22);
+  --color-red-200: rgb(220 38 38 / 0.28);
+  --color-sky-50: rgb(2 132 199 / 0.16);
+  --color-sky-100: rgb(2 132 199 / 0.22);
+  --color-sky-200: rgb(2 132 199 / 0.28);
+  --color-teal-50: rgb(13 148 136 / 0.16);
+  --color-teal-100: rgb(13 148 136 / 0.22);
+  --color-teal-200: rgb(13 148 136 / 0.28);
+  --color-yellow-50: rgb(202 138 4 / 0.16);
+  --color-yellow-100: rgb(202 138 4 / 0.22);
+  --color-yellow-200: rgb(202 138 4 / 0.28);
+  --color-primary-50: rgb(var(--color-primary-rgb-500) / 0.18);
+  --color-primary-100: rgb(var(--color-primary-rgb-500) / 0.24);
+  --color-primary-200: rgb(var(--color-primary-rgb-500) / 0.30);
+}
+
 /* 页面底色 */
 [data-theme='dark'] .bg-page,
 [data-theme='dark'] .bg-brand-page {

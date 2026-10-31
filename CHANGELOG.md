@@ -6,6 +6,16 @@
 
 ### 修复
 
+#### 暗色主题下所有 hover 都会退回浅色底，根子在变体类名
+`hover:bg-orange-50` 编译出来的类名是 `.hover\:bg-orange-50:hover`，和 `.bg-orange-50` 是两个不同的类。`[data-theme='dark'] .bg-orange-50` 这条规则**匹配不到它**，于是悬停时退回 Tailwind 的原始浅色值——深色主题上一块白底，文字又是提亮过的，几乎读不出来。加载器面板、关于页的依赖卡片都是这个原因。
+
+上一版把 LoaderCard 的 `hover:bg-{color}-50/50` 改成 `hover:bg-{color}-50`，当时以为修好了，其实只是换了个同样匹配不到的变体类名——问题还在，只是在等下一次悬停。
+
+- 治本做法：把**浅色档位本身**重映射成深色值（`--color-orange-50: rgb(234 88 12 / 0.16)`），这样 `bg-`、`hover:bg-`、`focus:bg-`、`group-hover:bg-`、`bg-*/50` 全部自动跟着走，不必为每种变体手写规则。
+- [`theme-dark.scss`](src/assets/styles/theme-dark.scss)：14 种彩色的 -50/-100/-200 全部纳入变量重映射；品牌色用 `--color-primary-rgb-500` 参与计算，跟随用户自定义的主题色。中深档（300 以上）不重映射——彩色块在深底上依然合适，改浅反而失真。
+- 中性色早就是这么做的（文件开头重映射 `--color-gray-*`），彩色系此前是逐类硬编码，所以只有不带变体的写法能被覆盖。现在两者统一。
+- [`dark-tint-coverage.test.ts`](src/assets/styles/__tests__/dark-tint-coverage.test.ts)：补断言要求 14 种彩色的三个浅档与品牌色三档都必须有变量重映射，缺一个就失败。
+
 #### 暗色主题：彩色淡底与深字的覆盖是逐条手写的，漏了不少
 中性色由 Tailwind v4 变量在 `[data-theme='dark']` 里整体重映射，所以 `bg-gray-100` 这类不用管；彩色系不在重映射范围内，`bg-orange-50` 必须逐条给。查了一遍，漏的比想象中多。
 
