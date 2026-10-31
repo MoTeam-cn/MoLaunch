@@ -109,41 +109,50 @@ pub async fn rename_version(
         e.to_string()
     })?;
 
-    // 2. 重命名 jar 文件
+    // 2. 目录内的文件跟着改：jar / JSON / natives 任意一步失败都回滚目录名，
+    //    以前三步全是 let _ 或只打日志，最后照样报告「重命名成功」，
+    //    用户看到新名字但启动时按 id 找不到 jar 和资源。
+    let rollback = || {
+        if let Err(e) = std::fs::rename(&new_dir, &old_dir) {
+            log_error!("[Rename] 回滚目录名失败，请手动检查: {}", e);
+        }
+    };
+
     let old_jar = new_dir.join(format!("{}.jar", version_id));
     let new_jar = new_dir.join(format!("{}.jar", new_name));
     if old_jar.exists() {
         if let Err(e) = std::fs::rename(&old_jar, &new_jar) {
-            log_error!("Failed to rename jar: {}", e);
+            rollback();
+            return Err(format!("重命名游戏主文件失败: {}", e));
         }
     }
 
-    // 3. 重命名 JSON 文件
     let old_json = new_dir.join(format!("{}.json", version_id));
     let new_json = new_dir.join(format!("{}.json", new_name));
     if old_json.exists() {
-        // 读取 JSON 并更新 id 字段
-        if let Ok(content) = std::fs::read_to_string(&old_json) {
-            if let Ok(mut json) = serde_json::from_str::<serde_json::Value>(&content) {
-                // 更新 id 字段为新版本名
-                json["id"] = serde_json::Value::String(new_name.clone());
-                if let Ok(new_content) = serde_json::to_string_pretty(&json) {
-                    let _ = std::fs::write(&new_json, new_content);
-                    let _ = std::fs::remove_file(&old_json);
-                }
-            }
+        let content =
+            std::fs::read_to_string(&old_json).map_err(|e| format!("读取版本配置失败: {}", e))?;
+        let mut json: serde_json::Value =
+            serde_json::from_str(&content).map_err(|e| format!("解析版本配置失败: {}", e))?;
+        json["id"] = serde_json::Value::String(new_name.clone());
+        let new_content = serde_json::to_string_pretty(&json)
+            .map_err(|e| format!("序列化版本配置失败: {}", e))?;
+        if let Err(e) = std::fs::write(&new_json, new_content) {
+            rollback();
+            return Err(format!("写入新版本配置失败: {}", e));
         }
-        if !new_json.exists() {
-            // JSON 更新失败时简单重命名
-            let _ = std::fs::rename(&old_json, &new_json);
+        if let Err(e) = std::fs::remove_file(&old_json) {
+            log_warn!("[Rename] 旧版本配置删除失败（不影响使用）: {}", e);
         }
     }
 
-    // 4. 重命名 natives 文件夹
     let old_natives = new_dir.join(format!("{}-natives", version_id));
     let new_natives = new_dir.join(format!("{}-natives", new_name));
     if old_natives.exists() {
-        let _ = std::fs::rename(&old_natives, &new_natives);
+        if let Err(e) = std::fs::rename(&old_natives, &new_natives) {
+            rollback();
+            return Err(format!("重命名 natives 目录失败: {}", e));
+        }
     }
 
     log_info!(

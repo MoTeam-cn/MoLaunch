@@ -42,8 +42,10 @@ pub(super) fn build_classpath(game_dir: &Path, json: &serde_json::Value) -> anyh
             entries.push(jar_path);
         }
     } else {
-        log_info!(
-            "[Classpath] Warning: Main jar not found: {}",
+        // 缺主 jar 一定启动不了（NoClassDefFoundError/无主类直接闪退），
+        // 以前只记一条 info 就继续拼 classpath，用户看到的是安装成功后的崩溃。
+        anyhow::bail!(
+            "缺少游戏主文件 {}，请在版本设置里执行修复后再启动",
             version_jar.display()
         );
     }

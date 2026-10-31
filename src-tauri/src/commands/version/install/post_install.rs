@@ -20,8 +20,14 @@ pub(crate) fn merge_and_rename_version(
     has_any_loader: bool,
 ) -> String {
     if has_any_loader {
-        merge_loader_json(game_dir, mc_version);
-        delete_original_dir(game_dir, mc_version);
+        // 顺序不能反：合并失败时加载器 JSON 里的 inheritsFrom 仍指向原版目录，
+        // 先删就会留下一个永远起不来的版本（classpath 递归收集不到父版本库）。
+        match merge_loader_json(game_dir, mc_version) {
+            Ok(()) => delete_original_dir(game_dir, mc_version),
+            Err(e) => {
+                crate::log_error!("[Merged] 合并加载器 JSON 失败，保留原版目录: {}", e);
+            }
+        }
     }
 
     // 确定最终的版本目录名
@@ -55,40 +61,43 @@ fn report_orphans(game_dir: &std::path::Path) {
 }
 
 /// 合并加载器版本的 JSON（删除 inheritsFrom，合并原版 JSON）
-fn merge_loader_json(game_dir: &std::path::Path, mc_version: &str) {
+fn merge_loader_json(game_dir: &std::path::Path, mc_version: &str) -> Result<(), String> {
     let versions_dir = game_dir.join("versions");
-    let Some(dir_name) = find_loader_version_dir(&versions_dir, mc_version) else {
-        return;
-    };
+    let dir_name = find_loader_version_dir(&versions_dir, mc_version)
+        .ok_or_else(|| format!("找不到 {} 的加载器版本目录", mc_version))?;
 
     let loader_json_path = versions_dir
         .join(&dir_name)
         .join(format!("{}.json", dir_name));
 
     if !loader_json_path.exists() {
-        return;
+        return Err(format!(
+            "加载器版本 JSON 不存在: {}",
+            loader_json_path.display()
+        ));
     }
 
-    let Ok(content) = std::fs::read_to_string(&loader_json_path) else {
-        return;
-    };
-    let Ok(json) = serde_json::from_str::<serde_json::Value>(&content) else {
-        return;
-    };
+    let content = std::fs::read_to_string(&loader_json_path)
+        .map_err(|e| format!("读取 {} 失败: {}", loader_json_path.display(), e))?;
+    let json = serde_json::from_str::<serde_json::Value>(&content)
+        .map_err(|e| format!("解析 {} 失败: {}", loader_json_path.display(), e))?;
 
-    if json.get("inheritsFrom").is_some() {
-        if let Ok(merged) =
-            crate::minecraft::version::json_merge::merge_version_json(&json, game_dir)
-        {
-            if let Ok(new_content) = serde_json::to_string_pretty(&merged) {
-                let _ = std::fs::write(&loader_json_path, new_content);
-                log_info!("[Merged] 已合并JSON并删除inheritsFrom: {}", dir_name);
-            }
-        }
+    if json.get("inheritsFrom").is_none() {
+        // 已经是自包含的 JSON，不需要合并
+        return Ok(());
     }
+
+    let merged = crate::minecraft::version::json_merge::merge_version_json(&json, game_dir)
+        .map_err(|e| format!("合并版本 JSON 失败: {}", e))?;
+    let new_content =
+        serde_json::to_string_pretty(&merged).map_err(|e| format!("序列化合并结果失败: {}", e))?;
+    // 写不进去就不能声称已合并——以前这里 let _ 之后照样打「已合并」
+    std::fs::write(&loader_json_path, new_content)
+        .map_err(|e| format!("写入 {} 失败: {}", loader_json_path.display(), e))?;
+    log_info!("[Merged] 已合并JSON并删除inheritsFrom: {}", dir_name);
+    Ok(())
 }
 
-/// 删除原版目录（加载器安装成功后只保留加载器版本目录）
 fn delete_original_dir(game_dir: &std::path::Path, mc_version: &str) {
     let mc_version_dir = game_dir.join("versions").join(mc_version);
     if mc_version_dir.exists() {
