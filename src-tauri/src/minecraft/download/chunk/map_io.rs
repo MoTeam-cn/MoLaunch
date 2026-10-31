@@ -23,7 +23,7 @@ pub(crate) fn save_map(table: &SegmentTable, map_path: &str, resume_key: Option<
         return;
     };
     if let Err(e) = table.save(Path::new(map_path), key) {
-        crate::log_error!("[Segment] 续传位图落盘失败，下次会从头下载: {}", e);
+        log_error!("[Segment] 续传位图落盘失败，下次会从头下载: {}", e);
     }
 }
 
