@@ -257,7 +257,7 @@ onBeforeUnmount(() => {
       <Tooltip v-for="c in MC_COLORS" :key="c" :text="c">
         <button
           type="button"
-          class="h-5 w-5 rounded-xs border border-black/10"
+          class="h-5 w-5 rounded-xs border border-gray-200"
           :class="color.toLowerCase() === c.toLowerCase() ? 'ring-2 ring-blue-500 ring-offset-1' : ''"
           :style="{ backgroundColor: c }"
           @click="color = c"

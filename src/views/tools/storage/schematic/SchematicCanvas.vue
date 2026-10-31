@@ -248,7 +248,7 @@ onBeforeUnmount(() => {
 <template>
   <div
     ref="rootEl"
-    class="inline-flex max-w-full rounded border border-gray-300 bg-[repeating-conic-gradient(#f2f3f5_0_25%,#ffffff_0_50%)] bg-[length:12px_12px] p-1"
+    class="inline-flex max-w-full rounded border border-gray-300 bg-[repeating-conic-gradient(var(--checker-a)_0_25%,var(--checker-b)_0_50%)] bg-[length:12px_12px] p-1"
   >
     <canvas
       ref="canvasRef"

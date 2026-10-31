@@ -217,7 +217,7 @@ onBeforeUnmount(disposeRenderer)
         </button>
       </span>
     </div>
-    <div ref="stageEl" class="relative min-h-[360px] flex-1 overflow-hidden rounded-sm bg-slate-900">
+    <div ref="stageEl" class="relative min-h-[360px] flex-1 overflow-hidden rounded-sm bg-[var(--surface-sunken)]">
       <canvas
         ref="canvasEl"
         class="h-full w-full touch-none select-none cursor-grab active:cursor-grabbing"
@@ -230,7 +230,7 @@ onBeforeUnmount(disposeRenderer)
       ></canvas>
       <!-- 常驻操作说明：画布本身没有可见的控件，不写清楚没人知道能拖 -->
       <div
-        class="pointer-events-none absolute bottom-2 left-2 rounded-sm bg-slate-900/70 px-2 py-1 text-[11px] leading-relaxed text-gray-300"
+        class="pointer-events-none absolute bottom-2 left-2 rounded-sm bg-[var(--surface-sunken)]/70 px-2 py-1 text-[11px] leading-relaxed text-gray-300"
       >
         <span>左键按住拖动：旋转视角</span>
         <span class="mx-1 text-gray-500">·</span>
@@ -238,12 +238,12 @@ onBeforeUnmount(disposeRenderer)
         <span class="mx-1 text-gray-500">·</span>
         <span>滚轮：缩放</span>
       </div>
-      <div v-if="loading" class="absolute inset-0 grid place-items-center bg-slate-900/80 text-sm text-gray-300">
+      <div v-if="loading" class="absolute inset-0 grid place-items-center bg-[var(--surface-sunken)]/80 text-sm text-gray-300">
         正在构建立体场景…
       </div>
       <div
         v-if="error && !loading"
-        class="absolute inset-0 flex flex-col items-center justify-center gap-1 bg-slate-900/90 px-4 text-center text-gray-300"
+        class="absolute inset-0 flex flex-col items-center justify-center gap-1 bg-[var(--surface-sunken)]/90 px-4 text-center text-gray-300"
       >
         <p class="text-sm">3D 预览不可用</p>
         <p class="max-w-[80%] break-all text-xs text-gray-400">{{ error }}</p>

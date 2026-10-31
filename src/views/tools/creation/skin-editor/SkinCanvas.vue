@@ -121,7 +121,7 @@ onBeforeUnmount(() => {
 
 <template>
   <div class="inline-flex flex-col items-center gap-2">
-    <div class="rounded border border-gray-300 bg-[repeating-conic-gradient(#f2f3f5_0_25%,#ffffff_0_50%)] bg-[length:16px_16px] p-1">
+    <div class="rounded border border-gray-300 bg-[repeating-conic-gradient(var(--checker-a)_0_25%,var(--checker-b)_0_50%)] bg-[length:16px_16px] p-1">
       <canvas
         ref="canvasRef"
         :style="canvasStyle"

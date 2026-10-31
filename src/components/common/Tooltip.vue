@@ -250,12 +250,12 @@ onUnmounted(() => {
 .tooltip-body {
   position: relative;
   padding: 6px 12px;
-  background: #1f2937;
-  color: #f9fafb;
+  background: var(--surface-pop);
+  color: var(--text-1);
   font-size: 12px;
   line-height: 1.5;
   border-radius: 6px;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+  box-shadow: var(--shadow-pop);
   width: max-content;
   max-width: 360px;
   /* 默认 normal：避免 pre-line 触发 Chromium max-content 退化（中文/短文本提前换行）；
@@ -281,7 +281,7 @@ onUnmounted(() => {
   position: absolute;
   width: 8px;
   height: 8px;
-  background: #1f2937;
-  box-shadow: 1px 1px 2px rgba(0, 0, 0, 0.1);
+  background: var(--surface-pop);
+  box-shadow: var(--shadow-pop);
 }
 </style>

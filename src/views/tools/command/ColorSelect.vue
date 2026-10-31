@@ -16,7 +16,7 @@ const selected = computed(() => COLOR_OPTIONS.find((o) => o.value === model.valu
     <template #selected>
       <span v-if="selected" class="flex min-w-0 items-center gap-1.5">
         <span
-          class="inline-block h-3 w-3 shrink-0 rounded-full border border-black/10"
+          class="inline-block h-3 w-3 shrink-0 rounded-full border border-gray-200"
           :style="{ backgroundColor: selected.color }"
         />
         <span class="truncate">{{ selected.label }}</span>
@@ -25,7 +25,7 @@ const selected = computed(() => COLOR_OPTIONS.find((o) => o.value === model.valu
     <template #option="{ option, selected: isSelected }">
       <span class="flex min-w-0 items-center gap-1.5">
         <span
-          class="inline-block h-3 w-3 shrink-0 rounded-full border border-black/10"
+          class="inline-block h-3 w-3 shrink-0 rounded-full border border-gray-200"
           :style="{ backgroundColor: option.color }"
         />
         <span class="flex-1 truncate">{{ option.label }}</span>
