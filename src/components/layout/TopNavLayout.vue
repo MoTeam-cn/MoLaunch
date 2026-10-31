@@ -118,7 +118,7 @@ async function doExit() {
   if (exiting.value) return
   exiting.value = true
   // 关闭窗口前先保存配置
-  await safeCall(() => tauri.saveConfigToFile(), 'save config before close')
+  await safeCall(() => tauri.saveConfigToFile(), 'save config before close', (e) => toastError(`保存配置失败：${e instanceof Error ? e.message : String(e)}`))
   // 联机状态清理：房主先停联机中心再关闭登记，房客停 easytier 并清空本地状态
   // 短超时保护，网络问题不卡住关窗；API 失败不阻塞关窗（服务端 keepalive 超时兜底）
   const role = onlineStore.roomState.role

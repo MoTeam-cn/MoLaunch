@@ -6,6 +6,7 @@ import { defineStore } from 'pinia'
 import { ref } from 'vue'
 import * as tauri from '@/utils/tauri'
 import { safeCall } from '@/utils/async'
+import { toastError } from '@/utils/toast'
 
 export const useJavaStore = defineStore('java', () => {
   const javaPath = ref('')
@@ -24,7 +25,7 @@ export const useJavaStore = defineStore('java', () => {
 
   // 保存 Java 路径到配置（走统一 apply_config，写 INI [Java] path）
   async function saveJavaPath(path: string) {
-    await safeCall(() => tauri.applyConfig({ javaPath: path }), 'save Java path')
+    await safeCall(() => tauri.applyConfig({ javaPath: path }), 'save Java path', (e) => toastError(`保存 Java 路径失败：${e instanceof Error ? e.message : String(e)}`))
   }
 
   async function detectJava() {

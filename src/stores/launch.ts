@@ -149,7 +149,7 @@ let javaNoticeUnlisten: Array<() => void> = []
     extraJvmArgs?: string[]
   }): Promise<number> {
     // 启动前自动备份存档（设置里开启后每个版本每天一次；失败不阻断启动）
-    await safeCall(() => runAutoBackup(params.versionId), 'auto backup worlds')
+    await safeCall(() => runAutoBackup(params.versionId), 'auto backup worlds', (e) => toastError(`自动备份存档失败：${e instanceof Error ? e.message : String(e)}`))
     launching.value = true
     launchingVersionId.value = params.versionId
     launchProgress.value = null

@@ -6,6 +6,9 @@
 
 ### 修复
 
+#### 用户主动操作失败时会给出提示
+`safeCall` 本身支持错误回调，但写操作路径上大多没传，失败只在控制台留一行。全仓筛出 12 处写操作调用，补齐需要提示的 5 处：[`java.ts`](src/stores/java.ts) 保存 Java 路径、[`settings.ts`](src/stores/settings.ts) 保存主题色、[`launch.ts`](src/stores/launch.ts) 自动备份、[`TopNavLayout.vue`](src/components/layout/TopNavLayout.vue) 关窗前保存配置。读操作的降级路径保持安静——全部提示只会让用户习惯性点掉弹窗。
+
 #### 用户看得见的失败，不该只躺在控制台里
 - [`auto-backup.ts`](src/utils/auto-backup.ts)：开了自动备份但备份失败时，异常直接抛给上层被 `safeCall` 吞掉，界面上什么都没有——用户以为存档有兜底。现在失败会提示，并且不写「今天已备份」的标记，下次启动还能重试。
 - [`plugins-install.ts`](src/stores/plugins/plugins-install.ts)：插件钩子执行失败只记 `console.error`，随后照样持久化启用状态，插件显示「已启用」却没有任何效果。现在失败回滚启用状态并提示。

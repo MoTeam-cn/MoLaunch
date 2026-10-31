@@ -12,6 +12,7 @@ import { applyPrimaryColor } from '@/utils/color'
 import { getConfigMap, applyConfig } from '@/utils/api/config'
 import { toastSuccess } from '@/utils/toast'
 import { safeCall, safeCallSync } from '@/utils/async'
+import { toastError } from '@/utils/toast'
 
 export type LayoutMode = 'sidebar' | 'topnav'
 
@@ -114,7 +115,7 @@ export const useSettingsStore = defineStore('settings', () => {
     saveSettings()
     toastSuccess(`主题色已更新为 ${color.toUpperCase()}`)
     // 异步写后端，失败仅日志不阻塞
-    await safeCall(() => applyConfig({ primaryColor: color }), '[Settings] save primaryColor to backend')
+    await safeCall(() => applyConfig({ primaryColor: color }), '[Settings] save primaryColor to backend', (e) => toastError(`保存主题色失败：${e instanceof Error ? e.message : String(e)}`))
   }
 
   loadSettings()
