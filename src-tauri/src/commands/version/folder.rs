@@ -6,7 +6,7 @@
 
 use crate::config::save_config;
 use crate::state::{AppState, McFolder};
-use crate::{log_info, log_warn};
+use crate::{log_error, log_info, log_warn};
 
 /// 列出所有 Minecraft 文件夹
 ///
@@ -73,10 +73,11 @@ pub async fn add_mc_folder(
 
     let result = config.mc_folders.clone();
 
-    // 持久化
-    if let Err(e) = save_config(&config) {
-        log_warn!("Failed to save config after adding folder: {}", e);
-    }
+    // 持久化：写不进去就不能说「已添加」——重启后这个文件夹会消失
+    save_config(&config).map_err(|e| {
+        log_error!("[Folders] 保存文件夹列表失败: {}", e);
+        format!("保存文件夹列表失败: {}", e)
+    })?;
 
     Ok(result)
 }

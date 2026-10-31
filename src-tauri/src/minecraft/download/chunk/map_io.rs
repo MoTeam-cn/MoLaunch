@@ -2,7 +2,7 @@
 
 use std::path::Path;
 
-use crate::log_debug;
+use crate::log_error;
 
 use super::table::SegmentTable;
 
@@ -23,7 +23,7 @@ pub(crate) fn save_map(table: &SegmentTable, map_path: &str, resume_key: Option<
         return;
     };
     if let Err(e) = table.save(Path::new(map_path), key) {
-        log_debug!("[Segment] 位图落盘失败: {}", e);
+        crate::log_error!("[Segment] 续传位图落盘失败，下次会从头下载: {}", e);
     }
 }
 

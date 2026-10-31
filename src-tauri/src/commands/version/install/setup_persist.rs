@@ -6,7 +6,7 @@
 use crate::minecraft::isolation::{self, IsolationMode};
 use crate::minecraft::version::{setup::VersionSetup, state::VersionType};
 use crate::state::AppState;
-use crate::{log_info, log_warn};
+use crate::{log_error, log_info, log_warn};
 
 /// 保存 setup.ini + 创建隔离目录
 #[allow(clippy::too_many_arguments)]
@@ -36,7 +36,7 @@ pub(crate) async fn save_setup_and_create_isolation(
         liteloader_version,
     );
     if let Err(e) = setup.save(&version_dir) {
-        log_warn!("[Merged] 保存 setup.ini 失败: {}", e);
+        log_error!("[Merged] 保存 setup.ini 失败，加载器版本将记不住: {}", e);
     } else {
         log_info!("[Merged] 已保存 setup.ini: {}", version_dir.display());
     }

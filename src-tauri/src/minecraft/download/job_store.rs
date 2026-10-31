@@ -146,7 +146,7 @@ fn persist(jobs: &[JobRecord]) {
         return;
     };
     if let Err(e) = crate::utils::fs::write_atomic(&path, text.as_bytes()) {
-        log_debug!("[JobStore] 台账落盘失败: {}", e);
+        crate::log_error!("[JobStore] 任务台账落盘失败，未完成任务将无法续传: {}", e);
     }
 }
 

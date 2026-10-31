@@ -6,6 +6,14 @@
 
 ### 修复
 
+#### 落盘失败不再只写一行 debug 日志
+写文件失败但流程照常继续，是这批问题的共同形态。按「失败后果」分开处理：用户主动操作的核心结果一律上抛，辅助数据至少留下 error 级痕迹。
+
+- [`map_io.rs`](src-tauri/src/minecraft/download/chunk/map_io.rs)：续传位图落盘失败原来是 `log_debug`，等于没有记录——下次打开从头下载，用户只觉得「怎么又卡住了」。改 error 并说明后果。
+- [`job_store.rs`](src-tauri/src/minecraft/download/job_store.rs)：任务台账写失败同样只记 debug，进程被杀后残留的 `.part` 文件没人认领也没人清理。改 error。
+- [`folder.rs`](src-tauri/src/commands/version/folder.rs)：添加游戏文件夹时保存配置失败只 warn，然后照样返回成功——界面提示「已添加」，重启后文件夹不见了。改为上抛错误。
+- [`setup_persist.rs`](src-tauri/src/commands/version/install/setup_persist.rs) / [`setup/load.rs`](src-tauri/src/minecraft/version/setup/load.rs)：`setup.ini` 保存失败会让加载器版本记不住、后续反复识别成 Unknown。前者提升为 error，后者的 `let _` 改为记录错误。
+
 #### 开屏与环境守卫页在深色主题下整屏发白
 - [`splash.html`](public/splash.html) / [`splash.js`](public/splash.js)：开屏是写死的浅色渐变，深色用户每次启动都先看到一屏白再跳到深色主界面。补深色渐变与文字色，并把脚本从 `<body>` 末尾移到 `<head>`——同步脚本会阻塞渲染，这样才能在首帧前落下 `data-theme`，放在末尾还是会先画一遍浅色。
 - [`checkTauriEnv.ts`](src/utils/checkTauriEnv.ts)：环境守卫页是纯静态内联 HTML，深色系统下整页白。样式改走类名并补 `prefers-color-scheme: dark` 分支（这一页拿不到应用内的主题偏好，跟随系统是唯一可靠选择）。

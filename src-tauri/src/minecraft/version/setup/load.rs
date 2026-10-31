@@ -112,7 +112,9 @@ impl VersionSetup {
             java: JavaConfig::default(),
             advanced: AdvancedConfig::default(),
         });
-        let _ = setup.save(version_dir);
+        if let Err(e) = setup.save(version_dir) {
+            crate::log_error!("[Setup] 默认配置落盘失败，版本类型可能识别不准: {}", e);
+        }
         setup
     }
 
