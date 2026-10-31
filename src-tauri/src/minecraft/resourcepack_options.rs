@@ -34,8 +34,10 @@ fn read_options_lines(game_dir: &Path) -> Vec<String> {
         .unwrap_or_default()
 }
 
-fn write_options_lines(game_dir: &Path, lines: &[String]) {
-    let _ = std::fs::write(game_dir.join("options.txt"), lines.join("\n"));
+fn write_options_lines(game_dir: &Path, lines: &[String]) -> Result<(), String> {
+    let path = game_dir.join("options.txt");
+    std::fs::write(&path, lines.join("\n"))
+        .map_err(|e| format!("写入 {} 失败: {}", path.display(), e))
 }
 
 /// 解析 resourcePacks 行，返回数组内容（去首尾括号）
@@ -88,8 +90,7 @@ pub fn set_resource_pack_enabled(
     if !replaced && enabled {
         lines.push(format!("resourcePacks:[{}]", desired));
     }
-    write_options_lines(game_dir, &lines);
-    Ok(())
+    write_options_lines(game_dir, &lines)
 }
 
 /// 设置/清除光影（shaderPack 键；None 清除）
@@ -110,6 +111,5 @@ pub fn set_shader_pack(game_dir: &Path, pack_name: Option<&str>) -> Result<(), S
     if !replaced {
         lines.push(desired);
     }
-    write_options_lines(game_dir, &lines);
-    Ok(())
+    write_options_lines(game_dir, &lines)
 }

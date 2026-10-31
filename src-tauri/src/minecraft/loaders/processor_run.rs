@@ -276,6 +276,24 @@ fn run_one(
             log_path.display()
         ));
     }
+
+    // 退出码 0 不等于成功：参数没解析对、写文件失败都可能让它悄悄跳过。
+    // 以前只看退出码就计入「已执行」，安装一路报告成功，进游戏才炸。
+    let missing: Vec<String> = step
+        .outputs
+        .iter()
+        .filter(|path| !path.is_file())
+        .map(|path| path.display().to_string())
+        .collect();
+    if !missing.is_empty() {
+        return Err(anyhow::anyhow!(
+            "processor {} 退出码为 0，但声明的产物没有生成：\n{}\n日志末尾：\n{}\n完整日志：{}",
+            step.label,
+            missing.join("\n"),
+            log_tail(&log_path),
+            log_path.display()
+        ));
+    }
     Ok(())
 }
 
