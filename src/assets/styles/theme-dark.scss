@@ -113,6 +113,7 @@ html[data-theme='dark'],
 [data-theme='dark'] .bg-white\/80 { background-color: rgb(23 26 31 / 0.80); }
 [data-theme='dark'] .bg-white\/90 { background-color: rgb(23 26 31 / 0.90); }
 [data-theme='dark'] .bg-white\/95 { background-color: rgb(23 26 31 / 0.95); }
+[data-theme='dark'] .bg-gray-50 { background-color: rgb(28 32 39); }
 [data-theme='dark'] .bg-gray-50\/40 { background-color: rgb(28 32 39 / 0.40); }
 [data-theme='dark'] .bg-gray-50\/50 { background-color: rgb(28 32 39 / 0.50); }
 [data-theme='dark'] .bg-gray-50\/60 { background-color: rgb(28 32 39 / 0.60); }
@@ -396,6 +397,19 @@ html[data-theme='dark'],
 [data-theme='dark'] .bg-emerald-100 {
   background-color: rgb(5 150 105 / 0.16);
 }
+[data-theme='dark'] .bg-orange-50\/50 {
+  background-color: rgb(234 88 12 / 0.10);
+}
+[data-theme='dark'] .bg-purple-50\/50 {
+  background-color: rgb(124 58 237 / 0.10);
+}
+[data-theme='dark'] .bg-green-50\/50 {
+  background-color: rgb(22 163 74 / 0.10);
+}
+[data-theme='dark'] .bg-teal-50\/50 {
+  background-color: rgb(13 148 136 / 0.10);
+}
+
 
 /* 对应的深色文字提亮（浅底上的 -600 在深色下对比不足） */
 [data-theme='dark'] .text-cyan-600,

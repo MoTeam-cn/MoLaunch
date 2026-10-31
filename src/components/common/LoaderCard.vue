@@ -127,7 +127,7 @@ function clear(e: Event) {
                 disabled ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer',
                 selected === ver.key
                   ? `border-${color}-400 bg-${color}-50 shadow-xs`
-                  : `border-gray-200 hover:border-${color}-300 hover:bg-${color}-50/50`
+                  : `border-gray-200 hover:border-${color}-300 hover:bg-${color}-50`
               ]"
               @click="select(ver.key)"
             >
