@@ -4,6 +4,17 @@
 
 ## [Unreleased]
 
+### 修复
+
+#### 暗色主题：彩色淡底与深字的覆盖是逐条手写的，漏了不少
+中性色由 Tailwind v4 变量在 `[data-theme='dark']` 里整体重映射，所以 `bg-gray-100` 这类不用管；彩色系不在重映射范围内，`bg-orange-50` 必须逐条给。查了一遍，漏的比想象中多。
+
+- 按「会不会出问题」分档清扫：底色与描边用 -200 及更浅会变成浅底压深底，文字用 -600 及更深会变成深字压深底。扫出源码正在用的这类档位，一次性补齐。
+- [`theme-dark.scss`](src/assets/styles/theme-dark.scss)：补橙/紫/绿/青四色的 `bg-*-200`（悬停态）、五色的 `border-*-300` 与橙紫的 `border-*-200`（强调块描边）、`text-red-600` / `text-amber-600` / `text-amber-800` / `text-green-800`（深字提亮）、以及加载器图标用的五色 `text-*-500`。
+- 顺手删掉昨天加的 `bg-gray-50` 覆盖：中性色走变量重映射，那条是冗余，留着会变成第二个来源。
+- [`dark-tint-coverage.test.ts`](src/assets/styles/__tests__/dark-tint-coverage.test.ts)（新）：把这次扫描固化成测试——遍历源码，凡是用了会出问题的彩色档位就必须能在 theme-dark.scss 里找到规则；另加一条「扫描结果不得为空」的断言，防止测试本身失效后仍然绿灯。
+
+
 
 ## [0.3.14-rc.3] - 2026-10-30
 

@@ -113,7 +113,6 @@ html[data-theme='dark'],
 [data-theme='dark'] .bg-white\/80 { background-color: rgb(23 26 31 / 0.80); }
 [data-theme='dark'] .bg-white\/90 { background-color: rgb(23 26 31 / 0.90); }
 [data-theme='dark'] .bg-white\/95 { background-color: rgb(23 26 31 / 0.95); }
-[data-theme='dark'] .bg-gray-50 { background-color: rgb(28 32 39); }
 [data-theme='dark'] .bg-gray-50\/40 { background-color: rgb(28 32 39 / 0.40); }
 [data-theme='dark'] .bg-gray-50\/50 { background-color: rgb(28 32 39 / 0.50); }
 [data-theme='dark'] .bg-gray-50\/60 { background-color: rgb(28 32 39 / 0.60); }
@@ -410,6 +409,70 @@ html[data-theme='dark'],
   background-color: rgb(13 148 136 / 0.10);
 }
 
+
+/* 悬停/强调用的中淡色底与描边：这些档位不参与中性色变量重映射，必须逐条给出 */
+[data-theme='dark'] .bg-orange-200 {
+  background-color: rgb(234 88 12 / 0.24);
+}
+[data-theme='dark'] .bg-purple-200 {
+  background-color: rgb(124 58 237 / 0.24);
+}
+[data-theme='dark'] .bg-green-200 {
+  background-color: rgb(22 163 74 / 0.24);
+}
+[data-theme='dark'] .bg-teal-200 {
+  background-color: rgb(13 148 136 / 0.24);
+}
+[data-theme='dark'] .border-orange-200 {
+  border-color: rgb(234 88 12 / 0.38);
+}
+[data-theme='dark'] .border-purple-200 {
+  border-color: rgb(124 58 237 / 0.38);
+}
+[data-theme='dark'] .border-orange-300 {
+  border-color: rgb(234 88 12 / 0.55);
+}
+[data-theme='dark'] .border-purple-300 {
+  border-color: rgb(124 58 237 / 0.55);
+}
+[data-theme='dark'] .border-blue-300 {
+  border-color: rgb(59 130 246 / 0.55);
+}
+[data-theme='dark'] .border-green-300 {
+  border-color: rgb(22 163 74 / 0.55);
+}
+[data-theme='dark'] .border-teal-300 {
+  border-color: rgb(13 148 136 / 0.55);
+}
+
+/* 深色文字：-600 / -800 在深底上对比不足，统一提亮 */
+[data-theme='dark'] .text-red-600 {
+  color: #ff8b8b;
+}
+[data-theme='dark'] .text-amber-600 {
+  color: #ffc75e;
+}
+[data-theme='dark'] .text-amber-800 {
+  color: #ffd98a;
+}
+[data-theme='dark'] .text-green-800 {
+  color: #7fe0a5;
+}
+[data-theme='dark'] .text-orange-500 {
+  color: #ffb072;
+}
+[data-theme='dark'] .text-purple-500 {
+  color: #c9a2f7;
+}
+[data-theme='dark'] .text-blue-500 {
+  color: #8cc0ff;
+}
+[data-theme='dark'] .text-green-500 {
+  color: #6fe0a0;
+}
+[data-theme='dark'] .text-teal-500 {
+  color: #6ee0d6;
+}
 
 /* 对应的深色文字提亮（浅底上的 -600 在深色下对比不足） */
 [data-theme='dark'] .text-cyan-600,
