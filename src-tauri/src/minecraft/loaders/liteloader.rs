@@ -21,7 +21,7 @@ pub async fn list_versions(
         sources::BMCLAPI_LITELOADER,
         source_mode,
     );
-    let content = sources::fetch_with_fallback(&urls).await?;
+    let content = sources::fetch_with_race(&urls).await?;
     parse_versions(&content, mc_version)
 }
 

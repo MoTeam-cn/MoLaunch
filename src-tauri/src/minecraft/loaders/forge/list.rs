@@ -16,7 +16,7 @@ pub async fn list_versions(
         source_mode,
     );
 
-    let content = sources::fetch_with_fallback(&urls).await?;
+    let content = sources::fetch_with_race(&urls).await?;
 
     // 尝试 BMCLAPI JSON 格式
     if let Ok(json_array) = serde_json::from_str::<Vec<serde_json::Value>>(&content) {

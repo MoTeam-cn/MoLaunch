@@ -27,7 +27,7 @@ pub use constants::{
 pub use health::{
     mark_official_ok, mark_official_slow, official_is_slow, official_slow_remaining_secs,
 };
-pub use http::{fetch_with_fallback, is_mirror_url, should_skip_status};
+pub use http::{fetch_with_fallback, fetch_with_race, is_mirror_url, should_skip_status};
 pub use library_chain::{
     fallback_urls as library_fallbacks, legacy_repositories, push_unique, relative_artifact_path,
 };

@@ -29,7 +29,7 @@ pub async fn list_versions(
     );
     crate::log_debug!("[NeoForge] 尝试源: {:?}", urls);
 
-    let content = match sources::fetch_with_fallback(&urls).await {
+    let content = match sources::fetch_with_race(&urls).await {
         Ok(c) => {
             crate::log_debug!("[NeoForge] Response length: {} bytes", c.len());
             c
@@ -84,7 +84,7 @@ pub async fn list_versions(
         sources::BMCLAPI_NEOFORGE_LEGACY,
         source_mode,
     );
-    if let Ok(legacy_content) = sources::fetch_with_fallback(&legacy_urls).await {
+    if let Ok(legacy_content) = sources::fetch_with_race(&legacy_urls).await {
         if let Ok(legacy_json) = serde_json::from_str::<serde_json::Value>(&legacy_content) {
             let legacy_files = legacy_json["files"]
                 .as_array()

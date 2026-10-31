@@ -37,7 +37,7 @@ pub async fn fetch_version_list(
         source_mode,
     );
 
-    let content = sources::fetch_with_fallback(&urls).await?;
+    let content = sources::fetch_with_race(&urls).await?;
     let json: serde_json::Value = serde_json::from_str(&content)?;
 
     let source_name = if urls.first().is_some_and(|u: &String| u.contains("bmclapi")) {

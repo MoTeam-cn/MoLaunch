@@ -20,7 +20,7 @@ pub async fn list_versions(
         sources::BMCLAPI_FABRIC_META,
         source_mode,
     );
-    let content = sources::fetch_with_fallback(&urls).await?;
+    let content = sources::fetch_with_race(&urls).await?;
     let json: serde_json::Value = serde_json::from_str(&content)?;
 
     let mut versions = Vec::new();
