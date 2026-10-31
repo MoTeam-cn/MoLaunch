@@ -24,10 +24,26 @@ export function renderNonTauriWarning(): boolean {
   const root = document.getElementById('app')
   if (root) {
     root.innerHTML = `
-      <div style="position:fixed;inset:0;display:flex;align-items:center;justify-content:center;
-                  background:linear-gradient(135deg,#f0f5ff 0%,#e0ecff 100%);
+      <style>
+        /* 环境守卫页是纯静态 HTML，拿不到也不该依赖主题偏好；
+           跟随系统深浅即可，免得深色系统下打开是整页白。 */
+        .env-guard {
+          background: linear-gradient(135deg, #f0f5ff 0%, #e0ecff 100%);
+          color: #1f2937;
+        }
+        .env-guard .env-title { color: #165dff; }
+        .env-guard .env-desc { color: #4b5563; }
+        @media (prefers-color-scheme: dark) {
+          .env-guard {
+            background: linear-gradient(135deg, #171a1f 0%, #0f1115 100%);
+            color: #e6e8eb;
+          }
+          .env-guard .env-desc { color: #b7bdc6; }
+        }
+      </style>
+      <div class="env-guard" style="position:fixed;inset:0;display:flex;align-items:center;justify-content:center;
                   font-family:-apple-system,BlinkMacSystemFont,'Segoe UI','Microsoft YaHei',sans-serif;
-                  color:#1f2937;text-align:center;padding:24px;">
+                  text-align:center;padding:24px;">
         <div style="max-width:480px;">
           <svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 24 24" fill="none"
                stroke="#165dff" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"
@@ -36,10 +52,10 @@ export function renderNonTauriWarning(): boolean {
             <line x1="12" y1="8" x2="12" y2="12"></line>
             <line x1="12" y1="16" x2="12.01" y2="16"></line>
           </svg>
-          <h1 style="font-size:22px;font-weight:600;margin:0 0 12px;color:#165dff;">
+          <h1 class="env-title" style="font-size:22px;font-weight:600;margin:0 0 12px;">
             小朋友，此页面默认给 Tauri 客户端使用
           </h1>
-          <p style="font-size:14px;line-height:1.7;margin:0;color:#4b5563;">
+          <p class="env-desc" style="font-size:14px;line-height:1.7;margin:0;">
             请勿使用浏览器直接打开呦？！<br/>
             请启动 MoLaunch 桌面客户端以正常使用本应用。
           </p>

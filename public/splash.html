@@ -151,7 +151,31 @@
         .sub.show {
             opacity: 1;
         }
+
+        /* 深色主题：splash 是最先画出来的画面，这里若还是浅色渐变，
+           深色用户每次启动都会先看到一屏白再跳黑。 */
+        html[data-theme='dark'] body {
+            background:
+                radial-gradient(120% 160% at 8% 0%, rgba(22, 93, 255, 0.2), transparent 55%),
+                linear-gradient(180deg, rgba(23, 26, 31, 0.96) 0%, rgba(15, 17, 21, 0.94) 100%);
+        }
+        html[data-theme='dark'] .name {
+            color: #e6e8eb;
+        }
+        html[data-theme='dark'] .bar {
+            background: rgba(255, 255, 255, 0.12);
+        }
+        html[data-theme='dark'] .info {
+            color: rgba(230, 232, 235, 0.5);
+        }
+        html[data-theme='dark'] .info .status {
+            color: rgba(255, 255, 255, 0.68);
+        }
+        html[data-theme='dark'] .sub {
+            color: rgba(230, 232, 235, 0.45);
+        }
     </style>
+    <script src="splash.js"></script>
 </head>
 <body data-tauri-drag-region>
 
@@ -169,8 +193,6 @@
             <div class="sub" id="sub">— 匠心 · 启动 —</div>
         </div>
     </div>
-
-    <script src="splash.js"></script>
 
 </body>
 </html>

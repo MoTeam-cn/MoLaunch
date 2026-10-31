@@ -4,6 +4,26 @@
  * 说明：脚本抽成外部文件以满足全局 CSP（script-src 'self'，不允许内联脚本）。
  */
 
+/**
+ * 主题要在首次绘制前落定
+ *
+ * 本脚本在 <head> 里同步执行（不 defer），执行时会阻塞渲染，
+ * 所以在这里写 data-theme 不会闪一下再变。
+ * splash 与主窗口可能不同源，localStorage 读不到时退回系统偏好。
+ */
+;(function applySplashTheme() {
+  try {
+    const raw = localStorage.getItem('molaunch.ui')
+    const mode = raw ? JSON.parse(raw).appearance || 'system' : 'system'
+    const dark =
+      mode === 'dark' ||
+      (mode !== 'light' && window.matchMedia('(prefers-color-scheme: dark)').matches)
+    document.documentElement.dataset.theme = dark ? 'dark' : 'light'
+  } catch {
+    document.documentElement.dataset.theme = 'light'
+  }
+})()
+
 document.addEventListener('DOMContentLoaded', () => {
   // 禁止右键菜单、快捷键与拖拽：splash 页仅作展示，不应响应任何交互。
   // 拦截 F1~F12 与所有 Ctrl/Cmd/Alt 组合键（刷新、DevTools、关窗、复制粘贴等），
