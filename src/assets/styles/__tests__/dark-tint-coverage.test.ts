@@ -70,6 +70,26 @@ describe('彩色淡底与深字的深色覆盖', () => {
     expect(missing, '这些彩色档位在暗色主题下会变成浅底或深字，必须在 theme-dark.scss 补规则').toEqual([])
   })
 
+  it('should remap every tint used by source when 变体类名匹配不到逐类规则', () => {
+    // 从源码实际用到的颜色推导，不写死清单：以后新增任何颜色都会自动被检查
+    const covered = coveredClasses()
+    const usedColors = new Set<string>()
+    for (const file of walk(path.join(SRC))) {
+      const text = fs.readFileSync(file, 'utf8')
+      for (const match of text.matchAll(CLASS_RE)) {
+        usedColors.add(match[1].replace(/^(?:bg|text|border)-/, '').replace(/-\d+.*$/, ''))
+      }
+    }
+    const missing = [...usedColors]
+      .filter((color) => color !== 'white' && color !== 'black')
+      .flatMap((color) =>
+        ['50', '100', '200']
+          .filter((shade) => !DARK.includes(`--color-${color}-${shade}:`))
+          .map((shade) => `${color}-${shade}`)
+      )
+    expect(missing, '这些颜色档位缺变量重映射，hover 等变体会露出浅色').toEqual([])
+  })
+
   it('should remap tint shades as variables when 变体类名匹配不到逐类规则', () => {
     // hover:/focus: 变体编译成独立类名，逐类规则匹配不到；
     // 只有把浅色档位本身重映射成深色值，悬停时才不会退回白底。
