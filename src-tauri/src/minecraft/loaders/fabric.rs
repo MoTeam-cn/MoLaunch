@@ -1,5 +1,6 @@
 //! Fabric loader module
 
+use super::{install_audit, install_flow, install_log};
 use std::path::Path;
 use std::sync::Arc;
 

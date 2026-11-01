@@ -1,5 +1,6 @@
 //! NeoForge loader module
 
+use super::{install_audit, install_flow, install_log};
 use crate::{log_info, log_warn};
 use std::path::Path;
 use std::sync::Arc;
