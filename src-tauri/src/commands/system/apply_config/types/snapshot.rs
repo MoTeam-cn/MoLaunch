@@ -132,6 +132,11 @@ fn default_log_share_provider() -> String {
     "mclogs".to_string()
 }
 
+/// 崩溃后自动上传日志默认关闭
+fn default_log_share_auto_upload() -> bool {
+    false
+}
+
 /// 配置快照：返回所有配置字段的当前值
 ///
 /// 用于前端一次性读取全部配置，取代此前分散的 14 个 get_* 命令。
@@ -167,6 +172,9 @@ pub struct ConfigSnapshot {
     /// 默认日志分享服务："mclogs"（mclo.gs）/ "logshare"（logshare.cn）
     #[serde(default = "default_log_share_provider")]
     pub log_share_provider: String,
+    /// 崩溃后自动上传日志并给出分享链接
+    #[serde(default = "default_log_share_auto_upload")]
+    pub log_share_auto_upload: bool,
     /// 更新源："api"（MoLaunch 云端公开端点，默认）/ "github"（GitHub Releases）
     pub selected_version: Option<String>,
     // 外部下载工具

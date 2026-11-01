@@ -32,6 +32,11 @@ pub(crate) fn default_log_share_provider() -> String {
     "mclogs".to_string()
 }
 
+/// 崩溃后自动上传日志并给出分享链接（默认关闭：涉及上传到第三方，需用户显式开启）
+pub(crate) fn default_log_share_auto_upload() -> bool {
+    false
+}
+
 impl Default for AppConfig {
     fn default() -> Self {
         let game_dir = super::paths::get_default_game_dir();

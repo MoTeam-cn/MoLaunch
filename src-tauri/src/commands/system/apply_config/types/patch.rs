@@ -131,6 +131,8 @@ pub struct ConfigPatch {
     pub release_memory_on_tray: Option<bool>,
     /// 默认日志分享服务："mclogs"（mclo.gs）/ "logshare"（logshare.cn）
     pub log_share_provider: Option<String>,
+    /// 崩溃后自动上传日志并给出分享链接
+    pub log_share_auto_upload: Option<bool>,
     /// 更新源："api"（MoLaunch 云端，默认）/ "github"（GitHub Releases）
     /// 双层 Option：外层 Some 表示"要更新此字段"，内层 None 表示"清空"
     pub selected_version: Option<Option<String>>,

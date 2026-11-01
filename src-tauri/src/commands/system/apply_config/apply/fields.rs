@@ -182,6 +182,10 @@ pub(super) fn apply_launcher(
         log_info!("[Config] log_share_provider = {}", provider);
         config.log_share_provider = provider.clone();
     }
+    if let Some(auto) = patch.log_share_auto_upload {
+        log_info!("[Config] log_share_auto_upload = {}", auto);
+        config.log_share_auto_upload = auto;
+    }
 
     // 更新源："api"（云端公开端点）/ "github"（GitHub Releases）
 }

@@ -177,6 +177,11 @@ pub fn load_config() -> Result<Option<AppConfig>, String> {
     // Log（默认日志分享服务，未配置时保留默认 mclogs）
     app_config.log_share_provider =
         config.get_or("Log", "share_provider", &app_config.log_share_provider);
+    app_config.log_share_auto_upload = config.get_or(
+        "Log",
+        "share_auto_upload",
+        &app_config.log_share_auto_upload.to_string(),
+    ) == "true";
 
     // Update（更新源："api" 云端 / "github" GitHub Releases）
 
