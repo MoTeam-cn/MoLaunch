@@ -95,6 +95,7 @@ impl Default for AppConfig {
                 use_dedicated_gpu: false,
             },
             log_share_provider: default_log_share_provider(),
+            log_share_auto_upload: default_log_share_auto_upload(),
             online: super::models::OnlineConfig::default(),
             tls: TlsConfig::default(),
         }
