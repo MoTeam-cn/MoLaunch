@@ -28,7 +28,7 @@ const PROVIDERS: Record<LogShareProvider, ProviderConfig> = {
   logshare: {
     label: 'logshare.cn',
     endpoint: 'https://api.logshare.cn/v1/log',
-    fallbackUrl: (id) => `https://logshare.cn/log/${id}`,
+    fallbackUrl: (id) => `https://logshare.cn/${id}`,
   },
 }
 

@@ -9,6 +9,7 @@ const CommunityConfigCard = defineAsyncComponent(() => import('@/components/comm
 const ExperimentalToggle = defineAsyncComponent(() => import('@/components/settings/ExperimentalToggle.vue'))
 const Tooltip = defineAsyncComponent(() => import('@/components/common/Tooltip.vue'))
 const Button = defineAsyncComponent(() => import('@/components/common/Button.vue'))
+const Checkbox = defineAsyncComponent(() => import('@/components/common/Checkbox.vue'))
 import {
   ExclamationTriangleIcon,
   EyeIcon,
@@ -31,6 +32,8 @@ const cfShowKey = ref(false)
 const logLevel = ref(3)
 // 默认日志分享服务（mclo.gs / logshare.cn，崩溃自动分析与手动分享默认使用）
 const logShareProvider = ref('mclogs')
+// 崩溃后自动上传日志并给出分享链接（默认关闭，涉及上传到第三方）
+const logShareAutoUpload = ref(false)
 
 const { loaded, markDirty } = useConfigPage({
   delay: 1000,
@@ -44,6 +47,7 @@ const { loaded, markDirty } = useConfigPage({
     cfApiKey.value = cfg.curseforgeApiKey
     logLevel.value = cfg.logLevel
     logShareProvider.value = (cfg.logShareProvider as string) || 'mclogs'
+    logShareAutoUpload.value = Boolean(cfg.logShareAutoUpload)
   },
 })
 
@@ -308,6 +312,19 @@ watch(logShareProvider, (v) => markDirty('logShareProvider', v))
             ]"
             style="min-width: 180px"
             @update:model-value="logShareProvider = String($event)"
+          />
+        </div>
+
+        <div class="px-5 py-4 flex items-center justify-between border-t border-gray-100">
+          <div>
+            <p class="text-sm font-medium text-gray-900">崩溃后自动上传日志</p>
+            <p class="text-xs text-gray-500 mt-0.5">
+              开启后游戏崩溃时会自动把日志传到上面选定的平台，并在崩溃弹窗里给出分享链接
+            </p>
+          </div>
+          <Checkbox
+            :model-value="logShareAutoUpload"
+            @update:model-value="logShareAutoUpload = Boolean($event)"
           />
         </div>
       </div>

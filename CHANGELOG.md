@@ -46,6 +46,21 @@ Windows 上 `Command::new` 不设 `CREATE_NO_WINDOW` 就会给子进程开一个
 
 ### 新增
 
+#### 崩溃后可自动上传日志并给出分享链接
+游戏崩溃时日志已经自动上传过一次（mclo.gs 云端分析），但那条链接用户拿不到；想要分享还得再点一次「分享日志」、等一次上传。现在这个能力做成了可选开关：开启后崩溃弹窗一出现就有可复制的链接。
+
+默认关闭——上传会把本机路径、Mod 列表这类信息送到第三方，不经用户同意不该外发。
+
+- [`models.rs`](src-tauri/src/state/config/models.rs) 等：新增 `log_share_auto_upload` 配置项，走 `apply_config` / `get_config`，写入 INI 的 `[Log] share_auto_upload`。
+- [`useCrashAutoShare.ts`](src/composables/useCrashAutoShare.ts)：新增组合式函数，按配置决定是否上传，失败只提示不打断弹窗。
+- [`CrashDialog.vue`](src/components/common/CrashDialog.vue)：崩溃弹出时调用，拿到链接后显示在弹窗里。
+- [`SettingsAdvanced.vue`](src/views/settings/SettingsAdvanced.vue)：新增「崩溃后自动上传日志」开关。
+
+#### 修正 logshare.cn 的分享链接格式
+实测接口返回的是 `https://logshare.cn/{id}`，而兜底逻辑拼的是 `/log/{id}`，服务端没有返回 `url` 时会给出一个打不开的地址。
+
+- [`logShare.ts`](src/utils/logShare.ts)：兜底链接改为 `/{id}`。
+
 #### 日志分享支持一次上传多个文件
 崩溃现场的线索通常散在几处：崩溃摘要、启动器日志、游戏日志尾部。以前只能把它们拼成一份文本上传，分享页上是一大坨；logshare.cn 的接口本来就支持一次带多个文件、按文件名分标签展示，只是没用上。
 

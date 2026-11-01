@@ -46,6 +46,12 @@
       </div>
     </div>
 
+    <!-- 自动上传得到的分享链接（需在设置里开启） -->
+    <div v-if="autoShare.url.value" class="mt-5 rounded-md border border-blue-100 bg-blue-50 px-3 py-2.5">
+      <p class="text-xs font-medium text-blue-700">日志已自动上传，把链接发给他人即可</p>
+      <p class="mt-1 text-xs break-all text-blue-600">{{ autoShare.url.value }}</p>
+    </div>
+
     <!-- 云端分析（mclo.gs Insights，崩溃后自动发起） -->
     <div v-if="cloudProblems.length > 0 || cloudInformation.length > 0" class="mt-5">
       <p class="mb-1.5 text-xs font-medium text-gray-500">云端分析（mclo.gs）</p>
@@ -153,6 +159,7 @@
 </template>
 
 <script setup lang="ts">
+import { useCrashAutoShare } from '@/composables/useCrashAutoShare'
 import { computed, ref, defineAsyncComponent } from 'vue'
 import {
   ChevronRightIcon,
@@ -275,7 +282,11 @@ function show(info: CrashInfo, vid?: string) {
   // 崩溃后自动发起 mclo.gs 云端分析（不阻塞弹窗，失败静默）
   cloudAnalysis.value = null
   void runCloudAnalysis()
+  // 开了「崩溃后自动上传」就顺带拿到一条分享链接（默认关闭）
+  void autoShare.run(buildShareFiles)
 }
+
+const autoShare = useCrashAutoShare()
 
 /** 组装分享用日志（以日志主体为主，便于第三方平台分析） */
 function buildShareContent(): string {

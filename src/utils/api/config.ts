@@ -59,6 +59,8 @@ export interface ConfigSnapshot {
   releaseMemoryOnTray: boolean
   /** 默认日志分享服务："mclogs"（mclo.gs）/ "logshare"（logshare.cn） */
   logShareProvider: string
+  /** 崩溃后自动上传日志并给出分享链接（默认关闭，涉及上传到第三方） */
+  logShareAutoUpload: boolean
   /** 更新源："api"（MoLaunch 云端公开端点）/ "github"（GitHub Releases） */
   // 社区资源
   communitySource: number
@@ -155,6 +157,8 @@ export interface ConfigPatch {
   releaseMemoryOnTray?: boolean
   /** 默认日志分享服务："mclogs"（mclo.gs）/ "logshare"（logshare.cn） */
   logShareProvider?: string
+  /** 崩溃后自动上传日志并给出分享链接 */
+  logShareAutoUpload?: boolean
   /** 更新源："api"（MoLaunch 云端公开端点）/ "github"（GitHub Releases） */
   // 社区资源（INI 明文）
   communitySource?: number                                 // 0/1/2
