@@ -71,15 +71,7 @@ fn coordinate_to_path(coordinate: &str, game_dir: &Path) -> PathBuf {
 ///
 /// 缺 processor jar 直接报错：那说明依赖基础就不完整，跳过只会让安装
 /// 「看起来成功」却少跑一步。
-pub(crate) fn plan_client_processors(
-    profile: &Value,
-    game_dir: &Path,
-    version: &str,
-) -> anyhow::Result<Vec<PlannedProcessor>> {
-    plan_client_processors_with_installer(profile, game_dir, version, Path::new(""))
-}
-
-/// 同 plan_client_processors，但知道安装器在哪
+/// 按 install_profile 排出 client 侧要跑的 processor
 ///
 /// INSTALLER 占位符要靠它解析；installertools 之类的 processor 会直接读安装器本身，
 /// 传空路径时这些参数会变成空字符串，processor 随即静默失败。

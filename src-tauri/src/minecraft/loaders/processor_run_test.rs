@@ -3,7 +3,8 @@
 use serde_json::json;
 
 use super::{
-    is_mojmaps_step, outputs_of, plan_client_processors, read_main_class, PlannedProcessor,
+    is_mojmaps_step, outputs_of, plan_client_processors_with_installer, read_main_class,
+    PlannedProcessor,
 };
 use std::path::PathBuf;
 
@@ -61,7 +62,12 @@ fn test_plan_client_processors_缺_jar_直接报错() {
             { "sides": ["client"], "jar": "net.minecraft:client:26.3-1:srg", "args": [] }
         ]
     });
-    let result = plan_client_processors(&profile, std::path::Path::new("C:/mc"), "26.3");
+    let result = plan_client_processors_with_installer(
+        &profile,
+        std::path::Path::new("C:/mc"),
+        "26.3",
+        std::path::Path::new(""),
+    );
     assert!(
         result.is_err(),
         "缺 processor jar 说明库没下全，跳过会让安装看起来成功却少跑一步"
@@ -73,15 +79,26 @@ fn test_plan_client_processors_缺_jar_直接报错() {
 #[test]
 fn test_plan_client_processors_空profile返回空() {
     let profile = json!({});
-    let planned = plan_client_processors(&profile, std::path::Path::new("C:/mc"), "26.3")
-        .expect("空 profile 不该报错");
+    let planned = plan_client_processors_with_installer(
+        &profile,
+        std::path::Path::new("C:/mc"),
+        "26.3",
+        std::path::Path::new(""),
+    )
+    .expect("空 profile 不该报错");
     assert!(planned.is_empty());
 }
 
 #[test]
 fn test_plan_client_processors_缺少jar字段时报错() {
     let profile = json!({ "processors": [{ "args": ["--task", "x"] }] });
-    assert!(plan_client_processors(&profile, std::path::Path::new("C:/mc"), "26.3").is_err());
+    assert!(plan_client_processors_with_installer(
+        &profile,
+        std::path::Path::new("C:/mc"),
+        "26.3",
+        std::path::Path::new(""),
+    )
+    .is_err());
 }
 
 fn sample_processor(arguments: &[&str]) -> PlannedProcessor {
