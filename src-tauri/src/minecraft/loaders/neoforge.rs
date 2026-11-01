@@ -348,7 +348,12 @@ pub async fn install(
         .join("versions")
         .join(&version_id)
         .join(format!("{}.json", version_id));
-    if let Err(reason) = super::artifact_check::check_install(game_dir, &installed_json) {
+    if let Err(reason) = super::artifact_check::check_install_full(
+        game_dir,
+        &installed_json,
+        mc_version,
+        &installer_path,
+    ) {
         // 注入器没把产物生成齐：用自己的执行器补一次
         log_warn!("[Install] 产物不齐，改由启动器执行 processors: {}", reason);
         match super::processor_run::run_from_installer(
@@ -368,7 +373,12 @@ pub async fn install(
                 ))
             }
         }
-        if let Err(reason) = super::artifact_check::check_install(game_dir, &installed_json) {
+        if let Err(reason) = super::artifact_check::check_install_full(
+            game_dir,
+            &installed_json,
+            mc_version,
+            &installer_path,
+        ) {
             return Err(anyhow::anyhow!(reason));
         }
     }

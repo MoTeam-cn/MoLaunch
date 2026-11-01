@@ -272,6 +272,29 @@ pub const KEYWORD_RULES: &[KeywordRule] = &[
         reason: "Nvidia 显卡驱动导致 JVM 崩溃",
         suggestion: "JVM 崩溃与 Nvidia 显卡驱动相关（EXCEPTION_ACCESS_VIOLATION）。\n请将 Nvidia 显卡驱动升级到最新版本后重试。",
     },
+    // ── 加载器安装不完整 ──
+    // NeoForge 26.x 起，FML 会直接按固定路径要 srg jar。这类文件只能由
+    // processor 在本地生成，缺失时安装阶段看着成功、启动才报「安装损坏」。
+    KeywordRule {
+        id: "loader_missing_srg",
+        source: SourceKind::RuntimeLog,
+        patterns: &["srg.jar", "client-extra.jar", "-mappings.txt"],
+        and_patterns: &["failed to find required file"],
+        category: CrashCategory::Forge,
+        confidence: 0.95,
+        reason: "加载器缺少反混淆产物（srg jar 未生成）",
+        suggestion: "加载器需要的反混淆文件不存在。\n这类文件没有下载地址，只能由安装器在本地跑 processor 生成，常见原因是安装时 Java 版本与游戏版本不匹配。\n请重新安装该加载器，并确认使用 Java 21。",
+    },
+    KeywordRule {
+        id: "loader_install_corrupted",
+        source: SourceKind::RuntimeLog,
+        patterns: &["installation is corrupted", "failed to find required file"],
+        and_patterns: &[],
+        category: CrashCategory::Forge,
+        confidence: 0.92,
+        reason: "加载器安装不完整",
+        suggestion: "加载器自己的完整性检查失败，说明安装阶段少生成了文件。\n请重新安装该加载器；若反复失败，确认已安装 Java 21 且游戏目录可写。",
+    },
     KeywordRule {
         id: "jvm_access_violation",
         source: SourceKind::HsErr,

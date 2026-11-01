@@ -110,6 +110,69 @@ pub(crate) fn check_install(game_dir: &Path, json_path: &Path) -> Result<Vec<Str
     Ok(soft)
 }
 
+/// 校验 processor 应当生成的产物
+///
+/// `client-<版本>-srg.jar` 这类文件**只由 processor 在本地生成**，而且
+/// **不在 version JSON 的 libraries 里**——只查 libraries 会漏掉它，
+/// 安装看着成功、启动时才被 FML 判成「安装损坏」。
+pub(crate) fn check_processor_outputs(
+    game_dir: &Path,
+    mc_version: &str,
+    installer_path: &Path,
+) -> Result<(), String> {
+    let file = std::fs::File::open(installer_path)
+        .map_err(|e| format!("打不开安装器（{}）：{}", installer_path.display(), e))?;
+    let mut archive =
+        zip::ZipArchive::new(file).map_err(|e| format!("安装器不是有效 zip：{}", e))?;
+    let mut content = String::new();
+    {
+        let mut entry = archive
+            .by_name("install_profile.json")
+            .map_err(|e| format!("安装器里没有 install_profile.json：{}", e))?;
+        std::io::Read::read_to_string(&mut entry, &mut content)
+            .map_err(|e| format!("读不到 install_profile.json：{}", e))?;
+    }
+    let profile: Value = serde_json::from_str(&content)
+        .map_err(|e| format!("install_profile.json 解析失败：{}", e))?;
+    let planned = super::processor_run::plan_client_processors(&profile, game_dir, mc_version)
+        .map_err(|e| format!("{}", e))?;
+
+    let mut missing: Vec<String> = Vec::new();
+    for step in &planned {
+        for output in &step.outputs {
+            if !output.is_file() {
+                missing.push(format!("{}（{} 未生成）", output.display(), step.label));
+            }
+        }
+    }
+    if missing.is_empty() {
+        return Ok(());
+    }
+    Err(format!(
+        "安装不完整：processor 有 {} 个产物没生成（{}）。\
+         这类文件没有下载地址，只能由安装器在本地跑 processor 生成——\
+         原因多见于 Java 版本与游戏版本不匹配、或临时目录没有写权限。\
+         请确认已安装 Java 21 后重试。",
+        missing.len(),
+        missing.join("、")
+    ))
+}
+
+/// 完整校验：libraries + processor 产物
+///
+/// NeoForge 的 srg jar 不在 libraries 里，必须单独查 processor 的 outputs，
+/// 否则缺失会一路放行到启动阶段。
+pub(crate) fn check_install_full(
+    game_dir: &Path,
+    json_path: &Path,
+    mc_version: &str,
+    installer_path: &Path,
+) -> Result<Vec<String>, String> {
+    let soft = check_install(game_dir, json_path)?;
+    check_processor_outputs(game_dir, mc_version, installer_path)?;
+    Ok(soft)
+}
+
 #[cfg(test)]
 #[path = "artifact_check_test.rs"]
 mod artifact_check_test;

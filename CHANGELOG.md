@@ -6,6 +6,15 @@
 
 ### 修复
 
+#### 安装校验漏了 processor 产物，导致 NeoForge 装完才崩
+`client-26.3-1-srg.jar` 这类文件**只能由 processor 在本地生成**，而且**不在 version JSON 的 `libraries` 里**——它在 `install_profile.json` 的 `processors[].outputs` 里。
+
+原来的安装后校验只遍历 `libraries`，于是：校验放行 → 不会触发兜底的 processor 执行器 → 用户装好开玩 → FML 报「Your NeoForge installation is corrupted」。启动前的文件检查同样只查库，所以也救不回来。
+
+- [`artifact_check.rs`](src-tauri/src/minecraft/loaders/artifact_check.rs)：新增 `check_processor_outputs`，从安装器里读 `install_profile.json`，复用 `processor_run::plan_client_processors` 拿到每个 processor 的 outputs 并逐个核对；`check_install_full` 把 libraries 与 processor 产物一起校验。
+- [`neoforge.rs`](src-tauri/src/minecraft/loaders/neoforge.rs)：两处校验改用 `check_install_full`。缺产物时才会触发「改由启动器自己跑 processor」的兜底路径——之前这条路从未被走到。
+- [`rules/table.rs`](src-tauri/src/minecraft/launch/watcher/analyzer/rules/table.rs)：崩溃识别新增两条规则，`failed to find required file` + `srg.jar` / `client-extra.jar` / `-mappings.txt`，以及 `installation is corrupted`。此前这类完全可判定的崩溃被归到「未识别到已知的崩溃模式」。
+
 #### 安装加载器时不再弹出控制台窗口
 Windows 上 `Command::new` 不设 `CREATE_NO_WINDOW` 就会给子进程开一个控制台窗口。项目里其他执行外部程序的地方都设了，唯独这两个漏了——官方安装器和自跑的 processor，正好是加载器安装必经的两步，所以装 NeoForge 时用户会看到一个黑窗口卡在那里。
 
