@@ -59,7 +59,14 @@ pub(crate) fn resolve_argument(argument: &str, context: &ProcessorContext<'_>) -
 /// 三种形态：字面量（`'1.21.1'`）、绝对路径、Maven 坐标。
 /// 坐标要转成本地路径，否则 processor 找不到文件。
 fn normalize_data_value(value: &str, context: &ProcessorContext<'_>) -> String {
+    // data 表的值可能还套一层方括号（如 [group:artifact:version:classifier@ext]），
+    // 不剥掉的话方括号会混进 group，拼出来的路径完全不存在。
     let trimmed = value.trim();
+    let trimmed = trimmed
+        .strip_prefix('[')
+        .and_then(|rest| rest.strip_suffix(']'))
+        .map(str::trim)
+        .unwrap_or(trimmed);
     if let Some(literal) = trimmed
         .strip_prefix("'")
         .and_then(|rest| rest.strip_suffix("'"))

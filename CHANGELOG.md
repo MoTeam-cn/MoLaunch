@@ -6,6 +6,13 @@
 
 ### 修复
 
+#### processor 参数解析修复：兜底路径此前根本跑不通
+补上校验后，缺产物会触发「启动器自己跑 processor」的兜底。但那条路的参数解析有四处硬伤，之前从未被执行到，所以一直没暴露：
+
+- [`maven.rs`](src-tauri/src/minecraft/utils/maven.rs)：Maven 坐标不支持 `@ext` 后缀。`net.minecraft:client_mappings:26.3-1:client@txt` 会把 `client@txt` 当成 classifier，拼出 `...-client@txt.jar` 这种不存在的路径。
+- [`processor_args.rs`](src-tauri/src/minecraft/loaders/processor_args.rs)：`install_profile` 的 data 表值外面还套一层方括号（`[group:artifact:version:classifier@ext]`），没剥掉时方括号混进 group，路径整个错位。
+- [`processor_run.rs`](src-tauri/src/minecraft/loaders/processor_run.rs)：`installer` 字段硬编码成空路径，`{INSTALLER}` 占位符解析成空字符串——用到它的 processor 会收到空参数后静默失败。新增 `plan_client_processors_with_installer`，`run_from_installer` 与产物校验都改走它；原函数签名保留以免牵连既有测试。
+
 #### 安装校验漏了 processor 产物，导致 NeoForge 装完才崩
 `client-26.3-1-srg.jar` 这类文件**只能由 processor 在本地生成**，而且**不在 version JSON 的 `libraries` 里**——它在 `install_profile.json` 的 `processors[].outputs` 里。
 

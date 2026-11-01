@@ -1,13 +1,20 @@
 //! Maven 坐标转路径工具
 //!
-//! 统一 Maven 坐标（如 `net.minecraftforge:forge:1.20.1-47.2.0`）到本地文件路径的转换。
+//! 统一 Maven 坐标（如 net.minecraftforge:forge:1.20.1-47.2.0）到本地文件路径的转换。
 
 use std::path::{Path, PathBuf};
 
 /// 将 Maven 坐标转为相对路径字符串
 ///
-/// 如 `group:artifact:version[:classifier]` → `group/artifact/version/artifact-version[-classifier].jar`
+/// 形如 group:artifact:version[:classifier]@ext → group/artifact/version/artifact-version[-classifier].ext
+///
+/// 扩展名后缀（@txt / @zip）必须剥掉再拼：install_profile 的 data 表用的就是这种写法，
+/// 不剥的话 @txt 会被当成 classifier，生成一个根本不存在的 .jar 路径。
 pub fn maven_to_relative_path(name: &str) -> String {
+    let (name, extension) = match name.rsplit_once('@') {
+        Some((head, ext)) if !ext.is_empty() && !ext.contains(':') => (head, ext),
+        _ => (name, "jar"),
+    };
     let parts: Vec<&str> = name.split(':').collect();
     if parts.len() < 3 {
         return name.to_string();
@@ -18,22 +25,26 @@ pub fn maven_to_relative_path(name: &str) -> String {
     let classifier = if parts.len() > 3 { parts[3] } else { "" };
     if classifier.is_empty() {
         format!(
-            "{}/{}/{}/{}-{}.jar",
-            group, artifact, version, artifact, version
+            "{}/{}/{}/{}-{}.{}",
+            group, artifact, version, artifact, version, extension
         )
     } else {
         format!(
-            "{}/{}/{}/{}-{}-{}.jar",
-            group, artifact, version, artifact, version, classifier
+            "{}/{}/{}/{}-{}-{}.{}",
+            group, artifact, version, artifact, version, classifier, extension
         )
     }
 }
 
 /// 将 Maven 坐标转为绝对路径 PathBuf
 ///
-/// 基于 `maven_to_relative_path` 拼接 `game_dir/libraries/` 前缀。
+/// 基于 maven_to_relative_path 拼接 game_dir/libraries/ 前缀。
 pub fn maven_to_local_path(name: &str, game_dir: &Path) -> PathBuf {
     game_dir
         .join("libraries")
         .join(maven_to_relative_path(name))
 }
+
+#[cfg(test)]
+#[path = "maven_test.rs"]
+mod maven_test;

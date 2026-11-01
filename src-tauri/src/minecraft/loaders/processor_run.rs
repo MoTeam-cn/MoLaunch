@@ -76,6 +76,19 @@ pub(crate) fn plan_client_processors(
     game_dir: &Path,
     version: &str,
 ) -> anyhow::Result<Vec<PlannedProcessor>> {
+    plan_client_processors_with_installer(profile, game_dir, version, Path::new(""))
+}
+
+/// 同 plan_client_processors，但知道安装器在哪
+///
+/// INSTALLER 占位符要靠它解析；installertools 之类的 processor 会直接读安装器本身，
+/// 传空路径时这些参数会变成空字符串，processor 随即静默失败。
+pub(crate) fn plan_client_processors_with_installer(
+    profile: &Value,
+    game_dir: &Path,
+    version: &str,
+    installer_path: &Path,
+) -> anyhow::Result<Vec<PlannedProcessor>> {
     let data = profile_data(profile);
     let minecraft_jar = game_dir
         .join("versions")
@@ -84,7 +97,7 @@ pub(crate) fn plan_client_processors(
     let context = ProcessorContext {
         game_dir,
         minecraft_jar: &minecraft_jar,
-        installer: Path::new(""),
+        installer: installer_path,
         binpatch: None,
         version,
         data: &data,
@@ -385,7 +398,8 @@ pub(crate) fn run_from_installer(
         std::io::Read::read_to_string(&mut entry, &mut content)?;
     }
     let profile: Value = serde_json::from_str(&content)?;
-    let planned = plan_client_processors(&profile, game_dir, mc_version)?;
+    let planned =
+        plan_client_processors_with_installer(&profile, game_dir, mc_version, installer_path)?;
     run_planned_processors(java_path, &planned, on_progress)
 }
 

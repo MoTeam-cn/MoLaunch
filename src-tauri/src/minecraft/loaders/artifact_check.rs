@@ -134,8 +134,13 @@ pub(crate) fn check_processor_outputs(
     }
     let profile: Value = serde_json::from_str(&content)
         .map_err(|e| format!("install_profile.json 解析失败：{}", e))?;
-    let planned = super::processor_run::plan_client_processors(&profile, game_dir, mc_version)
-        .map_err(|e| format!("{}", e))?;
+    let planned = super::processor_run::plan_client_processors_with_installer(
+        &profile,
+        game_dir,
+        mc_version,
+        installer_path,
+    )
+    .map_err(|e| format!("{}", e))?;
 
     let mut missing: Vec<String> = Vec::new();
     for step in &planned {
