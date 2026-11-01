@@ -39,6 +39,11 @@ Windows 上 `Command::new` 不设 `CREATE_NO_WINDOW` 就会给子进程开一个
 
 ### 新增
 
+#### Fabric / Forge / NeoForge 统一接入安装基础层
+- [`fabric.rs`](src-tauri/src/minecraft/loaders/fabric.rs)：`_progress_callback` 一直是未使用参数——Fabric 安装的进度条从来不动。现在按阶段上报，并在结束时审计版本 JSON 声明的库。
+- [`forge/install.rs`](src-tauri/src/minecraft/loaders/forge/install.rs) 与 [`neoforge.rs`](src-tauri/src/minecraft/loaders/neoforge.rs)：单点校验换成完整审计——同时核对 libraries、processor 产物与残留版本目录；补跑 processor 前后各审计一次，全过程写进安装记录。失败时错误消息带上记录文件路径。
+- 残留目录只报告不擅自删除：判据是「安装器自己的命名习惯 + 目录里确有同名 JSON」，用户自定义的实例名不会被误判。
+
 #### 加载器安装补上公共层：阶段、记录、审计
 四个加载器原来是各自一个函数做完所有事，进度散着硬编码百分比，失败时只有零散日志。现在抽出三层共用基础：
 

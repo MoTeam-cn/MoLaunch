@@ -348,39 +348,92 @@ pub async fn install(
         .join("versions")
         .join(&version_id)
         .join(format!("{}.json", version_id));
-    if let Err(reason) = super::artifact_check::check_install_full(
+    let mut record =
+        install_log::InstallLog::begin("NeoForge", &version_id, mc_version, &java_path, game_dir);
+    record.stage(install_flow::InstallStage::AuditArtifacts);
+
+    let first_audit = match super::install_audit::audit_install(
         game_dir,
         &installed_json,
         mc_version,
-        &installer_path,
+        Some(installer_path),
+        "neoforge",
+        &[version_id.as_str()],
     ) {
-        // 注入器没把产物生成齐：用自己的执行器补一次
-        log_warn!("[Install] 产物不齐，改由启动器执行 processors: {}", reason);
+        Ok(audit) => audit,
+        Err(e) => {
+            record.problem(format!("审计失败：{}", e));
+            let path = record.finish(false, "审计失败");
+            return Err(anyhow::anyhow!("{}{}", e, install_log::hint(path)));
+        }
+    };
+    record.note(first_audit.summary());
+    for stray in &first_audit.stray_dirs {
+        record.problem(format!("版本目录残留：{}", stray));
+    }
+
+    if first_audit.needs_processor_rerun() {
+        // 安装器没把产物生成齐：用自己的执行器补一次
+        log_warn!(
+            "[Install] 产物不齐，改由启动器执行 processors: {}",
+            first_audit.summary()
+        );
         match super::processor_run::run_from_installer(
             &java_path,
-            &installer_path,
+            installer_path,
             mc_version,
             game_dir,
             Some(&processor_progress),
         ) {
-            Ok(0) => return Err(anyhow::anyhow!(reason)),
-            Ok(ran) => log_info!("[Install] 自行执行 {} 个 processor，重新校验", ran),
-            Err(error) => {
+            Ok(0) => {
+                let path = record.finish(false, "没有可执行的 processor");
                 return Err(anyhow::anyhow!(
-                    "{}；自行执行 processors 也失败：{}",
-                    reason,
-                    error
-                ))
+                    "安装不完整：{}{}",
+                    first_audit.summary(),
+                    install_log::hint(path)
+                ));
+            }
+            Ok(ran) => record.note(format!("自行执行 {} 个 processor", ran)),
+            Err(error) => {
+                record.problem(format!("自行执行 processors 失败：{}", error));
+                let path = record.finish(false, "processor 执行失败");
+                return Err(anyhow::anyhow!(
+                    "安装不完整：{}；自行执行 processors 也失败：{}{}",
+                    first_audit.summary(),
+                    error,
+                    install_log::hint(path)
+                ));
             }
         }
-        if let Err(reason) = super::artifact_check::check_install_full(
+        match super::install_audit::audit_install(
             game_dir,
             &installed_json,
             mc_version,
-            &installer_path,
+            Some(installer_path),
+            "neoforge",
+            &[version_id.as_str()],
         ) {
-            return Err(anyhow::anyhow!(reason));
+            Ok(audit) if audit.is_clean() => record.note("补跑后产物齐全"),
+            Ok(audit) => {
+                record.problem(format!("补跑后仍有缺失：{}", audit.summary()));
+                let path = record.finish(false, "补跑后仍不齐");
+                return Err(anyhow::anyhow!(
+                    "安装不完整：{}{}",
+                    audit.summary(),
+                    install_log::hint(path)
+                ));
+            }
+            Err(e) => {
+                record.problem(format!("复查失败：{}", e));
+                let path = record.finish(false, "复查失败");
+                return Err(anyhow::anyhow!("{}{}", e, install_log::hint(path)));
+            }
         }
+    }
+
+    record.stage(install_flow::InstallStage::WrapUp);
+    if let Some(path) = record.finish(true, "NeoForge 安装完成") {
+        log_info!("[NeoForge] 安装记录：{}", path.display());
     }
 
     if let Some(ref cb) = progress_callback {

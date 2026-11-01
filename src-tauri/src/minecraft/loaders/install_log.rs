@@ -145,6 +145,16 @@ impl InstallLog {
     }
 }
 
+/// 把记录路径拼成错误消息后缀
+///
+/// 有记录就带上一句「详见」，没有就返回空串，不干扰原有错误。
+pub fn hint(path: Option<std::path::PathBuf>) -> String {
+    match path {
+        Some(p) => format!("（安装记录：{}）", p.display()),
+        None => String::new(),
+    }
+}
+
 /// 文件名只保留安全字符
 fn sanitize(name: &str) -> String {
     name.chars()

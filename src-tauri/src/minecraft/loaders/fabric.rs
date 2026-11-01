@@ -48,7 +48,7 @@ pub async fn install(
     fabric_version: &str,
     game_dir: &Path,
     mirror_url: Option<&str>,
-    _progress_callback: Option<Arc<dyn Fn(f64) + Send + Sync>>,
+    progress_callback: Option<Arc<dyn Fn(f64) + Send + Sync>>,
     config: &DownloadManagerConfig,
 ) -> anyhow::Result<()> {
     crate::log_info!(
@@ -59,6 +59,20 @@ pub async fn install(
 
     let version_id = format!("fabric-{}-{}", fabric_version, mc_version);
     let version_dir = game_dir.join("versions").join(&version_id);
+    let mut record = install_log::InstallLog::begin(
+        "Fabric",
+        &version_id,
+        mc_version,
+        "(不需要 Java)",
+        game_dir,
+    );
+    let report =
+        |cb: &Option<Arc<dyn Fn(f64) + Send + Sync>>, stage: install_flow::InstallStage, f: f64| {
+            if let Some(handler) = cb {
+                handler(stage.at(f));
+            }
+        };
+    record.stage(install_flow::InstallStage::Prepare);
     std::fs::create_dir_all(&version_dir)?;
 
     let url = sources::fabric_profile_url(mc_version, fabric_version);
@@ -102,10 +116,21 @@ pub async fn install(
         expected_hash: None,
     };
 
+    record.stage(install_flow::InstallStage::FetchInstaller);
+    report(
+        &progress_callback,
+        install_flow::InstallStage::FetchInstaller,
+        0.0,
+    );
     let results = manager.download_batch(vec![task], None).await;
     if let Some(result) = results.first() {
         if result.status == DownloadStatus::Failed {
-            return Err(anyhow::anyhow!("Failed to download Fabric profile"));
+            record.problem("下载 Fabric profile 失败");
+            let path = record.finish(false, "下载 Fabric profile 失败");
+            return Err(anyhow::anyhow!(
+                "Failed to download Fabric profile{}",
+                install_log::hint(path)
+            ));
         }
     }
 
@@ -122,7 +147,46 @@ pub async fn install(
     let profile_text = std::fs::read_to_string(&profile_path)?;
     if let Err(e) = serde_json::from_str::<serde_json::Value>(&profile_text) {
         let _ = std::fs::remove_file(&profile_path);
-        return Err(anyhow::anyhow!("Fabric profile JSON 解析失败：{}", e));
+        record.problem(format!("profile JSON 解析失败：{}", e));
+        let path = record.finish(false, "profile JSON 损坏");
+        return Err(anyhow::anyhow!(
+            "Fabric profile JSON 解析失败：{}{}",
+            e,
+            install_log::hint(path)
+        ));
+    }
+    report(
+        &progress_callback,
+        install_flow::InstallStage::FetchInstaller,
+        1.0,
+    );
+
+    // Fabric 没有 processor，也没有安装器，审计只核对版本 JSON 声明的库
+    record.stage(install_flow::InstallStage::AuditArtifacts);
+    match install_audit::audit_install(
+        game_dir,
+        &profile_path,
+        mc_version,
+        None,
+        "fabric",
+        &[version_id.as_str()],
+    ) {
+        Ok(audit) => {
+            record.note(audit.summary());
+            for stray in &audit.stray_dirs {
+                record.problem(format!("版本目录残留：{}", stray));
+            }
+            if !audit.missing_generated.is_empty() || !audit.missing_regular.is_empty() {
+                record.problem("有声明的库文件缺失，启动时会自动补下载");
+            }
+        }
+        Err(e) => record.problem(format!("审计失败：{}", e)),
+    }
+
+    record.stage(install_flow::InstallStage::WrapUp);
+    let path = record.finish(true, "Fabric 安装完成");
+    if let Some(p) = path {
+        crate::log_info!("[Fabric] 安装记录：{}", p.display());
     }
 
     crate::log_info!("[Fabric] Installed: {}", version_id);
