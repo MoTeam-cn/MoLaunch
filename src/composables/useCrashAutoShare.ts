@@ -22,14 +22,14 @@ export interface CrashAutoShare {
   /** 上传中（用于界面显示进度） */
   busy: Ref<boolean>
   /** 按当前配置尝试自动上传；未开启或失败时静默 */
-  run: (build: () => LogShareFile[]) => Promise<void>
+  run: (build: () => LogShareFile[] | Promise<LogShareFile[]>) => Promise<void>
 }
 
 export function useCrashAutoShare(): CrashAutoShare {
   const url = ref('')
   const busy = ref(false)
 
-  async function run(build: () => LogShareFile[]): Promise<void> {
+  async function run(build: () => LogShareFile[] | Promise<LogShareFile[]>): Promise<void> {
     url.value = ''
     let enabled = false
     let provider: LogShareProvider = 'mclogs'
@@ -42,10 +42,10 @@ export function useCrashAutoShare(): CrashAutoShare {
       return
     }
     if (!enabled) return
-    const files = sanitizeShareFiles(build())
-    if (files.length === 0) return
     busy.value = true
     try {
+      const files = sanitizeShareFiles(await build())
+      if (files.length === 0) return
       url.value = await uploadLogShare(joinShareFiles(files), provider, files)
     } catch (e) {
       // 自动上传失败只在提示里说一声，不打断用户看崩溃原因

@@ -51,6 +51,13 @@ Windows 上 `Command::new` 不设 `CREATE_NO_WINDOW` 就会给子进程开一个
 
 ### 新增
 
+#### 崩溃分享改读磁盘上的真实日志
+之前是把崩溃时抓到的日志片段拼成 `launcher.log`、`game-latest.log` 上传——这两个名字是凭内容起的，不是玩家磁盘上真有的文件。现在优先读实例目录里的 `latest.log`、`debug.log` 和最新崩溃报告，文件名就是原来那些；实例目录不可达时才退回片段。
+
+- [`crashShare.ts`](src/utils/crashShare.ts)：新增崩溃分享文件组装，从崩溃报告路径反推实例目录，最多取三份（`latest.log` 排最前）。
+- [`useCrashAutoShare.ts`](src/composables/useCrashAutoShare.ts)：组装流程支持异步。
+- [`CrashDialog.vue`](src/components/common/CrashDialog.vue)：改用统一组装，文件从 389 行降到 376 行。
+
 #### 崩溃后可自动上传日志并给出分享链接
 游戏崩溃时日志已经自动上传过一次（mclo.gs 云端分析），但那条链接用户拿不到；想要分享还得再点一次「分享日志」、等一次上传。现在这个能力做成了可选开关：开启后崩溃弹窗一出现就有可复制的链接。
 

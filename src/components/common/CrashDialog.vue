@@ -160,6 +160,7 @@
 
 <script setup lang="ts">
 import { useCrashAutoShare } from '@/composables/useCrashAutoShare'
+import { buildCrashShareFiles } from '@/utils/crashShare'
 import { computed, ref, defineAsyncComponent } from 'vue'
 import {
   ChevronRightIcon,
@@ -183,7 +184,6 @@ import {
   uploadLogShare,
   LOG_SHARE_PROVIDERS,
   analyseLogShare,
-  type LogShareFile,
 } from '@/utils/logShare'
 import type { LogShareProvider, MclogsAnalysis } from '@/utils/logShare'
 import type { CrashAction, CrashCategory, CrashInfo } from '@/types/version'
@@ -283,7 +283,7 @@ function show(info: CrashInfo, vid?: string) {
   cloudAnalysis.value = null
   void runCloudAnalysis()
   // 开了「崩溃后自动上传」就顺带拿到一条分享链接（默认关闭）
-  void autoShare.run(buildShareFiles)
+  void autoShare.run(() => buildCrashShareFiles(lastCrash.value, category.value))
 }
 
 const autoShare = useCrashAutoShare()
@@ -353,38 +353,13 @@ function buildReportContent(): string {
   return lines.filter(Boolean).join('\n')
 }
 
-/**
- * 组装分享用的多文件
- *
- * 崩溃现场通常散在几处：崩溃摘要、本次会话日志、游戏日志尾部。
- * 拆成独立文件上传，分享页上能分别展开，比挤在一份文本里好读得多。
- */
-function buildShareFiles(): LogShareFile[] {
-  const c = lastCrash.value
-  const files: LogShareFile[] = []
-  const summary = [
-    '==== MoLaunch 崩溃摘要 ====',
-    '',
-    `类别：${category.value}`,
-    `原因：${c.reason ?? ''}`,
-    c.problematic_mod ? `相关 Mod：${c.problematic_mod}` : '',
-  ]
-    .filter(Boolean)
-    .join('\n')
-  files.push({ name: 'crash-summary.txt', content: summary })
-  const logLines = (c.log_lines ?? []).join('\n')
-  if (logLines.trim()) files.push({ name: 'launcher.log', content: logLines })
-  const logTail = (c.log_tail ?? []).join('\n')
-  if (logTail.trim()) files.push({ name: 'game-latest.log', content: logTail })
-  return files
-}
 
 /** 分享日志到云端服务：脱敏 → 上传 → 打开分享页 */
 async function shareTo(provider: LogShareProvider) {
   shareMenuOpen.value = false
   sharing.value = provider
   try {
-    const files = sanitizeShareFiles(buildShareFiles())
+    const files = sanitizeShareFiles(await buildCrashShareFiles(lastCrash.value, category.value))
     const url = await uploadLogShare(joinShareFiles(files), provider, files)
     await open(url)
     toastSuccess('日志已分享，已打开分享页面')
