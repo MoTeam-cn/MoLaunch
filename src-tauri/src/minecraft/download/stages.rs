@@ -18,6 +18,8 @@ use super::util::{build_launcher_meta_urls, source_mode_of};
 /// `merged_json`：合并后的 JSON（含 downloads.client.url，用于获取下载 URL）
 /// 修复：之前只传 merged_json，但 merge_version_json 会移除 inheritsFrom，
 /// 导致 find_original_version 找不到父版本，jar 路径错误，启动时重复下载
+// 参数是与 download_libraries / download_assets 对齐的结果，抽结构体反而要改一圈调用方
+#[allow(clippy::too_many_arguments)]
 pub async fn download_client_jar(
     original_json: &serde_json::Value,
     merged_json: &serde_json::Value,
