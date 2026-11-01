@@ -1,6 +1,6 @@
 //! NeoForge loader module
 
-use super::{install_audit, install_flow, install_log};
+use super::{install_flow, install_log};
 use crate::{log_info, log_warn};
 use std::path::Path;
 use std::sync::Arc;
@@ -357,7 +357,7 @@ pub async fn install(
         game_dir,
         &installed_json,
         mc_version,
-        Some(installer_path),
+        Some(&installer_path),
         "neoforge",
         &[version_id.as_str()],
     ) {
@@ -381,7 +381,7 @@ pub async fn install(
         );
         match super::processor_run::run_from_installer(
             &java_path,
-            installer_path,
+            &installer_path,
             mc_version,
             game_dir,
             Some(&processor_progress),
@@ -410,7 +410,7 @@ pub async fn install(
             game_dir,
             &installed_json,
             mc_version,
-            Some(installer_path),
+            Some(&installer_path),
             "neoforge",
             &[version_id.as_str()],
         ) {

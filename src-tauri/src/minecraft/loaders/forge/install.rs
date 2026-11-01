@@ -1,6 +1,6 @@
 //! Forge 安装调度器 + Modern 安装（1.13+，injector 方式）
 
-use super::super::{install_audit, install_flow, install_log};
+use super::super::{install_flow, install_log};
 use std::path::Path;
 use std::sync::Arc;
 
