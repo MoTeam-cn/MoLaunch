@@ -169,6 +169,14 @@ pub async fn install(
     progress_callback: Option<Arc<dyn Fn(f64) + Send + Sync>>,
     config: &DownloadManagerConfig,
 ) -> anyhow::Result<()> {
+    let mut record = install_log::InstallLog::begin(
+        "NeoForge",
+        &format!("{}-neoforge-{}", mc_version, neoforge_version),
+        mc_version,
+        "（安装中确定）",
+        game_dir,
+    );
+    record.stage(install_flow::InstallStage::Prepare);
     if let Some(ref cb) = progress_callback {
         cb(0.0);
     }
@@ -214,6 +222,7 @@ pub async fn install(
     }
 
     if let Some(ref cb) = progress_callback {
+        record.note("安装包已就绪");
         cb(10.0);
     }
 
@@ -222,6 +231,7 @@ pub async fn install(
     launcher_profiles::ensure_profiles_exist(game_dir).map_err(|e: String| anyhow::anyhow!(e))?;
 
     if let Some(ref cb) = progress_callback {
+        record.stage(install_flow::InstallStage::FetchInstaller);
         cb(20.0);
     }
 
@@ -232,10 +242,12 @@ pub async fn install(
     }
 
     if let Some(ref cb) = progress_callback {
+        record.stage(install_flow::InstallStage::WarmLibraries);
         cb(30.0);
     }
 
     if let Some(ref cb) = progress_callback {
+        record.note("依赖库预取完成");
         cb(40.0);
     }
 
@@ -246,6 +258,7 @@ pub async fn install(
     let java_path = shared::find_java_for_install(game_dir, mc_version)?;
 
     if let Some(ref cb) = progress_callback {
+        record.stage(install_flow::InstallStage::RunInstaller);
         cb(50.0);
     }
 
@@ -338,6 +351,7 @@ pub async fn install(
         }
     }
     if let Some(ref cb) = progress_callback {
+        record.stage(install_flow::InstallStage::MergeVersion);
         cb(80.0);
     }
 
@@ -349,8 +363,7 @@ pub async fn install(
         .join("versions")
         .join(&version_id)
         .join(format!("{}.json", version_id));
-    let mut record =
-        install_log::InstallLog::begin("NeoForge", &version_id, mc_version, &java_path, game_dir);
+    record.note(format!("使用 Java：{}", java_path));
     record.stage(install_flow::InstallStage::AuditArtifacts);
 
     let first_audit = match super::install_audit::audit_install(
