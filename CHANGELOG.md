@@ -37,6 +37,19 @@ Windows 上 `Command::new` 不设 `CREATE_NO_WINDOW` 就会给子进程开一个
 - 主窗口高度 585 → 597，`minHeight` 同步。
 - [`DownloadStatsPanel.vue`](src/views/Downloads/DownloadStatsPanel.vue)：统计列是 `flex-1` 但没设 `min-h-0`，flex 子项默认 `min-height:auto`，内容一撑就把最后一项「剩余文件」顶出可视区。补 `min-h-0 overflow-y-auto`，顺带把行距收紧一档——窗口再小也能滚动看全，不会再被裁掉。
 
+### 新增
+
+#### 加载器安装补上公共层：阶段、记录、审计
+四个加载器原来是各自一个函数做完所有事，进度散着硬编码百分比，失败时只有零散日志。现在抽出三层共用基础：
+
+- [`install_flow.rs`](src-tauri/src/minecraft/loaders/install_flow.rs)（新）：安装阶段枚举与进度区间。准备 / 获取安装包 / 预取依赖库 / 执行安装器 / 合并版本 / 核对产物 / 收尾，各占固定区间，阶段内进度按比例折算。
+- [`install_log.rs`](src-tauri/src/minecraft/loaders/install_log.rs)（新）：按顺序记录阶段推进与关键动作，结束时落盘到 `cache/install_logs/<版本>-<时间戳>.log`。失败时把路径带进错误消息，用户直接发文件即可定位，不用再靠截图。
+- [`install_audit.rs`](src-tauri/src/minecraft/loaders/install_audit.rs)（新）：双向审计——该生成的有没有（libraries + processor 产物），不该留的有没有（安装器在 `versions/` 下留的临时目录）。只认安装器自己的命名习惯，不误伤用户自定义的实例名。
+- [`processor_run.rs`](src-tauri/src/minecraft/loaders/processor_run.rs)：抽出 `read_install_profile` 与 `collect_missing_outputs`，供审计复用。
+
+实现全部原创，只借鉴参考项目的设计思路；参考项目为 GPL-3.0，不可直接取用代码。
+
+
 
 
 ## [0.3.14-rc.5] - 2026-10-31

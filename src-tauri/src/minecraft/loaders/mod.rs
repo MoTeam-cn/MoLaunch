@@ -20,6 +20,9 @@ pub use api::{
 mod artifact_check;
 #[cfg(test)]
 mod forge_installer_test;
+pub mod install_audit;
+pub mod install_flow;
+pub mod install_log;
 mod processor_args;
 mod processor_run;
 

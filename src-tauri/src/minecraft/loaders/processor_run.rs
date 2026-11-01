@@ -395,6 +395,41 @@ pub(crate) fn run_from_installer(
     run_planned_processors(java_path, &planned, on_progress)
 }
 
+/// 列出 processor 应当产出、但没有落地的文件
+///
+/// NeoForge 的 srg jar 不在 version JSON 的 libraries 里，只能从安装包的
+/// install_profile 推出来——不查这一项，缺文件会一路放行到启动阶段。
+pub(crate) fn collect_missing_outputs(
+    installer_path: &Path,
+    game_dir: &Path,
+    mc_version: &str,
+) -> anyhow::Result<Vec<String>> {
+    let profile = read_install_profile(installer_path)?;
+    let planned =
+        plan_client_processors_with_installer(&profile, game_dir, mc_version, installer_path)?;
+    let mut missing = Vec::new();
+    for step in &planned {
+        for output in &step.outputs {
+            if !output.is_file() {
+                missing.push(format!("{}（{} 未生成）", output.display(), step.label));
+            }
+        }
+    }
+    Ok(missing)
+}
+
+/// 从安装包里读出 install_profile.json
+pub(crate) fn read_install_profile(installer_path: &Path) -> anyhow::Result<Value> {
+    let file = std::fs::File::open(installer_path)?;
+    let mut archive = zip::ZipArchive::new(file)?;
+    let mut content = String::new();
+    {
+        let mut entry = archive.by_name("install_profile.json")?;
+        std::io::Read::read_to_string(&mut entry, &mut content)?;
+    }
+    Ok(serde_json::from_str(&content)?)
+}
+
 #[cfg(test)]
 #[path = "processor_run_test.rs"]
 mod processor_run_test;
