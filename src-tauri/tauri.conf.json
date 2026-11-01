@@ -61,13 +61,13 @@
         "resizable": true,
         "title": "MoLaunch",
         "width": 1105,
-        "height": 585,
+        "height": 597,
         "center": true,
         "useHttpsScheme": true,
         "visible": false,
         "maximizable": true,
         "minWidth": 1105,
-        "minHeight": 585,
+        "minHeight": 597,
         "backgroundColor": "#f0f5ff"
       }
     ],
