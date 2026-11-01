@@ -26,6 +26,7 @@ pub async fn download_client_jar(
     mirror_url: Option<&str>,
     manager: &DownloadManager,
     progress_callback: Option<Arc<dyn Fn(GlobalProgress) + Send + Sync>>,
+    quick_check: bool,
 ) -> anyhow::Result<()> {
     // 用原始 json 的 inheritsFrom 确定主 jar 的正确位置
     // 有 inheritsFrom 时主 jar 在父版本目录下（如 Fabric 版本的主 jar 在原版目录）
@@ -44,11 +45,15 @@ pub async fn download_client_jar(
                 .as_i64()
                 .unwrap_or(-1),
         )
-        .with_hash(
+        // 启动时的文件补全不算哈希：几十 MB 的 jar 每次启动都读一遍，
+        // 换来的只是「确认没坏」，而下载阶段本来就已经校验过了。
+        .with_hash(if quick_check {
+            None
+        } else {
             merged_json["downloads"]["client"]["sha1"]
                 .as_str()
-                .map(|s| s.to_string()),
-        );
+                .map(|s| s.to_string())
+        });
 
     if checker.is_valid(&jar_path.to_string_lossy()) {
         log_debug!(

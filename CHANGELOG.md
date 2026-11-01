@@ -6,6 +6,13 @@
 
 ### 修复
 
+#### 启动前的文件核对不再重算主文件哈希
+`download_client_jar` 早就收了 `quick_check` 参数，但主 jar 那段一直无条件算 SHA1——几十 MB 的文件每次启动读一遍，只为确认「没坏」。而下载阶段本来就已经全量校验过。
+
+- [`stages.rs`](src-tauri/src/minecraft/download/stages.rs)：`quick_check` 真正生效，快速模式下跳过哈希只比对大小。
+- [`fix.rs`](src-tauri/src/minecraft/download/fix.rs)：启动补全传快速模式，并在完成时打一行总耗时，方便判断卡在哪一段。
+- [`full_download.rs`](src-tauri/src/minecraft/download/full_download.rs)：完整下载仍走全量校验，不受影响。
+
 #### processor 参数解析修复：兜底路径此前根本跑不通
 补上校验后，缺产物会触发「启动器自己跑 processor」的兜底。但那条路的参数解析有四处硬伤，之前从未被执行到，所以一直没暴露：
 

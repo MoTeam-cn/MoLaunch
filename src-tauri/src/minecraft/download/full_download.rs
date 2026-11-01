@@ -97,6 +97,7 @@ pub async fn download_version_full(
         mirror_url,
         &manager,
         progress_callback.clone(),
+        false,
     )
     .await?;
 

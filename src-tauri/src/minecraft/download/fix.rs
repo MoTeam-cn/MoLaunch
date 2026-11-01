@@ -37,6 +37,7 @@ pub async fn fix_version_files(
         return Err(anyhow::anyhow!("下载已取消"));
     }
 
+    let started = std::time::Instant::now();
     // 多阶段串行下载：会话级持有面板，避免 jar/libraries/assets 阶段切换时
     // 面板计数瞬间归零 emit `visible:false` 导致前端误跳转
     let _lease = PanelLease::acquire(manager);
@@ -53,6 +54,7 @@ pub async fn fix_version_files(
         mirror_url,
         manager,
         None,
+        true,
     )
     .await
     {
@@ -107,5 +109,9 @@ pub async fn fix_version_files(
     )
     .await?;
 
+    crate::log_info!(
+        "[Fix] 文件核对完成，用时 {:.1}s",
+        started.elapsed().as_secs_f64()
+    );
     Ok(())
 }
