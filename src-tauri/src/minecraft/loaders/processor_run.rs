@@ -256,15 +256,22 @@ fn run_one(
     let log_file = std::fs::File::create(&log_path)?;
     let log_clone = log_file.try_clone()?;
 
-    let mut child = std::process::Command::new(java_path)
+    let mut command = std::process::Command::new(java_path);
+    command
         .arg("-cp")
         .arg(&classpath)
         .arg(&main_class)
         .args(&step.arguments)
         .stdin(Stdio::null())
         .stdout(Stdio::from(log_file))
-        .stderr(Stdio::from(log_clone))
-        .spawn()?;
+        .stderr(Stdio::from(log_clone));
+    // 同上：processor 也是后台跑的，不该弹窗
+    #[cfg(windows)]
+    {
+        use std::os::windows::process::CommandExt;
+        command.creation_flags(0x08000000);
+    }
+    let mut child = command.spawn()?;
     let status = wait_with_timeout(&mut child, Duration::from_secs(PROCESSOR_TIMEOUT_SECS))
         .map_err(|e| anyhow::anyhow!("processor {} {}", step.label, e))?;
     if !status.success() {

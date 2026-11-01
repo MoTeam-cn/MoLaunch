@@ -213,6 +213,12 @@ fn run_installer_process(
     if let Some(dir) = working_dir {
         command.current_dir(dir);
     }
+    // 不设 CREATE_NO_WINDOW 会弹出控制台黑窗——安装过程对用户应该是静默的
+    #[cfg(windows)]
+    {
+        use std::os::windows::process::CommandExt;
+        command.creation_flags(0x08000000);
+    }
 
     let mut child = command
         .spawn()

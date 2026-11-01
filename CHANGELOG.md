@@ -4,6 +4,24 @@
 
 ## [Unreleased]
 
+### 修复
+
+#### 安装加载器时不再弹出控制台窗口
+Windows 上 `Command::new` 不设 `CREATE_NO_WINDOW` 就会给子进程开一个控制台窗口。项目里其他执行外部程序的地方都设了，唯独这两个漏了——官方安装器和自跑的 processor，正好是加载器安装必经的两步，所以装 NeoForge 时用户会看到一个黑窗口卡在那里。
+
+- [`forge_installer.rs`](src-tauri/src/minecraft/loaders/forge_installer.rs)：启动官方安装器时补 `creation_flags(0x08000000)`。
+- [`processor_run.rs`](src-tauri/src/minecraft/loaders/processor_run.rs)：自跑 processor 同样处理。
+
+#### 装完加载器后版本列表出现两个重复条目
+注入器会在 `versions/` 下留下一个它自己的目录（如 `neoforge-26.3.0.75-beta`），我们把它的 JSON 复制成目标版本（`26.3-NeoForge_26.3.0.75-beta`）之后没清掉源目录，两个都会出现在版本列表里。
+
+- [`shared.rs`](src-tauri/src/minecraft/loaders/shared.rs)：`copy_generated_version_json` 复制成功后删除注入器的临时目录；目录名与目标相同（理论上不会）时跳过，删除失败只告警不影响使用。
+
+#### 窗口高度与下载统计列
+- 主窗口高度 585 → 597，`minHeight` 同步。
+- [`DownloadStatsPanel.vue`](src/views/Downloads/DownloadStatsPanel.vue)：统计列是 `flex-1` 但没设 `min-h-0`，flex 子项默认 `min-height:auto`，内容一撑就把最后一项「剩余文件」顶出可视区。补 `min-h-0 overflow-y-auto`，顺带把行距收紧一档——窗口再小也能滚动看全，不会再被裁掉。
+
+
 
 ## [0.3.14-rc.5] - 2026-10-31
 

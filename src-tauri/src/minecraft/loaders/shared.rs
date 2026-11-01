@@ -453,6 +453,22 @@ pub fn copy_generated_version_json(
             &source_dir,
             loader_keyword,
         ) {
+            // 注入器会在 versions 下留一个它自己的目录（如 neoforge-26.3.0.75-beta），
+            // 不清掉的话用户在版本列表里会看到两个同名版本。
+            if source_dir != version_dir {
+                match std::fs::remove_dir_all(&source_dir) {
+                    Ok(()) => log_info!(
+                        "[{}] 已清理注入器临时目录: {}",
+                        loader_keyword,
+                        source_dir.display()
+                    ),
+                    Err(e) => log_warn!(
+                        "[{}] 清理注入器临时目录失败（不影响使用）: {}",
+                        loader_keyword,
+                        e
+                    ),
+                }
+            }
             return;
         }
     }
