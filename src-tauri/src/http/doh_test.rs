@@ -60,8 +60,19 @@ fn test_parse_answers_重复地址去重() {
     assert_eq!(parse_answers(body).expect("应解析成功").len(), 1);
 }
 
+/// 熔断状态是全局的，两个用例并行跑会互相清计数——这里串行化
+static BREAKER_TEST_LOCK: std::sync::Mutex<()> = std::sync::Mutex::new(());
+
+fn serialize_breaker_test() -> std::sync::MutexGuard<'static, ()> {
+    match BREAKER_TEST_LOCK.lock() {
+        Ok(guard) => guard,
+        Err(poisoned) => poisoned.into_inner(),
+    }
+}
+
 #[test]
 fn test_breaker_成功清零失败计数() {
+    let _guard = serialize_breaker_test();
     let now = Instant::now();
     note_failure(now);
     note_success();
@@ -70,6 +81,7 @@ fn test_breaker_成功清零失败计数() {
 
 #[test]
 fn test_breaker_连续失败达到阈值后打开并在超时后恢复() {
+    let _guard = serialize_breaker_test();
     let now = Instant::now();
     note_success();
     for _ in 0..BREAKER_THRESHOLD {
