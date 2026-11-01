@@ -7,7 +7,7 @@ fn test_文件名过滤非法字符() {
         "26.3-NeoForge_26.3.0.75-beta"
     );
     assert_eq!(sanitize("a/b\\c:d"), "a_b_c_d");
-    assert_eq!(sanitize("带中文"), "__");
+    assert_eq!(sanitize("带中文"), "___");
 }
 
 #[test]
