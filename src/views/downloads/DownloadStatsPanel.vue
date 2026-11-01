@@ -35,7 +35,7 @@ watch(
 
 <template>
   <div class="w-56 border-r border-gray-200 bg-white flex flex-col shrink-0">
-    <div class="flex-1 px-5 py-6 space-y-5">
+    <div class="flex-1 min-h-0 overflow-y-auto px-5 py-5 space-y-4">
       <!-- 当前阶段 -->
       <div class="overflow-hidden">
         <div class="text-xs text-gray-500 mb-1">当前阶段</div>
