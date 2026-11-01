@@ -26,6 +26,14 @@ export async function postForm<T>(url: string, body: Record<string, string>): Pr
   return res.data
 }
 
+/** POST JSON：部分服务（如 logshare）只接受 JSON body，且字段可以是非字符串 */
+export async function postJson<T>(url: string, body: unknown): Promise<T> {
+  const res = await http.post<T>(url, body, {
+    headers: { 'Content-Type': 'application/json' },
+  })
+  return res.data
+}
+
 /** GET 请求返回纯文本（如 .txt 资源清单） */
 export async function getText(url: string): Promise<string> {
   const res = await http.get<string>(url, { responseType: 'text' })

@@ -8,7 +8,7 @@
  * - mclo.gs：国际主流，POST https://api.mclo.gs/1/log（form: content=）
  * - logshare.cn：国内访问快，POST https://api.logshare.cn/v1/log（同构接口）
  */
-import { postForm, getJson } from '@/utils/request'
+import { postForm, postJson, getJson } from '@/utils/request'
 
 export type LogShareProvider = 'mclogs' | 'logshare'
 
@@ -38,6 +38,29 @@ export const LOG_SHARE_PROVIDERS: { value: LogShareProvider; label: string; desc
   { value: 'logshare', label: 'logshare.cn', desc: '国内访问快，支持 AI 分析' },
 ]
 
+/** 一个待上传的日志文件 */
+export interface LogShareFile {
+  /** 展示在分享页上的文件名 */
+  name: string
+  content: string
+}
+
+/** 多文件逐个脱敏 */
+export function sanitizeShareFiles(files: LogShareFile[]): LogShareFile[] {
+  return files.map((f) => ({ name: f.name, content: sanitizeShareLog(f.content) }))
+}
+
+/**
+ * 把多个文件拼成单份文本
+ *
+ * 只给不支持多文件的分享服务用（mclo.gs 只有单个 content 字段）。
+ */
+export function joinShareFiles(files: LogShareFile[]): string {
+  return files
+    .map((f) => `===== ${f.name} =====\n${f.content}`)
+    .join('\n\n')
+}
+
 /** 上传日志前脱敏：JWT / JSON 敏感字段 / Bearer 头 / URL query 参数 / 本机用户名路径 */
 export function sanitizeShareLog(content: string): string {
   let s = content
@@ -64,9 +87,25 @@ export function sanitizeShareLog(content: string): string {
 export async function uploadLogShare(
   content: string,
   provider: LogShareProvider,
+  files?: LogShareFile[],
 ): Promise<string> {
   const conf = PROVIDERS[provider]
-  const data = await postForm<{ id?: string; url?: string }>(conf.endpoint, { content })
+  // logshare.cn 支持一次带上多个文件，分享页按文件名分标签展示；
+  // mclo.gs 只有一个 content 字段，多文件只能拼成一份带分隔标题的文本。
+  // mclo.gs 只收表单（content=），logshare.cn 走 JSON 且 files 是数组——
+  // 两种形态不能混用，否则多文件字段会被表单序列化成 "[object Object]"。
+  let data: { id?: string; url?: string }
+  if (provider === 'logshare') {
+    const body: Record<string, unknown> = { content, source: 'molaunch' }
+    if (files && files.length > 0) {
+      body.files = files.map((f) => ({ name: f.name, content: f.content }))
+      if (!content.trim()) body.content = joinShareFiles(files)
+    }
+    data = await postJson<{ id?: string; url?: string }>(conf.endpoint, body)
+  } else {
+    const merged = files && files.length > 0 ? joinShareFiles(files) : content
+    data = await postForm<{ id?: string; url?: string }>(conf.endpoint, { content: merged })
+  }
   const id = data?.id
   // 第三方响应里的 url 不可信（会被交给系统 open 打开）：只接受 http/https，
   // 否则退回本地按 id 拼的链接，避免 file:// 等 scheme 被系统处理

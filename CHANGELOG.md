@@ -46,6 +46,14 @@ Windows 上 `Command::new` 不设 `CREATE_NO_WINDOW` 就会给子进程开一个
 
 ### 新增
 
+#### 日志分享支持一次上传多个文件
+崩溃现场的线索通常散在几处：崩溃摘要、启动器日志、游戏日志尾部。以前只能把它们拼成一份文本上传，分享页上是一大坨；logshare.cn 的接口本来就支持一次带多个文件、按文件名分标签展示，只是没用上。
+
+- [`logShare.ts`](src/utils/logShare.ts)：`uploadLogShare` 新增可选的文件列表。logshare 走 JSON body，把文件放进 `files` 数组并带上 `source` 标识；mclo.gs 只有单个 `content` 字段，多文件拼成带分隔标题的一份文本。两种形态分开处理——混用会把数组序列化成 `[object Object]`。
+- [`request.ts`](src/utils/request.ts)：新增 `postJson`，原来的 `postForm` 只收字符串键值，装不了数组。
+- [`CrashDialog.vue`](src/components/common/CrashDialog.vue)：崩溃分享拆成 `crash-summary.txt`、`launcher.log`、`game-latest.log` 三份，空的不传。
+- [`LogsTab.vue`](src/views/version-settings/LogsTab.vue)：分享时带上文件名，对方能看出是哪一份日志。
+
 #### Fabric / Forge / NeoForge 统一接入安装基础层
 - [`fabric.rs`](src-tauri/src/minecraft/loaders/fabric.rs)：`_progress_callback` 一直是未使用参数——Fabric 安装的进度条从来不动。现在按阶段上报，并在结束时审计版本 JSON 声明的库。
 - [`forge/install.rs`](src-tauri/src/minecraft/loaders/forge/install.rs) 与 [`neoforge.rs`](src-tauri/src/minecraft/loaders/neoforge.rs)：单点校验换成完整审计——同时核对 libraries、processor 产物与残留版本目录；补跑 processor 前后各审计一次，全过程写进安装记录。失败时错误消息带上记录文件路径。

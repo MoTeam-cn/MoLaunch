@@ -134,7 +134,11 @@ async function shareTo(provider: LogShareProvider) {
   shareMenuOpen.value = false
   sharing.value = provider
   try {
-    const url = await uploadLogShare(sanitizeShareLog(content.value), provider)
+    // 带上文件名：logshare 的分享页按名字分标签，单个文件也能看出是哪一份
+    const text = sanitizeShareLog(content.value)
+    const url = await uploadLogShare(text, provider, [
+      { name: selectedName.value || 'log.txt', content: text },
+    ])
     // 经 openExternal 统一校验 scheme，避免第三方响应里的异常 scheme 交系统处理
     await openExternal(url)
     toastSuccess('日志已分享，已打开分享页面')
