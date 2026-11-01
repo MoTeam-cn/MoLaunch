@@ -23,14 +23,6 @@ pub async fn install(
     progress_callback: Option<Arc<dyn Fn(f64) + Send + Sync>>,
     config: &DownloadManagerConfig,
 ) -> anyhow::Result<()> {
-    let mut record = install_log::InstallLog::begin(
-        "Forge",
-        &format!("{}-forge-{}", mc_version, forge_version),
-        mc_version,
-        "（安装中确定）",
-        game_dir,
-    );
-    record.stage(install_flow::InstallStage::Prepare);
     if let Some(ref cb) = progress_callback {
         cb(0.0);
     }
@@ -73,7 +65,6 @@ pub async fn install(
     }
 
     if let Some(ref cb) = progress_callback {
-        record.note("安装包已就绪");
         cb(10.0);
     }
 
@@ -112,6 +103,15 @@ async fn install_modern(
     log_info!("[Forge] Installing {} for MC {}", forge_version, mc_version);
 
     let version_id = format!("{}-forge-{}", mc_version, forge_version);
+    let mut record = install_log::InstallLog::begin(
+        "Forge",
+        &version_id,
+        mc_version,
+        "（安装中确定）",
+        game_dir,
+    );
+    record.stage(install_flow::InstallStage::Prepare);
+    record.note("安装包已下载");
 
     launcher_profiles::ensure_profiles_exist(game_dir).map_err(|e: String| anyhow::anyhow!(e))?;
 
