@@ -54,6 +54,17 @@ fn test_临吪目录识别() {
 }
 
 #[test]
+fn test_空关键字不做残留检查() {
+    let dir = temp_dir("empty_key");
+    let versions = dir.join("versions");
+    let v = versions.join("fabric-loader-0.16.9");
+    std::fs::create_dir_all(&v).expect("建版本目录");
+    std::fs::write(v.join("fabric-loader-0.16.9.json"), "{}").expect("写版本 JSON");
+    assert!(find_stray_loader_dirs(&dir, "", &[]).is_empty());
+    let _ = std::fs::remove_dir_all(&dir);
+}
+
+#[test]
 fn test_不误伤用户自定义名字() {
     let dir = temp_dir("keep");
     let versions = dir.join("versions");

@@ -169,7 +169,7 @@ pub async fn install(
         &profile_path,
         mc_version,
         None,
-        "fabric",
+        "", // Fabric 没有安装器临时目录，不做残留检查
         &[version_id.as_str()],
     ) {
         Ok(audit) => {

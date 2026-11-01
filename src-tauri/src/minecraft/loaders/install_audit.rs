@@ -114,6 +114,11 @@ pub fn find_stray_loader_dirs(
     loader_keyword: &str,
     keep_versions: &[&str],
 ) -> Vec<String> {
+    // 空关键字表示这个加载器没有安装器临时目录（如 Fabric 只写一个 profile JSON），
+    // 传空即不做检查——拿 "fabric-" 当前缀会把同版本的其它实例全报成残留。
+    if loader_keyword.trim().is_empty() {
+        return Vec::new();
+    }
     let versions_dir = game_dir.join("versions");
     let Ok(entries) = std::fs::read_dir(&versions_dir) else {
         return Vec::new();
